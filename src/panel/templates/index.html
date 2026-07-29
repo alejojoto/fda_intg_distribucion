@@ -4629,14 +4629,17 @@ function avisoDeFactura(f, enFamilia) {
   // en esta máquina, con su serie y su papel, así que lo que le falta se queda
   // aquí y no se suelta junto con el resto del lote. Llenarla ya tiene su botón
   // en la fila; soltarla no existe en ningún otro lado, y por eso vive aquí.
+  // El aviso NO nombra el lote (2026-07-29): "soltar el lote no la suelta" era
+  // mecánica interna que el operador no maneja. Dice hasta cuándo se queda —
+  // llenarla o liberarla, los dos botones de la fila — y nada más.
   if (tieneAmarre(f)) {
     const hechas = f.amarrada;
     return `
     <tr class="fila-aviso ${enFamilia ? "fam-parte" : ""}">
       <td colspan="8">De este pedido ya ${hechas.length === 1
         ? `salió la factura ${hechas[0]}` : `salieron las facturas ${hechas.join(" y ")}`}
-        en esta máquina, así que esta se queda apartada aquí: ninguna otra la toma
-        y soltar el lote no la suelta.
+        en esta máquina, así que esta se queda apartada aquí: ninguna otra
+        máquina la toma hasta que la llenes o la liberes.
         <button onclick="liberarAmarre(this,'${esc(f.pedido_id)}')"
                 title="Vuelve a quedar disponible para cualquier máquina.">Liberarla</button></td>
     </tr>`;
