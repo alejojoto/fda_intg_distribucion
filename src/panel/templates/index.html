@@ -10,7 +10,7 @@
      el estado detrás ("FDA (beta) — llenando 3 de 10") conservando este
      prefijo. El "(beta)" (2026-07-28) va DESPUÉS de "FDA", así el prefijo que
      busca ventana_encima sigue matcheando; se quita cuando salga de beta. -->
-<title>FDA (beta) 2</title>
+<title>FDA (beta)</title>
 <!-- Color de la barra de título de la ventana de app de Edge (la pinta con el
      theme-color de la página): claro a propósito, para que no se confunda con
      la cabecera oscura del panel. En un navegador normal no se nota. -->
@@ -2310,6 +2310,13 @@ let avanceLlenado = null;
 const pctCorto = (n) => (Math.round(n * 100) / 100).toString().replace(".", ",");
 
 function pintarInfoLlenado() {
+  // ESCONDIDAS EN PRODUCCIÓN hasta que la sección quede lista (2026-07-29,
+  // pedido del usuario). El gate vive aquí y no en pintarBarraEnFila porque
+  // esa solo corre al abrir AJUSTES/ADMIN, pestañas que una máquina de
+  // operación no abre nunca — allá las cajitas habrían quedado a la vista.
+  // Nada se quita: el HTML y lo que las llena siguen intactos, así que
+  // devolverlas es borrar estas dos líneas.
+  $("llenado-info").style.display = enFilaDisponible() ? "" : "none";
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
   $("info-fecha").textContent = iso ? dmaCorto(iso) : "—";
@@ -3997,7 +4004,7 @@ const pendientesLlenables = () => ultimaLista.pendientes.filter(f => f.llenable)
    ventana propia se reconoce por él para no abrir una segunda
    (ventana_app.TITULO_VENTANA) y, en el camino de Edge, ventana_encima busca
    la del panel por el prefijo del <title>. */
-const TITULO_PAGINA = "FDA (beta) 2";  // el <title> del <head>; ver ventana_encima.py
+const TITULO_PAGINA = "FDA (beta)";  // el <title> del <head>; ver ventana_encima.py
 const TITULO_FASE = {
   conectando: "buscando el programa",
   entorno: "ajustando fecha y serie",
