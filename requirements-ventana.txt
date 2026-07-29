@@ -1,0 +1,14 @@
+# Dependencia OPCIONAL: la ventana propia del panel (src/ventana_app.py).
+#
+# Vive aparte de requirements.txt a propósito (2026-07-27). Al meterla ahí,
+# el día que su instalación falló en la máquina de operación se cayó el
+# `pip install -r requirements.txt` COMPLETO (código 2), y con él las
+# dependencias que sí son obligatorias — supabase, flask, gspread dejaron de
+# actualizarse por una librería que solo cambia cómo se ve la ventana.
+#
+# El asistente funciona sin esto: si falta, el panel se abre en ventana de
+# app de Edge y, si tampoco hay, en el navegador por defecto.
+#
+# Versión fijada (2026-07-29) por la misma razón que en requirements.txt:
+# para subirla, probar en el Mac primero y cambiar el número aquí.
+pywebview==6.2.1

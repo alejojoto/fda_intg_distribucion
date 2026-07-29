@@ -1,0 +1,13 @@
+# Distribucion del Asistente FDA — arbol generado, no se edita a mano.
+# Llaves y datos de la maquina: nunca viajan por git.
+.env
+credenciales/
+data/*
+!data/.gitkeep
+logs/*
+!logs/.gitkeep
+reports/*
+!reports/.gitkeep
+__pycache__/
+*.db
+*.sqlite3
