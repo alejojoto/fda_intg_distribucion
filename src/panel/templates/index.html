@@ -569,6 +569,16 @@
   .campo-obligatorio input[type="date"] { box-shadow:inset 3px 0 0 #f59e0b; }
   .campo-obligatorio input.lleno { box-shadow:inset 3px 0 0 #16a34a; }
   .editor-acciones { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+  /* Ventana de UN cliente (Clientes y sucursales -> Editar): su nombre, sus
+     marcas y sus sucursales dejan de pisar la lista. Va por DEBAJO del editor
+     de fila (z-index 20), que se abre encima de ella. */
+  #cliente-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                     display:none; z-index:19; align-items:flex-start; justify-content:center; }
+  #cliente-overlay.visible { display:flex; }
+  #cliente-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
+                  width:min(720px, 94vw); max-height:85vh; overflow:auto;
+                  box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #cliente-caja h3 { margin:0 0 12px; font-size:14px; }
   /* Editor de campaña de descuento (modal propio, más ancho que el de catálogo) */
   #desc-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
                   display:none; z-index:21; align-items:flex-start; justify-content:center; }
@@ -1703,6 +1713,19 @@
     <div class="editor-acciones">
       <button id="editor-guardar" class="primario" onclick="guardarEditor()">Guardar</button>
       <button onclick="intentarCerrarEditor()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ventana de UN cliente del catálogo (su botón "Editar"): nombre, marcas y
+     sucursales. El editor de una fila se abre ENCIMA de esta. -->
+<div id="cliente-overlay" onclick="if(event.target===this)cerrarVentanaCliente()">
+  <div id="cliente-caja">
+    <h3 id="cliente-titulo"></h3>
+    <div id="cliente-cuerpo"></div>
+    <div class="editor-acciones">
+      <button class="primario" id="cliente-agregar" onclick="agregarSucursal()">Agregar sucursal</button>
+      <button onclick="cerrarVentanaCliente()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -7507,6 +7530,7 @@ function alternarCatalogo(tipo) {
 function cerrarCatalogo() {
   catalogoActual = null;
   catalogoFilas = [];
+  $("cliente-overlay").classList.remove("visible");
   clienteEnEdicion = null;
   $("catalogo-vista").innerHTML = "";
   pintarBotonesCatalogos();
@@ -7634,6 +7658,7 @@ async function abrirCatalogo(tipo, prefill) {
     if (tipo === "feriados") feriadoAnio = d.anio;
     catalogoActual = tipo;
     catalogoFilas = d.filas;
+    // No se oculta aquí: tras guardar una fila se restaura la ventana del cliente.
     clienteEnEdicion = null;     // abrir un catálogo siempre vuelve al listado
     paginacion.catalogo.pagina = 1;
     pintarBotonesCatalogos();
@@ -7739,7 +7764,7 @@ function pintarFilasCatalogo() {
 // backend. La paginación cuenta SUCURSALES (filas), no clientes, y un cliente
 // resuelto NO tiene botones por fila (feedback 2026-07-19, 3ª ronda: la página
 // era lenta con tantos botones): tiene un solo "Editar" en su cabecera que
-// abre su vista de edición — ahí están "Agregar sucursal" y el Editar de cada
+// abre su ventana — ahí están "Agregar sucursal" y el Editar de cada
 // sucursal.
 //
 // Dos bloques quedan fuera de esa regla y llevan botón POR FILA (2026-07-29):
@@ -7749,7 +7774,6 @@ function pintarFilasCatalogo() {
 const GRUPO_NUEVAS = " nuevas";   // sentinela: no choca con ningún código real
 
 function pintarClientesAgrupados(filtro) {
-  if (clienteEnEdicion !== null) { pintarClienteEnEdicion(); return; }
   const grupos = new Map();
   catalogoFilas.forEach((f, i) => {
     const nueva = esEntradaNueva(f);
@@ -7809,6 +7833,9 @@ function pintarClientesAgrupados(filtro) {
   }
   $("t-catalogo").querySelector("tbody").innerHTML =
     html || `<tr><td colspan="4" class="mut">Sin clientes que coincidan.</td></tr>`;
+  // La ficha del cliente vive en su propia ventana: cualquier repintado de la
+  // lista la refresca también, para que las dos digan lo mismo.
+  if (clienteEnEdicion !== null) pintarVentanaCliente();
 }
 
 // `opciones.suelta` = la fila NO cuelga de un cliente (entrada nueva o cruce
@@ -7817,7 +7844,7 @@ function pintarClientesAgrupados(filtro) {
 function filaSucursalHtml(f, i, conEditar, opciones) {
   const {suelta = false, nueva = false} = opciones || {};
   // "Borrar de verdad" (modo prueba de implantación o modo admin): solo en
-  // la vista de edición de UN cliente y solo sobre un cruce creado a mano en
+  // la ventana de UN cliente y solo sobre un cruce creado a mano en
   // el panel (origen 'manual') — los del catálogo real no se tocan.
   const borrarDefinitivo = conEditar && (modoImplantacion || modoAdmin) && f.origen === "manual"
     ? ` <button class="btn-rojo" title="Borra este cliente por completo, en todos los equipos. Solo existe en modo prueba o modo admin."
@@ -7852,7 +7879,9 @@ function estrellaCliente(g) {
 // catálogo lo vuelve a esconder.
 function avisoFavorito(codigo, msg) {
   const sel = (window.CSS && CSS.escape) ? CSS.escape(codigo) : codigo;
-  const el = document.querySelector(`[data-fav-aviso="${sel}"]`);
+  // Con la ventana abierta, la estrella visible está dentro de ella.
+  const raiz = clienteEnEdicion !== null ? $("cliente-caja") : document;
+  const el = raiz.querySelector(`[data-fav-aviso="${sel}"]`);
   if (!el) { mensaje(msg, "error"); return; }
   el.textContent = msg;
   el.style.display = "";
@@ -7909,59 +7938,108 @@ async function guardarCadenaCliente(rif, esCadena) {
   return r.es_cadena;
 }
 
-// Vista de edición de UN cliente (botón "Editar" de su cabecera): solo sus
-// sucursales, cada una con Editar, más "Agregar sucursal". Ignora el filtro
-// y la paginación — un cliente se edita completo.
-function pintarClienteEnEdicion() {
+// Ventana de UN cliente (botón "Editar" de su cabecera): su nombre, sus marcas y
+// sus sucursales, cada una con su Editar. Es una ventana y no una vista dentro de
+// la lista (2026-07-30, pedido del usuario): así la lista de atrás no queda a
+// medio usar —con su "Agregar cliente" a la vista mientras editas otro— y se
+// cierra por donde se cierra todo lo demás.
+function pintarVentanaCliente() {
   const filas = [];
   catalogoFilas.forEach((f, i) => {
     if ((f.codigo_cliente_winledger || "") === clienteEnEdicion) filas.push([f, i]);
   });
-  if (!filas.length) { salirEdicionCliente(); return; }   // desapareció tras recargar
+  if (!filas.length) { cerrarVentanaCliente(); return; }   // desapareció tras recargar
   const [primera] = filas[0];
-  const etiqueta = clienteEnEdicion
-    ? `${clienteEnEdicion} — ${primera.nombre_cliente_winledger || "(nombre no cargado)"}`
-    : "(cruces sin código de cliente)";
-  $("cat-conteo").textContent = `editando 1 cliente · ${filas.length} sucursal(es)`;
-  $("pag-catalogo").innerHTML = "";
   const grupo = {codigo: clienteEnEdicion, favorito: filas.some(([f]) => f.favorito)};
+  // El título lleva el código y no el nombre: el nombre vive en su campo, dos
+  // renglones más abajo, y repetirlo arriba sería el mismo dato dos veces.
+  $("cliente-titulo").innerHTML = clienteEnEdicion
+    ? `${estrellaCliente(grupo)}Cliente ${esc(clienteEnEdicion)}`
+    : "(cruces sin código de cliente)";
   // "Es cadena" efectivo: el override manual manda; si es NULL, la regla
-  // automática (≥2 sucursales o con código de sucursal). El check refleja ese
+  // automática (>=2 sucursales o con código de sucursal). El check refleja ese
   // valor efectivo y, al tocarlo, fija el override a mano.
   const autoCadena = filas.length >= 2 || filas.some(([f]) => f.codigo_sucursal_winledger);
-  const esCadena = filas[0][0].es_cadena_manual == null ? autoCadena : !!filas[0][0].es_cadena_manual;
-  $("t-catalogo").querySelector("tbody").innerHTML = `
-    <tr class="grupo"><td colspan="4">
-      <button onclick="salirEdicionCliente()">‹ Volver</button>
-      ${estrellaCliente(grupo)}${esc(etiqueta)}
-      ${clienteEnEdicion ? `<button class="primario" style="float:right"
-          onclick="agregarSucursal()">Agregar sucursal</button>` : ""}
-    </td></tr>
-    ${clienteEnEdicion ? `<tr><td colspan="4" class="mut" style="border:0">
-      Marca la ★ para hacerlo favorito: los favoritos salen de primeros en esta
-      lista y en la de descuentos.</td></tr>
-    <tr><td colspan="4" style="border:0; padding-top:0">
-      <label style="cursor:pointer; font-size:12.5px">
-        <input type="checkbox" ${esCadena ? "checked" : ""}
-               onclick="alternarCadenaCliente('${esc(clienteEnEdicion)}')">
-        Es cadena — sale agrupado con las cadenas en el selector de descuentos.
-      </label>
-      <span class="obj-aviso-inline" data-cadena-aviso="${esc(clienteEnEdicion)}" style="display:none"></span>
-    </td></tr>` : ""}
-    ${filas.map(([f, i]) => filaSucursalHtml(f, i, true)).join("")}`;
+  const esCadena = primera.es_cadena_manual == null ? autoCadena : !!primera.es_cadena_manual;
+  const cabecera = clienteEnEdicion ? `
+    <label class="editor-campo" style="max-width:420px">
+      <span class="campo-linea">Nombre del cliente${chipOrigen("winledger", true)}</span>
+      <input type="text" id="cliente-nombre" value="${esc(primera.nombre_cliente_winledger || "")}"
+             placeholder="como aparece en el programa de facturación"
+             onchange="guardarNombreCliente()"
+             onkeydown="if(event.key==='Enter')this.blur()">
+    </label>
+    <span class="obj-aviso-inline" id="cliente-nombre-aviso" style="display:none"></span>
+    <p class="mut" style="margin:0 0 10px">Marca la ★ para hacerlo favorito: los
+      favoritos salen de primeros en la lista de clientes y en la de descuentos.</p>
+    <label style="cursor:pointer; font-size:12.5px">
+      <input type="checkbox" ${esCadena ? "checked" : ""}
+             onclick="alternarCadenaCliente('${esc(clienteEnEdicion)}')">
+      Es cadena — sale agrupado con las cadenas en el selector de descuentos.
+    </label>
+    <span class="obj-aviso-inline" data-cadena-aviso="${esc(clienteEnEdicion)}" style="display:none"></span>` : "";
+  $("cliente-cuerpo").innerHTML = cabecera + `
+    <div style="overflow-x:auto; margin-top:12px"><table>
+      <thead><tr>
+        <th><span class="orig-punto appsheet" title="${esc(ORIGENES.appsheet.titulo)}"></span>Sucursal</th>
+        <th><span class="orig-punto winledger" title="${esc(ORIGENES.winledger.titulo)}"></span>Código sucursal</th>
+        <th>Activo</th><th></th>
+      </tr></thead>
+      <tbody>${filas.map(([f, i]) => filaSucursalHtml(f, i, true)).join("")}</tbody>
+    </table></div>`;
+  // Sin código de cliente no hay a qué colgarle una sucursal nueva.
+  $("cliente-agregar").style.display = clienteEnEdicion ? "" : "none";
+  $("cliente-overlay").classList.add("visible");
 }
 
 function editarCliente(codigo) {
   clienteEnEdicion = codigo;
-  pintarFilasCatalogo();
+  pintarVentanaCliente();
 }
 
-function salirEdicionCliente() {
+function cerrarVentanaCliente() {
+  $("cliente-overlay").classList.remove("visible");
   clienteEnEdicion = null;
-  pintarFilasCatalogo();
+  if (catalogoActual === "clientes") pintarFilasCatalogo();   // la lista, con lo que se haya cambiado
 }
 
-// "Agregar sucursal" desde la vista de edición de un cliente: abre el editor
+// Nombre del cliente en el programa de facturación, tecleado en su ventana: la app
+// de pedidos no siempre lo manda y sin él la lista lo rotula con el código pelado.
+// Guarda al salir del campo y solo si cambió.
+async function guardarNombreCliente() {
+  const inp = $("cliente-nombre");
+  if (!inp || !clienteEnEdicion) return;
+  const nombre = inp.value.trim();
+  const fila = catalogoFilas.find(
+    f => (f.codigo_cliente_winledger || "") === clienteEnEdicion);
+  const actual = ((fila && fila.nombre_cliente_winledger) || "").trim();
+  if (nombre === actual) return;
+  if (!nombre) { avisoNombreCliente("Escribe el nombre del cliente."); inp.value = actual; return; }
+  try {
+    await api("/api/cliente/nombre", {rif: clienteEnEdicion, nombre});
+    for (const f of catalogoFilas) {
+      if ((f.codigo_cliente_winledger || "") === clienteEnEdicion)
+        f.nombre_cliente_winledger = nombre;
+    }
+    // El selector de descuentos ya cargado usa el mismo nombre: se sincroniza en
+    // memoria para que las dos vistas no queden discrepantes (igual que la marca
+    // de cadena, ver guardarCadenaCliente).
+    if (descSelector) {
+      const c = descSelector.clientes.find(x => x.rif === clienteEnEdicion);
+      if (c) c.nombre = nombre;
+    }
+    pintarFilasCatalogo();   // repinta la lista y, con ella, el título de la ventana
+  } catch (e) { avisoNombreCliente("No se pudo guardar el nombre: " + e.message); }
+}
+
+function avisoNombreCliente(msg) {
+  const el = $("cliente-nombre-aviso");
+  if (!el) { if (msg) mensaje(msg, "error"); return; }
+  el.textContent = msg || "";
+  el.style.display = msg ? "" : "none";
+}
+
+// "Agregar sucursal" desde la ventana de un cliente: abre el editor
 // con el código de cliente (y RIF) ya puestos — solo falta la sucursal nueva.
 function agregarSucursal() {
   const primera = catalogoFilas.find(
@@ -8195,7 +8273,7 @@ async function guardarEditor(confirmado) {
     cerrarEditor();
     mensaje(r.aviso || "Guardado.", r.aviso ? "error" : "info");
     // abrirCatalogo recarga y vuelve al listado; si se estaba editando un
-    // cliente, se restaura su vista (para seguir agregando sucursales).
+    // cliente, se restaura su ventana (para seguir agregando sucursales).
     const clienteEditando = clienteEnEdicion;
     await abrirCatalogo(catalogoActual);
     if (clienteEditando !== null && catalogoActual === "clientes") {
