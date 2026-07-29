@@ -1267,9 +1267,10 @@
          Las cantidades cambian con el modo de impresión: con Imprimir: sí van
          1..10 y nada más (el papel obliga a lotes cortos de tamaño variable);
          sin imprimir, 1/5/10 + "otro…", que muestra el campo editable al
-         lado. La corrida encadena (CONTRATOS.md 3.1 punto 3, act. 2026-07-29): cada
-         documento se llena completo y se ACEPTA al cerrar, y con Imprimir: sí
-         se espera el «Continuar» del operador entre facturas. -->
+         lado; con una ruta elegida aparece también "ruta completa". La corrida
+         encadena (CONTRATOS.md 3.1 punto 3, act. 2026-07-29): cada documento se
+         llena completo y se ACEPTA al cerrar, y con Imprimir: sí se espera el
+         «Continuar» del operador entre facturas. -->
     <!-- DESACTIVADO EN PRODUCCIÓN, temporal (2026-07-28, pedido del usuario):
          el bloque entero solo se muestra con el modo admin prendido o en modo
          prueba — ver pintarBarraEnFila. Arranca OCULTO para que en producción
@@ -2161,6 +2162,10 @@ let relanzandoTrasConfirmacion = false;
 let cantidadEnFila = 5;           // preseleccionado 5 (decisión 2026-07-20)
 let otroEnFila = false;           // true = el campo libre "otro" está elegido
 let completaEnFila = false;       // true = "pedido completo" (siguiente pedido entero)
+// "ruta completa" (2026-07-30, pedido del usuario): el lote se lleva TODO lo
+// pendiente de la ruta elegida. Solo existe sin imprimir, con una ruta elegida
+// y fuera de producción (ver rutaCompletaDisponible).
+let rutaCompletaEnFila = false;
 // Corrida encadenada de "Llenar en fila" (2026-07-26, PLAN.md pendiente 8):
 // colaEnFila es la fila EXACTA que el lote va a llenar — la que quedó apartada
 // en el estado compartido al arrancar (pendiente 33), así que ninguna otra
@@ -4100,6 +4105,7 @@ function repintar() {
   // escalón el backend ya no reporta más y el botón se apaga solo.
   const hayMasProc = !!ultimaLista.hay_procesadas_mas_antiguas;
   pintarProcesadas(paginarFamilias("procesadas", ultimaLista.procesadas, hayMasProc));
+  sincronizarCantidades();   // el dropdown de la corrida sigue a la lista y a la ruta
 }
 
 // Facturas que ESTE panel puede llenar ahora. Las partes ya listas,
@@ -5966,10 +5972,35 @@ async function confirmarHermanas() {
 // lotes cortos y de tamaño variable — si quedan 7 fichas en la serie, ese 7
 // tiene que agarrarse de un clic. Sin imprimir no hay restricción de papel:
 // bastan los atajos 1/5/10 y ahí sí vale "otro…" (campo editable al lado, sin
-// tope) para un lote grande. La corrida encadena en ambos casos; con "sí"
-// solo cambia que se espera el «Continuar» del operador entre facturas.
+// tope) para un lote grande. Sin imprimir y con una ruta elegida se suma "ruta
+// completa", que llena todas las pendientes de esa ruta (2026-07-30, pedido
+// del usuario). La corrida encadena en ambos casos; con "sí" solo cambia que
+// se espera el «Continuar» del operador entre facturas.
 const imprimirEnFila = () =>
   document.querySelector('input[name="enfila-imp"]:checked').value === "si";
+
+// "ruta completa" (2026-07-30, pedido del usuario): llenar de un tirón todo lo
+// pendiente de la ruta elegida. Con impresión no aparece (el papel obliga a
+// lotes cortos y de tamaño variable) y sin ruta elegida tampoco: sería "todo lo
+// que haya", que no es lo que se pidió. El gate de la barra (enFilaDisponible)
+// la deja fuera de producción.
+function rutaCompletaDisponible() {
+  return !imprimirEnFila() && rutaSeleccionada !== "" && enFilaDisponible();
+}
+
+// El <select> se reconstruye solo cuando cambia lo que muestra (si "ruta
+// completa" está o no, y con cuántas facturas): repintarlo en cada recarga de
+// la lista le cerraría el desplegable al operador justo mientras lo mira.
+let firmaCantidadesPintada = null;
+function firmaCantidades() {
+  // La ruta entra en la firma, no solo la cuenta: cambiar de una ruta a otra
+  // con la misma cantidad de pendientes dejaba el hover nombrando la anterior.
+  return rutaCompletaDisponible()
+    ? `ruta|${rutaSeleccionada}|${pendientesLlenables().length}` : "sin-ruta";
+}
+function sincronizarCantidades() {
+  if (firmaCantidades() !== firmaCantidadesPintada) pintarCantidades();
+}
 
 function pintarCantidades() {
   const imp = imprimirEnFila();
@@ -5984,6 +6015,11 @@ function pintarCantidades() {
   const HOVER_PEDIDO_COMPLETO = "Llena el siguiente pedido disponible completo, "
     + "sin importar en cuántas facturas esté dividido (cada factura son máx. 25 líneas).";
   const numeros = imp ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [1, 5, 10];
+  // La opción puede dejar de existir sin que el operador toque el dropdown (se
+  // cambió de ruta, de canal o de modo): ahí la elección vuelve a la cantidad
+  // numérica vigente en vez de quedar apuntando a algo que ya no está.
+  const conRuta = rutaCompletaDisponible();
+  if (!conRuta) rutaCompletaEnFila = false;
   // El dropdown nunca puede mostrar una opción distinta de la cantidad que de
   // verdad se va a llenar, así que al cambiar de modo la cantidad vigente se
   // acomoda a la lista nueva: con impresión no hay "otro…" (10 es el tope), y
@@ -5992,14 +6028,23 @@ function pintarCantidades() {
   if (imp) {
     otroEnFila = false;
     if (cantidadEnFila > 10) cantidadEnFila = 10;
-  } else if (!completaEnFila && !otroEnFila && !numeros.includes(cantidadEnFila)) {
+  } else if (!completaEnFila && !rutaCompletaEnFila && !otroEnFila && !numeros.includes(cantidadEnFila)) {
     otroEnFila = true;
     $("enfila-otro").value = cantidadEnFila;
   }
   let html = `<option value="completa" title="${HOVER_PEDIDO_COMPLETO}"`
     + `${completaEnFila ? " selected" : ""}>pedido completo</option>`;
   html += numeros.map(n =>
-    `<option value="${n}"${(!completaEnFila && !otroEnFila && n === cantidadEnFila) ? " selected" : ""}>${n} ${n === 1 ? "factura" : "facturas"}</option>`).join("");
+    `<option value="${n}"${(!completaEnFila && !rutaCompletaEnFila && !otroEnFila && n === cantidadEnFila) ? " selected" : ""}>${n} ${n === 1 ? "factura" : "facturas"}</option>`).join("");
+  if (conRuta) {
+    // "(sin ruta)" es un grupo real de pedidos, no la ausencia de filtro: se
+    // nombra distinto para que el hover no diga "la ruta __sin_ruta__".
+    const cuales = rutaSeleccionada === "__sin_ruta__"
+      ? "los pedidos sin ruta" : `la ruta ${nombreRuta(rutaSeleccionada)}`;
+    const n = pendientesLlenables().length;
+    html += `<option value="ruta" title="${esc(`Llena de un tirón todas las facturas pendientes de ${cuales}.`)}"`
+      + `${rutaCompletaEnFila ? " selected" : ""}>ruta completa (${n} ${n === 1 ? "factura" : "facturas"})</option>`;
+  }
   if (!imp) html += `<option value="otro"${otroEnFila ? " selected" : ""}>otro…</option>`;
   $("enfila-cantidad").innerHTML = html;
   $("enfila-otro").style.display = otroEnFila ? "" : "none";
@@ -6009,6 +6054,7 @@ function pintarCantidades() {
   // despachar; la nota gris con "no").
   $("enfila-imp-aviso").style.display = imp ? "" : "none";
   $("enfila-sinimp-nota").style.display = imp ? "none" : "";
+  firmaCantidadesPintada = firmaCantidades();
 }
 
 // Cambio en el dropdown: "pedido completo" fija ese modo; un número fija la
@@ -6019,9 +6065,10 @@ function pintarCantidades() {
 // se teclea "2" y queda 25) y el lote sale con una cantidad que nadie eligió.
 function cantidadElegida(valor) {
   completaEnFila = valor === "completa";
+  rutaCompletaEnFila = valor === "ruta";
   otroEnFila = valor === "otro";
   if (otroEnFila) $("enfila-otro").value = "";
-  else if (!completaEnFila) cantidadEnFila = parseInt(valor, 10);
+  else if (!completaEnFila && !rutaCompletaEnFila) cantidadEnFila = parseInt(valor, 10);
   $("enfila-otro").style.display = otroEnFila ? "" : "none";
   $("enfila-otro-facturas").style.display = otroEnFila ? "" : "none";
   if (otroEnFila) $("enfila-otro").focus();
@@ -6143,6 +6190,7 @@ function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
   $("enfila-bloque").style.display = conFila ? "" : "none";
   $("btn-llenar-siguiente").style.display = conFila ? "none" : "";
+  sincronizarCantidades();   // la opción "ruta completa" depende de este mismo gate
 }
 
 // El botón de producción: llena la PRIMERA pendiente de la lista — la misma
@@ -6226,6 +6274,9 @@ function lanzarEnFila() {
 // es su propia confirmación y no repite la de arriba.
 function lanzarEnFilaConfirmado() {
   if (completaEnFila) { arrancarSecuencia(familiaDelSiguiente().partes); return; }
+  // Ruta completa: el lote se lleva TODO lo pendiente de la ruta, así que no
+  // hay corte que pueda partir un pedido en dos lotes y nada que preguntar.
+  if (rutaCompletaEnFila) { arrancarSecuencia(pendientesLlenables().length); return; }
   if (otroEnFila) { cantidadEnFila = parseInt($("enfila-otro").value, 10); }
   const familia = familiaPartidaPorElCorte(cantidadEnFila);
   if (familia) { abrirAvisoFamilia(familia); return; }
@@ -6284,7 +6335,9 @@ async function arrancarSecuencia(meta, saltarPedido = null) {
   // ya apartadas en otra máquina. Si había menos pendientes que las pedidas,
   // la meta real ya nace más corta y no hay con qué reponer.
   metaPedidaEnFila = meta;
-  reponerEnFila = !completaEnFila;
+  // Con "ruta completa" el lote ya se llevó todo lo que había en la ruta: si
+  // alguna factura resulta ajena, no queda ninguna con que reponerla.
+  reponerEnFila = !completaEnFila && !rutaCompletaEnFila;
   pedidoSaltadoEnFila = saltarPedido;
   descartadasEnFila = [];
   reposicionesEnFila = [];
