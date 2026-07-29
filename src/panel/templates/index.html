@@ -693,10 +693,18 @@
   .desc-tab-marca { margin-left:6px; font-size:10.5px; font-weight:600; color:#b54708;
                     background:#fef0c7; border-radius:8px; padding:1px 6px; }
   .desc-pendiente { font-size:12px; color:#b54708; margin-top:4px; }
-  /* Compite / se suma sin elegir, habiendo otra campaña de por medio: la misma
-     barra ámbar de un campo obligatorio vacío, y el mismo ámbar en el resumen. */
-  #desc-acum-opciones.falta { box-shadow:inset 3px 0 0 #f59e0b; padding-left:8px; }
+  /* Prioridad / se suma sin elegir, habiendo otra campaña de por medio: el bloque
+     se vuelve una tarjeta ámbar —la decisión no puede parecer un extra opcional,
+     que es justo cómo se leía siendo un check suelto (2026-07-30)— y el mismo
+     ámbar marca la pendiente en el resumen. */
+  #desc-acum-bloque.falta { background:#fffaeb; border:1px solid #fde68a;
+                            border-radius:6px; padding:8px 10px; }
+  #desc-acum-bloque.falta #desc-acum-titulo { font-weight:600; color:#92400e; }
   .desc-overview .falta { color:#b54708; }
+  /* Y hasta que se elija, la tabla se LEE pero no se ordena: poner quién manda
+     ya es haber elegido prioridad, y así se hacía sin ver la otra opción. */
+  .choque-orden.bloqueado .c-manda,
+  .choque-orden.bloqueado .c-mover { opacity:.35; pointer-events:none; }
   .desc-ir { border:none; background:none; padding:0; font:inherit; font-size:12px;
              color:#1d4ed8; text-decoration:underline; cursor:pointer; }
   /* El resumen de la campaña: desde 2026-07-29 es la franja FIJA bajo las
@@ -1758,11 +1766,19 @@
              porcentajes distintos, así que no hay default seguro que asumir en
              silencio — se elige antes de dejar guardar. Sin ninguna campaña
              encima no bloquea nada y la campaña compite, como siempre. -->
-        <div class="editor-campo" id="desc-acum-bloque">Con otras campañas
+        <div class="editor-campo" id="desc-acum-bloque"><span id="desc-acum-titulo">Con otras campañas</span>
           <span class="obligatorio-tag" id="desc-acum-oblig" style="display:none">obligatorio</span>
           <div id="desc-acum-opciones">
-            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="compite" onchange="descAcumulableCambio()"> Compite: manda una sola de las dos y la otra no aplica</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="prioridad" onchange="descAcumulableCambio()"> Prioridad: manda una sola y tú eliges cuál</label>
             <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="suma" onchange="descAcumulableCambio()"> Se suma: su porcentaje se agrega al de la campaña que mande</label>
+          </div>
+          <!-- El aviso trae la acción ahí mismo (las dos opciones de arriba) y
+               dice las dos consecuencias de no elegir: no guarda, y la tabla de
+               quién manda no se deja tocar. Justo eso pasó el 2026-07-30: se
+               ordenó la prioridad sin haber visto nunca la opción de sumar. -->
+          <div class="desc-pendiente" id="desc-acum-falta" style="display:none">
+            Elige una: mientras no lo hagas no se puede guardar, ni ordenar quién manda.
+            <button type="button" class="desc-ir" id="desc-acum-ir" onclick="descTab('choques')">Ver el conflicto</button>
           </div>
         </div>
       </div>
@@ -8647,8 +8663,8 @@ function nuevoDescuento() {
   descEdit = {
     id: null, nombre: "", alcance: "total", porcentaje: 10,
     // Arranca en paquetes: los kilos solo llevan descuento si se piden.
-    // acumulable null = sin decidir: una campaña nueva no llega con "compite"
-    // puesto, así que si aparece un conflicto hay que elegir (ver descValidar).
+    // acumulable null = sin decidir: una campaña nueva no llega con la prioridad
+    // puesta, así que si aparece un conflicto hay que elegir (ver descValidar).
     presentaciones: "paq", acumulable: null,
     vigencia_desde: "", vigencia_hasta: "", indefinida: false,
     todosClientes: false, selCli: {}, selProd: new Set(),
@@ -8737,7 +8753,7 @@ function abrirEditorDescuento() {
   descTituloActualizar();
   for (const r of document.getElementsByName("desc-pres")) r.checked = (r.value === descEdit.presentaciones);
   $("desc-pct").value = descEdit.porcentaje;
-  descAcumSet(descEdit.acumulable == null ? "" : (descEdit.acumulable ? "suma" : "compite"));
+  descAcumSet(descEdit.acumulable == null ? "" : (descEdit.acumulable ? "suma" : "prioridad"));
   $("desc-desde").value = descEdit.vigencia_desde;
   $("desc-hasta").value = descEdit.vigencia_hasta;
   // Fecha a la que se vuelve si el operador desmarca "Sin fecha de fin": la
@@ -8836,10 +8852,12 @@ function descTab(nombre) {
     .appendChild($("desc-pct-bloque"));
   $(nombre === "clientes" ? "desc-cli-slot-clientes" : "desc-cli-slot-datos")
     .appendChild($("desc-cli-bloque"));
-  // El par compite/se suma viaja igual, entre Detalles y Conflictos: ahí es el
+  // El par prioridad/se suma viaja igual, entre Detalles y Conflictos: ahí es el
   // único control que mueve el resultado cuando no hay orden que reordenar.
   $(nombre === "choques" ? "desc-acum-slot-choques" : "desc-acum-slot-datos")
     .appendChild($("desc-acum-bloque"));
+  // Parado en Conflictos, "Ver el conflicto" llevaría a donde ya estás.
+  $("desc-acum-ir").style.display = nombre === "choques" ? "none" : "";
   descPintarOverview();
   if (nombre === "clientes") descPintarClientes();
   if (nombre === "alcance") descAlcanceCambio();
@@ -8856,7 +8874,7 @@ function descResumenPctEditor() {
   return "varios % (según el árbol)";
 }
 
-// "compite" | "suma" | "" (sin decidir todavía: campaña nueva sin tocar el par).
+// "prioridad" | "suma" | "" (sin decidir: campaña nueva sin tocar el par).
 function descAcumActual() {
   for (const r of document.getElementsByName("desc-acum")) if (r.checked) return r.value;
   return "";
@@ -8913,7 +8931,7 @@ function descPintarOverview() {
 // Renglón de conflictos del resumen fijo (2026-07-30, pedido del usuario): con
 // qué campañas se pisa esta y en qué termina, sin tener que abrir la pestaña
 // Conflictos. Sin ninguna campaña de por medio solo dice algo la suma marcada:
-// "compite" es lo normal y no hay nada que anunciar.
+// competir por la línea es lo normal y no hay nada que anunciar.
 function descConflictoResumen() {
   const decision = descAcumActual();
   if (!descHayCoincidencia()) {
@@ -8932,26 +8950,29 @@ function descConflictoResumen() {
     : `${otras} campaña${otras === 1 ? "" : "s"} más`;
   let queda;
   if (decision === "suma") queda = "se suma al % de la que mande";
-  else if (decision === "compite") {
+  else if (decision === "prioridad") {
     // Quién manda sale de la tabla que el operador tiene a la vista (su primera
     // fila), no de una cuenta aparte: así el resumen dice lo mismo que la pestaña.
     const tabla = descFilasConvivencia(r);
     const primera = (tabla.conOrden && tabla.filas.length) ? tabla.filas[0].item : null;
     const manda = primera
       ? (primera.es_esta ? "esta campaña" : `«${esc(primera.etiqueta || "")}»`) : "";
-    queda = manda ? `compite y manda ${manda}` : "compite";
+    queda = manda ? `por prioridad manda ${manda}` : "por prioridad";
   } else {
-    queda = `<span class="falta"><b>falta decidir</b> si compite o se suma</span>`;
+    queda = `<span class="falta"><b>falta decidir</b>: prioridad o se suma</span>`;
   }
   return `<div class="meta"><b>Conflictos:</b> se pisa con ${conQuien} — ${queda}</div>`;
 }
 
-// Marca de obligatorio del par compite/se suma: solo con otra campaña de por
-// medio, y solo mientras no se haya elegido (ver descValidar).
+// Marca de obligatorio del par prioridad/se suma: solo con otra campaña de por
+// medio, y solo mientras no se haya elegido (ver descValidar). Es la señal que
+// faltaba — de check suelto la decisión se leía como un extra que se saltaba sin
+// verlo (2026-07-30).
 function descAcumPintarPendiente() {
   const falta = descHayCoincidencia() && !descAcumActual();
   $("desc-acum-oblig").style.display = falta ? "" : "none";
-  $("desc-acum-opciones").classList.toggle("falta", falta);
+  $("desc-acum-falta").style.display = falta ? "" : "none";
+  $("desc-acum-bloque").classList.toggle("falta", falta);
 }
 
 // --- Alcance: check "Todos los productos" + % + árbol grupo→producto --------
@@ -9528,7 +9549,7 @@ function descValidar() {
   // sumarse: con otra campaña de por medio son dos porcentajes distintos y no
   // hay default que se pueda asumir en silencio.
   if (descHayCoincidencia() && !descAcumActual())
-    return {msg: "Hay otra campaña de por medio: di si esta compite con ella o si se suma.",
+    return {msg: "Hay otra campaña de por medio: elige si esta lleva prioridad o si se suma.",
             tab: "choques"};
   return {msg: "", tab: null};
 }
@@ -9726,7 +9747,13 @@ function descPintarChoques(r) {
   // El subtítulo con la instrucción solo acompaña a la tabla: con puras notas
   // informativas no se le pide nada al operador. Con sumas no se decide nada
   // tampoco — se explica qué está viendo.
-  const subtitulo = tabla.conOrden
+  // Con la decisión pendiente el subtítulo no explica la tabla: manda a elegir,
+  // que es lo que abre paso a ordenarla.
+  const subtitulo = (descHayCoincidencia() && !descAcumActual())
+    ? `<p class="mut" style="margin:0 0 8px">${tabla.conOrden
+        ? "Elige arriba antes de seguir: con prioridad ordenas quién manda de las de abajo; sumándose no hay orden que decidir."
+        : "Elige arriba cómo se lleva con la otra campaña: de eso depende con qué porcentaje se factura."}</p>`
+    : tabla.conOrden
     ? `<p class="mut" style="margin:0 0 8px">Manda la de arriba: de ella sale el porcentaje.${
         sumas.length ? " Lo marcado con + se suma encima, en su misma fila." : ""}</p>`
     : (tabla.html
@@ -9946,8 +9973,12 @@ function descTablaConvivencia(r) {
   const cabecera = conOrden
     ? `<th class="c-manda">Manda</th><th class="c-puesto">#</th><th>Campaña</th>`
     : `<th>Campaña</th>`;
+  // Sin elegir todavía prioridad o suma, la tabla se lee completa pero no se
+  // ordena: ordenarla ES elegir prioridad, y así se elegía sin ver la otra
+  // opción (2026-07-30). Los nombres siguen abriendo su campaña.
+  const bloqueado = conOrden && descHayCoincidencia() && !descAcumActual();
   return {
-    html: `<table class="choque-orden"><thead><tr>
+    html: `<table class="choque-orden${bloqueado ? " bloqueado" : ""}"><thead><tr>
       ${cabecera}<th class="c-pct">%</th><th class="c-mover"></th>
     </tr></thead><tbody>${cuerpo}</tbody></table>`,
     conOrden,
@@ -10544,8 +10575,8 @@ function descEstadoBorrador() {
     indefinida: $("desc-indefinida").checked,
     alcance: descAlcanceActual(),
     presentaciones: descPresActual(),
-    // null = sin decidir, para que retomar el borrador no dé por elegido un
-    // "compite" que el operador nunca marcó.
+    // null = sin decidir, para que retomar el borrador no dé por elegida una
+    // prioridad que el operador nunca marcó.
     acumulable: descAcumActual() === "" ? null : descAcumActual() === "suma",
     todosClientes: descEdit.todosClientes,
     selCli,
