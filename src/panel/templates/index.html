@@ -402,7 +402,7 @@
   #borrador-aviso-texto { flex:1; }
   /* Barra de status: UNA sola barra con dos líneas.
      Línea 1 (#mensaje) = estado dinámico (procesando, error, info).
-     Línea 2 (#seguridad) = botones del llenado — SOLO durante el llenado. */
+     Línea 2 (#seguridad) = aviso de seguridad + botones — SOLO durante el llenado. */
   #statusbar { position:sticky; top:0; z-index:5; margin:-16px -18px 14px; padding:10px 18px;
                background:#fff; border-bottom:1px solid #e2e6ec; box-shadow:0 2px 6px rgba(0,0,0,.04); }
   #mensaje { display:flex; align-items:center; gap:12px;
@@ -1144,6 +1144,10 @@
       <div id="info-grupos"></div>
     </div>
     <div id="seguridad">
+      <!-- Se oculta en las fases donde el llenado espera al operador (pausa,
+           impresión, aviso de Winledger por cerrar): ahí SÍ tiene que tocar
+           mouse y teclado. Ver FASES_DEL_OPERADOR en el sondeo de fase. -->
+      <span id="aviso-no-tocar">⚠️ <b>No muevas el mouse ni teclees.</b></span>
       <!-- Paso de cierre con "Imprimir: sí" (fase 'esperando_impresion'): solo
            se ve mientras el poll de fase la reporte (ver llenar()). Va antes
            del Detener porque es la acción primaria. -->
@@ -2488,7 +2492,7 @@ function replantarCajaFlotante() {
   try { plantarBarraFlotante(ALTO_FLOTANTE); } catch (e) {}
 }
 
-// Muestra la línea 2 de la barra (⏸ y ■ Detener) solo durante el llenado.
+// Muestra la línea 2 de la barra (aviso, ⏸ y ■ Detener) solo durante el llenado.
 function marcarLlenando(activo) {
   $("statusbar").classList.toggle("llenando", activo);
   // ⏸ mientras haya llenado en curso, sea suelto o en corrida. El sondeo de
@@ -2496,6 +2500,7 @@ function marcarLlenando(activo) {
   $("btn-pausa").style.display = activo ? "" : "none";
   if (!activo) {
     pausaPedida = false;             // el turno terminó: la pausa no sobrevive
+    $("aviso-no-tocar").style.display = "";
   }
   pintarBotonPausa();
   if (activo) {
@@ -5138,6 +5143,12 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
                    ? " Pausa pedida: se detiene al terminar el paso en curso." : ""),
                 "info",
                 !FASES_DEL_OPERADOR.includes(f.fase));
+      // El aviso solo vale mientras el programa teclea. En las fases donde el
+      // que actúa es el OPERADOR —pausa, imprimir en Winledger, cerrar un aviso
+      // suyo— el llenado está parado esperándolo: ahí el mouse y el teclado son
+      // suyos y el aviso estorba justo cuando toca lo contrario.
+      $("aviso-no-tocar").style.display =
+        FASES_DEL_OPERADOR.includes(f.fase) ? "none" : "";
       // «Continuar» solo se ve en la fase 'esperando_impresion' (paso de
       // cierre con Imprimir: sí) — se apaga sola al salir de ella. Al tocar
       // papel cambia color/texto/ícono para romper la inercia de cuatro
