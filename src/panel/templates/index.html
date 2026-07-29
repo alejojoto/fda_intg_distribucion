@@ -693,6 +693,10 @@
   .desc-tab-marca { margin-left:6px; font-size:10.5px; font-weight:600; color:#b54708;
                     background:#fef0c7; border-radius:8px; padding:1px 6px; }
   .desc-pendiente { font-size:12px; color:#b54708; margin-top:4px; }
+  /* Compite / se suma sin elegir, habiendo otra campaña de por medio: la misma
+     barra ámbar de un campo obligatorio vacío, y el mismo ámbar en el resumen. */
+  #desc-acum-opciones.falta { box-shadow:inset 3px 0 0 #f59e0b; padding-left:8px; }
+  .desc-overview .falta { color:#b54708; }
   .desc-ir { border:none; background:none; padding:0; font:inherit; font-size:12px;
              color:#1d4ed8; text-decoration:underline; cursor:pointer; }
   /* El resumen de la campaña: desde 2026-07-29 es la franja FIJA bajo las
@@ -1692,14 +1696,13 @@
       <button type="button" class="desc-tab activa" data-t="datos" onclick="descTab('datos')">Detalles</button>
       <button type="button" class="desc-tab" data-t="alcance" onclick="descTab('alcance')">Productos<span class="desc-tab-marca" id="desc-marca-alcance" style="display:none"></span></button>
       <button type="button" class="desc-tab" data-t="clientes" onclick="descTab('clientes')">Clientes<span class="desc-tab-marca" id="desc-marca-clientes" style="display:none"></span></button>
-      <!-- Coincidencias con otras campañas: la pestaña SOLO aparece cuando hay
-           algo que mostrar (2026-07-29). El nombre lo eligió el usuario ese día
-           entre cuatro: cubre por igual el choque que hay que decidir, la
-           superposición donde ya manda la más específica y la suma —"Conflictos"
-           habría prometido pelea donde no la hay—, y la urgencia la carga el
-           chip naranja, que sale solo con un choque de verdad. -->
+      <!-- Conflictos con otras campañas: la pestaña SOLO aparece cuando hay algo
+           que mostrar (2026-07-29). Se llamó "Coincidencias" hasta el 2026-07-30,
+           cuando el usuario la renombró: aunque dos campañas se sumen en vez de
+           pelear, la palabra fuerte es la que hace entrar a mirar, y de mirar
+           depende decidir si esta se suma o compite. -->
       <button type="button" class="desc-tab" data-t="choques" id="desc-tab-btn-choques"
-              style="display:none" onclick="descTab('choques')">Coincidencias<span class="desc-tab-marca" id="desc-marca-choques" style="display:none"></span></button>
+              style="display:none" onclick="descTab('choques')">Conflictos<span class="desc-tab-marca" id="desc-marca-choques" style="display:none"></span></button>
     </div>
 
     <div id="desc-cuerpo">
@@ -1745,13 +1748,22 @@
       <!-- Acumulable (CONTRATOS.md 4.4, 2026-07-28): la campaña deja de competir
            por la línea y su % se suma al de la que mande. Es una propiedad de la
            campaña entera, no del número, así que no viaja con el bloque del
-           porcentaje — pero SÍ viaja a Coincidencias (2026-07-29): es el único
+           porcentaje — pero SÍ viaja a Conflictos (2026-07-29): es el único
            control que cambia el resultado cuando no hay orden que reordenar
            (gana la más específica), y decidirlo desde Detalles obligaba a saltar
            de pestaña para ver en qué quedó. -->
       <div id="desc-acum-slot-datos">
+        <!-- Dos opciones, ninguna marcada de entrada (2026-07-30, pedido del
+             usuario): con otra campaña de por medio, competir y sumarse facturan
+             porcentajes distintos, así que no hay default seguro que asumir en
+             silencio — se elige antes de dejar guardar. Sin ninguna campaña
+             encima no bloquea nada y la campaña compite, como siempre. -->
         <div class="editor-campo" id="desc-acum-bloque">Con otras campañas
-          <label class="desc-todos" style="margin-top:2px"><input type="checkbox" id="desc-acumulable" onchange="descAcumulableCambio()"> Se suma: su porcentaje se agrega al de la campaña que mande, en vez de competir con ella</label>
+          <span class="obligatorio-tag" id="desc-acum-oblig" style="display:none">obligatorio</span>
+          <div id="desc-acum-opciones">
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="compite" onchange="descAcumulableCambio()"> Compite: manda una sola de las dos y la otra no aplica</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="suma" onchange="descAcumulableCambio()"> Se suma: su porcentaje se agrega al de la campaña que mande</label>
+          </div>
         </div>
       </div>
       <div class="desc-pendiente" id="desc-falta-productos" style="display:none; margin-bottom:10px">
@@ -8635,7 +8647,9 @@ function nuevoDescuento() {
   descEdit = {
     id: null, nombre: "", alcance: "total", porcentaje: 10,
     // Arranca en paquetes: los kilos solo llevan descuento si se piden.
-    presentaciones: "paq", acumulable: false,
+    // acumulable null = sin decidir: una campaña nueva no llega con "compite"
+    // puesto, así que si aparece un conflicto hay que elegir (ver descValidar).
+    presentaciones: "paq", acumulable: null,
     vigencia_desde: "", vigencia_hasta: "", indefinida: false,
     todosClientes: false, selCli: {}, selProd: new Set(),
     prodPct: {},
@@ -8723,7 +8737,7 @@ function abrirEditorDescuento() {
   descTituloActualizar();
   for (const r of document.getElementsByName("desc-pres")) r.checked = (r.value === descEdit.presentaciones);
   $("desc-pct").value = descEdit.porcentaje;
-  $("desc-acumulable").checked = !!descEdit.acumulable;
+  descAcumSet(descEdit.acumulable == null ? "" : (descEdit.acumulable ? "suma" : "compite"));
   $("desc-desde").value = descEdit.vigencia_desde;
   $("desc-hasta").value = descEdit.vigencia_hasta;
   // Fecha a la que se vuelve si el operador desmarca "Sin fecha de fin": la
@@ -8822,7 +8836,7 @@ function descTab(nombre) {
     .appendChild($("desc-pct-bloque"));
   $(nombre === "clientes" ? "desc-cli-slot-clientes" : "desc-cli-slot-datos")
     .appendChild($("desc-cli-bloque"));
-  // El check "Se suma" viaja igual, entre Detalles y Coincidencias: ahí es el
+  // El par compite/se suma viaja igual, entre Detalles y Conflictos: ahí es el
   // único control que mueve el resultado cuando no hay orden que reordenar.
   $(nombre === "choques" ? "desc-acum-slot-choques" : "desc-acum-slot-datos")
     .appendChild($("desc-acum-bloque"));
@@ -8842,13 +8856,34 @@ function descResumenPctEditor() {
   return "varios % (según el árbol)";
 }
 
-// "Se suma" es el interruptor entre competir y apilarse, y desde Coincidencias
+// "compite" | "suma" | "" (sin decidir todavía: campaña nueva sin tocar el par).
+function descAcumActual() {
+  for (const r of document.getElementsByName("desc-acum")) if (r.checked) return r.value;
+  return "";
+}
+
+function descAcumSet(valor) {
+  for (const r of document.getElementsByName("desc-acum")) r.checked = (r.value === valor);
+}
+
+// ¿Esta campaña coincide con alguna otra? Cuenta por igual el choque a decidir,
+// la superposición donde manda la más específica y la suma: en los tres casos
+// elegir compite/se suma cambia el porcentaje que se factura. Un chequeo a
+// medias (listo=false) no dice nada — ver descChequearChoques.
+function descHayCoincidencia() {
+  const r = descChoqueUltimo;
+  if (!r || !r.listo) return false;
+  return !!((r.choques || []).length || (r.sumas || []).length || (r.notas || []).length);
+}
+
+// "Se suma" es el interruptor entre competir y apilarse, y desde Conflictos
 // se toca MIRANDO las tablas: el chequeo va sin debounce para que el resultado
 // cambie con el clic y no 400 ms después. El listener delegado del modal dispara
 // además el chequeo con debounce; es el mismo payload, así que la segunda
 // respuesta repinta lo mismo.
 function descAcumulableCambio() {
   descPintarOverview();
+  descRevalidarAviso();   // elegida la opción, el aviso de "falta decidir" se va con el clic
   descChequearChoques();
 }
 
@@ -8866,16 +8901,57 @@ function descPintarOverview() {
   const pctTxt = esp ? descResumenPctEditor() : (pctVal ? `${pctVal}%` : "—");
   const clientesTxt = descEdit.todosClientes ? "TODOS los clientes"
     : (objetivos.length ? descQuienes(objetivos, false) : "sin elegir");
-  // El renglón de la suma solo sale marcado: sin marcar, "compite" es lo normal
-  // y no hay nada que anunciar.
-  const acumTxt = $("desc-acumulable").checked
-    ? `<div class="meta"><b>Con otras:</b> se suma al % de la que mande</div>` : "";
   $("desc-overview").innerHTML = `
     <div class="meta"><b>Productos:</b> ${esc(alcanceTxt)}</div>
     <div class="meta"><b>Aplica a:</b> ${esc(presTxt)}</div>
     <div class="meta"><b>Descuento:</b> ${esc(pctTxt)}</div>
-    ${acumTxt}
+    ${descConflictoResumen()}
     <div class="meta"><b>Clientes:</b> ${esc(clientesTxt)}</div>`;
+  descAcumPintarPendiente();
+}
+
+// Renglón de conflictos del resumen fijo (2026-07-30, pedido del usuario): con
+// qué campañas se pisa esta y en qué termina, sin tener que abrir la pestaña
+// Conflictos. Sin ninguna campaña de por medio solo dice algo la suma marcada:
+// "compite" es lo normal y no hay nada que anunciar.
+function descConflictoResumen() {
+  const decision = descAcumActual();
+  if (!descHayCoincidencia()) {
+    return decision === "suma"
+      ? `<div class="meta"><b>Con otras:</b> se suma al % de la que mande</div>` : "";
+  }
+  const r = descChoqueUltimo;
+  // Las notas (superposición donde manda la más específica) llegan como texto
+  // suelto, sin el nombre de la otra campaña: se cuentan al final.
+  const nombres = [...new Set((r.choques || []).map(c => c.otra_etiqueta)
+    .concat((r.sumas || []).map(s => s.etiqueta)))].filter(Boolean);
+  const otras = (r.notas || []).length;
+  const conQuien = nombres.length
+    ? nombres.map(n => `«${esc(n)}»`).join(", ")
+      + (otras ? ` y ${otras} más` : "")
+    : `${otras} campaña${otras === 1 ? "" : "s"} más`;
+  let queda;
+  if (decision === "suma") queda = "se suma al % de la que mande";
+  else if (decision === "compite") {
+    // Quién manda sale de la tabla que el operador tiene a la vista (su primera
+    // fila), no de una cuenta aparte: así el resumen dice lo mismo que la pestaña.
+    const tabla = descFilasConvivencia(r);
+    const primera = (tabla.conOrden && tabla.filas.length) ? tabla.filas[0].item : null;
+    const manda = primera
+      ? (primera.es_esta ? "esta campaña" : `«${esc(primera.etiqueta || "")}»`) : "";
+    queda = manda ? `compite y manda ${manda}` : "compite";
+  } else {
+    queda = `<span class="falta"><b>falta decidir</b> si compite o se suma</span>`;
+  }
+  return `<div class="meta"><b>Conflictos:</b> se pisa con ${conQuien} — ${queda}</div>`;
+}
+
+// Marca de obligatorio del par compite/se suma: solo con otra campaña de por
+// medio, y solo mientras no se haya elegido (ver descValidar).
+function descAcumPintarPendiente() {
+  const falta = descHayCoincidencia() && !descAcumActual();
+  $("desc-acum-oblig").style.display = falta ? "" : "none";
+  $("desc-acum-opciones").classList.toggle("falta", falta);
 }
 
 // --- Alcance: check "Todos los productos" + % + árbol grupo→producto --------
@@ -9341,7 +9417,10 @@ function descPayload(activo) {
     nombre: $("desc-nombre").value.trim(),
     alcance,
     presentaciones: descPresActual(),
-    acumulable: $("desc-acumulable").checked ? 1 : 0,
+    // Sin decidir viaja como 0 (compite): el chequeo en vivo tiene que poder
+    // correr con el borrador a medias. El freno de "elige antes de guardar" es
+    // descValidar, no el payload.
+    acumulable: descAcumActual() === "suma" ? 1 : 0,
     porcentaje: $("desc-pct").value.trim(),
     vigencia_desde: $("desc-desde").value,
     vigencia_hasta: descEdit.indefinida ? null : $("desc-hasta").value,
@@ -9443,9 +9522,14 @@ function descValidar() {
   // En especificado no se valida que toda fila tenga %: marcar ya estampa el
   // descuento a aplicar, y una fila que se deje vacía a propósito simplemente no
   // recibe descuento (válido — puede ser un solo producto con descuento).
-  // Los choques (CONTRATOS.md 4.4) no bloquean: la tabla de prioridad siempre
-  // muestra un orden completo, así que en el editor nunca queda nada sin
-  // decidir.
+  // El ORDEN de los choques (CONTRATOS.md 4.4) no bloquea: la tabla de prioridad
+  // siempre muestra un orden completo, así que ahí nunca queda nada sin decidir.
+  // Lo que SÍ bloquea desde el 2026-07-30 (pedido del usuario) es competir o
+  // sumarse: con otra campaña de por medio son dos porcentajes distintos y no
+  // hay default que se pueda asumir en silencio.
+  if (descHayCoincidencia() && !descAcumActual())
+    return {msg: "Hay otra campaña de por medio: di si esta compite con ella o si se suma.",
+            tab: "choques"};
   return {msg: "", tab: null};
 }
 
@@ -9473,6 +9557,15 @@ async function guardarDescuento() {
   // 400 ms de retraso, así que elegir una fecha y pulsar Guardar de una podía
   // mandar el orden viejo (o ninguno) y toparse con el rechazo del servidor.
   await descChequearChoques();
+  // Ese chequeo puede ESTRENAR un conflicto (la última tecla lo destapó, u otra
+  // máquina activó una campaña que se pisa con esta): se revalida con lo que
+  // acaba de llegar, o el "elige compite o se suma" se saltaría justo aquí.
+  const frescos = descValidar();
+  if (frescos.msg) {
+    if (frescos.tab) descTab(frescos.tab);
+    descError(frescos.msg);
+    return false;
+  }
   const payload = descPayload();
   if (descChoqueOrden && descChoqueOrden.length) payload.orden_choque = descChoqueOrden;
   try {
@@ -9502,6 +9595,10 @@ async function desactivarDescuento(id, activo) {
     const r = await api("/api/descuento", {
       id, nombre: d.nombre, alcance: d.alcance, porcentaje: d.porcentaje,
       vigencia_desde: d.vigencia_desde, vigencia_hasta: d.vigencia_hasta, activo,
+      // Van explícitas porque el guardado toma lo que llega: sin ellas, apagar y
+      // volver a encender la campaña la dejaba compitiendo y en "ambas"
+      // presentaciones, perdiendo en silencio dos decisiones ya tomadas.
+      acumulable: d.acumulable ? 1 : 0, presentaciones: d.presentaciones,
       clientes: d.objetivos.map(o => ({codigo_cliente_winledger: o.codigo_cliente_winledger,
                 cliente_id: o.cliente_id, incluir: o.incluir})),
       grupos: d.grupos,
@@ -9556,9 +9653,16 @@ async function descChequearChoques() {
   } catch (e) {
     return;   // un chequeo en vivo fallido no debe tapar el editor; se reintenta solo
   }
-  descChoqueUltimo = r;
+  // Solo se guarda el chequeo COMPLETO: un borrador a medias (el % vaciado para
+  // reteclearlo, los productos desmarcados un momento) vuelve con listo=false, y
+  // si se quedara, el renglón de conflictos del resumen y el freno de compite/se
+  // suma perderían el conflicto que ya se sabía. Mismo criterio que
+  // descFusionarOrden y descPintarChoques, que también dejan el a medias de lado.
+  if (r.listo) descChoqueUltimo = r;
   descFusionarOrden(r);
   descPintarChoques(r);
+  descPintarOverview();   // el renglón de conflictos del resumen sale de este chequeo
+  descRevalidarAviso();   // conflicto estrenado (o resuelto): el aviso a la vista se pone al día
 }
 const descChequearChoquesDebounced = debounce(descChequearChoques, 400);
 
@@ -9628,7 +9732,7 @@ function descPintarChoques(r) {
     : (tabla.html
        ? `<p class="mut" style="margin:0 0 8px">Estas campañas no compiten: sus porcentajes se suman.</p>`
        : "");
-  // Sin título propio: la pestaña ya se llama Coincidencias y repetirlo aquí
+  // Sin título propio: la pestaña ya se llama Conflictos y repetirlo aquí
   // era decir dos veces lo mismo (2026-07-29). Lo que sí queda es el subtítulo,
   // que dice en cuál de los tres casos estás y qué hacer con él.
   //
@@ -9642,14 +9746,16 @@ function descPintarChoques(r) {
   descPestanaChoques(true, choques.length > 0);
 }
 
-// Muestra u oculta la pestaña «Con otras campañas» según haya algo que mostrar,
-// con el chip naranja solo cuando hay un CHOQUE (una suma no se decide, se lee).
-// Si la pestaña se va estando abierta —se quitó el último choque desde el propio
-// editor— el foco vuelve a Detalles en vez de dejar el cuerpo en blanco.
+// Muestra u oculta la pestaña «Conflictos» según haya algo que mostrar, con el
+// chip naranja cuando queda algo por decidir: un CHOQUE de verdad, o el par
+// compite/se suma todavía sin elegir (2026-07-30) — una suma ya decidida no se
+// decide, se lee. Si la pestaña se va estando abierta —se quitó el último
+// conflicto desde el propio editor— el foco vuelve a Detalles en vez de dejar el
+// cuerpo en blanco.
 function descPestanaChoques(hay, conChoque) {
   $("desc-tab-btn-choques").style.display = hay ? "" : "none";
   const marca = $("desc-marca-choques");
-  marca.style.display = (hay && conChoque) ? "" : "none";
+  marca.style.display = (hay && (conChoque || !descAcumActual())) ? "" : "none";
   marca.textContent = "decidir";
   if (!hay && $("desc-tab-choques").style.display !== "none") descTab("datos");
 }
@@ -10438,7 +10544,9 @@ function descEstadoBorrador() {
     indefinida: $("desc-indefinida").checked,
     alcance: descAlcanceActual(),
     presentaciones: descPresActual(),
-    acumulable: $("desc-acumulable").checked,
+    // null = sin decidir, para que retomar el borrador no dé por elegido un
+    // "compite" que el operador nunca marcó.
+    acumulable: descAcumActual() === "" ? null : descAcumActual() === "suma",
     todosClientes: descEdit.todosClientes,
     selCli,
     selProd: [...descEdit.selProd],
@@ -10543,7 +10651,8 @@ async function borradorContinuar() {
       if (campanaDesaparecida) id = null;
       descEdit = {
         id, nombre: datos.nombre, alcance: datos.alcance, porcentaje: datos.porcentaje,
-        presentaciones: datos.presentaciones, acumulable: !!datos.acumulable,
+        presentaciones: datos.presentaciones,
+        acumulable: datos.acumulable == null ? null : !!datos.acumulable,
         vigencia_desde: datos.vigencia_desde, vigencia_hasta: datos.vigencia_hasta,
         indefinida: datos.indefinida, todosClientes: datos.todosClientes,
         selCli, selProd: new Set(datos.selProd), prodPct: datos.prodPct,
