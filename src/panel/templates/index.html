@@ -316,7 +316,7 @@
   /* Reclamo de otra máquina (estado compartido): la está llenando ahora, o la
      apartó su lote y le va a llegar el turno (mismo ámbar: para quien mira,
      las dos significan "esa es de la otra máquina"). */
-  .chip.llenando, .chip.reservada { background:#fef0c7; color:#b54708; }
+  .chip.llenando, .chip.reservada, .chip.familia-ajena { background:#fef0c7; color:#b54708; }
   /* Marca de visibilidad (PLAN.md pendiente 18): despachado != aprobado en
      alguna línea. Ámbar con borde para distinguirla de los chips de estado. */
   .chip.despacho-difiere { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
@@ -4268,7 +4268,7 @@ function accionesDeFila(f) {
   if (f.estado === "llenada_prueba")
     return `<button class="acento" onclick="llenar('${id}',${f.parte},false,false,true)">Llenar otra vez</button>`;
   if (f.estado === "pendiente" || f.estado === "reservada")
-    return `<button class="acento" onclick="llenar('${id}',${f.parte})">Llenar</button>` +
+    return `<button class="acento" onclick="${f.familia_ajena ? "llenarFamiliaAjena" : "llenar"}('${id}',${f.parte})">Llenar</button>` +
            `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
   if (f.estado === "error_llenado")
     return `<button class="acento" onclick="llenar('${id}',${f.parte})">Reintentar</button>` +
@@ -4298,7 +4298,20 @@ function accionesDeFila(f) {
 const tieneAmarre = (f) => !!(f.amarrada && f.amarrada.length) && !secuenciaActiva;
 
 function chipEstado(f) {
-  if (f.estado === "pendiente") return "";
+  if (f.estado === "pendiente") {
+    if (!f.familia_ajena) return "";
+    const maquina = esc(f.familia_ajena.maquina);
+    const partes = f.familia_ajena.partes || [];
+    const lista = partes.length > 1
+      ? `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`
+      : partes[0];
+    const titulo = partes.length === 1
+      ? `'${maquina}' ya tiene la parte ${lista} de este pedido. `
+      : `'${maquina}' ya tiene las partes ${lista} de este pedido. `;
+    return `<span class="chip familia-ajena" title="${titulo}`
+         + `Un pedido dividido se factura completo en la misma máquina: la parte que ya salió lleva la serie y el papel de ese equipo.">`
+         + `pedido en '${maquina}'</span>`;
+  }
   const propiaTomada = f.estado === "reservada" && !f.remota;
   const enCola = propiaTomada && !tieneAmarre(f);
   const titulo = f.estado === "llenada_prueba"
@@ -5161,7 +5174,8 @@ function pararPorTasa() {
 // valor; queda como gancho para el lote general (PLAN.md pendiente 8) aún en
 // diseño.
 async function llenar(pedido_id, parte, autorizarCancelar = false,
-                      tasaConfirmada = false, repetirConfirmado = false) {
+                      tasaConfirmada = false, repetirConfirmado = false,
+                      motivoFamilia = null) {
   if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return "ocupado"; }
   // Llegó el relanzamiento (o esta llamada es otra cosa): la bandera cumplió.
   // Se limpia acá, en la única puerta de entrada, para que ninguna salida
@@ -5189,7 +5203,8 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // llenado — el servidor lo exige igual (codigo 'sin_configurar').
   if (configPendiente.length) {
     abrirConfigMaquina(configPendiente).then((ok) => {
-      if (ok) llenar(pedido_id, parte, autorizarCancelar, tasaConfirmada, repetirConfirmado);
+      if (ok) llenar(pedido_id, parte, autorizarCancelar, tasaConfirmada,
+                     repetirConfirmado, motivoFamilia);
     });
     return "sin_configurar";
   }
@@ -5338,6 +5353,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
        // Sí explícito para repetir una factura que ya se llenó en esta sesión
        // de prueba (sin registro que lo recuerde). La corrida jamás lo manda.
        repetir_confirmado: repetirConfirmado,
+       familia_ajena_motivo: motivoFamilia,
        autorizar_cancelar: autorizarCancelar});
     // ¿Algo del llenado anterior estorbando en Winledger — documento a medias
     // en la Ficha o una ventana de artículo abierta? El programa NO lo toca sin
@@ -5663,6 +5679,19 @@ const ACCIONES_MOTIVO = {
     boton: "Llenar igual",
     clase: "primario",
   },
+  familia: {
+    titulo: (id, partes) => {
+      const familia = (filaDeFactura(id, partes[0]) || {}).familia_ajena;
+      const maquina = familia ? familia.maquina : "otra máquina";
+      return `'${maquina}' ya está facturando este pedido — ¿llenar esta parte aquí igual?`;
+    },
+    nota: "Un pedido dividido se factura completo en la misma máquina: la parte que ya salió lleva la serie y el papel de ese equipo. Si la llenas aquí, el pedido queda repartido entre dos equipos y dos series.",
+    opciones: ["Ese equipo no está disponible (apagado, dañado o sin red)",
+               "Ya se acordó que esta parte sale de esta máquina",
+               "Allá no van a facturar el resto del pedido"],
+    boton: "Llenar aquí igual",
+    clase: "primario",
+  },
 };
 
 // Qué máquina tiene tomada una factura y cómo, para el título del diálogo. Si
@@ -5809,6 +5838,11 @@ function tomarIgual(pedido_id, parte) {
   abrirMotivo("tomar", pedido_id, [parte]);
 }
 
+function llenarFamiliaAjena(pedido_id, parte) {
+  if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
+  abrirMotivo("familia", pedido_id, [parte]);
+}
+
 function cerrarMotivo() {
   motivoPedido = null;
   $("motivo-overlay").classList.remove("visible");
@@ -5850,6 +5884,10 @@ async function confirmarMotivo() {
   }
   cerrarMotivo();
   const parte = partes[0];
+  if (accion === "familia") {
+    await llenar(pedido_id, parte, false, false, false, motivo);
+    return;
+  }
   // "Llenar igual": primero se le quita el candado a la otra máquina (con el
   // motivo al log del panel, que es la traza para revisar después) y recién
   // entonces el llenado normal, que la reclama para esta como cualquier otra.
