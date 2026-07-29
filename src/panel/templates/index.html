@@ -308,6 +308,11 @@
      factura una persona a mano. Azul apagado: no es un logro del sistema
      (verde = lista) ni un problema (rojo), es "esto no es trabajo de aquí". */
   .chip.facturada_a_mano { background:#e0eaff; color:#2d3f6b; }
+  /* Llenada en esta sesión de PRUEBA (2026-07-30): pasó por el llenado pero no
+     dejó registro, así que al reabrir el panel vuelve a pendiente. Violeta
+     apagado: no es una factura lista de verdad (verde) ni trabajo de otra
+     máquina (ámbar). */
+  .chip.llenada_prueba { background:#ede9fe; color:#5b21b6; }
   /* Reclamo de otra máquina (estado compartido): la está llenando ahora, o la
      apartó su lote y le va a llegar el turno (mismo ámbar: para quien mira,
      las dos significan "esa es de la otra máquina"). */
@@ -1095,7 +1100,10 @@
       <button type="button" class="rapida-chip" id="rapida-procesadas-si" onclick="rapidaProcesadas(true)"
               title="El pedido llenado pasa a PROCESADAS y no se vuelve a ofrecer, igual que en producción.">Pasa a procesadas</button>
       <button type="button" class="rapida-chip" id="rapida-procesadas-no" onclick="rapidaProcesadas(false)"
-              title="El pedido sigue en PENDIENTES tras llenarlo, para repetirlo cuantas veces haga falta.">Sigue pendiente</button>
+              title="El pedido no se registra: queda marcado «llenada en prueba» mientras el panel siga abierto, para repetirlo cuantas veces haga falta.">Sigue pendiente</button>
+      <button type="button" class="rapida-chip" id="rapida-olvidar-prueba" style="display:none"
+              onclick="olvidarLlenadasPrueba()"
+              title="Las llenadas en esta prueba vuelven a pendientes. No hay registro que borrar: esa marca solo vive mientras el panel esté abierto.">Olvidar llenadas</button>
     </span>
     <span class="rapida-grupo">
       <b>Carga</b>
@@ -1597,10 +1605,13 @@
                      onchange="guardarOpcionesPrueba()">
               Pasa a procesadas</label>
             <label class="desc-todos"
-                   title="El pedido sigue en PENDIENTES tras llenarlo, para repetirlo cuantas veces haga falta. Dentro de la misma sesión del panel el segundo llenado pide confirmar, para que ninguna corrida lo repita sola.">
+                   title="El pedido llenado no se registra en ninguna parte: queda marcado «llenada en prueba» y sale de la cola para que la corrida siga con el siguiente. Al reabrir el panel vuelve a pendiente, listo para repetirlo cuantas veces haga falta.">
               <input type="radio" name="prueba-procesadas" id="prueba-procesadas-no"
                      onchange="guardarOpcionesPrueba()">
               Sigue pendiente</label>
+            <button type="button" id="prueba-olvidar-llenadas" style="display:none"
+                    onclick="olvidarLlenadasPrueba()"
+                    title="Las llenadas en esta prueba vuelven a pendientes sin reabrir el panel, para repetir la misma corrida. No hay registro que borrar: esa marca solo vive mientras el panel esté abierto.">Olvidar llenadas</button>
           </div>
         </div>
         <div class="prueba-grupo">
@@ -2111,6 +2122,11 @@ window.addEventListener("unhandledrejection", e =>
 // factura LISTA y se puede llenar la siguiente de una vez.
 let secuenciaActiva = false;
 let llenando = false;
+// Cuántas facturas quedaron marcadas "llenada en prueba" (procesadas fantasma
+// del modo prueba, 2026-07-30). Se declara aquí, con el resto del estado, y no
+// junto a sus funciones: actualizarModoLlenado() la lee y corre desde el
+// arranque de la página.
+let llenadasPrueba = 0;
 // Un llenado que se interrumpe para preguntar (documento en curso en la Ficha)
 // NO terminó: el sí del operador lo relanza enseguida. Sin esta bandera el
 // finally de llenar() apagaba el modo llenado en ese hueco y la ventana volvía
@@ -2354,6 +2370,10 @@ function actualizarModoLlenado() {
   // La ventana PRIMERO: es lo esencial del modo. Las cajitas y el título son
   // accesorios — si algún día revientan, no pueden llevarse el plantado.
   aplicarVentanaFlotante(activo);
+  // Con la corrida andando no se ofrece olvidar las llenadas de prueba: entre
+  // facturas devolvería a la cola las que ya se llenaron y la corrida las
+  // repetiría (el servidor lo niega igual).
+  pintarOlvidarPrueba();
   try {
     pintarInfoLlenado();
     pintarTituloVentana();
@@ -3826,6 +3846,10 @@ async function cargar() {
     const d = await api("/api/facturas?" + filtros());
     ultimaLista = d;
     listaCargada = true;   // desde aquí el título de la ventana ya puede contar
+    // Llenadas en esta prueba (marca en memoria del servidor, sin registro): de
+    // aquí sale si se ofrece devolverlas a pendientes.
+    llenadasPrueba = d.llenadas_prueba || 0;
+    pintarOlvidarPrueba();
     // Semilla del sondeo de 20 s: viene calculada del mismo estado remoto que
     // esta respuesta ya trajo, sin un viaje extra a Supabase.
     if (d.firma_compartida) firmaCompartida = d.firma_compartida;
@@ -4142,6 +4166,7 @@ const ESTADOS_RESUMEN = {
   reservada:        ["apartada", "apartadas"],
   en_cola:          ["en cola", "en cola"],
   facturada_a_mano: ["a mano", "a mano"],
+  llenada_prueba:   ["llenada en prueba", "llenadas en prueba"],
 };
 
 // Con qué nombre se cuenta una parte en el resumen. Lo único que no sale del
@@ -4207,6 +4232,12 @@ function accionesDeFila(f) {
   // (ver sacarDeLaCola).
   if (f.estado === "reservada" && secuenciaActiva)
     return `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
+  // Llenada en esta sesión de prueba (sin registro): el único botón que aplica
+  // es llenarla otra vez — no hay documento cerrado que reabrir ni registro que
+  // descartar. Lleva el sí de repetición puesto: lo dice el propio botón, así
+  // que volver a preguntarlo sobraría.
+  if (f.estado === "llenada_prueba")
+    return `<button class="acento" onclick="llenar('${id}',${f.parte},false,false,true)">Llenar otra vez</button>`;
   if (f.estado === "pendiente" || f.estado === "reservada")
     return `<button class="acento" onclick="llenar('${id}',${f.parte})">Llenar</button>` +
            `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
@@ -4241,7 +4272,10 @@ function chipEstado(f) {
   if (f.estado === "pendiente") return "";
   const propiaTomada = f.estado === "reservada" && !f.remota;
   const enCola = propiaTomada && !tieneAmarre(f);
-  const titulo = f.estado === "reservada" || f.estado === "llenando"
+  const titulo = f.estado === "llenada_prueba"
+    ? "Se llenó en esta prueba y no queda registro: al reabrir el panel vuelve "
+      + "a pendiente."
+    : f.estado === "reservada" || f.estado === "llenando"
     ? (f.remota
         ? `La tiene '${f.maquina || "otra máquina"}': se opera desde allá.`
         : tieneAmarre(f)
@@ -4887,7 +4921,8 @@ function crearProductoDesdeRevision(i, j) {
 // se dice "en cola" y la arma chipEstado (2026-07-26).
 const ETIQUETAS_ESTADO = {completada: "lista", error_llenado: "error",
                           facturada_a_mano: "facturada a mano",
-                          reservada: "apartada"};
+                          reservada: "apartada",
+                          llenada_prueba: "llenada en prueba"};
 const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 
 function pintarProcesadas(familias) {
@@ -6840,6 +6875,35 @@ function rapidaProcesadas(marcar) {
   $("prueba-procesadas-si").checked = marcar;
   $("prueba-procesadas-no").checked = !marcar;
   guardarOpcionesPrueba();
+}
+
+// --- Procesadas FANTASMA del modo prueba (2026-07-30) -----------------------
+// Con "Sigue pendiente", la factura llenada queda marcada "llenada en prueba" y
+// sale de la cola para que la corrida siga con la siguiente. Esa marca vive en
+// la memoria del servidor: devolverlas a pendientes es lo que hace repetible la
+// misma corrida sin reabrir el panel. El control aparece solo cuando hay algo
+// que olvidar, y no mientras la corrida avanza. `llenadasPrueba` vive arriba,
+// con el resto del estado.
+function pintarOlvidarPrueba() {
+  const mostrar = llenadasPrueba > 0 && !secuenciaActiva && !llenando;
+  const etiqueta = `Olvidar llenadas (${llenadasPrueba})`;
+  for (const id of ["rapida-olvidar-prueba", "prueba-olvidar-llenadas"]) {
+    const b = $(id);
+    if (!b) continue;
+    b.style.display = mostrar ? "" : "none";
+    b.textContent = etiqueta;
+  }
+}
+
+async function olvidarLlenadasPrueba() {
+  try {
+    const r = await api("/api/prueba/olvidar-llenadas", {});
+    mensaje(`${r.olvidadas} ${r.olvidadas === 1 ? "factura vuelve" : "facturas vuelven"} `
+            + `a pendientes: la prueba se puede repetir igual.`, "info");
+    cargar();
+  } catch (e) {
+    mensaje("No se pudieron devolver a pendientes: " + e.message, "error");
+  }
 }
 
 function rapidaCanal(canal) {
