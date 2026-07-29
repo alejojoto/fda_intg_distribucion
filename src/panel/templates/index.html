@@ -1462,6 +1462,36 @@
         La Fecha a facturar arranca en el día elegido y el botón del calendario
         lo repone con un clic; en cualquier factura se puede cambiar a mano.</p>
     </div>
+    <!-- Cómo abre el panel esta máquina (2026-07-29, pedido del usuario): la
+         ventana propia es el camino normal y este interruptor es la contingencia
+         si en alguna máquina se queda pegada — antes había que editar el .env por
+         escritorio remoto (ASISTENTE_VENTANA_EDGE, que sigue existiendo para
+         cuando el panel no abre y no hay dónde pulsar). Lo lee
+         ventana_panel.abrir_panel al abrir el asistente. -->
+    <div class="ajustes-bloque">
+      <h3>Ventana del asistente en esta máquina</h3>
+      <div class="ajustes-fila" style="gap:24px">
+        <label class="desc-todos"
+               title="El asistente abre en su propia ventana, con su ícono en la barra de tareas.">
+          <input type="radio" name="ventana-panel" value="propia"
+                 onchange="guardarVentanaPanel(this.value)">
+          Ventana propia
+        </label>
+        <label class="desc-todos"
+               title="El panel abre en el navegador, en una ventana sin pestañas ni barra de direcciones.">
+          <input type="radio" name="ventana-panel" value="navegador"
+                 onchange="guardarVentanaPanel(this.value)">
+          Navegador
+        </label>
+        <span class="prueba-nota"
+              title="La ventana la abre el lanzador antes de levantar el panel, así que la que ya está abierta sigue como está.">Se aplica al reabrir el asistente</span>
+      </div>
+      <p class="mut" style="margin:8px 0 0">
+        <b>Ventana propia:</b> tiene su ícono en la barra de tareas y, al anclarla,
+        pulsar el ícono trae la ventana que ya está abierta.<br>
+        <b>Navegador:</b> opción de respaldo, por si la ventana propia se queda
+        pegada durante un llenado.</p>
+    </div>
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
       <div class="cat-btns" id="cat-btns"></div>
@@ -6843,6 +6873,7 @@ async function cargarAjustes() {
     if ((d.configuracion_pendiente || []).length && !resolverConfigMaquina)
       abrirConfigMaquina(d.configuracion_pendiente);
     pintarDiaDespacho(d.dia_despacho);
+    pintarVentanaPanel(d.ventana);
     pintarBotonesCatalogos();
     // Cierre asistido de implantación (ASISTENTE_PRUEBA_IMPLANTACION en ESTA
     // máquina): habilita el borrado definitivo de datos de prueba y demás usos
@@ -6885,6 +6916,26 @@ async function guardarDiaDespacho(dia) {
   } catch (e) {
     pintarDiaDespacho(anterior);   // el radio no se queda marcando lo que no se guardó
     mensaje("No se pudo guardar el día de despacho: " + e.message, "error");
+  }
+}
+
+let ventanaPanel = "propia";
+
+function pintarVentanaPanel(v) {
+  ventanaPanel = v === "navegador" ? "navegador" : "propia";
+  document.querySelectorAll("input[name=ventana-panel]")
+          .forEach(r => { r.checked = r.value === ventanaPanel; });
+}
+
+// Se guarda al marcar, sin botón aparte (igual que el día de despacho), y no se
+// anuncia: el radio ya lo dice y el efecto se ve al reabrir el asistente.
+async function guardarVentanaPanel(v) {
+  const anterior = ventanaPanel;
+  try {
+    pintarVentanaPanel((await api("/api/ajustes/ventana", {ventana: v})).ventana);
+  } catch (e) {
+    pintarVentanaPanel(anterior);   // el radio no se queda marcando lo que no se guardó
+    mensaje("No se pudo guardar cómo abre el panel: " + e.message, "error");
   }
 }
 
