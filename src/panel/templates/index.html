@@ -343,6 +343,11 @@
   .det-error { color:#a12a2a; font-size:12px; margin-top:6px; }
   .det-nota { color:var(--mut); font-size:11.5px; margin-top:3px; }
   .det-nota.alerta { color:#b54708; }
+  /* Línea que se mandó a llenar pero no entró al documento: se tachan solo las
+     cifras — el nombre y el motivo tienen que leerse bien. */
+  tr.linea-no-escrita td:nth-child(3), tr.linea-no-escrita td:nth-child(4) {
+    color:var(--mut); text-decoration:line-through;
+  }
   .detalle-error { color:var(--err); font-size:12px; }
   .mut { color:var(--mut); font-size:12px; }
   /* Aviso sensible (Ajustes de admin, 2026-07-26): esta máquina es también el
@@ -4314,8 +4319,15 @@ function filaLineaDetalle(d, l) {
   const producto = `${esc(l.descripcion || l.codigo_winledger)}
     <div class="mut">${esc(l.codigo_winledger)}${l.presentacion ? ` · ${esc(l.presentacion)}` : ""}</div>
     ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}`;
+  // Línea que se mandó pero NO entró al documento (cargador: sin precio,
+  // código inexistente, aviso no reconocido). Va marcada porque la foto son
+  // las líneas mandadas: sin esto el detalle muestra un renglón que el
+  // documento no tiene.
+  const omitida = l.omitida
+    ? `<div class="det-nota alerta">No entró al documento: ${esc(l.omitida)}.</div>` : "";
   if (!d.editable) return `
-    <tr><td class="det-num">${l.n}</td><td>${producto}</td>
+    <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
+      <td class="det-num">${l.n}</td><td>${producto}${omitida}</td>
       <td>${fmtCantidad(l.cantidad)}${l.ajustada
         ? ` <span class="chip ajustada">a mano</span>` : ""}</td>
       <td>${fmtCantidad(l.descuento_pct)} %</td></tr>`;
