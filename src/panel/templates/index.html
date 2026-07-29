@@ -3849,6 +3849,16 @@ async function reintentarConexion() {
 }
 
 async function latido() {
+  // Señal de vida hacia la ventana propia (2026-07-29). Va ANTES del /salud y
+  // sin depender de él: si el panel se cae, esta página sigue viva y es la que
+  // avisa (abajo) — la ventana solo tiene que enterarse de que sigue habiendo
+  // página. Cuando este aviso se corta, la ventana da por muerta la página y
+  // pinta su propio aviso en vez de quedarse en blanco. En Edge no hay puente
+  // y no hace falta: ahí el operador tiene recarga y barra de direcciones.
+  const apiV = apiVentana();
+  if (apiV && apiV.latido) {
+    try { Promise.resolve(apiV.latido()).catch(() => {}); } catch (e) {}
+  }
   let salud = null;
   try {
     const r = await fetch("/salud", {cache: "no-store"});
