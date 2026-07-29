@@ -4124,11 +4124,18 @@ function accionesDeFila(f) {
   //     "Llenar igual" (2026-07-26 / 2026-07-28), que le quita el candado con
   //     motivo. Es otra cosa: ahí no hay documento firme, hay un llenado que
   //     nadie está terminando.
+  //     Un error de allá lleva ADEMÁS "Descartar" (2026-07-29): decir "se
+  //     descarta desde allá" dejaba trancada una factura que ya no hace falta
+  //     (salió a mano, el cliente la anuló) cuando ese equipo no está
+  //     disponible — llenarla de nuevo aquí no era la salida.
   if (f.remota)
     return f.refacturable
       ? `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`
       : ["reservada", "llenando", "error_llenado"].includes(f.estado)
-        ? `<button onclick="tomarIgual('${id}',${f.parte})">Llenar igual</button>`
+        ? `<button onclick="tomarIgual('${id}',${f.parte})">Llenar igual</button>` +
+          (f.estado === "error_llenado"
+            ? `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`
+            : "")
         : "";
   // "reservada" propia = la cola del lote de ESTA máquina. Mientras la corrida
   // AVANZA no lleva "Llenar" (2026-07-26): esa factura la llena el lote cuando
@@ -4619,15 +4626,16 @@ function avisoDeFactura(f, enFamilia) {
   const detalle = f.detalle_error
     ? esc(f.detalle_error) + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "")
     : "";
-  // Error de OTRA máquina (2026-07-28): el reintento y el descarte viven allá.
-  // El aviso lo dice y nombra la salida que SÍ hay en esta fila («Llenar
-  // igual»), en vez de encargar botones que aquí no existen.
+  // Error de OTRA máquina (2026-07-28): lo normal es resolverlo allá, pero las
+  // dos salidas están en esta fila (2026-07-29) — antes el aviso solo nombraba
+  // «Llenar igual» y con ese equipo apagado no quedaba forma de cerrar una
+  // factura que ya no hacía falta.
   if (f.remota) return `
     <tr class="fila-aviso ${enFamilia ? "fam-parte" : ""}">
       <td colspan="8">${falloHace(f.fecha_cargado)} en
-        '${esc(f.maquina || "otra máquina")}': se reintenta o se descarta desde
-        allá. Si ese equipo no está disponible, «Llenar igual» la toma para
-        esta máquina. ${detalle}</td>
+        '${esc(f.maquina || "otra máquina")}': lo normal es reintentarla desde
+        allá. Si ese equipo no está disponible, «Llenar igual» la llena en esta
+        máquina y «Descartar» la cierra para todas. ${detalle}</td>
     </tr>`;
   // Última reapertura de la factura, si la hubo (2026-07-27). Va en su propio
   // renglón gris —igual que en PROCESADAS— en vez de pegada a la frase: cuenta
@@ -5480,6 +5488,16 @@ const ACCIONES_MOTIVO = {
     titulo: (id, partes) => partes.length > 1
       ? `Descartar ${partes.length} facturas de ${id} (partes ${partes.join(", ")}) — ¿por qué?`
       : `Descartar ${refFactura(id, partes[0])} — ¿por qué?`,
+    // Solo cuando el llenado falló en OTRA máquina (2026-07-29): descartarla
+    // aquí la cierra en todas, y lo que quedó a medias allá no lo puede
+    // resolver este panel.
+    nota: (id, partes) => {
+      const f = filaDeFactura(id, partes[0]);
+      if (!f || !f.remota) return "";
+      return `El llenado falló en '${f.maquina || "otra máquina"}'. Descartarla `
+           + "aquí la cierra para todas las máquinas; si allá quedó un documento "
+           + "a medias, hay que cancelarlo en ese equipo.";
+    },
     opciones: ["Ya se facturó a mano",
                "El cliente anuló el pedido",
                "No se despachó (no hubo entrega)",
@@ -5682,6 +5700,22 @@ async function confirmarMotivo() {
     // (la lista todavía está fresca). Si las hay, se pregunta después.
     const hermanas = hermanasSinLlenar(pedido_id, partes);
     cerrarMotivo();
+    // Error de otra máquina (2026-07-29): primero se le quita el candado con el
+    // mismo motivo. /api/tomar_factura es el único camino que CONFIRMA contra
+    // la nube que el estado compartido quedó libre — si no responde, no se
+    // descarta nada y allá sigue su reintento, en vez de un descarte que solo
+    // existe en esta máquina.
+    for (const parte of partes) {
+      const fila = filaDeFactura(pedido_id, parte);
+      if (!fila || !fila.remota) continue;
+      try {
+        await api("/api/tomar_factura", {pedido_id, parte, motivo});
+      } catch (e) {
+        await cargar();
+        avisoFactura(pedido_id, parte, `No se pudo descartar: ${e.message}`);
+        return;
+      }
+    }
     const {hechas, fallidas} = await aplicarMotivo(pedido_id, partes, motivo);
     await cargar();
     for (const f of fallidas) avisoFactura(pedido_id, f.parte, `No se pudo descartar: ${f.msg}`);
