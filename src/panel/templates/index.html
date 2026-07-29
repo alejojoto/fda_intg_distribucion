@@ -5766,6 +5766,7 @@ function familiaPartidaPorElCorte(n) {
   while (fin < p.length && p[fin].pedido_id === pedido_id) fin++;
   return {
     pedido_id,
+    cliente: ultimaDentro.razon_social || ultimaDentro.cliente_id,
     dentro: n - inicio,       // partes que entrarían con la cantidad elegida
     total: fin - inicio,      // partes pendientes del pedido
     // Saltarlo solo tiene sentido si queda algo DESPUÉS con que llenar el
@@ -5778,13 +5779,14 @@ function abrirAvisoFamilia(f) {
   familiaEnAviso = f;
   const extra = f.total - f.dentro;
   const menos = cantidadEnFila - f.dentro;
+  const totalJuntas = cantidadEnFila + extra;
   $("aviso-fam-texto").textContent =
-    `El pedido ${f.pedido_id} se divide en ${f.total} facturas y con ` +
-    `${cantidadEnFila} solo ${f.dentro === 1 ? "entraría 1" : "entrarían " + f.dentro}. ` +
+    `El pedido ${f.pedido_id}${f.cliente ? " (" + f.cliente + ")" : ""} se divide en ` +
+    `${f.total} facturas y con ${cantidadEnFila} solo ` +
+    `${f.dentro === 1 ? "entraría 1" : "entrarían " + f.dentro}. ` +
     `Un pedido dividido se llena entero o no se llena: elige cómo cierra el lote.`;
-  $("aviso-fam-juntas").textContent = `Llenar las ${f.total} juntas`;
-  $("aviso-fam-juntas").title =
-    `El lote sale con ${extra} factura${extra > 1 ? "s" : ""} más de las que pediste.`;
+  $("aviso-fam-juntas").textContent =
+    `Llenar las ${f.total} juntas (salen ${totalJuntas} facturas)`;
   $("aviso-fam-saltar").style.display = f.hayConQueRellenar ? "" : "none";
   $("aviso-fam-saltar").title =
     `Se llenan las ${cantidadEnFila} que pediste con los pedidos que siguen; ` +
