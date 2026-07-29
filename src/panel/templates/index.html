@@ -51,9 +51,6 @@
   .rapida-chip:hover:not(:disabled) { background:rgba(255,255,255,.14); }
   .rapida-chip.on { background:#f2f4f8; border-color:#f2f4f8; color:#1d2433; font-weight:600; }
   .rapida-chip:disabled { opacity:.4; }
-  /* Los preajustes son ACCIONES, no estado: el borde punteado los separa de los
-     chips de arriba, que sí muestran cómo está puesto cada switch. */
-  .rapida-preajuste { border-style:dashed; }
   #rapida-n { width:44px; padding:2px 4px; text-align:center; font-size:12px; }
   /* Aviso de conexión perdida (2026-07-27). Primera fila del body (que es un
      flex column): empuja al resto en vez de taparlo, sin posicionamiento fijo
@@ -254,6 +251,17 @@
   tr.fila-conflicto:hover td { background:#f6f6f6; }
   tr.fila-conflicto.abierto:hover td { background:#fdecec; }
   tr.fila-conflicto button { margin-left:10px; vertical-align:middle; }
+  /* Líneas omitidas del llenado (2026-07-29, decisión del usuario): mismo
+     patrón visual que el doble llenado, pero ámbar — no es un problema de
+     plata, es una revisión pendiente. Sin revisar grita; revisada baja a gris
+     como rastro de cuándo se despachó. */
+  tr.fila-omitidas td { background:#f6f6f6; color:var(--mut); font-size:12px;
+                     padding-top:0; padding-bottom:8px; }
+  tr.fila-omitidas.pendiente td { background:#fffbeb; color:#b54708;
+                     font-weight:600; border-left:4px solid #f5a524; }
+  tr.fila-omitidas:hover td { background:#f6f6f6; }
+  tr.fila-omitidas.pendiente:hover td { background:#fffbeb; }
+  tr.fila-omitidas button { margin-left:10px; vertical-align:middle; }
   #aviso-conflictos { background:#c62828; color:#fff; border-radius:8px;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; cursor:pointer; }
@@ -318,6 +326,9 @@
      verde apagado — no es un problema, es una decisión que alguien tomó y que
      tiene que verse antes de llenar. */
   .chip.ajustada { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
+  /* "Por revisar" (2026-07-29): quedaron líneas omitidas sin despachar. Mismo
+     ámbar que despacho-difiere: ese color ya dice "hay que mirar esto". */
+  .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   /* --- Detalle del pedido (2026-07-29) ------------------------------------
      Se abre DEBAJO de la fila, no en un modal: el operador compara contra la
      lista y contra el papel que tiene al lado sin perder de vista dónde está. */
@@ -884,20 +895,20 @@
      Los dos SÍ son preguntas — hay salidas distintas entre las que elegir — y
      por eso interrumpen. */
   #aviso-fam-overlay, #tasa-overlay, #docencurso-overlay, #repetida-overlay,
-  #trancon-overlay, #configmaq-overlay {
+  #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay {
                        position:fixed; inset:0; background:rgba(29,36,51,.45);
                        display:none; z-index:20; align-items:flex-start; justify-content:center; }
   #aviso-fam-overlay.visible, #tasa-overlay.visible, #docencurso-overlay.visible,
   #repetida-overlay.visible, #trancon-overlay.visible,
-  #configmaq-overlay.visible { display:flex; }
+  #configmaq-overlay.visible, #lineas-omitidas-overlay.visible { display:flex; }
   #aviso-fam-caja, #tasa-caja, #docencurso-caja, #repetida-caja, #trancon-caja,
-  #configmaq-caja {
+  #configmaq-caja, #lineas-omitidas-caja {
                     background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                     width:min(480px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #aviso-fam-caja h3, #tasa-caja h3, #docencurso-caja h3, #repetida-caja h3,
-  #trancon-caja h3, #configmaq-caja h3 { margin:0 0 10px; font-size:14px; }
+  #trancon-caja h3, #configmaq-caja h3, #lineas-omitidas-caja h3 { margin:0 0 10px; font-size:14px; }
   #aviso-fam-caja p, #tasa-caja p, #docencurso-caja p, #repetida-caja p,
-  #trancon-caja p, #configmaq-caja p { margin:0 0 12px; font-size:13.5px; }
+  #trancon-caja p, #configmaq-caja p, #lineas-omitidas-caja p { margin:0 0 12px; font-size:13.5px; }
   /* Configuración obligatoria de la máquina (2026-07-29): los dos campos se
      resuelven DENTRO del aviso — el que falta arranca vacío y con el foco. */
   #configmaq-caja label { display:block; font-weight:600; font-size:13px;
@@ -915,10 +926,11 @@
      por si el alto que hace falta no cabe en la pantalla. */
   body.modo-llenado #tasa-overlay, body.modo-llenado #docencurso-overlay,
   body.modo-llenado #repetida-overlay, body.modo-llenado #trancon-overlay,
-  body.modo-llenado #configmaq-overlay { overflow-y:auto; }
+  body.modo-llenado #configmaq-overlay,
+  body.modo-llenado #lineas-omitidas-overlay { overflow-y:auto; }
   body.modo-llenado #tasa-caja, body.modo-llenado #docencurso-caja,
   body.modo-llenado #repetida-caja, body.modo-llenado #trancon-caja,
-  body.modo-llenado #configmaq-caja {
+  body.modo-llenado #configmaq-caja, body.modo-llenado #lineas-omitidas-caja {
                     margin-top:10px; width:min(700px, 96vw); padding:14px 16px; }
   /* El aviso del documento sin terminar es la excepción (2026-07-28, pedido del
      usuario): cabe en la caja SIN agrandar la ventana. Título y botonera pegados
@@ -931,6 +943,11 @@
      avisos pendientes de la barra: es lo que el operador tiene que sopesar. */
   #tasa-consecuencia { background:#fef0c7; color:#b54708; border-radius:6px;
                        padding:8px 10px; }
+  /* Lista de líneas omitidas dentro del aviso de fin de llenado (2026-07-29):
+     mismo ámbar "hay que sopesar esto" que #tasa-consecuencia. */
+  #lineas-omitidas-lista { background:#fef0c7; color:#b54708; border-radius:6px;
+                           padding:8px 10px; margin:0 0 12px; font-size:13px;
+                           line-height:1.5; }
   /* La tasa se escribe DENTRO del aviso (pedido del usuario 2026-07-22): el
      overlay tapa el campo Tasa de la barra, así que pedirla allá obligaba a
      parar, escribirla y volver a dar Llenar. Viene pre-llenada con la última
@@ -1044,13 +1061,6 @@
        Solo aparece con el modo admin prendido, igual que esas opciones. -->
   <div id="barra-rapida" style="display:none">
     <span class="rapida-grupo">
-      <b>Empresa</b>
-      <button type="button" class="rapida-chip" id="rapida-emp-999" onclick="rapidaEmpresa('999')"
-              title="Prueba de implantación: relleno fijo (mismo cliente y dos artículos que sí existen allá) y cierre asistido.">999</button>
-      <button type="button" class="rapida-chip" id="rapida-emp-001" onclick="rapidaEmpresa('001')"
-              title="Finca Dos Aguas: datos reales del pedido y el sistema se detiene sin Aceptar, como en producción.">001</button>
-    </span>
-    <span class="rapida-grupo">
       <b>Llena</b>
       <button type="button" class="rapida-chip" id="rapida-completa" onclick="rapidaCuanto(false)"
               title="Todas las líneas de la factura, igual que en producción.">Completa</button>
@@ -1069,11 +1079,11 @@
               title="No se elige serie: queda la que esté puesta en el programa.">Serie</button>
     </span>
     <span class="rapida-grupo">
-      <b>Preajuste</b>
-      <button type="button" class="rapida-chip rapida-preajuste" onclick="preajusteLlenado('completo')"
-              title="Deja el llenado como en producción: factura completa y sin saltar tasa, fecha ni serie.">Todo completo</button>
-      <button type="button" class="rapida-chip rapida-preajuste" onclick="preajusteLlenado('prueba')"
-              title="Deja el llenado corto: recorta a las primeras líneas y salta tasa, fecha y serie.">Todo de prueba</button>
+      <b>Al llenar</b>
+      <button type="button" class="rapida-chip" id="rapida-procesadas-si" onclick="rapidaProcesadas(true)"
+              title="El pedido llenado pasa a PROCESADAS y no se vuelve a ofrecer, igual que en producción.">Pasa a procesadas</button>
+      <button type="button" class="rapida-chip" id="rapida-procesadas-no" onclick="rapidaProcesadas(false)"
+              title="El pedido sigue en PENDIENTES tras llenarlo, para repetirlo cuantas veces haga falta.">Sigue pendiente</button>
     </span>
     <span class="rapida-grupo">
       <b>Carga</b>
@@ -1973,6 +1983,26 @@
   </div>
 </div>
 
+<!-- Faltaron líneas en el documento (2026-07-29, decisión del usuario): el
+     llenado puede saltarse renglones (artículo sin precio, código
+     inexistente, cantidad 0, un aviso que no reconoce) y seguir — el
+     documento queda en pantalla incompleto y el operador lo Acepta él mismo,
+     así que hay que decírselo ANTES de que lo haga. Mismo patrón que el
+     trancón: aparece solo, sin que el operador lo pida, SIN cierre por clic
+     afuera — solo por sus botones. -->
+<div id="lineas-omitidas-overlay">
+  <div id="lineas-omitidas-caja">
+    <h3>Faltaron líneas en el documento</h3>
+    <p id="lineas-omitidas-resumen"></p>
+    <div id="lineas-omitidas-lista"></div>
+    <p>El documento que está en pantalla no tiene esos renglones.</p>
+    <div class="editor-acciones">
+      <button class="primario" onclick="cerrarLineasOmitidas()">Entendido</button>
+      <button onclick="marcarLineasOmitidasRevisada()">Ya la completé a mano</button>
+    </div>
+  </div>
+</div>
+
 <div id="repetida-overlay" onclick="if(event.target===this)resolverRepetida(false)">
   <div id="repetida-caja">
     <h3>Esta factura ya se llenó en esta sesión de prueba</h3>
@@ -2625,6 +2655,37 @@ async function responderTrancon(reiniciar) {
     : "Sin cambios: el programa de facturación quedó como está.", "info", reiniciar);
   try { await api("/api/responder_trancon", {reiniciar: reiniciar}); }
   catch (e) { mensaje("No se pudo responder el aviso: " + e.message, "error"); }
+}
+
+// Aviso "faltaron líneas en el documento" al terminar un llenado (2026-07-29,
+// decisión del usuario). El aviso ámbar de la barra (mensaje()) se queda
+// como está — este modal es adicional y avisa aparte porque hay que revisar
+// la factura DESPUÉS, no solo en este momento.
+let lineasOmitidasPedido = null;   // {pedido_id, parte} de la factura en aviso
+
+function abrirLineasOmitidas(pedido_id, parte, omitidas, llenadas, pedidas) {
+  lineasOmitidasPedido = {pedido_id, parte};
+  $("lineas-omitidas-resumen").textContent =
+    `${refFacturaUbicable(pedido_id, parte)}: se escribieron ${llenadas} de ${pedidas} líneas.`;
+  $("lineas-omitidas-lista").innerHTML = Object.entries(omitidas || {})
+    .map(([codigo, motivo]) => `${esc(codigo)} — ${esc(motivo)}`).join("<br>");
+  $("lineas-omitidas-overlay").classList.add("visible");
+  crecerVentanaPorModal("lineas-omitidas-caja");
+}
+
+function cerrarLineasOmitidas() {
+  lineasOmitidasPedido = null;
+  $("lineas-omitidas-overlay").classList.remove("visible");
+  replantarCajaFlotante();
+}
+
+// "Ya la completé a mano": el operador ya escribió a mano lo que faltó. El
+// botón "Entendido" NO llama a este endpoint — la factura se queda "por
+// revisar" en PROCESADAS hasta que se marque desde ahí (marcarFacturaRevisada).
+async function marcarLineasOmitidasRevisada() {
+  const pedido = lineasOmitidasPedido;
+  cerrarLineasOmitidas();
+  if (pedido) await marcarFacturaRevisada(pedido.pedido_id, pedido.parte);
 }
 
 // Modal "esta factura ya se llenó en esta sesión de prueba" (2026-07-26): el
@@ -4133,6 +4194,14 @@ const chipAjustes = (f) =>
         f.ajustes_manuales === 1 ? "1 línea a mano" : `${f.ajustes_manuales} líneas a mano`}</span>`
     : "";
 
+// El llenado se saltó renglones y todavía nadie despachó la revisión
+// (2026-07-29). El renglón con el detalle va aparte, a todo el ancho de la
+// fila (ver filaProcesada); el chip es solo la marca rápida en la lista.
+const chipPorRevisar = (f) =>
+  f.revision_pendiente
+    ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
+    : "";
+
 // El pedido traía un producto en varias líneas: se factura una sola con la
 // cantidad total (el programa de facturación no admite el mismo artículo
 // repetido en un documento). El monto no cambia; se avisa porque el número de
@@ -4780,6 +4849,20 @@ function filaProcesada(f, enFamilia) {
           : ""}
       </td>
     </tr>` : "";
+  // Líneas omitidas (2026-07-29): renglón propio a todo lo ancho, igual que
+  // el de doble llenado. Sin revisar grita en ámbar con su botón; revisada
+  // baja a gris y se queda como rastro de cuándo se despachó.
+  const omitidas = f.lineas_omitidas ? `
+    <tr class="fila-omitidas${f.revision_pendiente ? " pendiente" : ""}"
+        data-factura-key="${clave}">
+      <td colspan="11">
+        ${f.revision_pendiente
+          ? `<span>Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas).replaceAll("\n", "<br>")}</span>
+             <button class="acento" onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`
+          : `<span>Se revisó el ${esc((f.revisada_at || "").replace("T", " ").slice(0, 16))}. `
+            + `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas).replaceAll("\n", "<br>")}</span>`}
+      </td>
+    </tr>` : "";
   const abre = abridorDetalle(f);
   return `
     <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
@@ -4793,10 +4876,22 @@ function filaProcesada(f, enFamilia) {
         reemisiones ? `<div class="mut">${esc(reemisiones).replaceAll("\n", "<br>")}</div>` : ""}</td>
       <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
-      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}</td>
+      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td style="white-space:nowrap">${accionesDeFila(f)}</td>
-    </tr>${conflicto}${filaDetalle(f, 11)}
+    </tr>${conflicto}${omitidas}${filaDetalle(f, 11)}
     <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
+}
+
+// Botón "Revisada" del renglón de líneas omitidas, y "Ya la completé a mano"
+// del aviso que se abre al terminar el llenado (marcarLineasOmitidasRevisada):
+// el operador ya vio qué faltó y despacha la factura tal como quedó.
+async function marcarFacturaRevisada(pedido_id, parte) {
+  try {
+    await api("/api/factura_revisada", {pedido_id, parte});
+    cargar();
+  } catch (e) {
+    mensaje("No se pudo marcar la factura como revisada: " + e.message, "error");
+  }
 }
 
 // --- Llenado ---------------------------------------------------------------
@@ -5139,6 +5234,14 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
           (avisos ? ` OJO: ${avisos}.` : "");
       const tipoExito = avisos ? "alerta" : "exito";
       mensaje(textoExito, tipoExito);
+      // Líneas omitidas (2026-07-29, decisión del usuario): el documento en
+      // pantalla puede tener MENOS renglones de los pedidos — se avisa aparte
+      // del OJO ámbar de arriba porque hay que revisar la factura DESPUÉS, no
+      // solo ahora. El modal es adicional; el mensaje de arriba se queda como
+      // está.
+      const huboOmitidas = r.lineas_omitidas && Object.keys(r.lineas_omitidas).length > 0;
+      if (huboOmitidas)
+        abrirLineasOmitidas(pedido_id, parte, r.lineas_omitidas, r.lineas_llenadas, r.lineas_pedidas);
       // Espera de envío a la plataforma (2026-07-28, TEMPORAL): solo en
       // producción, solo en llenado individual y solo si el documento quedó EN
       // PANTALLA (r.cierre null) — si el paso de cierre ya lo canceló o lo
@@ -5158,12 +5261,20 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // Detener pulsado mientras se esperaba el «Continuar» (2026-07-26): esa
         // factura llega con exito=true porque su documento YA quedó cerrado,
         // así que sin esta rama la corrida encadenaba la siguiente y el Detener
-        // se comportaba como un Continuar.
+        // se comportaba como un Continuar. Va de PRIMERO aunque además hayan
+        // faltado líneas: parar es parar, y el aviso de las omitidas ya se
+        // abrió arriba de todos modos.
         if (r.detenido_por_operador) {
           detenerSecuencia(
             `Detenido: ${refFacturaUbicable(pedido_id, parte)} quedó lista y su ` +
             `documento cerrado (${hechasEnFila} de ${metaEnFila}). La corrida ` +
             `no sigue.` + (avisos ? ` OJO: ${avisos}.` : ""));
+        } else if (huboOmitidas) {
+          // La corrida no sigue sola sobre una factura incompleta: se pausa
+          // igual que ante cualquier otro fallo, para que el operador decida.
+          pausarSecuenciaPorFallo(
+            `${refFacturaUbicable(pedido_id, parte)} quedó incompleta (${hechasEnFila} de ` +
+            `${metaEnFila}): faltaron líneas y hay que revisarla.`);
         } else if (hechasEnFila < metaEnFila) {
           continuarEnFila = true;
         } else {
@@ -6574,8 +6685,6 @@ function pintarBarraRapida() {
   const es999 = $("prueba-emp-999").checked;
   const recorta = $("prueba-cuanto-recorte").checked;
   const marcar = (id, on) => $(id).classList.toggle("on", on);
-  marcar("rapida-emp-999", es999);
-  marcar("rapida-emp-001", !es999);
   marcar("rapida-completa", !recorta);
   marcar("rapida-recorte", recorta);
   $("rapida-n").value = $("prueba-recortar-n").value;
@@ -6587,14 +6696,10 @@ function pintarBarraRapida() {
     // regla que abajo, ver pintarOpcionesPrueba).
     chip.disabled = es999;
   }
+  marcar("rapida-procesadas-si", $("prueba-procesadas-si").checked);
+  marcar("rapida-procesadas-no", $("prueba-procesadas-no").checked);
   marcar("rapida-canal-produccion", $("prueba-canal-produccion").checked);
   marcar("rapida-canal-desarrollo", $("prueba-canal-desarrollo").checked);
-}
-
-function rapidaEmpresa(cual) {
-  $("prueba-emp-999").checked = cual === "999";
-  $("prueba-emp-001").checked = cual === "001";
-  guardarOpcionesPrueba();
 }
 
 function rapidaCuanto(recortar) {
@@ -6614,23 +6719,15 @@ function rapidaSalto(cual) {
   guardarOpcionesPrueba();
 }
 
-function rapidaCanal(canal) {
-  $("prueba-canal-desarrollo").checked = canal === "desarrollo";
-  $("prueba-canal-produccion").checked = canal === "produccion";
+function rapidaProcesadas(marcar) {
+  $("prueba-procesadas-si").checked = marcar;
+  $("prueba-procesadas-no").checked = !marcar;
   guardarOpcionesPrueba();
 }
 
-// Un clic deja el llenado entero de un lado: 'completo' = como en producción
-// (factura completa, sin saltar tasa, fecha ni serie); 'prueba' = corto (las
-// primeras líneas y los tres saltos). No toca la empresa ni el canal a
-// propósito — eso es dónde factura y qué versión corre el equipo, no cuánto se
-// llena; cada uno queda en su chip.
-function preajusteLlenado(cual) {
-  const prueba = cual === "prueba";
-  $("prueba-cuanto-recorte").checked = prueba;
-  $("prueba-cuanto-completa").checked = !prueba;
-  for (const id of ["prueba-saltar-tasa", "prueba-saltar-fecha", "prueba-saltar-serie"])
-    $(id).checked = prueba;
+function rapidaCanal(canal) {
+  $("prueba-canal-desarrollo").checked = canal === "desarrollo";
+  $("prueba-canal-produccion").checked = canal === "produccion";
   guardarOpcionesPrueba();
 }
 
