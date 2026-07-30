@@ -371,8 +371,12 @@
      líneas quedaban apretadas entre las facturas de arriba y las de abajo. */
   .celda-detalle { cursor:pointer; }
   .celda-detalle:hover { text-decoration:underline; text-decoration-style:dotted; }
-  .btn-detalle { padding:1px 7px; margin-left:6px; font-size:11px; line-height:1.6;
-                 color:var(--mut); }
+  /* "Ver detalles" vive en la columna de acciones, junto a Llenar/Descartar
+     (pedido del usuario 2026-07-30), separado por una línea fina para que no
+     se lea como parte del mismo grupo. */
+  .btn-detalle { padding:5px 9px; font-size:12.5px; }
+  .sep-acciones { display:inline-block; width:1px; height:16px; margin:0 8px;
+                  background:#cbd2dc; vertical-align:middle; }
   .detalle-cab { font-size:12.5px; margin-bottom:8px; }
   #detalle-cuerpo table { font-size:12.5px; }
   #detalle-cuerpo th, #detalle-cuerpo td { padding:5px 8px; vertical-align:middle; }
@@ -4145,13 +4149,15 @@ function nubeClase() {
   return "nube-ok";
 }
 
+// Sin contador de segundos (pedido del usuario 2026-07-30): lo que corre cada
+// pocos segundos marcaría un número distinto en cada pintada, puro ruido para
+// quien solo quiere saber si está al día. El minuto es la unidad mínima.
 function haceTexto(ts) {
   if (!ts) return "sin datos aún";
   const ms = Date.now() - (typeof ts === "number" ? ts : new Date(ts).getTime());
   if (isNaN(ms) || ms < 0) return "sin datos aún";
-  const s = Math.round(ms / 1000);
-  if (s < 60) return "hace " + s + " s";
-  const m = Math.round(s / 60);
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "hace menos de 1 min";
   if (m < 60) return "hace " + m + " min";
   const h = Math.floor(m / 60);
   return "hace " + h + " h" + (m % 60 ? " " + (m % 60) + " min" : "");
@@ -4175,7 +4181,7 @@ function armarPopoverNube(clase) {
     html += `<div class="nube-nota">Lo que hagan las otras computadoras puede `
           + `no verse al día. Se reintenta solo cada pocos segundos.</div>`;
   }
-  html += `<div class="nube-fila" title="Se revisan solos cada 5 segundos.">`
+  html += `<div class="nube-fila" title="Se revisan solos cada pocos segundos.">`
         + `<span>Pedidos y facturas</span><span>`
         + (nube.ultimoOk ? "revisados " + haceTexto(nube.ultimoOk) : "sin datos aún")
         + `</span></div>`;
@@ -4779,14 +4785,22 @@ const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 // las que identifican el pedido y quedan a mano sin ir a buscar el botón.
 function botonDetalle(f) {
   if (f.tiene_detalle === false) return "";
-  return ` <button class="btn-detalle"
+  return `<button class="btn-detalle"
     title="Qué se llena en cada línea de esta factura"
-    onclick="event.stopPropagation();abrirDetalle('${esc(f.pedido_id)}',${f.parte})"
+    onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"
     >Ver detalles</button>`;
 }
 
 const abridorDetalle = (f) => f.tiene_detalle === false ? ""
   : ` class="celda-detalle" onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"`;
+
+// Columna de acciones: "Ver detalles" primero (si aplica), separado por una
+// línea fina de Llenar/Descartar/etc. (accionesDeFila).
+function celdaAcciones(f) {
+  const vd = botonDetalle(f);
+  const resto = accionesDeFila(f);
+  return vd + (vd && resto ? `<span class="sep-acciones"></span>` : "") + resto;
+}
 
 async function abrirDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
@@ -5072,14 +5086,14 @@ function filaPendiente(f, enFamilia) {
   const abre = abridorDetalle(f);
   return `
     <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
-      <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}${botonDetalle(f)}</td>
+      <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td${abre}>${enFamilia ? "" : esc(f.razon_social || f.cliente_id)}</td>
       <td${abre}>${enFamilia ? "" : esc(f.ruta || "")}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
       <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}</td>
-      <td style="white-space:nowrap">${accionesDeFila(f)}</td>
+      <td style="white-space:nowrap">${celdaAcciones(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
 }
@@ -5419,7 +5433,7 @@ function filaProcesada(f, enFamilia) {
   const abre = abridorDetalle(f);
   return `
     <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
-      <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}${botonDetalle(f)}</td>
+      <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td${abre}>${enFamilia ? "" : esc(f.razon_social || f.cliente_id || "")}</td>
       <td${abre}>${enFamilia ? "" : esc(f.ruta || "")}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
@@ -5430,7 +5444,7 @@ function filaProcesada(f, enFamilia) {
       <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
-      <td style="white-space:nowrap">${accionesDeFila(f)}</td>
+      <td style="white-space:nowrap">${celdaAcciones(f)}</td>
     </tr>${conflicto}${omitidas}
     <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
 }
