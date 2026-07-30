@@ -8848,11 +8848,18 @@ async function abrirCatalogo(tipo, prefill) {
     const query = tipo === "feriados" && feriadoAnio ? "?anio=" + feriadoAnio : "";
     const d = await api("/api/catalogo/" + tipo + query);
     if (tipo === "feriados") feriadoAnio = d.anio;
+    // Recargar el MISMO catálogo (lo que pasa tras guardar o borrar una fila)
+    // conserva filtro y página: quien acaba de cambiar algo necesita verlo ahí
+    // mismo para comprobarlo o deshacerlo, y devolverlo al listado completo se
+    // lo esconde. Cambiar de catálogo sí arranca limpio.
+    const mismoCatalogo = tipo === catalogoActual;
+    const filtroPrevio = mismoCatalogo && $("cat-filtro") ? $("cat-filtro").value : "";
     catalogoActual = tipo;
     catalogoFilas = d.filas;
     // No se oculta aquí: tras guardar una fila se restaura la ventana del cliente.
     clienteEnEdicion = null;     // abrir un catálogo siempre vuelve al listado
-    paginacion.catalogo.pagina = 1;
+    // paginar() recorta sola la página si el catálogo encogió y quedó fuera de rango.
+    if (!mismoCatalogo) paginacion.catalogo.pagina = 1;
     pintarBotonesCatalogos();
     // Esta vista es la de AJUSTES; Descuentos tiene su propia pestaña y su
     // propio render (renderDescuentos), no pasa por aquí.
@@ -8876,7 +8883,7 @@ async function abrirCatalogo(tipo, prefill) {
         ${leyenda ? `<div class="orig-leyenda">${leyenda}</div>` : ""}
         ${d.aviso ? `<p class="detalle-error" style="margin:0 0 8px">${esc(d.aviso)}</p>` : ""}
         <div class="cat-cabecera" style="padding:0 0 10px">
-          <span class="buscador"><input type="text" id="cat-filtro" placeholder="filtrar…" oninput="paginacion.catalogo.pagina=1;pintarFilasCatalogo()">
+          <span class="buscador"><input type="text" id="cat-filtro" placeholder="filtrar…" value="${esc(filtroPrevio)}" oninput="paginacion.catalogo.pagina=1;pintarFilasCatalogo()">
             <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
                 onclick="limpiarBuscador('cat-filtro', function(){paginacion.catalogo.pagina=1;pintarFilasCatalogo();})">&times;</button></span>
           ${def.cabeceraExtra ? def.cabeceraExtra(d) : ""}
