@@ -762,7 +762,7 @@
                     padding:6px 10px; border-bottom:1px solid #eef0f4; font-size:13px; }
   .desc-suc-row { padding-left:30px; background:#fafbfc; font-size:12.5px; }
   .desc-cli-row .nom { flex:1; }
-  .desc-cli-row .badge { font-size:10.5px; color:#15803d; border:1px solid #9dcfae;
+  .desc-cli-row .badge, tr.grupo .badge { font-size:10.5px; color:#15803d; border:1px solid #9dcfae;
                          border-radius:10px; padding:0 6px; }
   .fav { cursor:pointer; font-size:15px; line-height:1; }
   /* La estrella va en su propia columna, alineada al borde derecho de la fila
@@ -4050,11 +4050,13 @@ function paginarClientes(tab, items) {
   const totalPaginas = Math.max(1, paginas.length);
   p.pagina = Math.min(Math.max(1, p.pagina), totalPaginas);
   const visibles = paginas[p.pagina - 1] || [];
-  // Cuántas sucursales quedaron atrás: las páginas no miden todas igual, así
-  // que se suman en vez de multiplicar por el tamaño de página.
+  // Cuántos ítems quedaron atrás: las páginas no miden todas igual, así
+  // que se suman en vez de multiplicar por el tamaño de página. Cada ítem es
+  // un cliente resuelto (una fila resume TODAS sus sucursales, 2026-07-30) o
+  // una entrada suelta — ya no una sucursal, de ahí la unidad "filas".
   const desde = paginas.slice(0, p.pagina - 1)
                        .reduce((n, pagina) => n + pagina.length, 0);
-  pintarPiePaginacion(tab, p, items.length, desde, visibles.length, totalPaginas, "sucursales");
+  pintarPiePaginacion(tab, p, items.length, desde, visibles.length, totalPaginas, "filas");
   return visibles;
 }
 
@@ -8542,6 +8544,15 @@ function pintarClientesAgrupados(filtro) {
     grupos.get(codigo).filas.push([f, i]);
   });
   let lista = [...grupos.values()];
+  // Cadena efectiva (misma regla que la ficha del cliente): el override manual
+  // manda; si es NULL, la automática (≥2 sucursales o con código de sucursal).
+  // Las sueltas no son un cliente resuelto todavía, así que no aplica.
+  for (const g of lista) {
+    if (g.sueltas) continue;
+    const [primera] = g.filas[0];
+    const auto = g.filas.length >= 2 || g.filas.some(([f]) => f.codigo_sucursal_winledger);
+    g.esCadena = primera.es_cadena_manual == null ? auto : !!primera.es_cadena_manual;
+  }
   // Las entradas nuevas de primeras (son el trabajo pendiente), los cruces sin
   // código al final y los favoritos arriba del resto; dentro de cada bloque
   // manda el orden alfabético que ya trae el backend.
@@ -8556,33 +8567,46 @@ function pintarClientesAgrupados(filtro) {
           .some(c => String(f[c] ?? "").toLowerCase().includes(filtro)))};
     }).filter(g => g.filas.length);
   }
-  // Se aplana en filas para paginar por sucursal; cada fila recuerda su
-  // grupo, y la cabecera del grupo se pinta cuando cambia. Ningún cliente
-  // queda partido entre dos páginas (ver paginasPorCliente).
+  // Un cliente ya resuelto se resume en UNA fila (2026-07-30, pedido del
+  // usuario): sus sucursales ya no se listan aquí, viven en su ficha ("Ver
+  // detalle"). Las sueltas siguen una fila por entrada — cada una es un caso
+  // independiente por resolver, todavía sin cliente que las agrupe.
   const items = [];
-  for (const g of lista) for (const par of g.filas) items.push([g, par]);
+  for (const g of lista) {
+    if (g.sueltas) { for (const par of g.filas) items.push([g, par]); }
+    else items.push([g, null]);
+  }
   const visibles = paginarClientes("catalogo", items);
   const nuevas = catalogoFilas.filter(esEntradaNueva).length;
-  $("cat-conteo").textContent = `${lista.length} cliente(s) · ${items.length} sucursal(es)`
+  const totalSucursales = lista.reduce((n, g) => n + g.filas.length, 0);
+  $("cat-conteo").textContent = `${lista.length} cliente(s) · ${totalSucursales} sucursal(es)`
     + (nuevas ? ` · ${nuevas} por clasificar` : "");
   let html = "", grupoPintado = null;
-  for (const [g, [f, i]] of visibles) {
-    if (g !== grupoPintado) {
-      grupoPintado = g;
-      // Un grupo de entradas sueltas no es un cliente: no lleva el "Editar" de
-      // cabecera (abría todas juntas) ni estrella de favorito, y explica qué
-      // hay que hacer con lo que tiene debajo.
-      html += g.sueltas
-        ? `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}
+  for (const [g, par] of visibles) {
+    if (g.sueltas) {
+      if (g !== grupoPintado) {
+        grupoPintado = g;
+        // Un grupo de entradas sueltas no es un cliente: no lleva el "Ver
+        // detalle" de cabecera (abría todas juntas) ni estrella de favorito, y
+        // explica qué hay que hacer con lo que tiene debajo.
+        html += `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}
              <div class="mut" style="font-weight:400">${g.nuevas
                ? "Llegaron solas de la app de pedidos. Sus pedidos esperan en revisión hasta que digas si cada una es un cliente independiente o la sucursal de otro — además del nombre, hace falta el código de cliente (y el de sucursal, si la hay) para que funcione."
                : "Cruces sin código de cliente: se resuelven uno por uno."}</div>
-           </td></tr>`
-        : `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}
-             <button style="float:right" onclick="editarCliente('${esc(g.codigo)}')">Editar</button>
+           </td></tr>`;
+      }
+      const [f, i] = par;
+      html += filaSucursalHtml(f, i, g.sueltas, {suelta: g.sueltas, nueva: g.nuevas});
+    } else {
+      // Cadena o cliente de sucursal única, más visible que antes (pedido del
+      // usuario 2026-07-30): el detalle de cada sucursal ya no se lista aquí,
+      // solo cuántas hay.
+      const badge = g.esCadena
+        ? ` <span class="badge">cadena · ${g.filas.length} sucursales</span>` : "";
+      html += `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}${badge}
+             <button style="float:right" onclick="editarCliente('${esc(g.codigo)}')">Ver detalle</button>
            </td></tr>`;
     }
-    html += filaSucursalHtml(f, i, g.sueltas, {suelta: g.sueltas, nueva: g.nuevas});
   }
   $("t-catalogo").querySelector("tbody").innerHTML =
     html || `<tr><td colspan="4" class="mut">Sin clientes que coincidan.</td></tr>`;
@@ -8595,7 +8619,7 @@ function pintarClientesAgrupados(filtro) {
 // sin código): se muestra con su clave interna y, si además es nueva, el botón
 // dice "Clasificar" en vez de "Editar".
 function filaSucursalHtml(f, i, conEditar, opciones) {
-  const {suelta = false, nueva = false} = opciones || {};
+  const {suelta = false, nueva = false, conToggleActivo = false} = opciones || {};
   // "Borrar de verdad" (modo prueba de implantación o modo admin): solo en
   // la ventana de UN cliente y solo sobre un cruce creado a mano en
   // el panel (origen 'manual') — los del catálogo real no se tocan.
@@ -8607,14 +8631,35 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // entradas nuevas pueden llegar con el nombre en blanco o repetido, y sin la
   // clave no hay forma de saber cuál se está abriendo.
   const nombre = esc(f.sucursal_nombre || (suelta ? "(nombre no llegó)" : "(única)"));
+  // Toggle de un clic (solo dentro de la ficha del cliente, 2026-07-30): fuera
+  // de ahí se conserva el punto informativo, sin click.
+  const celdaActivo = conToggleActivo
+    ? `<label style="cursor:pointer" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté desmarcada, esta sucursal no entra al proceso automático de facturación.">
+         <input type="checkbox" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`
+    : puntoEstado(f.activo);
   return `<tr>
     <td style="padding-left:26px">${nombre}${suelta
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
-    <td>${puntoEstado(f.activo)}</td>
+    <td>${celdaActivo}</td>
     <td>${conEditar ? `<button class="${nueva ? "acento" : ""}" onclick="abrirEditor(${i})">${
       nueva ? "Clasificar" : "Editar"}</button>${borrarDefinitivo}` : ""}</td>
   </tr>`;
+}
+
+// Activa/desactiva UNA sucursal desde su toggle en la ficha del cliente
+// (2026-07-30): sale del proceso automático de facturación mientras esté
+// desmarcada, sin pasar por el editor completo de la fila.
+async function alternarActivoSucursal(indice) {
+  const f = catalogoFilas[indice];
+  try {
+    const r = await api("/api/sucursal/activo", {cliente_id: f.cliente_id, activo: !f.activo});
+    f.activo = r.activo ? 1 : 0;
+    if (r.aviso) mensaje(r.aviso, "error");
+    pintarFilasCatalogo();
+  } catch (e) {
+    avisoFilaCatalogo(indice, "No se pudo cambiar el estado: " + e.message);
+  }
 }
 
 // Estrella de favorito del cliente (misma marca que usa el selector de
@@ -8691,6 +8736,38 @@ async function guardarCadenaCliente(rif, esCadena) {
   return r.es_cadena;
 }
 
+// Aviso "en el objeto" para el check de activo del detalle del cliente: el
+// span vive pegado a él (data-activo-cliente-aviso).
+function avisoActivoCliente(codigo, msg) {
+  const sel = (window.CSS && CSS.escape) ? CSS.escape(codigo) : codigo;
+  const el = document.querySelector(`[data-activo-cliente-aviso="${sel}"]`);
+  if (!el) { mensaje(msg, "error"); return; }
+  el.textContent = msg;
+  el.style.display = "";
+  el.scrollIntoView({block: "nearest"});
+}
+
+// Activa/desactiva el cliente COMPLETO (filtro maestro sobre todas sus
+// sucursales, 2026-07-30): toma el estado efectivo actual y guarda el
+// contrario, igual que alternarCadenaCliente.
+async function alternarActivoCliente(codigo) {
+  const filas = catalogoFilas.filter(f => (f.codigo_cliente_winledger || "") === codigo);
+  if (!filas.length) return;
+  const actual = !!filas[0].activo_cliente;
+  try {
+    await guardarActivoCliente(codigo, !actual);
+    pintarFilasCatalogo();
+  } catch (e) { avisoActivoCliente(codigo, "No se pudo cambiar si el cliente está activo: " + e.message); }
+}
+
+async function guardarActivoCliente(rif, activo) {
+  const r = await api("/api/cliente/activo", {rif, activo});
+  for (const f of catalogoFilas) {
+    if ((f.codigo_cliente_winledger || "") === rif) f.activo_cliente = r.activo ? 1 : 0;
+  }
+  return r.activo;
+}
+
 // Ventana de UN cliente (botón "Editar" de su cabecera): su nombre, sus marcas y
 // sus sucursales, cada una con su Editar. Es una ventana y no una vista dentro de
 // la lista (2026-07-30, pedido del usuario): así la lista de atrás no queda a
@@ -8714,7 +8791,16 @@ function pintarVentanaCliente() {
   // valor efectivo y, al tocarlo, fija el override a mano.
   const autoCadena = filas.length >= 2 || filas.some(([f]) => f.codigo_sucursal_winledger);
   const esCadena = primera.es_cadena_manual == null ? autoCadena : !!primera.es_cadena_manual;
+  const activoCliente = !!primera.activo_cliente;
   const cabecera = clienteEnEdicion ? `
+    <label style="cursor:pointer; font-size:12.5px; display:block; margin-bottom:12px">
+      <input type="checkbox" ${activoCliente ? "checked" : ""}
+             onclick="alternarActivoCliente('${esc(clienteEnEdicion)}')">
+      Cliente activo — desactívalo para sacarlo por completo (todas sus
+      sucursales a la vez) del proceso automático de facturación, sin tocar el
+      estado propio de cada una.
+    </label>
+    <span class="obj-aviso-inline" data-activo-cliente-aviso="${esc(clienteEnEdicion)}" style="display:none"></span>
     <label class="editor-campo" style="max-width:420px">
       <span class="campo-linea">Nombre del cliente${chipOrigen("winledger", true)}</span>
       <input type="text" id="cliente-nombre" value="${esc(primera.nombre_cliente_winledger || "")}"
@@ -8738,7 +8824,7 @@ function pintarVentanaCliente() {
         <th><span class="orig-punto winledger" title="${esc(ORIGENES.winledger.titulo)}"></span>Código sucursal</th>
         <th>Activo</th><th></th>
       </tr></thead>
-      <tbody>${filas.map(([f, i]) => filaSucursalHtml(f, i, true)).join("")}</tbody>
+      <tbody>${filas.map(([f, i]) => filaSucursalHtml(f, i, true, {conToggleActivo: true})).join("")}</tbody>
     </table></div>`;
   // Sin código de cliente no hay a qué colgarle una sucursal nueva.
   $("cliente-agregar").style.display = clienteEnEdicion ? "" : "none";
