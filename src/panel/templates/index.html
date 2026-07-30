@@ -8038,18 +8038,24 @@ const CATALOGOS = {
     // (CONTRATOS.md 4.3, verificado coherente en todo el catálogo). El panel
     // la reconoce al escribir el código (editorDerivarCampos); el backend
     // exige la coherencia igual (candado en guardar del catálogo).
+    // Los dos nombres son informativos —el cruce real se guarda por pt_id +
+    // presentación— pero se pueden corregir a mano (usuario 2026-07-30): son lo
+    // único que dice de qué producto se trata cuando el automático no los trae.
     campos: [
-      // El nombre es informativo (viene del catálogo AppSheet): identifica
-      // el producto al editar o al llegar desde "Crear producto"; el cruce
-      // real se guarda por pt_id + presentación.
-      {campo: "descripcion", etiqueta: "Producto", soloLectura: true,
-       origenDato: "appsheet"},
+      {campo: "descripcion", etiqueta: "Producto", origenDato: "appsheet",
+       ayuda: "Se pone automáticamente con lo que manda la app de pedidos. "
+            + "Si lo escribes aquí, deja de actualizarse solo; bórralo para "
+            + "devolverlo al automático."},
       {campo: "pt_id", etiqueta: "PT_id (código de barras)", obligatorio: true,
        origenDato: "appsheet"},
       {campo: "codigo_articulo", etiqueta: "Código de artículo", obligatorio: true,
        origenDato: "winledger"},
       {campo: "presentacion", etiqueta: "Presentación", derivadaDe: "codigo_articulo",
        origenDato: "winledger"},
+      {campo: "nombre", etiqueta: "Artículo en facturación", origenDato: "winledger",
+       ayuda: "Se pone automáticamente con el nombre que tenga ese código de "
+            + "artículo. Si lo escribes aquí, ese nombre queda para todos los "
+            + "productos que usen el mismo código."},
     ],
     columnas: [
       {campo: "descripcion", etiqueta: "Producto", origenDato: "appsheet"},
@@ -8775,18 +8781,12 @@ function abrirEditor(indice, prefill) {
       c.obligatorioSi ? ` <span class="obligatorio-tag">${esc(c.etiquetaCond || "obligatorio si aplica")}</span>` : "";
     // Etiqueta, pastilla de origen y tag en UNA línea: .editor-campo apila en
     // columna, así que sin este envoltorio cada pedazo caería en su renglón.
+    // `ayuda` va en el hover de la etiqueta: dice ante todo si el campo se pone
+    // solo, que es lo que hace falta saber antes de escribir encima.
     const linea = (nota, extra) =>
-      `<span class="campo-linea"><span class="campo-etiqueta">${esc(c.etiqueta)}${
+      `<span class="campo-linea"><span class="campo-etiqueta"${
+        c.ayuda ? ` title="${esc(c.ayuda)}"` : ""}>${esc(c.etiqueta)}${
         nota || ""}</span>${chip}${extra || ""}</span>`;
-    // Campos informativos (soloLectura, ej. el nombre del producto): se
-    // muestran deshabilitados cuando traen valor y no se pintan vacíos —
-    // no forman parte del formulario ni viajan al guardado.
-    if (c.soloLectura) {
-      if (!valor) return "";
-      return `<label class="editor-campo">${linea()}
-        <input type="text" value="${esc(valor)}" disabled>
-      </label>`;
-    }
     // Campo derivado (la presentación desde el código de artículo): se muestra
     // pero no se edita — lo llena editorDerivarCampos() al escribir la fuente.
     if (c.derivadaDe) {
@@ -8850,7 +8850,6 @@ function firmaEditorCatalogo() {
   const def = CATALOGOS[catalogoActual];
   const partes = [];
   for (const c of def.campos) {
-    if (c.soloLectura) continue;
     const el = $("ed-" + c.campo);
     if (!el) continue;
     partes.push(c.campo + "=" + (c.tipo === "checkbox" ? (el.checked ? "1" : "0") : el.value));
@@ -8902,7 +8901,6 @@ async function guardarEditor(confirmado, nombreEnConflicto) {
   const def = CATALOGOS[catalogoActual];
   const cuerpo = {};
   for (const c of def.campos) {
-    if (c.soloLectura) continue;   // informativo: no viaja al guardado
     const el = $("ed-" + c.campo);
     cuerpo[c.campo] = c.tipo === "checkbox" ? (el.checked ? 1 : 0) : el.value.trim();
   }
@@ -9086,7 +9084,7 @@ function editorMarcarObligatorios() {
   const mezcla = origenesDeCatalogo(def).length > 1;
   const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
   for (const c of def.campos) {
-    if (c.soloLectura || c.tipo === "checkbox" || c.derivadaDe) continue;
+    if (c.tipo === "checkbox" || c.derivadaDe) continue;
     const el = $("ed-" + c.campo);
     if (!el || el.disabled) continue;
     const req = typeof c.obligatorioSi === "function" ? c.obligatorioSi(get) : !!c.obligatorio;
@@ -9134,7 +9132,7 @@ function editorValidar() {
   if (!def) return "";
   const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
   for (const c of def.campos) {
-    if (c.soloLectura || c.tipo === "checkbox") continue;
+    if (c.tipo === "checkbox") continue;
     const el = $("ed-" + c.campo);
     // Derivado: si la fuente ya está llena pero no resuelve (un código que no
     // es paq ni kg), se bloquea con explicación — no se adivina.
