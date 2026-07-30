@@ -4606,7 +4606,7 @@ function contenidoDetalle(clave) {
        ${d.causa_salida ? ` · ${esc(d.causa_salida)}` : ""} · ${d.lineas.length} líneas`;
   const nota = d.editable
     ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
-        Lo que cambies aquí es lo que se escribe en el documento.</div>`
+        Esto es lo que se escribe en el documento; puedes editar los números.</div>`
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: para cambiarle algo, vuelve a llenarla.</div>`;
