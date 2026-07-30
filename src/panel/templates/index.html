@@ -768,8 +768,10 @@
   /* La estrella va en su propia columna, alineada al borde derecho de la fila
      (el .nom con flex:1 la empuja): así no se pega al nombre ni al check. */
   .desc-cli-row .fav { margin-left:auto; }
-  /* Misma columna derecha en la página de CLIENTES (cabeceras del catálogo). */
-  tr.grupo .fav { float:right; margin-left:8px; }
+  /* En el catálogo de CLIENTES la estrella va pegada al nombre, no al borde
+     (ahí solo flota el botón "›" — si también flotara la estrella, las dos
+     quedarían adyacentes y la flecha parecería apuntarle). */
+  tr.grupo .fav { margin-left:8px; }
   .desc-mini { font-size:11.5px; padding:2px 7px; }
   /* Pestañas del editor de campaña + árbol de alcance */
   .desc-tabs { display:flex; gap:4px; border-bottom:1px solid #e2e6ec; margin:0 0 12px; }
@@ -8609,8 +8611,8 @@ function pintarClientesAgrupados(filtro) {
     }).filter(g => g.filas.length);
   }
   // Un cliente ya resuelto se resume en UNA fila (2026-07-30, pedido del
-  // usuario): sus sucursales ya no se listan aquí, viven en su ficha ("Ver
-  // detalle"). Las sueltas siguen una fila por entrada — cada una es un caso
+  // usuario): sus sucursales ya no se listan aquí, viven en su ficha (botón
+  // "›"). Las sueltas siguen una fila por entrada — cada una es un caso
   // independiente por resolver, todavía sin cliente que las agrupe.
   const items = [];
   for (const g of lista) {
@@ -8627,9 +8629,9 @@ function pintarClientesAgrupados(filtro) {
     if (g.sueltas) {
       if (g !== grupoPintado) {
         grupoPintado = g;
-        // Un grupo de entradas sueltas no es un cliente: no lleva el "Ver
-        // detalle" de cabecera (abría todas juntas) ni estrella de favorito, y
-        // explica qué hay que hacer con lo que tiene debajo.
+        // Un grupo de entradas sueltas no es un cliente: no lleva el botón "›"
+        // de cabecera (abría todas juntas) ni estrella de favorito, y explica
+        // qué hay que hacer con lo que tiene debajo.
         html += `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}
              <div class="mut" style="font-weight:400">${g.nuevas
                ? "Llegaron solas de la app de pedidos. Sus pedidos esperan en revisión hasta que digas si cada una es un cliente independiente o la sucursal de otro — además del nombre, hace falta el código de cliente (y el de sucursal, si la hay) para que funcione."
@@ -8644,8 +8646,8 @@ function pintarClientesAgrupados(filtro) {
       // solo cuántas hay.
       const badge = g.esCadena
         ? ` <span class="badge">cadena · ${g.filas.length} sucursales</span>` : "";
-      html += `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}${badge}
-             <button style="float:right" onclick="editarCliente('${esc(g.codigo)}')">Ver detalle</button>
+      html += `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}${badge}${estrellaCliente(g)}
+             <button style="float:right" title="Ver detalle" onclick="editarCliente('${esc(g.codigo)}')">›</button>
            </td></tr>`;
     }
   }
