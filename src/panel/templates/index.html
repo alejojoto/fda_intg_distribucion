@@ -95,7 +95,10 @@
   #sin-conexion-texto { flex:1; }
   #sin-conexion button { flex:none; }
   #sin-conexion .spinner { border-color:rgba(255,255,255,.4); border-top-color:#fff; }
-  main { padding:16px 18px; max-width:1200px; margin:0 auto; width:100%;
+  /* Ancho de trabajo (2026-07-31): las listas se quedaban cortas con 1200px.
+     El tope en vw deja siempre aire a los lados — a pantalla completa el texto
+     de las tablas quedaría demasiado largo para seguir una fila con la vista. */
+  main { padding:16px 18px; max-width:min(1560px, 94vw); margin:0 auto; width:100%;
          flex:1; min-height:0; display:flex; flex-direction:column; }
   /* Todo lo que no sea el panel de la tab activa mantiene su altura;
      el panel activo absorbe el resto de la ventana. */
@@ -1525,8 +1528,8 @@
   <div class="barra" id="filtros-barra">
     <div class="campo">Buscar<span class="buscador">
         <input type="text" id="f-buscar" style="width:260px"
-            placeholder="pedido, cliente, ruta, tipo, Nº doc…"
-            title="Busca en pedido, cliente (nombre y código), ruta, tipo (Paq./kg) y Nº de documento."
+            placeholder="pedido, cliente, sucursal, ruta, tipo, Nº doc…"
+            title="Busca en pedido, cliente (nombre y código), sucursal, ruta, tipo (Paq./kg) y Nº de documento."
             oninput="filtroBusquedaDinamico()">
         <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar búsqueda"
             onclick="limpiarBuscador('f-buscar', aplicarFiltros)">&times;</button>
@@ -1568,7 +1571,7 @@
   <section id="sec-pendientes" class="tab-panel">
     <div class="tabla-scroll"><table id="t-pendientes">
       <thead><tr>
-        <th>Pedido</th><th>Cliente</th><th>Ruta</th><th>Fecha pedido</th>
+        <th>Pedido</th><th>Cliente y sucursal</th><th>Ruta</th><th>Fecha pedido</th>
         <th>Líneas</th><th>Tipo</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody></tbody>
@@ -1579,7 +1582,7 @@
   <section id="sec-procesadas" class="tab-panel" style="display:none">
     <div class="tabla-scroll"><table id="t-procesadas">
       <thead><tr>
-        <th>Pedido</th><th>Cliente</th><th>Ruta</th><th>Fecha pedido</th><th>Líneas</th>
+        <th>Pedido</th><th>Cliente y sucursal</th><th>Ruta</th><th>Fecha pedido</th><th>Líneas</th>
         <th>Nº doc</th><th>Detalle</th><th>Procesada</th><th>Máquina</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody></tbody>
@@ -4240,7 +4243,7 @@ function refFacturaUbicable(pedido_id, parte) {
   if (!f) return `${pedido_id}`;
   const datos = [];
   if (f.total_partes > 1) datos.push(`parte ${parte}`);
-  const cliente = f.razon_social || f.cliente_id;
+  const cliente = clienteEnLinea(f);
   if (cliente) datos.push(cliente);
   if (f.ruta) datos.push(`Ruta ${nombreRuta(f.ruta)}`);
   return datos.length ? `${pedido_id} (${datos.join(" · ")})` : `${pedido_id}`;
@@ -5283,6 +5286,34 @@ async function guardarAjuste(pedidoId, parte, codigo, cuerpo) {
   cargar();     // el chip de la fila cuenta las líneas ajustadas
 }
 
+// Cliente y sucursal de una factura, resueltos para mostrar (2026-07-31): el
+// nombre del cliente viene del programa de facturación y el de la sucursal, de
+// la app de pedidos. Solo las cadenas tienen sucursal propia, así que sin
+// código de sucursal se muestra un nombre solo — repetir el mismo nombre en dos
+// renglones no distingue nada. Sin nombre de cliente cargado (cliente aún sin
+// completar en el catálogo) se cae al que manda la app de pedidos.
+function clienteYSucursal(f) {
+  const cliente = (f.nombre_cliente || "").trim()
+        || (f.razon_social || "").trim() || f.cliente_id || "";
+  const sucursal = (f.nombre_sucursal || "").trim() || (f.razon_social || "").trim();
+  const propia = Boolean((f.codigo_sucursal_winledger || "").trim()) && sucursal
+        && sucursal.toLowerCase() !== cliente.toLowerCase();
+  return {cliente, sucursal: propia ? sucursal : ""};
+}
+
+// Celda "Cliente y sucursal" de las listas: la sucursal cuelga debajo, en gris.
+function celdaCliente(f) {
+  const {cliente, sucursal} = clienteYSucursal(f);
+  return esc(cliente) + (sucursal ? `<div class="mut">${esc(sucursal)}</div>` : "");
+}
+
+// Los dos en una sola línea, donde no cabe el renglón aparte (cabecera de un
+// pedido partido, avisos que nombran una factura).
+function clienteEnLinea(f) {
+  const {cliente, sucursal} = clienteYSucursal(f);
+  return sucursal ? `${cliente} · ${sucursal}` : cliente;
+}
+
 function pintarPendientes(familias) {
   $("t-pendientes").querySelector("tbody").innerHTML = familias.map(partes => {
     const f0 = partes[0];
@@ -5291,7 +5322,7 @@ function pintarPendientes(familias) {
     if (partes.length === 1 && !(f0.total_partes > 1)) return filaPendiente(f0, false);
     return `
     <tr class="fam-cabecera">
-      <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(f0.razon_social || f0.cliente_id)}</td>
+      <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(clienteEnLinea(f0))}</td>
       <td>${esc(f0.ruta || "")}</td>
       <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
       <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
@@ -5311,7 +5342,7 @@ function filaPendiente(f, enFamilia) {
   return `
     <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
       <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}</td>
-      <td${abre}>${enFamilia ? "" : esc(f.razon_social || f.cliente_id)}</td>
+      <td${abre}>${enFamilia ? "" : celdaCliente(f)}</td>
       <td${abre}>${enFamilia ? "" : esc(f.ruta || "")}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
@@ -5652,7 +5683,7 @@ function pintarProcesadas(familias) {
     if (partes.length === 1 && !(f0.total_partes > 1)) return filaProcesada(f0, false);
     return `
     <tr class="fam-cabecera">
-      <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(f0.razon_social || f0.cliente_id || "")}</td>
+      <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(clienteEnLinea(f0))}</td>
       <td>${esc(f0.ruta || "")}</td>
       <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
       <td colspan="7" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
@@ -5708,7 +5739,7 @@ function filaProcesada(f, enFamilia) {
   return `
     <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
       <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}</td>
-      <td${abre}>${enFamilia ? "" : esc(f.razon_social || f.cliente_id || "")}</td>
+      <td${abre}>${enFamilia ? "" : celdaCliente(f)}</td>
       <td${abre}>${enFamilia ? "" : esc(f.ruta || "")}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
