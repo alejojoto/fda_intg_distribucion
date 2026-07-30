@@ -8575,7 +8575,7 @@ function pintarClientesAgrupados(filtro) {
       html += g.sueltas
         ? `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}
              <div class="mut" style="font-weight:400">${g.nuevas
-               ? "Llegaron solas de la app de pedidos. Sus pedidos esperan en revisión hasta que digas si cada una es un cliente independiente o la sucursal de otro."
+               ? "Llegaron solas de la app de pedidos. Sus pedidos esperan en revisión hasta que digas si cada una es un cliente independiente o la sucursal de otro — además del nombre, hace falta el código de cliente (y el de sucursal, si la hay) para que funcione."
                : "Cruces sin código de cliente: se resuelven uno por uno."}</div>
            </td></tr>`
         : `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}
