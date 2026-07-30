@@ -5353,15 +5353,20 @@ function pintarLlenadosPorRevisar(lista, hayPedidosSinDatos) {
           ? "Marcada para volver a llenar."
           : `${falloHace(f.fecha_cargado)}: ${detalle}`)
       : `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas || "").replaceAll("\n", "<br>")}`;
-    const botones = f.tipo === "error"
+    const acciones = f.tipo === "error"
       ? `<button class="acento" onclick="llenar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Ya viste qué faltó y la factura queda como está."
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`;
+    // "Ver detalles" va en la columna de acciones, como en las demás listas
+    // (celdaAcciones); aquí no puede ser celdaAcciones tal cual porque los
+    // botones de la cola no salen del estado sino del tipo de revisión.
+    const vd = botonDetalle(f);
+    const botones = vd + (vd ? `<span class="sep-acciones"></span>` : "") + acciones;
     return `
     <tr>
       <td${abre}>${esc(f.pedido_id)}${f.total_partes > 1
-        ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}${botonDetalle(f)}</td>
+        ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
       <td${abre}>${esc(f.razon_social || f.cliente_id || "")}</td>
       <td${abre}>${esc(f.ruta || "")}</td>
       <td>${quePaso}${(f.tipo === "error" && detalle && ultimaReemision)
@@ -8877,7 +8882,7 @@ function cerrarEditor() {
   borradorOlvidar("catalogo");   // salida por las buenas (guardado o descarte deliberado): no es trabajo interrumpido
 }
 
-async function guardarEditor(confirmado) {
+async function guardarEditor(confirmado, nombreEnConflicto) {
   // Validación de obligatorios ANTES de mandar al servidor (mismo criterio que
   // el editor de descuentos): el aviso va DENTRO del modal y se limpia al
   // corregir (ver editorRevalidar). El servidor revalida igual.
@@ -8914,6 +8919,7 @@ async function guardarEditor(confirmado) {
       return;
     }
   }
+  if (nombreEnConflicto) cuerpo.nombre_en_conflicto = nombreEnConflicto;
   try {
     const r = await api("/api/catalogo/" + catalogoActual, cuerpo);
     cerrarEditor();
@@ -8935,8 +8941,60 @@ async function guardarEditor(confirmado) {
     // revisión, es porque le falta OTRA cosa — y ahí queda dicha cuál.
     if (catalogoActual === "clientes" || catalogoActual === "productos") cargar();
   } catch (e) {
+    if (e.datos && e.datos.conflicto_nombre) {
+      preguntarNombreArticulo(e.datos.conflicto_nombre);
+      return;
+    }
     editorError("No se pudo guardar: " + e.message);   // dentro del modal, no en la barra tapada
   }
+}
+
+// Cambiar el código de artículo de un producto CONSERVA el nombre que ya se
+// venía mostrando (el código nuevo lo hereda). Cuando el código nuevo ya tiene
+// un nombre propio, el servidor no elige: devuelve el conflicto y aquí se
+// pregunta, porque el nombre pertenece al código y queda para todos los
+// productos que lo usen.
+function preguntarNombreArticulo(info) {
+  editorError("El código " + info.codigo + " ya está cargado como «" + info.nombre_codigo
+    + "» y este producto se muestra como «" + info.nombre_actual
+    + "». El nombre que elijas queda para ese código en todos los productos que lo usen.");
+
+  const recortar = nombre => nombre.length > 28 ? nombre.slice(0, 28) + "…" : nombre;
+  botonGuardarEditor = $("editor-guardar");
+  const cont = document.createElement("span");
+  cont.className = "confirmar-borrar";
+  const usarCatalogo = document.createElement("button");
+  usarCatalogo.className = "primario";
+  usarCatalogo.textContent = "Usar «" + recortar(info.nombre_codigo) + "»";
+  usarCatalogo.disabled = true;
+  const conservar = document.createElement("button");
+  conservar.textContent = "Mantener «" + recortar(info.nombre_actual) + "»";
+  conservar.disabled = true;
+  const cancelar = document.createElement("button");
+  cancelar.className = "cb-no";
+  cancelar.textContent = "Cancelar";
+  cont.append(usarCatalogo, conservar, cancelar);
+  botonGuardarEditor.replaceWith(cont);
+
+  // Evita que el rebote del clic en Guardar elija un nombre sin querer.
+  const t = setTimeout(() => {
+    usarCatalogo.disabled = false;
+    conservar.disabled = false;
+  }, 400);
+  const terminar = () => {
+    clearTimeout(t);
+    reponerBotonGuardar();
+    editorError("");
+  };
+  usarCatalogo.onclick = () => {
+    terminar();
+    guardarEditor(false, "catalogo");
+  };
+  conservar.onclick = () => {
+    terminar();
+    guardarEditor(false, "conservar");
+  };
+  cancelar.onclick = terminar;
 }
 
 // --- Editor de catálogos: obligatorios con aviso dentro del modal ------------
