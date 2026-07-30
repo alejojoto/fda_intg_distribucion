@@ -5209,15 +5209,32 @@ function contenidoDetalle(clave) {
     return `<div class="det-error">${esc(detalleFallos[clave])}</div>`;
   const d = detalleDatos[clave];
   if (!d) return `<span class="mut">Buscando el detalle…</span>`;
-  const cliente = [d.razon_social, d.cliente_codigo_winledger].filter(Boolean).join(" · ");
-  // Una factura ya llenada no repite el encabezado: su nota ya dice qué se está
-  // viendo, y el pedido está en el título de la ventana.
-  const cabecera = d.origen === "registro"
-    ? ""
-    : `${esc(cliente || d.cliente_id || "")}${
-        d.sucursal_codigo_winledger ? ` (suc. ${esc(d.sucursal_codigo_winledger)})` : ""}
-       ${d.ruta ? ` · ${esc(d.ruta)}` : ""} · ${esc((d.fecha_orden_salida || "").slice(0,10))}
-       ${d.causa_salida ? ` · ${esc(d.causa_salida)}` : ""} · ${d.lineas.length} líneas`;
+  // El encabezado va SIEMPRE, también en una factura ya llenada (2026-07-31):
+  // se abría un documento emitido sin ver de quién era. Manda la fila de la
+  // lista —trae cliente y sucursal resueltos igual que su columna— y el detalle
+  // completa los códigos: de una procesada cuyo pedido ya salió de la caché, el
+  // detalle no manda más que el pedido.
+  const fila = filaDeLista(d.pedido_id, d.parte) || {};
+  const {cliente, sucursal} = clienteYSucursal({
+    nombre_cliente: fila.nombre_cliente,
+    nombre_sucursal: fila.nombre_sucursal,
+    razon_social: fila.razon_social || d.razon_social,
+    cliente_id: fila.cliente_id || d.cliente_id,
+    codigo_sucursal_winledger: (fila.codigo_sucursal_winledger
+                                || d.sucursal_codigo_winledger),
+  });
+  const codigoSucursal = fila.codigo_sucursal_winledger || d.sucursal_codigo_winledger || "";
+  const contexto = [fila.ruta || d.ruta,
+                    (fila.fecha_orden_salida || d.fecha_orden_salida || "").slice(0, 10),
+                    fila.causa_salida || d.causa_salida,
+                    `${d.lineas.length} ${d.lineas.length === 1 ? "línea" : "líneas"}`,
+                   ].filter(Boolean);
+  const cabecera = (cliente
+      ? `<div>${esc(cliente)}${d.cliente_codigo_winledger
+          ? ` · ${esc(d.cliente_codigo_winledger)}` : ""}</div>` : "")
+    + (sucursal ? `<div class="mut">${esc(sucursal)}${
+        codigoSucursal ? ` · ${esc(codigoSucursal)}` : ""}</div>` : "")
+    + `<div>${esc(contexto.join(" · "))}</div>`;
   const nota = d.editable
     ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
         Esto es lo que se escribe en el documento; puedes editar los números.</div>`
