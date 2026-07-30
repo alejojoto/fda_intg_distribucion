@@ -8635,8 +8635,19 @@ const CATALOGOS = {
       // ver catalogos.sembrar_clientes_desde_agromovil). Solo una entrada que
       // ni la app conoce arranca sin elegir, y de ahí depende el resto del
       // formulario (ver editorAplicarEtiquetas y los obligatorioSi de abajo).
+      // El check de prueba va PEGADO al dropdown y no como una tercera opción
+      // suya (pedido del usuario 2026-07-31): marcar prueba es raro y elegir
+      // entre tres cosas cada vez, para lo mismo de siempre, estorba. Marcado
+      // apaga el dropdown y el resto de obligatorios: ese cliente no factura.
       {campo: "clasificacion", etiqueta: "Qué es", obligatorio: true, origenDato: "panel",
-       opcionesDe: () => opcionesClasificacion()},
+       opcionesDe: () => opcionesClasificacion(),
+       checkAcompanante: {campo: "es_prueba", etiqueta: "Cliente de prueba",
+         ayuda: "Marca esta entrada como cliente de prueba: sus pedidos no se facturan "
+              + "ni aparecen en revisión. No hace falta ningún código."}},
+      // Se pinta junto al dropdown de arriba (checkAcompanante), pero se declara
+      // aquí para que el guardado y la firma de cambios del editor lo vean.
+      {campo: "es_prueba", tipo: "checkbox", etiqueta: "Cliente de prueba",
+       pintadoJunto: true},
       {campo: "codigo_cliente_winledger", etiqueta: "Código de cliente", obligatorio: true,
        etiquetaSegun: (get) => get("clasificacion") === "sucursal"
          ? "Código del cliente principal" : "Código de cliente",
@@ -8872,6 +8883,27 @@ function clienteEsCadena(codigoCliente) {
 // pedido cae en revisión con ese motivo) hasta que alguien los clasifica.
 const esEntradaNueva = (f) => (f && f.clasificacion) === "nuevo";
 
+// Cliente de prueba (2026-07-31): lo marca una persona con el check del editor.
+// No factura nunca, así que no se le pide código ninguno ni aparece entre las
+// entradas por resolver.
+const esClientePrueba = (f) => (f && f.clasificacion) === "prueba";
+
+// Qué le falta a una entrada para poder cruzar, o "" si está completa
+// (2026-07-31, pedido del usuario). La clasificación ya llega sola del catálogo
+// maestro de la app de pedidos, pero el código de cliente lo teclea una
+// persona: sin él la entrada no cruza y su pedido espera en revisión. Devuelve
+// el texto que se le muestra al operador.
+function faltaDeEntrada(f) {
+  if (!f || esClientePrueba(f)) return "";
+  if (esEntradaNueva(f)) return "Falta decir qué es";
+  if (!(f.codigo_cliente_winledger || "").trim()) return "Falta el código de cliente";
+  // El código de SUCURSAL no entra aquí (regla del usuario 2026-07-31): el
+  // programa de facturación deja facturar sin él y solo lo exige en los
+  // clientes que de verdad tienen sucursales. Si lo exige y falta, ese rechazo
+  // ya manda el pedido a revisión por su cuenta.
+  return "";
+}
+
 // Qué mostrar preseleccionado en "Qué es". Una entrada nueva arranca SIN
 // elegir — es justo la decisión que se le pide a la persona. En una fila del
 // catálogo de siempre (sin clasificación guardada) se refleja lo que ya es,
@@ -8880,7 +8912,9 @@ function clasificacionDe(fila) {
   if (!fila) return "";
   if (fila.clasificacion === "cliente" || fila.clasificacion === "sucursal")
     return fila.clasificacion;
-  if (esEntradaNueva(fila)) return "";
+  // Una de prueba tampoco trae elección: si alguien desmarca el check, el
+  // dropdown vuelve a pedirla en vez de dejar "cliente" puesto por descarte.
+  if (esEntradaNueva(fila) || esClientePrueba(fila)) return "";
   return fila.codigo_sucursal_winledger ? "sucursal" : "cliente";
 }
 
@@ -9089,24 +9123,33 @@ function pintarFilasCatalogo() {
 // sucursal.
 //
 // Dos bloques quedan fuera de esa regla y llevan botón POR FILA (2026-07-29):
-// las entradas nuevas por clasificar y los cruces sin código, porque NO son
-// clientes — son entradas sueltas. Con el "Editar" en la cabecera, buscar una
-// de ellas y pulsarlo abría las 25 de golpe como si fueran un solo cliente.
-const GRUPO_NUEVAS = " nuevas";   // sentinela: no choca con ningún código real
+// las entradas por resolver y los clientes de prueba, porque NO son clientes —
+// son entradas sueltas. Con el "Editar" en la cabecera, buscar una de ellas y
+// pulsarlo abría las 25 de golpe como si fueran un solo cliente.
+// Desde 2026-07-31 el bloque de arriba ya no es solo "las nuevas": recoge TODA
+// entrada que todavía no puede facturar, le falte lo que le falte (decir qué
+// es, el código de cliente o el de sucursal). El pedido de esa entrada está
+// esperando en revisión, así que van juntas y de primeras — antes una entrada
+// ya clasificada pero sin código quedaba perdida entre los clientes resueltos.
+const GRUPO_PENDIENTES = " pendientes";   // sentinela: no choca con ningún código real
+const GRUPO_PRUEBA = " prueba";
 
 function pintarClientesAgrupados(filtro) {
   const grupos = new Map();
   catalogoFilas.forEach((f, i) => {
-    const nueva = esEntradaNueva(f);
-    const codigo = nueva ? GRUPO_NUEVAS : (f.codigo_cliente_winledger || "");
-    const etiqueta = nueva
-      ? "Entradas nuevas por clasificar"
-      : codigo
-        ? `${codigo} — ${f.nombre_cliente_winledger || "(nombre no cargado)"}`
-        : "(cruces sin código de cliente)";
+    const falta = faltaDeEntrada(f);
+    const prueba = esClientePrueba(f);
+    const codigo = falta ? GRUPO_PENDIENTES
+      : prueba ? GRUPO_PRUEBA : (f.codigo_cliente_winledger || "");
+    const etiqueta = falta
+      ? "Entradas por resolver"
+      : prueba
+        ? "Clientes de prueba"
+        : `${codigo} — ${f.nombre_cliente_winledger || "(nombre no cargado)"}`;
     if (!grupos.has(codigo))
       grupos.set(codigo, {codigo, etiqueta, favorito: !!f.favorito,
-                          sueltas: nueva || !codigo, nuevas: nueva, filas: []});
+                          sueltas: !!falta || prueba, pendientes: !!falta,
+                          prueba, filas: []});
     grupos.get(codigo).filas.push([f, i]);
   });
   let lista = [...grupos.values()];
@@ -9119,11 +9162,11 @@ function pintarClientesAgrupados(filtro) {
     const auto = g.filas.length >= 2 || g.filas.some(([f]) => f.codigo_sucursal_winledger);
     g.esCadena = primera.es_cadena_manual == null ? auto : !!primera.es_cadena_manual;
   }
-  // Las entradas nuevas de primeras (son el trabajo pendiente), los cruces sin
-  // código al final y los favoritos arriba del resto; dentro de cada bloque
-  // manda el orden alfabético que ya trae el backend.
-  lista.sort((a, b) => (b.codigo === GRUPO_NUEVAS) - (a.codigo === GRUPO_NUEVAS)
-                       || (a.codigo === "") - (b.codigo === "")
+  // Las entradas por resolver de primeras (son el trabajo pendiente), los
+  // clientes de prueba al final y los favoritos arriba del resto; dentro de
+  // cada bloque manda el orden alfabético que ya trae el backend.
+  lista.sort((a, b) => (b.codigo === GRUPO_PENDIENTES) - (a.codigo === GRUPO_PENDIENTES)
+                       || (a.codigo === GRUPO_PRUEBA) - (b.codigo === GRUPO_PRUEBA)
                        || (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0));
   if (filtro) {
     lista = lista.map(g => {
@@ -9143,11 +9186,11 @@ function pintarClientesAgrupados(filtro) {
     else items.push([g, null]);
   }
   const visibles = paginarClientes("catalogo", items);
-  const nuevas = catalogoFilas.filter(esEntradaNueva).length;
+  const porResolver = catalogoFilas.filter(f => faltaDeEntrada(f)).length;
   const totalSucursales = lista.reduce((n, g) => n + g.filas.length, 0);
   const catFiltroActivo = hayFiltroActivo("catalogo");
   const conteoTexto = `${lista.length} cliente(s) · ${totalSucursales} sucursal(es)`
-    + (nuevas ? ` · ${nuevas} por clasificar` : "");
+    + (porResolver ? ` · ${porResolver} por resolver` : "");
   $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${conteoTexto}</span> ${chipFiltroActivo(catFiltroActivo)}`;
   let html = "", grupoPintado = null;
   for (const [g, par] of visibles) {
@@ -9158,13 +9201,13 @@ function pintarClientesAgrupados(filtro) {
         // de cabecera (abría todas juntas) ni estrella de favorito, y explica
         // qué hay que hacer con lo que tiene debajo.
         html += `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}
-             <div class="mut" style="font-weight:400">${g.nuevas
-               ? "Llegaron solas de la app de pedidos. Sus pedidos esperan en revisión hasta que digas si cada una es un cliente independiente o la sucursal de otro — además del nombre, hace falta el código de cliente (y el de sucursal, si la hay) para que funcione."
-               : "Cruces sin código de cliente: se resuelven uno por uno."}</div>
+             <div class="mut" style="font-weight:400">${g.pendientes
+               ? "Sus pedidos esperan en revisión hasta que estén completas. Lo que le falta a cada una está en su fila: el tipo lo trae la app de pedidos, pero el código de cliente se escribe aquí."
+               : "No se facturan nunca: sus pedidos se descartan sin pasar por revisión."}</div>
            </td></tr>`;
       }
       const [f, i] = par;
-      html += filaSucursalHtml(f, i, g.sueltas, {suelta: g.sueltas, nueva: g.nuevas});
+      html += filaSucursalHtml(f, i, g.sueltas, {suelta: g.sueltas, falta: faltaDeEntrada(f)});
     } else {
       // Cadena o cliente de sucursal única, más visible que antes (pedido del
       // usuario 2026-07-30): el detalle de cada sucursal ya no se lista aquí,
@@ -9183,11 +9226,13 @@ function pintarClientesAgrupados(filtro) {
   if (clienteEnEdicion !== null) pintarVentanaCliente();
 }
 
-// `opciones.suelta` = la fila NO cuelga de un cliente (entrada nueva o cruce
-// sin código): se muestra con su clave interna y, si además es nueva, el botón
-// dice "Clasificar" en vez de "Editar".
+// `opciones.suelta` = la fila NO cuelga de un cliente (entrada por resolver o
+// cliente de prueba): se muestra con su clave interna. `opciones.falta` es el
+// texto de lo que le impide facturar (ver faltaDeEntrada): se pinta bajo el
+// nombre y cambia el botón, para que el operador sepa qué va a completar antes
+// de abrir la ventana.
 function filaSucursalHtml(f, i, conEditar, opciones) {
-  const {suelta = false, nueva = false, conToggleActivo = false} = opciones || {};
+  const {suelta = false, falta = "", conToggleActivo = false} = opciones || {};
   // "Borrar de verdad" (modo prueba de implantación o modo admin): solo en
   // la ventana de UN cliente y solo sobre un cruce creado a mano en
   // el panel (origen 'manual') — los del catálogo real no se tocan.
@@ -9199,6 +9244,10 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // entradas nuevas pueden llegar con el nombre en blanco o repetido, y sin la
   // clave no hay forma de saber cuál se está abriendo.
   const nombre = esc(f.sucursal_nombre || (suelta ? "(nombre no llegó)" : "(única)"));
+  // Una entrada nueva no se "edita": se dice qué es. Las demás incompletas ya
+  // saben qué son y solo les falta un código.
+  const textoBoton = !falta ? "Editar"
+    : falta === "Falta decir qué es" ? "Clasificar" : "Completar";
   // Toggle de un clic (solo dentro de la ficha del cliente, 2026-07-30): fuera
   // de ahí se conserva el punto informativo, sin click.
   const celdaActivo = conToggleActivo
@@ -9207,11 +9256,12 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
     : puntoEstado(f.activo);
   return `<tr>
     <td style="padding-left:26px">${nombre}${suelta
-        ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}</td>
+        ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
+        ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
     <td>${celdaActivo}</td>
-    <td>${conEditar ? `<button class="${nueva ? "acento" : ""}" onclick="abrirEditor(${i})">${
-      nueva ? "Clasificar" : "Editar"}</button>${borrarDefinitivo}` : ""}</td>
+    <td>${conEditar ? `<button class="${falta ? "acento" : ""}" onclick="abrirEditor(${i})">${
+      textoBoton}</button>${borrarDefinitivo}` : ""}</td>
   </tr>`;
 }
 
@@ -9393,7 +9443,8 @@ function pintarVentanaCliente() {
         <th><span class="orig-punto winledger" title="${esc(ORIGENES.winledger.titulo)}"></span>Código sucursal</th>
         <th>Activo</th><th></th>
       </tr></thead>
-      <tbody>${filas.map(([f, i]) => filaSucursalHtml(f, i, true, {conToggleActivo: true})).join("")}</tbody>
+      <tbody>${filas.map(([f, i]) => filaSucursalHtml(f, i, true,
+        {conToggleActivo: true, falta: faltaDeEntrada(f)})).join("")}</tbody>
     </table></div>`;
   // Sin código de cliente no hay a qué colgarle una sucursal nueva.
   $("cliente-agregar").style.display = clienteEnEdicion ? "" : "none";
@@ -9563,6 +9614,7 @@ function abrirEditor(indice, prefill) {
   // se recuerda aparte (`claseActual`) porque el campo de la fila ya quedó
   // pisado con el valor normalizado.
   if (catalogoActual === "clientes") {
+    fila.es_prueba = esClientePrueba(fila) ? 1 : 0;
     editorFila.claseActual = clasificacionDe(fila);
     fila.clasificacion = editorFila.claseActual;
     // Sucursal que la app de pedidos ya colgó de un cliente resuelto (mismo
@@ -9588,6 +9640,8 @@ function abrirEditor(indice, prefill) {
   $("editor-origenes").style.display = leyenda ? "" : "none";
   const mezcla = origenesDeCatalogo(def).length > 1;
   $("editor-campos").innerHTML = def.campos.map(c => {
+    // Lo pinta el campo que lo acompaña (checkAcompanante), no este map.
+    if (c.pintadoJunto) return "";
     const valor = fila[c.campo];
     const chip = chipOrigen(c.origenDato, mezcla);
     // Una clave puede ser editable en algunas filas (la fecha de un feriado
@@ -9629,14 +9683,23 @@ function abrirEditor(indice, prefill) {
     // no dice.
     const opciones = c.opcionesDe ? c.opcionesDe() : c.opciones;
     if (opciones) {
-      return `<label class="editor-campo">${linea(notaClave, tag)}
-        <select id="ed-${c.campo}" ${esClave ? "disabled" : ""}>
+      const ac = c.checkAcompanante;
+      const select = `<select id="ed-${c.campo}" ${esClave ? "disabled" : ""}>
           ${opciones.map(o => {
             const v = o.valor ?? o, txt = o.etiqueta ?? o;
             return `<option value="${esc(v)}" ${v === valor ? "selected" : ""}>${esc(txt)}</option>`;
           }).join("")}
-        </select>
-      </label>`;
+        </select>`;
+      if (!ac) return `<label class="editor-campo">${linea(notaClave, tag)}${select}</label>`;
+      return `<div class="editor-campo">${linea(notaClave, tag)}
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1">${select}</div>
+          <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer"
+                 title="${esc(ac.ayuda || "")}">
+            <input type="checkbox" id="ed-${ac.campo}" ${fila[ac.campo] ? "checked" : ""}
+                   onchange="editorAplicarPrueba()">${esc(ac.etiqueta)}</label>
+        </div>
+      </div>`;
     }
     // Sugerencias (`sugerenciasDe`): el campo se sigue tecleando libre, pero
     // ofrece la lista de lo que ya existe — así colgar una sucursal de su
@@ -9660,6 +9723,7 @@ function abrirEditor(indice, prefill) {
   editorError("");   // sin avisos de una edición anterior
   editorDerivarCampos();   // la presentación de una fila existente se pinta de una
   editorAplicarEtiquetas();   // rótulos que dependen de "Qué es"
+  editorAplicarPrueba();   // apaga el dropdown y los obligatorios si es de prueba
   editorMarcarObligatorios();   // barras ámbar/azul de los obligatorios desde el arranque
   $("editor-overlay").classList.add("visible");
   // Firma inicial del formulario: sirve para saber al cerrar si algo cambió.
@@ -9906,11 +9970,13 @@ function editorMarcarObligatorios() {
   if (!def) return;
   const mezcla = origenesDeCatalogo(def).length > 1;
   const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
+  const prueba = editorEsPrueba();
   for (const c of def.campos) {
     if (c.tipo === "checkbox" || c.derivadaDe) continue;
     const el = $("ed-" + c.campo);
     if (!el || el.disabled) continue;
-    const req = typeof c.obligatorioSi === "function" ? c.obligatorioSi(get) : !!c.obligatorio;
+    const req = prueba && !def.clave.includes(c.campo) ? false
+      : typeof c.obligatorioSi === "function" ? c.obligatorioSi(get) : !!c.obligatorio;
     const etiqueta = el.closest("label");
     etiqueta.classList.toggle("campo-obligatorio", req);
     el.classList.toggle("lleno", el.value.trim() !== "");
@@ -9954,8 +10020,10 @@ function editorValidar() {
   const def = CATALOGOS[catalogoActual];
   if (!def) return "";
   const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
+  const prueba = editorEsPrueba();
   for (const c of def.campos) {
     if (c.tipo === "checkbox") continue;
+    if (prueba && !def.clave.includes(c.campo)) continue;
     const el = $("ed-" + c.campo);
     // Derivado: si la fuente ya está llena pero no resuelve (un código que no
     // es paq ni kg), se bloquea con explicación — no se adivina.
@@ -9970,6 +10038,20 @@ function editorValidar() {
       return `Falta llenar: ${c.etiqueta.replace(/\s*\(.*?\)\s*$/, "").trim()}.`;
   }
   return "";
+}
+
+// ¿El editor abierto está marcado como cliente de prueba? Ese cliente no
+// factura, así que ningún código le hace falta: el dropdown se apaga y los
+// obligatorios dejan de pedirse (solo la clave sigue haciendo falta, sin ella
+// no hay a quién marcar).
+function editorEsPrueba() {
+  const el = $("ed-es_prueba");
+  return !!(el && el.checked);
+}
+
+function editorAplicarPrueba() {
+  const select = $("ed-clasificacion");
+  if (select) select.disabled = editorEsPrueba();
 }
 
 // Revalida el aviso del editor SOLO si ya hay uno a la vista (tras intentar
