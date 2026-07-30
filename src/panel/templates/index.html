@@ -349,7 +349,14 @@
   /* Los títulos de las columnas se quedan a la vista al bajar por las líneas,
      como en las tablas de la lista (.tabla-scroll). */
   #detalle-cuerpo thead th { position:sticky; top:0; background:#fff; z-index:1; }
-  .det-cant, .det-pct { width:82px; padding:3px 6px; text-align:right; }
+  .det-cant, .det-pct { width:82px; padding:3px 6px; text-align:right;
+                        -moz-appearance:textfield; appearance:textfield; }
+  /* Sin las flechitas ▲▼ del navegador (pedido del usuario 2026-07-30): en una
+     línea que ya trae botones sobran, y se quedaban pegadas al pulsarlas. La
+     cantidad y el % se teclean. */
+  .det-cant::-webkit-outer-spin-button, .det-cant::-webkit-inner-spin-button,
+  .det-pct::-webkit-outer-spin-button, .det-pct::-webkit-inner-spin-button {
+    -webkit-appearance:none; margin:0; }
   .det-auto { font-size:11.5px; color:var(--mut); margin-top:3px; }
   .det-auto button { padding:1px 6px; font-size:11px; margin-left:4px; }
   .det-opciones { margin-top:4px; }
