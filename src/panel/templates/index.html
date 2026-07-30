@@ -806,10 +806,14 @@
   /* La estrella va en su propia columna, alineada al borde derecho de la fila
      (el .nom con flex:1 la empuja): así no se pega al nombre ni al check. */
   .desc-cli-row .fav { margin-left:auto; }
-  /* Misma columna derecha en el catálogo de CLIENTES: ancho fijo para que la
-     estrella quede alineada entre filas, con hueco de sobra al botón "›" para
-     que la flecha no parezca apuntarle. */
-  tr.grupo .fav { float:right; width:18px; text-align:center; margin-left:16px; }
+  /* Columna fija al inicio de la fila en el catálogo de CLIENTES: ancho fijo
+     para que la estrella quede alineada entre filas, lejos del botón "›" que
+     va al otro extremo. */
+  tr.grupo .fav { display:inline-block; width:18px; text-align:center; margin-right:8px; }
+  /* El botón "›" del catálogo de CLIENTES: más grande y notorio que un botón
+     normal, para que se note como acción de la fila. */
+  tr.grupo .btn-abrir-ficha { float:right; font-size:20px; line-height:1;
+                             padding:2px 12px; font-weight:700; }
   .desc-mini { font-size:11.5px; padding:2px 7px; }
   /* Pestañas del editor de campaña + árbol de alcance */
   .desc-tabs { display:flex; gap:4px; border-bottom:1px solid #e2e6ec; margin:0 0 12px; }
@@ -8736,8 +8740,7 @@ const CATALOGOS = {
     ],
     // Activar/desactivar sin abrir el editor (pedido del usuario 2026-07-29):
     // un vendedor desactivado deja de ofrecerse en "Vendedor de esta máquina".
-    acciones: (f, i) => ` <button onclick="alternarVendedor(${i})">${
-      f.activo ? "Desactivar" : "Activar"}</button>`,
+    toggleActivo: (i) => `alternarVendedor(${i})`,
   },
   feriados: {
     titulo: "Feriados",
@@ -8799,12 +8802,12 @@ const CATALOGOS = {
            ["bancario", "Feriados bancarios"]].map(([v, t]) =>
           `<option value="${v}" ${v === feriadoClase ? "selected" : ""}>${t}</option>`).join("")}
       </select></label>`,
+    toggleActivo: (i) => `alternarFeriado(${i})`,
     // Eliminar solo para origen "manual": un feriado calculado no se borra.
     // Restaurar solo para las calculadas que alguien tocó (`ajustado`): quita
     // la excepción local y devuelve el nombre y el activo que calcula el
-    // sistema — Desactivar/Activar no repone el nombre.
-    acciones: (f, i) => `<button onclick="alternarFeriado(${i})">${
-      f.activo ? "Desactivar" : "Activar"}</button>${
+    // sistema.
+    acciones: (f, i) => `${
       f.origen === "manual" ? ` <button onclick="confirmarBorrar(this, () => eliminarFeriado(${i}))">Eliminar</button>` : ""}${
       f.ajustado ? ` <button onclick="confirmarBorrar(this, () => restaurarFeriado(${i}), 'Confirmar restaurar')">Restaurar</button>` : ""}`,
   },
@@ -8963,6 +8966,16 @@ function puntoEstado(activo) {
     activo ? "Activo" : "Inactivo"}"></span>`;
 }
 
+// Interruptor iOS de Activo/Inactivo que alterna con un clic, sin abrir el
+// editor — mismo estilo que ya usan el editor de catálogos y la ficha del
+// cliente (.switch). `onclick` es la llamada a la función que guarda el
+// cambio (def.toggleActivo(i) de cada catálogo).
+function switchActivo(activo, onclick) {
+  return `<label style="cursor:pointer; display:inline-flex" title="${
+    activo ? "Activo" : "Inactivo"}"><input type="checkbox" class="switch" ${
+    activo ? "checked" : ""} onclick="${onclick}"></label>`;
+}
+
 // Sistemas de origen presentes en un catálogo, en el orden en que aparecen.
 function origenesDeCatalogo(def) {
   const vistos = [];
@@ -9101,13 +9114,13 @@ function pintarFilasCatalogo() {
       }
     }
     return cabecera + `
-    <tr${def.atenuarInactivas && !f.activo ? ' class="fila-inactiva"' : ""}${def.acciones ? ` data-fila-idx="${i}"` : ""}>
+    <tr${def.atenuarInactivas && !f.activo ? ' class="fila-inactiva"' : ""}${(def.acciones || def.toggleActivo) ? ` data-fila-idx="${i}"` : ""}>
       ${columnas.map(c => `<td>${c.tipo === "checkbox"
-          ? puntoEstado(f[c.campo])
+          ? (def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i)) : puntoEstado(f[c.campo]))
           : esc(f[c.campo] ?? "")}</td>`).join("")}
       <td><button onclick="abrirEditor(${i})">Editar</button>
           ${def.acciones ? def.acciones(f, i) : ""}</td>
-    </tr>` + (def.acciones
+    </tr>` + ((def.acciones || def.toggleActivo)
       ? `<tr class="fila-aviso-error" data-fila-idx="${i}" style="display:none"><td colspan="${columnas.length + 1}"></td></tr>`
       : "");
   }).join("") ||
@@ -9215,7 +9228,7 @@ function pintarClientesAgrupados(filtro) {
       const badge = g.esCadena
         ? ` <span class="badge">cadena · ${g.filas.length} sucursales</span>` : "";
       html += `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}${badge}
-             <button style="float:right" title="Ver detalle" onclick="editarCliente('${esc(g.codigo)}')">›</button>
+             <button class="btn-abrir-ficha" title="Ver detalle" onclick="editarCliente('${esc(g.codigo)}')">›</button>
            </td></tr>`;
     }
   }
