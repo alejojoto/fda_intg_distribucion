@@ -5093,6 +5093,21 @@ async function abrirDetalle(pedidoId, parte) {
   await cargarDetalle(pedidoId, parte);
 }
 
+// La ventana, arriba y vacía, SIN ir al servidor: la trae después quien la
+// abrió (con cargarDetalle). Existe para que una acción lenta que termina en el
+// detalle no deje ni un instante la lista descubierta — ver confirmarMotivo.
+// Descarta lo que se hubiera traído antes de esa factura: si se está reabriendo,
+// la foto de cuando estaba cerrada ya no es lo que se va a llenar.
+function abrirDetalleCargando(pedidoId, parte) {
+  const clave = claveDetalle(pedidoId, parte);
+  detalleAbierto = clave;
+  detalleTocado = false;
+  delete detalleFallos[clave];
+  delete detalleDatos[clave];
+  pintarVentanaDetalle(clave);      // "Buscando el detalle…"
+  $("detalle-overlay").classList.add("visible");
+}
+
 function cerrarDetalle() {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("detalle-overlay").classList.remove("visible");
@@ -6801,23 +6816,31 @@ async function confirmarMotivo() {
     await llenar(pedido_id, parte);
     return;
   }
-  try {
-    const r = await api("/api/refacturar", {pedido_id, parte, motivo});
-    if (r.aviso) { mensaje(r.aviso, "info"); await cargar(); return; }
-  } catch (e) {
-    avisoFactura(pedido_id, parte, e.message);
-    return;
-  }
   // A diferencia de "Llenar igual" (accion "tomar"), esto reabre un documento
   // YA CERRADO — el motivo más común para reabrirlo es que algo del pedido
   // tiene que salir distinto, así que en vez de llenar de una se abre el
-  // mismo detalle editable de "Ver detalles" (ya editable: la factura quedó
+  // mismo detalle editable de "Ver detalles" (ya editable: la factura queda
   // en error_llenado) para ajustar cantidades y descuentos antes de volver a
-  // llenar (pedido del usuario 2026-07-31). cargar() primero: la fila tiene
-  // que verse como error_llenado propia para que el detalle la reconozca
-  // editable y con su botón de llenar.
+  // llenar (pedido del usuario 2026-07-31).
+  // La ventana se abre ANTES de tocar el servidor, no después: reabrir puede
+  // tardar segundos —si la factura ya no está en la caché, /api/refacturar
+  // relee el pipeline de la nube— y en ese hueco la lista quedaba descubierta,
+  // con el modal del motivo ya cerrado. Un segundo clic ahí caía sobre el
+  // botón de la fila de abajo y arrancaba un llenado a espaldas de la
+  // revisión (visto 2026-07-31).
+  abrirDetalleCargando(pedido_id, parte);
+  try {
+    const r = await api("/api/refacturar", {pedido_id, parte, motivo});
+    if (r.aviso) { cerrarDetalle(); mensaje(r.aviso, "info"); await cargar(); return; }
+  } catch (e) {
+    cerrarDetalle();
+    avisoFactura(pedido_id, parte, e.message);
+    return;
+  }
+  // cargar() antes de traer el detalle: la fila tiene que verse ya como
+  // error_llenado propia para que la ventana la pinte editable y con su botón.
   await cargar();
-  await abrirDetalle(pedido_id, parte);
+  await cargarDetalle(pedido_id, parte);
 }
 
 // Aviso "en el objeto" para una fila de factura (Descartar / Volver a
