@@ -1026,20 +1026,56 @@
      Los dos SÍ son preguntas — hay salidas distintas entre las que elegir — y
      por eso interrumpen. */
   #aviso-fam-overlay, #tasa-overlay, #docencurso-overlay, #repetida-overlay,
-  #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay {
+  #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay {
                        position:fixed; inset:0; background:rgba(29,36,51,.45);
                        display:none; z-index:20; align-items:flex-start; justify-content:center; }
   #aviso-fam-overlay.visible, #tasa-overlay.visible, #docencurso-overlay.visible,
   #repetida-overlay.visible, #trancon-overlay.visible,
-  #configmaq-overlay.visible, #lineas-omitidas-overlay.visible { display:flex; }
+  #configmaq-overlay.visible, #lineas-omitidas-overlay.visible,
+  #previo-overlay.visible { display:flex; }
   #aviso-fam-caja, #tasa-caja, #docencurso-caja, #repetida-caja, #trancon-caja,
-  #configmaq-caja, #lineas-omitidas-caja {
+  #configmaq-caja, #lineas-omitidas-caja, #previo-caja {
                     background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                     width:min(480px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #aviso-fam-caja h3, #tasa-caja h3, #docencurso-caja h3, #repetida-caja h3,
-  #trancon-caja h3, #configmaq-caja h3, #lineas-omitidas-caja h3 { margin:0 0 10px; font-size:14px; }
+  #trancon-caja h3, #configmaq-caja h3, #lineas-omitidas-caja h3,
+  #previo-caja h3 { margin:0 0 10px; font-size:14px; }
   #aviso-fam-caja p, #tasa-caja p, #docencurso-caja p, #repetida-caja p,
   #trancon-caja p, #configmaq-caja p, #lineas-omitidas-caja p { margin:0 0 12px; font-size:13.5px; }
+  /* Revisión previa de la corrida (2026-07-30): lleva una tabla con el lote
+     entero, así que no cabe en los 480 px de los demás avisos. Grande a
+     propósito (2026-07-31, pedido del usuario): sale con el panel todavía a
+     tamaño completo, así que usa ese espacio — las cajitas más grandes que
+     las de la barrita del llenado y la lista con aire. */
+  #previo-caja { width:min(960px, 96vw); margin-top:4vh; padding:20px 22px; }
+  #previo-caja h3 { font-size:16px; }
+  #previo-cajitas { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  #previo-cajitas .cajita { padding:7px 14px; min-width:88px; }
+  #previo-cajitas .cj-rot { font-size:11.5px; }
+  #previo-cajitas .cj-val { font-size:16px; }
+  /* Ámbar en la cajita = ese dato no lo pone el asistente y la factura sale con
+     lo que el programa de facturación tenga puesto. */
+  .cajita.ojo { background:#fef0c7; border-color:#fde68a; }
+  .cajita.ojo .cj-val { color:#b54708; }
+  #previo-avisos { display:flex; flex-direction:column; gap:6px; margin:0 0 10px; }
+  #previo-avisos .previo-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
+                               padding:8px 10px; font-size:13px; line-height:1.45; }
+  #previo-resumen { font-size:13px; margin:0 0 6px; }
+  /* La lista crece con el lote (una corrida de ruta completa pasa de 40
+     facturas): scrollea por dentro para que la botonera nunca quede fuera de
+     pantalla. */
+  #previo-lista { max-height:52vh; overflow-y:auto; border:1px solid #e2e6ec;
+                  border-radius:6px; }
+  #previo-lista table { width:100%; border-collapse:collapse; font-size:13px; }
+  #previo-lista th { position:sticky; top:0; background:#f6f7f9; text-align:left;
+                     font-size:11.5px; color:var(--mut); padding:6px 10px;
+                     border-bottom:1px solid #e2e6ec; }
+  #previo-lista td { padding:6px 10px; border-bottom:1px solid #f0f2f5; }
+  #previo-lista tr:last-child td { border-bottom:none; }
+  #previo-lista .previo-n { color:var(--mut); width:24px; }
+  #previo-lista .previo-num { text-align:right; width:52px; }
+  #previo-lista .previo-desc { width:130px; }
+  #previo-lista .previo-desc .pct { color:#047857; font-weight:600; }
   /* Configuración obligatoria de la máquina (2026-07-29): los campos se
      resuelven DENTRO del aviso — el que falta arranca vacío y con el foco. */
   #configmaq-caja label { display:block; font-weight:600; font-size:13px;
@@ -2144,6 +2180,28 @@
   </div>
 </div>
 
+<!-- Revisión previa de la corrida (2026-07-30, pedido del usuario): mandar
+     facturas en serie compromete de una vez la SERIE, la fecha y la tasa del
+     lote entero, y una vez arrancado no hay dónde corregirlas factura por
+     factura. Así que "Llenar en fila" ya no pregunta "¿seguro?" y en su lugar
+     enseña con qué se va a llenar y qué facturas entran. Se abre con la fila
+     YA resuelta (después del aviso de familia): lo que se ve es exactamente lo
+     que se va a apartar y llenar. -->
+<div id="previo-overlay" onclick="if(event.target===this)cerrarPrevioLote()">
+  <div id="previo-caja">
+    <h3>Revisa antes de llenar en fila</h3>
+    <p id="previo-proceso" class="mut"></p>
+    <div id="previo-cajitas"></div>
+    <div id="previo-avisos"></div>
+    <div id="previo-resumen" class="mut"></div>
+    <div id="previo-lista"></div>
+    <div class="editor-acciones">
+      <button class="primario" id="previo-llenar" onclick="confirmarPrevioLote()"></button>
+      <button onclick="cerrarPrevioLote()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- La tasa del día a facturar todavía no se tiene (pedido del usuario
      2026-07-22): al dar Llenar se avisa ANTES de tocar Winledger, porque la
      factura saldría con el Cambio que ya tenga el sistema. Lo decide la
@@ -2472,9 +2530,13 @@ function verDetalleTecnico() {
 // nunca se pone, y el check se muestra forzado prendido, así que leerlo alcanza.
 // El gate espeja al del backend: app.py solo aplica los saltos con el modo
 // prueba activo (ui_bridge.modo_implantacion, que incluye el toggle admin).
-function saltandoTasa() {
+function saltandoTasa() { return saltandoPuestaAPunto("tasa"); }
+
+// Los otros dos saltos (serie y fecha) con el mismo gate: los lee la revisión
+// previa del lote para no anunciar una serie o una fecha que no se van a poner.
+function saltandoPuestaAPunto(cual) {
   if (!(modoImplantacion || modoAdmin)) return false;
-  const chk = $("prueba-saltar-tasa");
+  const chk = $(`prueba-saltar-${cual}`);
   return chk ? chk.checked : false;
 }
 
@@ -7007,18 +7069,21 @@ function terminarEsperaEnvioPlataforma() {
   $("btn-envio-listo").style.display = "none";
 }
 
-// Lanza el flujo. Pide una confirmación en línea (igual que el borrado) antes
-// de arrancar el lote — lanzarEnFilaConfirmado es lo que corre al confirmar.
+// Lanza el flujo. Ya NO pide una confirmación en línea (2026-07-30, pedido del
+// usuario): confirmar sin enseñar nada no dejaba verificar justo lo que hay que
+// verificar antes de una corrida —la serie sobre todo—, así que ese paso lo
+// sustituye la ventana de revisión previa, que sale al final, con la fila ya
+// resuelta (revisarLotePrevio, dentro de arrancarSecuencia).
 // "Pedido completo" arranca sin avisar nada: ese botón EXISTE para no partir
 // pedidos, así que "el siguiente viene doble" es su comportamiento normal, no
 // una novedad que valga interrumpir (pedido del usuario 2026-07-26; el aviso
-// informativo que salía ahí se retiró). En modo numérico son dos pasos:
-// cantidad válida → qué facturas entran (pedido que el corte partiría). La
-// impresión ya no pregunta nada: su aviso está a la vista en la barra mientras
-// "Imprimir: sí" esté elegido (2026-07-22).
+// informativo que salía ahí se retiró). En modo numérico sigue habiendo un paso
+// antes: qué facturas entran cuando el corte partiría un pedido. La impresión
+// no pregunta nada: su aviso está a la vista en la barra mientras "Imprimir:
+// sí" esté elegido (2026-07-22).
 function lanzarEnFila() {
-  // Validaciones que abortan con aviso van ANTES de confirmar: no tiene
-  // sentido pedir confirmación de algo que igual no va a arrancar.
+  // Validaciones que abortan con aviso van ANTES de abrir nada: no tiene
+  // sentido enseñar un lote que igual no va a arrancar.
   if (!pendientesLlenables().length) { mensaje("No hay pendientes.", "info"); return; }
   if (otroEnFila) {
     const n = parseInt($("enfila-otro").value, 10);
@@ -7028,14 +7093,6 @@ function lanzarEnFila() {
       return;
     }
   }
-  // Confirmación en línea antes de arrancar el lote, igual que el borrado: el
-  // botón se cambia por "Confirmar llenar en fila" / "Cancelar".
-  confirmarSinQuitar($("btn-secuencia"), lanzarEnFilaConfirmado, "Confirmar llenar en fila");
-}
-
-// Lo que corre solo tras confirmar. El aviso de familia partida por el corte
-// es su propia confirmación y no repite la de arriba.
-function lanzarEnFilaConfirmado() {
   if (completaEnFila) { arrancarSecuencia(familiaDelSiguiente().partes); return; }
   // Ruta completa: el lote se lleva TODO lo pendiente de la ruta, así que no
   // hay corte que pueda partir un pedido en dos lotes y nada que preguntar.
@@ -7052,6 +7109,168 @@ const enFilaPrefijo = () =>
   (secuenciaActiva && metaEnFila > 1)
     ? `Factura ${hechasEnFila + 1} de ${metaEnFila}: ` : "";
 
+// --- Revisión previa de la corrida (2026-07-30, pedido del usuario) ---------
+// Mandar facturas en serie compromete de una sola vez la SERIE del lote entero
+// —y la fecha y la tasa—, y una vez arrancada la corrida no hay dónde
+// corregirlas factura por factura. Por eso "Llenar en fila" ya no pregunta
+// "¿seguro?": abre esta ventana con la puesta a punto que va a usar y las
+// facturas que va a llenar, y de ahí sale a llenar o se cancela.
+// Se abre con la fila YA resuelta (después del aviso de familia), así que lo
+// que se lee es exactamente lo que se va a apartar.
+// `previoResolver` es la promesa que espera la decisión: mientras exista hay
+// una revisión abierta, y arrancarSecuencia no deja entrar a otra.
+let previoResolver = null;
+let previoCola = [];              // la fila EXACTA que se está mostrando
+let previoDescuentos = null;      // resumen del servidor; null = todavía en vuelo
+let previoDescuentosFallo = "";
+
+function revisarLotePrevio(cola) {
+  previoCola = cola;
+  previoDescuentos = null;
+  previoDescuentosFallo = "";
+  pintarPrevioLote();
+  // Los descuentos se piden EN PARALELO: la ventana abre con lo que el panel
+  // ya tiene en la lista y esa columna se completa sola al llegar la
+  // respuesta. Nadie espera un viaje al servidor para ver su propio lote.
+  pedirDescuentosDelLote(cola);
+  $("previo-overlay").classList.add("visible");
+  return new Promise(decidir => { previoResolver = decidir; });
+}
+
+function cerrarPrevioLote() { salirDelPrevio(false); }
+function confirmarPrevioLote() { salirDelPrevio(true); }
+
+function salirDelPrevio(seguir) {
+  $("previo-overlay").classList.remove("visible");
+  const decidir = previoResolver;
+  previoResolver = null;
+  if (decidir) decidir(seguir);
+}
+
+async function pedirDescuentosDelLote(cola) {
+  try {
+    const r = await api("/api/resumen_lote", {
+      facturas: cola.map(c => ({pedido_id: c.pedido_id, parte: c.parte})),
+      fecha_facturar: $("f-fecha-facturar").value || null,
+    });
+    if (cola !== previoCola) return;   // la ventana ya se cerró o abrió otra
+    previoDescuentos = r.facturas || [];
+  } catch (e) {
+    if (cola !== previoCola) return;
+    previoDescuentos = [];
+    previoDescuentosFallo = `No se pudieron consultar los descuentos del lote: `
+      + `${e.message}. El llenado los aplica igual.`;
+  }
+  if (previoResolver) pintarPrevioLote();
+}
+
+function pintarPrevioLote() {
+  const n = previoCola.length;
+  $("previo-llenar").textContent = `Llenar ${n} factura${n === 1 ? "" : "s"}`;
+  // Qué va a pasar, en una línea: el mismo dato que las notas de los radios de
+  // impresión, dicho sobre ESTE lote — es la última vista antes de arrancar.
+  $("previo-proceso").textContent = imprimirEnFila()
+    ? `Se llenan una tras otra; después de cada factura, el programa espera tu
+       «Continuar» para que revises la impresión y el papel.`.replace(/\s+/g, " ")
+    : `Se llenan una tras otra, sin pausas: no se imprime nada ni se espera
+       confirmación entre una factura y la siguiente.`.replace(/\s+/g, " ");
+  $("previo-cajitas").innerHTML = cajitasPrevio().join("");
+  $("previo-avisos").innerHTML = avisosPrevio().map(
+    t => `<div class="previo-ojo">${esc(t)}</div>`).join("");
+  const filas = previoCola.map(c => filaDeLista(c.pedido_id, c.parte) || c);
+  const lineas = filas.reduce((total, f) => total + (f.cantidad_lineas || 0), 0);
+  const conDescuento = previoDescuentos
+    ? previoDescuentos.filter(d => (d.descuentos || []).length).length : null;
+  $("previo-resumen").textContent =
+    `${lineas} línea${lineas === 1 ? "" : "s"} en total`
+    + (conDescuento === null ? ""
+       : conDescuento ? ` · ${conDescuento} factura${conDescuento === 1 ? "" : "s"} con descuento`
+       : " · ninguna lleva descuento")
+    + (previoDescuentosFallo ? ` · ${previoDescuentosFallo}` : "");
+  $("previo-lista").innerHTML = `<table><thead><tr>
+      <th></th><th>Pedido</th><th>Cliente</th>
+      <th class="previo-num">Líneas</th><th class="previo-desc">Descuento</th>
+    </tr></thead><tbody>${filas.map(filaPrevio).join("")}</tbody></table>`;
+}
+
+function filaPrevio(f, i) {
+  const parte = f.total_partes > 1
+    ? ` <span class="mut">(factura ${f.parte} de ${f.total_partes})</span>` : "";
+  return `<tr>
+    <td class="previo-n">${i + 1}</td>
+    <td>${esc(f.pedido_id)}${parte}</td>
+    <td>${esc(f.razon_social || f.cliente_id || "")}</td>
+    <td class="previo-num">${f.cantidad_lineas ?? ""}</td>
+    <td class="previo-desc">${descuentoPrevio(f)}</td></tr>`;
+}
+
+// El descuento de la factura RESUMIDO (pedido del usuario): un porcentaje si
+// todas las líneas con descuento llevan el mismo, y un rango si son varios —
+// el detalle línea por línea vive en la ventana del pedido.
+function descuentoPrevio(f) {
+  if (previoDescuentos === null) return `<span class="mut">…</span>`;
+  const d = previoDescuentos.find(
+    x => x.pedido_id === f.pedido_id && x.parte === f.parte);
+  if (!d || d.sin_detalle) return `<span class="mut">—</span>`;
+  const pcts = d.descuentos || [];
+  if (!pcts.length) return `<span class="mut">sin descuento</span>`;
+  const texto = pcts.length === 1
+    ? `${pctCorto(pcts[0])}%`
+    : `${pctCorto(pcts[0])}–${pctCorto(pcts[pcts.length - 1])}%`;
+  // "en 12 de 25" solo cuando el descuento NO cubre la factura entera: si la
+  // cubre toda, el porcentaje solo ya lo dice.
+  const parcial = d.lineas_con_descuento < d.lineas
+    ? ` <span class="mut">en ${d.lineas_con_descuento} de ${d.lineas}</span>` : "";
+  return `<span class="pct">${esc(texto)}</span>${parcial}`;
+}
+
+// Los datos que deciden en qué documento cae cada factura del lote. En ámbar
+// va lo que el asistente NO va a poner: ahí la factura sale con lo que el
+// programa de facturación tenga puesto en ese momento.
+function cajitasPrevio() {
+  const caj = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
+      <span class="cj-rot">${esc(rot)}</span>
+      <span class="cj-val">${esc(val)}</span></div>`;
+  const cajitas = [];
+  cajitas.push(saltandoPuestaAPunto("serie")
+    ? caj("Serie", "no se elige", true)
+    : caj("Serie", serieSeleccionada || "la que esté puesta", !serieSeleccionada));
+  const iso = $("f-fecha-facturar").value;
+  cajitas.push(saltandoPuestaAPunto("fecha")
+    ? caj("Fecha a facturar", "no se toca", true)
+    : caj("Fecha a facturar", iso ? dmaCorto(iso) : "—", !iso));
+  const tasa = tasaParaLlenar();
+  cajitas.push(saltandoTasa()
+    ? caj("Tasa", "no se registra", true)
+    : caj("Tasa", tasa || "no se registra", !tasa));
+  cajitas.push(caj("Ruta", rutaSeleccionada === "" ? "todas"
+    : rutaSeleccionada === "__sin_ruta__" ? "sin ruta"
+    : nombreRuta(rutaSeleccionada)));
+  cajitas.push(caj("Imprimir", imprimirEnFila() ? "sí" : "no", imprimirEnFila()));
+  // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
+  // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
+  const p999 = $("prueba-emp-999");
+  if (p999 && p999.checked) cajitas.push(caj("Empresa", "999 (prueba)", true));
+  return cajitas;
+}
+
+// Lo que hay que sopesar antes de dar el sí, con su consecuencia sobre el lote
+// entero (no sobre una factura suelta, que es como lo dicen los avisos del
+// llenado individual).
+function avisosPrevio() {
+  const avisos = [];
+  const n = previoCola.length;
+  if (!saltandoPuestaAPunto("serie") && !serieSeleccionada)
+    avisos.push(`No hay serie elegida: ${n === 1 ? "la factura sale" :
+      `las ${n} facturas salen`} con la que el programa de facturación tenga `
+      + `puesta al empezar cada una.`);
+  const motivoTasa = saltandoTasa() ? null : motivoTasaAusente();
+  if (motivoTasa)
+    avisos.push(`${motivoTasa} Ninguna factura del lote registra tasa: todas `
+      + `salen con el Cambio que el programa tenga.`);
+  return avisos;
+}
+
 // Arranque de una corrida NUEVA: aparta la fila en el estado compartido y, con
 // lo que quedó apartado, fija el objetivo y reinicia la cuenta. reintentarEnFila
 // NO pasa por aquí a propósito: la reanudación conserva la cuenta y la reserva
@@ -7060,8 +7279,9 @@ const enFilaPrefijo = () =>
 async function arrancarSecuencia(meta, saltarPedido = null) {
   // Guarda de re-entrada: apartar el lote es un viaje a Supabase y durante ese
   // rato el botón sigue en pantalla — un segundo click no puede lanzar una
-  // segunda corrida.
-  if (reservandoLote || secuenciaActiva) return;
+  // segunda corrida. Con la revisión previa abierta pasa lo mismo, y encima
+  // dura lo que el operador tarde en leerla.
+  if (reservandoLote || secuenciaActiva || previoResolver) return;
   // Sin la configuración de esta computadora no se aparta nada: el servidor
   // rechaza la reserva igual, y apartarle facturas a las demás máquinas sin
   // poder llenarlas es lo peor que podría pasar aquí.
@@ -7076,6 +7296,11 @@ async function arrancarSecuencia(meta, saltarPedido = null) {
     .slice(0, meta)
     .map(f => ({pedido_id: f.pedido_id, parte: f.parte}));
   if (!cola.length) { mensaje("No hay pendientes.", "info"); return; }
+  // Nada se aparta ni se toca hasta que el operador vea con qué se va a llenar
+  // y diga que sí (2026-07-30). Va aquí y no en el botón porque este es el
+  // único punto por el que pasan TODOS los arranques de corrida, y con la fila
+  // ya resuelta: las tres salidas del aviso de familia arman colas distintas.
+  if (!await revisarLotePrevio(cola)) return;
   reservandoLote = true;
   try {
     await api("/api/reservar_lote", {facturas: cola});
