@@ -576,9 +576,17 @@
                      display:none; z-index:19; align-items:flex-start; justify-content:center; }
   #cliente-overlay.visible { display:flex; }
   #cliente-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
-                  width:min(720px, 94vw); max-height:85vh; overflow:auto;
+                  width:min(720px, 94vw); max-height:85vh; overflow:hidden;
+                  display:flex; flex-direction:column;
                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
-  #cliente-caja h3 { margin:0 0 12px; font-size:14px; }
+  /* Solo las sucursales hacen scroll: con una cadena larga, "Agregar sucursal"
+     y "Cerrar" quedan siempre a la vista (mismo reparto que #desc-caja). */
+  #cliente-caja > .cliente-cabecera, #cliente-caja > .editor-acciones { flex:none; }
+  #cliente-cuerpo { flex:1 1 auto; min-height:0; overflow:auto; }
+  #cliente-caja > .editor-acciones { border-top:1px solid #e2e6ec; padding-top:12px; }
+  .cliente-cabecera { display:flex; align-items:center; gap:12px; margin:0 0 12px; }
+  .cliente-cabecera h3 { margin:0; font-size:14px; }
+  .cliente-cabecera button { margin-left:auto; }
   /* Editor de campaña de descuento (modal propio, más ancho que el de catálogo) */
   #desc-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
                   display:none; z-index:21; align-items:flex-start; justify-content:center; }
@@ -1722,10 +1730,12 @@
      sucursales. El editor de una fila se abre ENCIMA de esta. -->
 <div id="cliente-overlay" onclick="if(event.target===this)cerrarVentanaCliente()">
   <div id="cliente-caja">
-    <h3 id="cliente-titulo"></h3>
+    <div class="cliente-cabecera">
+      <h3 id="cliente-titulo"></h3>
+      <button class="primario" id="cliente-agregar" onclick="agregarSucursal()">Agregar sucursal</button>
+    </div>
     <div id="cliente-cuerpo"></div>
     <div class="editor-acciones">
-      <button class="primario" id="cliente-agregar" onclick="agregarSucursal()">Agregar sucursal</button>
       <button onclick="cerrarVentanaCliente()">Cerrar</button>
     </div>
   </div>
