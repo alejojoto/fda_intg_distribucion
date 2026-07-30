@@ -561,6 +561,33 @@
   .punto-estado { display:inline-block; width:9px; height:9px; border-radius:50%;
                   background:#d92d20; box-shadow:0 0 0 2px #fee4e2; }
   .punto-estado.si { background:#16a34a; box-shadow:0 0 0 2px #dcfce7; }
+  /* Interruptor de activo/inactivo (pedido del usuario 2026-07-31): el cuadrito
+     de marcar no decía de un vistazo si estaba prendido —había que fijarse si
+     tenía o no el gancho—. El interruptor lo dice por posición Y por color:
+     verde a la derecha = activo, gris a la izquierda = inactivo. Se estila el
+     propio input (appearance:none) en vez de envolverlo en más etiquetas, así
+     el marcado de cada sitio no cambia: basta con ponerle la clase.
+     Solo lo usa activo/inactivo; los demás checks siguen siendo checks —un
+     interruptor verde ahí se leería como "encendido/apagado", que no es lo que
+     dicen. Las lucecitas (.punto-estado) quedan igual: informan donde no se
+     puede tocar. */
+  .switch { appearance:none; -webkit-appearance:none; -moz-appearance:none;
+            position:relative; flex:none; box-sizing:content-box;
+            width:34px; height:20px; margin:0; padding:0; border:0;
+            border-radius:999px; background:#d0d5dd; cursor:pointer;
+            transition:background .18s ease; vertical-align:middle; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px;
+                   width:16px; height:16px; border-radius:50%; background:#fff;
+                   box-shadow:0 1px 3px rgba(16,24,40,.35);
+                   transition:transform .18s ease; }
+  .switch:checked { background:#16a34a; }
+  .switch:checked::after { transform:translateX(14px); }
+  .switch:disabled { cursor:default; opacity:.5; }
+  .switch:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+  /* Etiqueta que acompaña a un interruptor: el texto largo no debe reflotar
+     debajo del interruptor al pasar de un renglón. */
+  .switch-linea { display:flex; align-items:flex-start; gap:9px; cursor:pointer; }
+  .switch-linea .switch { margin-top:1px; }
   /* De dónde sale cada dato (2026-07-27): un solo lenguaje de color en los
      catálogos — ámbar = Winledger (el ERP), azul = AppSheet (la app de
      pedidos), gris = dato propio del panel. El color va acompañado SIEMPRE
@@ -1563,8 +1590,8 @@
       <p class="mut" style="margin:8px 0 0">
         El <b>nombre</b> es con el que las demás computadoras ven tus llenados
         en el historial; no puede repetirse con el de otra. El
-        <b>vendedor</b> es quien factura (no quien elaboró el pedido) y va en
-        cada factura que se cargue desde aquí; solo aparecen los activos.
+        <b>vendedor</b> es el campo que se llena en la ficha de cada factura
+        que se cargue desde aquí; solo aparecen los activos.
         Las dos cosas hacen falta para poder facturar.</p>
     </div>
     <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
@@ -8768,8 +8795,8 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // Toggle de un clic (solo dentro de la ficha del cliente, 2026-07-30): fuera
   // de ahí se conserva el punto informativo, sin click.
   const celdaActivo = conToggleActivo
-    ? `<label style="cursor:pointer" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté desmarcada, esta sucursal no entra al proceso automático de facturación.">
-         <input type="checkbox" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`
+    ? `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
+         <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`
     : puntoEstado(f.activo);
   return `<tr>
     <td style="padding-left:26px">${nombre}${suelta
@@ -8928,12 +8955,12 @@ function pintarVentanaCliente() {
   const esCadena = primera.es_cadena_manual == null ? autoCadena : !!primera.es_cadena_manual;
   const activoCliente = !!primera.activo_cliente;
   const cabecera = clienteEnEdicion ? `
-    <label style="cursor:pointer; font-size:12.5px; display:block; margin-bottom:12px">
-      <input type="checkbox" ${activoCliente ? "checked" : ""}
+    <label class="switch-linea" style="font-size:12.5px; margin-bottom:12px">
+      <input type="checkbox" class="switch" ${activoCliente ? "checked" : ""}
              onclick="alternarActivoCliente('${esc(clienteEnEdicion)}')">
-      Cliente activo — desactívalo para sacarlo por completo (todas sus
+      <span>Cliente activo — apágalo para sacarlo por completo (todas sus
       sucursales a la vez) del proceso automático de facturación, sin tocar el
-      estado propio de cada una.
+      estado propio de cada una.</span>
     </label>
     <span class="obj-aviso-inline" data-activo-cliente-aviso="${esc(clienteEnEdicion)}" style="display:none"></span>
     <label class="editor-campo" style="max-width:420px">
@@ -9184,8 +9211,8 @@ function abrirEditor(indice, prefill) {
       </label>`;
     }
     if (c.tipo === "checkbox") {
-      return `<label class="editor-campo" style="flex-direction:row;align-items:center;gap:8px">
-        <input type="checkbox" id="ed-${c.campo}" ${valor === undefined || valor ? "checked" : ""}>
+      return `<label class="editor-campo" style="flex-direction:row;align-items:center;gap:9px">
+        <input type="checkbox" class="switch" id="ed-${c.campo}" ${valor === undefined || valor ? "checked" : ""}>
         ${esc(c.etiqueta)}</label>`;
     }
     // Opciones fijas (presentación, tipo de feriado…) o calculadas al abrir
