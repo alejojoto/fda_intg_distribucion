@@ -10623,6 +10623,36 @@ document.addEventListener("keydown", (ev) => {
 window.addEventListener("resize", cerrarCalendario);
 window.addEventListener("scroll", cerrarCalendario, true);
 
+// --- Porcentaje de descuento: al entrar, el valor queda seleccionado --------
+// (usuario 2026-07-30) Un % ya escrito obligaba a borrarlo antes de poner otro,
+// y si no se borraba lo tecleado se MEZCLABA con el viejo (campo con "5", se
+// teclea "2", queda 25 o 52). Al entrar al campo se selecciona todo, así el
+// número nuevo reemplaza al anterior de una sola tecleada.
+// Con Tab el navegador ya selecciona solo; el clic del ratón es el que colapsa
+// la selección en el mouseup, así que ese primer mouseup —solo el que dio el
+// foco— se anula. Un clic posterior dentro del campo ya enfocado sigue
+// colocando el cursor donde se pulsó.
+const SEL_PCT_DESCUENTO = "#desc-pct, .desc-pct-inp, .det-pct";
+let pctPorSeleccionar = null;
+
+document.addEventListener("focusin", (ev) => {
+  const el = ev.target.closest?.(SEL_PCT_DESCUENTO);
+  if (el && el.value !== "") el.select();
+});
+
+document.addEventListener("mousedown", (ev) => {
+  const el = ev.target.closest?.(SEL_PCT_DESCUENTO);
+  pctPorSeleccionar = el && el !== document.activeElement ? el : null;
+}, true);
+
+document.addEventListener("mouseup", (ev) => {
+  const el = pctPorSeleccionar;
+  pctPorSeleccionar = null;
+  if (!el || ev.target.closest?.(SEL_PCT_DESCUENTO) !== el || el.value === "") return;
+  ev.preventDefault();
+  el.select();
+}, true);
+
 // --- Borrador del trabajo a medias -----------------------------------------
 // (usuario 2026-07-26) Un refresh del navegador o el cierre de la aplicación se
 // llevaba lo tecleado en un editor abierto. Lo que quedó a medias se guarda en
