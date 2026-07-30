@@ -330,23 +330,28 @@
      ámbar que despacho-difiere: ese color ya dice "hay que mirar esto". */
   .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   /* --- Detalle del pedido (2026-07-29) ------------------------------------
-     Se abre DEBAJO de la fila, no en un modal: el operador compara contra la
-     lista y contra el papel que tiene al lado sin perder de vista dónde está. */
+     Se abre en SU ventana (2026-07-30, pedido del usuario), igual que la ficha
+     de un cliente: colgado debajo de la fila partía la lista en dos y las
+     líneas quedaban apretadas entre las facturas de arriba y las de abajo. */
   .celda-detalle { cursor:pointer; }
   .celda-detalle:hover { text-decoration:underline; text-decoration-style:dotted; }
-  .btn-detalle { padding:1px 6px; margin-left:6px; font-size:11px; line-height:1.4;
+  .btn-detalle { padding:1px 7px; margin-left:6px; font-size:11px; line-height:1.6;
                  color:var(--mut); }
-  .btn-detalle.abierto { color:#1d4ed8; border-color:#9dbdf5; background:#eef4ff; }
-  tr.fila-detalle td { background:#f8fafc; padding-top:0; padding-bottom:10px; }
-  tr.fila-detalle:hover td { background:#f8fafc; }
-  .detalle-caja { border:1px solid #dfe4ec; border-radius:8px; background:#fff;
-                  padding:10px 12px; }
   .detalle-cab { font-size:12.5px; margin-bottom:8px; }
-  .detalle-cab b { font-size:13px; }
-  .detalle-caja table { font-size:12.5px; }
-  .detalle-caja th, .detalle-caja td { padding:5px 8px; vertical-align:middle; }
-  .detalle-caja td.det-num { color:var(--mut); width:26px; }
-  .det-cant, .det-pct { width:82px; padding:3px 6px; text-align:right; }
+  #detalle-cuerpo table { font-size:12.5px; }
+  #detalle-cuerpo th, #detalle-cuerpo td { padding:5px 8px; vertical-align:middle; }
+  #detalle-cuerpo td.det-num { color:var(--mut); width:26px; }
+  /* Los títulos de las columnas se quedan a la vista al bajar por las líneas,
+     como en las tablas de la lista (.tabla-scroll). */
+  #detalle-cuerpo thead th { position:sticky; top:0; background:#fff; z-index:1; }
+  .det-cant, .det-pct { width:82px; padding:3px 6px; text-align:right;
+                        -moz-appearance:textfield; appearance:textfield; }
+  /* Sin las flechitas ▲▼ del navegador (pedido del usuario 2026-07-30): en una
+     línea que ya trae botones sobran, y se quedaban pegadas al pulsarlas. La
+     cantidad y el % se teclean. */
+  .det-cant::-webkit-outer-spin-button, .det-cant::-webkit-inner-spin-button,
+  .det-pct::-webkit-outer-spin-button, .det-pct::-webkit-inner-spin-button {
+    -webkit-appearance:none; margin:0; }
   .det-auto { font-size:11.5px; color:var(--mut); margin-top:3px; }
   .det-auto button { padding:1px 6px; font-size:11px; margin-left:4px; }
   .det-opciones { margin-top:4px; }
@@ -582,6 +587,21 @@
   .cliente-cabecera { display:flex; align-items:center; gap:12px; margin:0 0 12px; }
   .cliente-cabecera h3 { margin:0; font-size:14px; }
   .cliente-cabecera button { margin-left:auto; }
+  /* Ventana del detalle de UNA factura (botón "Ver detalles"): sus líneas con
+     la cantidad y el descuento que llevará cada una. Mismo reparto que la del
+     cliente — solo el cuerpo hace scroll, "Cerrar" siempre a la vista — y el
+     mismo z-index: los avisos del llenado (20) salen por encima. */
+  #detalle-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                     display:none; z-index:19; align-items:flex-start; justify-content:center; }
+  #detalle-overlay.visible { display:flex; }
+  #detalle-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
+                  width:min(860px, 94vw); max-height:85vh; overflow:hidden;
+                  display:flex; flex-direction:column;
+                  box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #detalle-caja > h3, #detalle-caja > .editor-acciones { flex:none; }
+  #detalle-caja > h3 { margin:0 0 12px; font-size:14px; }
+  #detalle-cuerpo { flex:1 1 auto; min-height:0; overflow:auto; }
+  #detalle-caja > .editor-acciones { border-top:1px solid #e2e6ec; padding-top:12px; }
   /* Editor de campaña de descuento (modal propio, más ancho que el de catálogo) */
   #desc-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
                   display:none; z-index:21; align-items:flex-start; justify-content:center; }
@@ -1691,6 +1711,18 @@
     <div id="cliente-cuerpo"></div>
     <div class="editor-acciones">
       <button onclick="cerrarVentanaCliente()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ventana del detalle de UNA factura (su botón "Ver detalles"): el pedido
+     línea por línea, en el orden en que se va a llenar. -->
+<div id="detalle-overlay" onclick="if(event.target===this)cerrarDetalle()">
+  <div id="detalle-caja">
+    <h3 id="detalle-titulo"></h3>
+    <div id="detalle-cuerpo"></div>
+    <div class="editor-acciones">
+      <button onclick="cerrarDetalle()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3339,7 +3371,7 @@ function cambioFechaFacturar() {
   pintarAvisoFecha();
   // El descuento de cada línea depende del día del documento: un detalle
   // abierto se queda mostrando los % de la fecha anterior si no se recarga.
-  refrescarDetallesAbiertos();
+  refrescarDetalleAbierto();
   const campo = $("f-tasa");
   const escrito = campo.value.trim();
   const eraAMano = escrito && escrito !== tasaAutoBCV;
@@ -4345,7 +4377,7 @@ async function elegirRepetida(boton, pedidoId, parte, codigo, decision) {
               {pedido_id: pedidoId, parte, codigo_winledger: codigo, decision});
     // La misma decisión se toma desde el detalle: si está abierto, la cantidad
     // que muestra esa línea acaba de cambiar.
-    if (detallesAbiertos.has(claveDetalle(pedidoId, parte)))
+    if (detalleAbierto === claveDetalle(pedidoId, parte))
       await cargarDetalle(pedidoId, parte);
     cargar();
   } catch (e) {
@@ -4362,38 +4394,38 @@ async function elegirRepetida(boton, pedidoId, parte, codigo, decision) {
 // llegó menos producto o de que se pactó otro descuento, y el documento tiene
 // que salir con lo acordado. Lo que no se toca sigue saliendo automático.
 // En PROCESADAS es solo lectura — muestra lo que de verdad se llenó.
-const detallesAbiertos = new Set();   // "pedido|parte" que el operador dejó abiertos
+// Se abre en su propia ventana (2026-07-30), así que hay UNA a la vista.
+let detalleAbierto = null;            // "pedido|parte" que está en la ventana
 const detalleDatos = {};              // "pedido|parte" → respuesta del panel
 const detalleFallos = {};             // "pedido|parte" → por qué no se pudo traer
 
 const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 
-// El chevron abre y CIERRA (el mismo control deshace lo que hizo). Las celdas
-// Pedido, Cliente y Ruta hacen lo mismo al pulsarlas: son las que identifican
-// el pedido, y buscarle un botón chico a cada fila cansa.
+// Las celdas Pedido, Cliente y Ruta abren la misma ventana al pulsarlas: son
+// las que identifican el pedido y quedan a mano sin ir a buscar el botón.
 function botonDetalle(f) {
   if (f.tiene_detalle === false) return "";
-  const abierto = detallesAbiertos.has(claveDetalle(f.pedido_id, f.parte));
-  return ` <button class="btn-detalle${abierto ? " abierto" : ""}"
-    title="${esc(abierto ? "Cerrar el detalle" : "Ver el detalle: qué se llena en cada línea")}"
-    onclick="event.stopPropagation();alternarDetalle('${esc(f.pedido_id)}',${f.parte})"
-    >${abierto ? "▾" : "▸"}</button>`;
+  return ` <button class="btn-detalle"
+    title="Qué se llena en cada línea de esta factura"
+    onclick="event.stopPropagation();abrirDetalle('${esc(f.pedido_id)}',${f.parte})"
+    >Ver detalles</button>`;
 }
 
 const abridorDetalle = (f) => f.tiene_detalle === false ? ""
-  : ` class="celda-detalle" onclick="alternarDetalle('${esc(f.pedido_id)}',${f.parte})"`;
+  : ` class="celda-detalle" onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"`;
 
-async function alternarDetalle(pedidoId, parte) {
+async function abrirDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
-  if (detallesAbiertos.has(clave)) {
-    detallesAbiertos.delete(clave);
-    delete detalleFallos[clave];
-    repintar();
-    return;
-  }
-  detallesAbiertos.add(clave);
-  repintar();                       // el renglón aparece ya, aunque falte el dato
+  detalleAbierto = clave;
+  delete detalleFallos[clave];
+  pintarVentanaDetalle(clave);      // lo que ya se haya traído antes, de una vez
+  $("detalle-overlay").classList.add("visible");
   await cargarDetalle(pedidoId, parte);
+}
+
+function cerrarDetalle() {
+  $("detalle-overlay").classList.remove("visible");
+  detalleAbierto = null;
 }
 
 async function cargarDetalle(pedidoId, parte) {
@@ -4411,45 +4443,43 @@ async function cargarDetalle(pedidoId, parte) {
     detalleFallos[clave] = e.message;
     delete detalleDatos[clave];
   }
-  pintarDetalleEnSitio(clave);
+  pintarVentanaDetalle(clave);
 }
 
-// Repinta SOLO el renglón del detalle, sin tocar la tabla: así el operador no
-// pierde la posición ni el foco mientras corrige una línea.
-function pintarDetalleEnSitio(clave) {
-  const fila = document.querySelector(`tr.fila-detalle[data-detalle-key="${CSS.escape(clave)}"]`);
-  if (!fila) return;
-  fila.style.display = detallesAbiertos.has(clave) ? "" : "none";
-  fila.querySelector("td").innerHTML = contenidoDetalle(clave);
+// La ventana muestra UNA factura: una respuesta que llega tarde (se cerró, o se
+// abrió otra mientras viajaba) no pisa lo que el operador tiene delante.
+function pintarVentanaDetalle(clave) {
+  if (clave !== detalleAbierto) return;
+  const d = detalleDatos[clave];
+  const partes = d && d.total_partes > 1 ? ` · factura ${d.parte} de ${d.total_partes}` : "";
+  $("detalle-titulo").textContent = d
+    ? `Pedido ${d.pedido_id}${partes}` : "Detalle del pedido";
+  $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
 }
 
-function filaDetalle(f, columnas) {
-  const clave = claveDetalle(f.pedido_id, f.parte);
-  if (!detallesAbiertos.has(clave)) return "";
-  return `<tr class="fila-detalle" data-detalle-key="${esc(clave)}">
-    <td colspan="${columnas}">${contenidoDetalle(clave)}</td></tr>`;
-}
-
+// El pedido y en cuál de sus facturas se está viendo van en el título de la
+// ventana, así que aquí quedan el cliente, la ruta y el resto del encabezado.
 function contenidoDetalle(clave) {
   if (detalleFallos[clave])
-    return `<div class="detalle-caja"><div class="det-error">${esc(detalleFallos[clave])}</div></div>`;
+    return `<div class="det-error">${esc(detalleFallos[clave])}</div>`;
   const d = detalleDatos[clave];
-  if (!d) return `<div class="detalle-caja"><span class="mut">Buscando el detalle…</span></div>`;
+  if (!d) return `<span class="mut">Buscando el detalle…</span>`;
   const cliente = [d.razon_social, d.cliente_codigo_winledger].filter(Boolean).join(" · ");
-  const partes = d.total_partes > 1 ? ` · factura ${d.parte} de ${d.total_partes}` : "";
+  // Una factura ya llenada no repite el encabezado: su nota ya dice qué se está
+  // viendo, y el pedido está en el título de la ventana.
   const cabecera = d.origen === "registro"
-    ? `<b>${esc(d.pedido_id)}</b>${partes} — así se llenó`
-    : `<b>${esc(d.pedido_id)}</b> — ${esc(cliente || d.cliente_id || "")}${
+    ? ""
+    : `${esc(cliente || d.cliente_id || "")}${
         d.sucursal_codigo_winledger ? ` (suc. ${esc(d.sucursal_codigo_winledger)})` : ""}
        ${d.ruta ? ` · ${esc(d.ruta)}` : ""} · ${esc((d.fecha_orden_salida || "").slice(0,10))}
-       ${d.causa_salida ? ` · ${esc(d.causa_salida)}` : ""} · ${d.lineas.length} líneas${partes}`;
+       ${d.causa_salida ? ` · ${esc(d.causa_salida)}` : ""} · ${d.lineas.length} líneas`;
   const nota = d.editable
     ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
         Lo que cambies aquí es lo que se escribe en el documento.</div>`
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: para cambiarle algo, vuelve a llenarla.</div>`;
-  return `<div class="detalle-caja">
+  return `
     <div class="detalle-cab">${cabecera}${nota}</div>
     <table><thead><tr>
       <th></th><th>Producto</th><th style="width:180px">Cantidad</th>
@@ -4457,8 +4487,7 @@ function contenidoDetalle(clave) {
     </tr></thead><tbody>
       ${d.lineas.map(l => filaLineaDetalle(d, l)).join("")}
     </tbody></table>
-    <div class="det-error" id="det-error-${esc(clave)}" style="display:none"></div>
-  </div>`;
+    <div class="det-error" id="det-error-${esc(clave)}" style="display:none"></div>`;
 }
 
 function filaLineaDetalle(d, l) {
@@ -4577,14 +4606,13 @@ function elegirCantidad(pedidoId, parte, codigo, cual, valor) {
 const quitarAjuste = (pedidoId, parte, codigo, campo) =>
   guardarAjuste(pedidoId, parte, codigo, {[campo]: null});
 
-// Los detalles que el operador dejó abiertos, al día otra vez (cambió la fecha
-// a facturar, se editó una campaña de descuento…).
-function refrescarDetallesAbiertos() {
-  for (const clave of detallesAbiertos) {
-    const [pedidoId, parte] = [clave.slice(0, clave.lastIndexOf("|")),
-                               Number(clave.slice(clave.lastIndexOf("|") + 1))];
-    cargarDetalle(pedidoId, parte);
-  }
+// El detalle que el operador tenga abierto, al día otra vez (cambió la fecha a
+// facturar, se editó una campaña de descuento…).
+function refrescarDetalleAbierto() {
+  if (!detalleAbierto) return;
+  const corte = detalleAbierto.lastIndexOf("|");
+  cargarDetalle(detalleAbierto.slice(0, corte),
+                Number(detalleAbierto.slice(corte + 1)));
 }
 
 function lineaDeDetalle(pedidoId, parte, codigo) {
@@ -4643,7 +4671,7 @@ function filaPendiente(f, enFamilia) {
       <td>${esc(f.causa_salida || "")}</td>
       <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}</td>
       <td style="white-space:nowrap">${accionesDeFila(f)}</td>
-    </tr>` + filaDetalle(f, 8) + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
+    </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
 }
 
@@ -4962,7 +4990,7 @@ function filaProcesada(f, enFamilia) {
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td style="white-space:nowrap">${accionesDeFila(f)}</td>
-    </tr>${conflicto}${omitidas}${filaDetalle(f, 11)}
+    </tr>${conflicto}${omitidas}
     <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
 }
 
