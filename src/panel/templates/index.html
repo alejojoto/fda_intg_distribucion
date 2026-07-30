@@ -257,6 +257,11 @@
                              border:1px solid #cbd2dc; border-radius:6px; }
   .paginador .nav { display:flex; gap:6px; align-items:center; margin-left:36px; }
   .paginador button { padding:3px 10px; }
+  /* Conteo con un filtro activo (buscador, fecha, ruta, "solo esta máquina" o
+     el filtro de un catálogo): mismo ámbar de atención que despacho-difiere/
+     por-revisar, para que salte a la vista que la lista NO está completa
+     (pedido del usuario 2026-07-31). */
+  .conteo-filtrado { color:var(--warn); font-weight:600; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { text-align:left; padding:7px 10px; border-bottom:1px solid #eef0f4; vertical-align:top; }
   th { color:var(--mut); font-weight:600; font-size:12px; }
@@ -380,6 +385,9 @@
   /* "Por revisar" (2026-07-29): quedaron líneas omitidas sin despachar. Mismo
      ámbar que despacho-difiere: ese color ya dice "hay que mirar esto". */
   .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
+  /* "Filtro activo" junto al conteo de una lista filtrada: mismo ámbar, para
+     que se note que lo que se ve no es la lista completa. */
+  .chip.chip-filtro { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   /* --- Detalle del pedido (2026-07-29) ------------------------------------
      Se abre en SU ventana (2026-07-30, pedido del usuario), igual que la ficha
      de un cliente: colgado debajo de la fila partía la lista en dos y las
@@ -3837,6 +3845,37 @@ function filtros() {
        + "&solo_aqui=" + ($("f-solo-aqui").checked ? "1" : "");
 }
 
+// ¿Hay algún filtro activo sobre la lista de esta tab? No es una hipótesis:
+// cada control mira su propio valor vigente (pedido del usuario 2026-07-31,
+// "avisa que mientras estés filtrando no estás viendo todos los resultados").
+// PENDIENTES y EN REVISIÓN solo filtran por buscador y ruta (las fechas y
+// "solo esta máquina" son exclusivas de PROCESADAS, ver cambiarTab). El
+// catálogo filtra con su propio campo de texto y, en Feriados, además con
+// el tipo (feriadoClase).
+function hayFiltroActivo(tab) {
+  if (tab === "catalogo") {
+    const texto = (($("cat-filtro") || {}).value || "").trim() !== "";
+    const tipo = catalogoActual === "feriados" && feriadoClase !== "todas";
+    return texto || tipo;
+  }
+  const buscar = ($("f-buscar").value || "").trim() !== "";
+  const ruta = rutaSeleccionada !== "";
+  if (tab === "procesadas") {
+    const fechas = !!($("f-desde").value || $("f-hasta").value);
+    return buscar || ruta || fechas || $("f-solo-aqui").checked;
+  }
+  return buscar || ruta;
+}
+
+// Etiqueta que acompaña el conteo cuando hayFiltroActivo dio true: el mismo
+// aviso en los tres sitios que muestran un conteo (pie de paginación y los dos
+// formatos de cat-conteo), para que diga siempre lo mismo.
+function chipFiltroActivo(filtroActivo) {
+  return filtroActivo
+    ? `<span class="chip chip-filtro" title="No se muestra la lista completa: hay un filtro activo. Bórralo para ver todo.">Filtro activo</span>`
+    : "";
+}
+
 // --- PROCESADAS: histórico progresivo (2026-07-23; por escalones 2026-07-28) -
 // Ya no hay botón de "Buscar en histórico". La vista estándar trae solo los
 // últimos 30 días (recorte del backend); cuando el operador llega al final de
@@ -4225,9 +4264,12 @@ function pintarPiePaginacion(tab, p, total, desde, mostrados, totalPaginas, unid
   const textoEnCurso = enFoco ? document.activeElement.value : null;
   const cursor = enFoco ? document.activeElement.selectionStart : 0;
 
+  const filtroActivo = hayFiltroActivo(tab);
+  const conteoTexto = total ? `${desde + 1}–${desde + mostrados} de ${total} ${unidad}` : `0 ${unidad}`;
   $("pag-" + tab).innerHTML = `
     <label>Mostrar <select onchange="cambiarPorPagina('${tab}', this.value)">${opciones}</select> por página</label>
-    <span>${total ? `${desde + 1}–${desde + mostrados} de ${total} ${unidad}` : `0 ${unidad}`}</span>
+    <span class="${filtroActivo ? "conteo-filtrado" : ""}">${conteoTexto}</span>
+    ${chipFiltroActivo(filtroActivo)}
     <span class="nav">
       <button onclick="cambiarPagina('${tab}', -1)" ${p.pagina <= 1 ? "disabled" : ""}>‹ Anterior</button>
       <span>Página <input type="text" inputmode="numeric" class="pag-num" id="${idNum}"
@@ -8971,7 +9013,8 @@ function pintarFilasCatalogo() {
   } else {
     visibles = paginar("catalogo", coincidentes);
   }
-  $("cat-conteo").textContent = `${coincidentes.length} de ${catalogoFilas.length}`;
+  const catFiltroActivo = hayFiltroActivo("catalogo");
+  $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${coincidentes.length} de ${catalogoFilas.length}</span> ${chipFiltroActivo(catFiltroActivo)}`;
   // `grupoFila` mete una fila de cabecera (ej. el mes en Feriados) cada vez
   // que la etiqueta cambia respecto a la fila anterior — las filas ya vienen
   // ordenadas del backend, así que basta comparar con la última pintada.
@@ -9064,8 +9107,10 @@ function pintarClientesAgrupados(filtro) {
   const visibles = paginarClientes("catalogo", items);
   const nuevas = catalogoFilas.filter(esEntradaNueva).length;
   const totalSucursales = lista.reduce((n, g) => n + g.filas.length, 0);
-  $("cat-conteo").textContent = `${lista.length} cliente(s) · ${totalSucursales} sucursal(es)`
+  const catFiltroActivo = hayFiltroActivo("catalogo");
+  const conteoTexto = `${lista.length} cliente(s) · ${totalSucursales} sucursal(es)`
     + (nuevas ? ` · ${nuevas} por clasificar` : "");
+  $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${conteoTexto}</span> ${chipFiltroActivo(catFiltroActivo)}`;
   let html = "", grupoPintado = null;
   for (const [g, par] of visibles) {
     if (g.sueltas) {
