@@ -1421,23 +1421,23 @@
   <div id="aviso-conflictos" style="display:none" onclick="irAConflictos()"></div>
 
   <div class="tabs">
-    <button class="tab-btn activa" id="tab-pendientes" onclick="cambiarTab('pendientes')">
+    <button class="tab-btn activa" id="tab-pendientes" onclick="irATab('pendientes')">
       PENDIENTES (<span id="n-pendientes">…</span>)</button>
     <!-- EN REVISIÓN (2026-07-20): entre PENDIENTES y PROCESADAS, y solo
          visible cuando el pipeline dejó pedidos sin poder facturar (ver
          repintar). -->
-    <button class="tab-btn" id="tab-revision" style="display:none" onclick="cambiarTab('revision')">
+    <button class="tab-btn" id="tab-revision" style="display:none" onclick="irATab('revision')">
       EN REVISIÓN (<span id="n-revision">…</span>)</button>
-    <button class="tab-btn" id="tab-procesadas" onclick="cambiarTab('procesadas')">
+    <button class="tab-btn" id="tab-procesadas" onclick="irATab('procesadas')">
       PROCESADAS</button>
-    <button class="tab-btn" id="tab-descuentos" onclick="cambiarTab('descuentos')">DESCUENTOS</button>
-    <button class="tab-btn" id="tab-ajustes" onclick="cambiarTab('ajustes')">AJUSTES</button>
+    <button class="tab-btn" id="tab-descuentos" onclick="irATab('descuentos')">DESCUENTOS</button>
+    <button class="tab-btn" id="tab-ajustes" onclick="irATab('ajustes')">AJUSTES</button>
     <!-- ADMIN (2026-07-29): los ajustes de admin salieron de AJUSTES a su propia
          página. El botón solo se RENDERIZA en el equipo designado admin
          (es_maquina_admin, ver ui_bridge.es_maquina_admin): en una máquina de
          operación la pestaña no existe. -->
     {% if es_maquina_admin %}
-    <button class="tab-btn" id="tab-admin" onclick="cambiarTab('admin')">ADMIN</button>
+    <button class="tab-btn" id="tab-admin" onclick="irATab('admin')">ADMIN</button>
     {% endif %}
   </div>
 
@@ -1838,7 +1838,7 @@
 
 <!-- Ventana de UN cliente del catálogo (su botón "Editar"): nombre, marcas y
      sucursales. El editor de una fila se abre ENCIMA de esta. -->
-<div id="cliente-overlay" onclick="if(event.target===this)intentarCerrarVentanaCliente()">
+<div id="cliente-overlay" onclick="if(event.target===this)intentarCerrarVentanaCliente(true)">
   <div id="cliente-caja">
     <div class="cliente-cabecera">
       <h3 id="cliente-titulo"></h3>
@@ -1853,7 +1853,7 @@
 
 <!-- Ventana del detalle de UNA factura (su botón "Ver detalles"): el pedido
      línea por línea, en el orden en que se va a llenar. -->
-<div id="detalle-overlay" onclick="if(event.target===this)cerrarDetalle()">
+<div id="detalle-overlay" onclick="if(event.target===this)intentarCerrarDetalle()">
   <div id="detalle-caja">
     <h3 id="detalle-titulo"></h3>
     <div id="detalle-cuerpo"></div>
@@ -2125,7 +2125,7 @@
      salida de mover la fecha al DESPACHO (hoy o mañana, según lo configurado
      en AJUSTES): dejar que Winledger ponga el Cambio que tenga —que puede ser
      0— es peor que registrar la conocida avisando. -->
-<div id="tasa-overlay" onclick="if(event.target===this)pararPorTasa()">
+<div id="tasa-overlay" onclick="if(event.target===this)intentarPararPorTasa()">
   <div id="tasa-caja">
     <h3 id="tasa-titulo"></h3>
     <p id="tasa-motivo"></p>
@@ -2513,9 +2513,15 @@ let confirmSalidaCerrar = null;
 
 // cfg = {acciones: nodo .editor-acciones del editor, guardar: fn, cerrar: fn}
 // y, para cuando la salida no es cerrar sino IR a otra parte (ej. abrir otra
-// campaña desde la tabla de choques): mensaje/guardarTxt/salirTxt propios.
-// `guardarClase` para los modales donde guardar ES la acción y su botón tiene
-// color propio (el motivo de "Descartar", que va en rojo).
+// campaña desde la tabla de choques): mensaje/guardarTxt/salirTxt/seguirTxt
+// propios. `guardarClase` para los modales donde guardar ES la acción y su
+// botón tiene color propio (el motivo de "Descartar", que va en rojo).
+// SIN `guardar` la pregunta queda de dos salidas (salir / seguir): es la de las
+// ventanas que guardan solas, donde nada se pierde y lo único que se evita es
+// que un clic distraído saque al operador de lo que está haciendo; ahí el botón
+// de salir va neutro (`salirClase: ""`), no en rojo de descarte.
+// `alMostrar` corre con la pregunta ya puesta, para las cajas que tienen que
+// volver a medirse (la ventanita flotante del llenado).
 function pedirConfirmSalida(cfg) {
   if (confirmSalidaCerrar) return;            // ya hay una pregunta a la vista
   const acciones = cfg.acciones;
@@ -2532,12 +2538,14 @@ function pedirConfirmSalida(cfg) {
   bGuardar.className = cfg.guardarClase || "primario";
   bGuardar.textContent = cfg.guardarTxt || "Guardar";
   const bSalir = document.createElement("button");
-  bSalir.className = "cb-si";                  // rojo: descarta trabajo
+  bSalir.className = cfg.salirClase === undefined ? "cb-si" : cfg.salirClase;
   bSalir.textContent = cfg.salirTxt || "Salir sin guardar";
   bSalir.disabled = true;                      // retardo anti doble-clic
   const bSeguir = document.createElement("button");
-  bSeguir.textContent = "Seguir editando";     // Cancelar de la pregunta, de último
-  fila.append(msg, bGuardar, bSalir, bSeguir);
+  bSeguir.textContent = cfg.seguirTxt || "Seguir editando";   // Cancelar de la pregunta, de último
+  fila.append(msg);
+  if (cfg.guardar) fila.append(bGuardar);
+  fila.append(bSalir, bSeguir);
   acciones.append(fila);
   const t = setTimeout(() => { bSalir.disabled = false; }, 400);
   const cerrarPregunta = () => {
@@ -2550,6 +2558,7 @@ function pedirConfirmSalida(cfg) {
   bSeguir.onclick = cerrarPregunta;
   bGuardar.onclick = () => { cerrarPregunta(); cfg.guardar(); };
   bSalir.onclick = () => { cerrarPregunta(); cfg.cerrar(); };
+  if (cfg.alMostrar) cfg.alMostrar();
 }
 
 function actualizarStatusbar() {
@@ -3898,6 +3907,7 @@ async function cambioRuta(valor) {
 }
 
 function cambiarTab(tab) {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   for (const t of ["pendientes", "procesadas", "descuentos", "ajustes", "admin", "revision"]) {
     // El botón de ADMIN solo se renderiza en el equipo admin; su sección sí
     // existe siempre, así que la guarda es sobre el botón.
@@ -4904,6 +4914,7 @@ function celdaAcciones(f) {
 async function abrirDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
+  detalleTocado = false;
   delete detalleFallos[clave];
   pintarVentanaDetalle(clave);      // lo que ya se haya traído antes, de una vez
   $("detalle-overlay").classList.add("visible");
@@ -4911,8 +4922,33 @@ async function abrirDetalle(pedidoId, parte) {
 }
 
 function cerrarDetalle() {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("detalle-overlay").classList.remove("visible");
   detalleAbierto = null;
+  detalleTocado = false;
+}
+
+// Cantidades, descuentos y las opciones de cada línea se guardan solas, pero
+// ajustarlas es trabajo largo: un clic afuera no puede llevarse la ventana en
+// medio. Igual que en la del cliente, se escucha en el cuerpo (que se repinta
+// entero con cada ajuste) y no control por control.
+let detalleTocado = false;
+$("detalle-cuerpo").addEventListener("change", () => { detalleTocado = true; });
+$("detalle-cuerpo").addEventListener("click", (ev) => {
+  if (ev.target.closest("button")) detalleTocado = true;
+});
+
+// Solo lo usa el clic afuera: el botón Cerrar es salida deliberada.
+function intentarCerrarDetalle() {
+  if (!detalleTocado) { cerrarDetalle(); return; }
+  pedirConfirmSalida({
+    acciones: $("detalle-caja").querySelector(".editor-acciones"),
+    mensaje: "Estás ajustando esta factura; lo que cambiaste ya quedó guardado.",
+    salirTxt: "Cerrar el detalle",
+    salirClase: "",
+    seguirTxt: "Seguir aquí",
+    cerrar: cerrarDetalle,
+  });
 }
 
 const partesDeClave = (clave) => [clave.slice(0, clave.lastIndexOf("|")),
@@ -5635,6 +5671,7 @@ function abrirAvisoTasa(motivo, llenado) {
   // el correcto, y corregirla es escribir encima.
   const sugerida = tasaSugeridaParaAviso(fecha);
   $("tasa-editable").value = sugerida ? sugerida.tasa : "";
+  tasaDelAvisoAlAbrir = $("tasa-editable").value;
   sincronizarBotonTasa();
 
   // "Llenar para el despacho": la salida al día que factura esta máquina
@@ -5665,9 +5702,33 @@ function sincronizarBotonTasa() {
 }
 
 function cerrarAvisoTasa() {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("tasa-overlay").classList.remove("visible");
   replantarCajaFlotante();
   llenadoEsperandoTasa = null;
+}
+
+// La tasa que traía el campo al abrir el aviso: sirve para saber si el operador
+// escribió una encima.
+let tasaDelAvisoAlAbrir = "";
+
+// Clic afuera del aviso (equivale a Parar) con una tasa escrita a mano: se
+// pregunta antes de botarla junto con el llenado. Los cuatro botones del aviso
+// siguen siendo salidas directas — se pulsan a conciencia.
+function intentarPararPorTasa() {
+  const valor = $("tasa-editable").value.trim();
+  // Vaciar el campo no es escribir una tasa: ahí no hay nada que rescatar.
+  if (!valor || valor === tasaDelAvisoAlAbrir.trim()) { pararPorTasa(); return; }
+  pedirConfirmSalida({
+    acciones: $("tasa-caja").querySelector(".editor-acciones"),
+    mensaje: "Escribiste una tasa que todavía no se ha usado.",
+    guardarTxt: "Llenar con esta tasa",
+    guardar: llenarConTasaDelAviso,
+    salirTxt: "Parar el llenado",
+    seguirTxt: "Seguir aquí",
+    cerrar: pararPorTasa,
+    alMostrar: () => crecerVentanaPorModal("tasa-caja"),   // la pregunta agranda la caja
+  });
 }
 
 // "aaaa-mm-dd" → "dd/mm" (para las etiquetas cortas de los botones).
@@ -7875,9 +7936,39 @@ async function guardarMaquina() {
     clearTimeout(maquinaGuardadoTimer);
     $("maquina-guardado").style.display = "";
     maquinaGuardadoTimer = setTimeout(ocultarMaquinaGuardado, 4000);
+    return true;
   } catch (e) {
     mensaje(e.message, "error");
+    return false;
   }
+}
+
+// Nombre y vendedor tecleados que todavía no pasaron por Guardar. El vendedor
+// solo cuenta con el selector ya cargado: mientras llega el catálogo su valor
+// es "" y no significa que se haya quitado.
+function maquinaSinGuardar() {
+  const inp = $("maquina-nombre");
+  if (!inp) return false;
+  const vendedor = $("vendedor-select").value;
+  return inp.value.trim() !== (nombreMaquina || "")
+      || (!!vendedor && vendedor !== (vendedorMaquina || ""));
+}
+
+// Las pestañas de arriba pasan por aquí y no por cambiarTab directo: salir de
+// AJUSTES con la configuración de esta máquina a medio escribir la botaba sin
+// avisar. Las idas programáticas a otra pestaña (un aviso que lleva a la
+// factura del conflicto) siguen yendo derecho: ahí no hay clic distraído.
+function irATab(tab) {
+  if (tab === "ajustes" || $("sec-ajustes").style.display === "none" || !maquinaSinGuardar()) {
+    cambiarTab(tab);
+    return;
+  }
+  pedirConfirmSalida({
+    acciones: $("maquina-nombre").closest(".ajustes-fila"),
+    mensaje: "La configuración de esta máquina quedó sin guardar.",
+    guardar: async () => { if (await guardarMaquina()) cambiarTab(tab); },
+    cerrar: () => cambiarTab(tab),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -8730,6 +8821,7 @@ function avisoFavorito(codigo, msg) {
 }
 
 async function alternarFavoritoCliente(codigo) {
+  if (clienteEnEdicion !== null) clienteTocado = true;   // la ★ no dispara `change`
   const actual = catalogoFilas.some(
     f => (f.codigo_cliente_winledger || "") === codigo && f.favorito);
   try {
@@ -8876,6 +8968,7 @@ function pintarVentanaCliente() {
 
 function editarCliente(codigo) {
   clienteEnEdicion = codigo;
+  clienteTocado = false;
   pintarVentanaCliente();
 }
 
@@ -8883,8 +8976,18 @@ function cerrarVentanaCliente() {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("cliente-overlay").classList.remove("visible");
   clienteEnEdicion = null;
+  clienteTocado = false;
   if (catalogoActual === "clientes") pintarFilasCatalogo();   // la lista, con lo que se haya cambiado
 }
+
+// La ventana quedó "en uso" en cuanto se toca cualquiera de sus controles
+// (nombre, marcas del cliente, activo de una sucursal). Se escucha en la caja
+// entera y no control por control porque su contenido se repinta con cada
+// cambio guardado: el contenedor sobrevive, los campos no. La ★ es un <span>
+// con onclick, así que no dispara `change` y se marca en su propia función.
+let clienteTocado = false;
+$("cliente-caja").addEventListener("input", () => { clienteTocado = true; });
+$("cliente-caja").addEventListener("change", () => { clienteTocado = true; });
 
 // Nombre tecleado que todavía no está guardado. El campo se guarda solo al
 // salir de él, y el clic que cierra la ventana dispara ese guardado primero:
@@ -8902,16 +9005,35 @@ function nombreClienteSinGuardar() {
   return (nombre && nombre !== guardado && nombre !== nombreClienteEnVuelo) ? nombre : "";
 }
 
-// Intento de cierre de la ventana del cliente (clic afuera o Cerrar): con el
-// nombre sin guardar pregunta antes de botarlo, igual que los demás editores.
-function intentarCerrarVentanaCliente() {
-  if (!nombreClienteSinGuardar()) { cerrarVentanaCliente(); return; }
-  pedirConfirmSalida({
-    acciones: $("cliente-caja").querySelector(".editor-acciones"),
-    mensaje: "El nombre del cliente quedó sin guardar.",
-    guardar: async () => { if (await guardarNombreCliente()) cerrarVentanaCliente(); },
-    cerrar: cerrarVentanaCliente,
-  });
+// Intento de cierre de la ventana del cliente. Con el nombre sin guardar
+// pregunta siempre, igual que los demás editores. Y aunque esté todo guardado,
+// el clic AFUERA de la caja no cierra una ventana en la que se está trabajando
+// (pasó delante de un cliente: el clic distraído se llevó la ventana): pregunta
+// primero. El botón Cerrar es la salida deliberada y ahí no hay nada que
+// preguntar.
+function intentarCerrarVentanaCliente(porAfuera) {
+  const acciones = $("cliente-caja").querySelector(".editor-acciones");
+  if (nombreClienteSinGuardar()) {
+    pedirConfirmSalida({
+      acciones,
+      mensaje: "El nombre del cliente quedó sin guardar.",
+      guardar: async () => { if (await guardarNombreCliente()) cerrarVentanaCliente(); },
+      cerrar: cerrarVentanaCliente,
+    });
+    return;
+  }
+  if (porAfuera && clienteTocado) {
+    pedirConfirmSalida({
+      acciones,
+      mensaje: "Estás editando este cliente; lo que cambiaste ya quedó guardado.",
+      salirTxt: "Cerrar la ventana",
+      salirClase: "",
+      seguirTxt: "Seguir aquí",
+      cerrar: cerrarVentanaCliente,
+    });
+    return;
+  }
+  cerrarVentanaCliente();
 }
 
 // Nombre del cliente en el programa de facturación, tecleado en su ventana: la app
