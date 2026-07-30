@@ -6766,7 +6766,16 @@ async function confirmarMotivo() {
     avisoFactura(pedido_id, parte, e.message);
     return;
   }
-  await llenar(pedido_id, parte);   // si algo falla, queda con "Reintentar" en EN REVISIÓN
+  // A diferencia de "Llenar igual" (accion "tomar"), esto reabre un documento
+  // YA CERRADO — el motivo más común para reabrirlo es que algo del pedido
+  // tiene que salir distinto, así que en vez de llenar de una se abre el
+  // mismo detalle editable de "Ver detalles" (ya editable: la factura quedó
+  // en error_llenado) para ajustar cantidades y descuentos antes de volver a
+  // llenar (pedido del usuario 2026-07-31). cargar() primero: la fila tiene
+  // que verse como error_llenado propia para que el detalle la reconozca
+  // editable y con su botón de llenar.
+  await cargar();
+  await abrirDetalle(pedido_id, parte);
 }
 
 // Aviso "en el objeto" para una fila de factura (Descartar / Volver a
