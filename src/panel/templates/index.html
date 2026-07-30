@@ -2703,8 +2703,15 @@ function pintarBotonPausa() {
 }
 
 // --- Detener el llenado: botón "Detener" ------------------------------------
+// Detener pulsado en ESTE llenado (2026-07-30). El backend ya hace que el stop
+// mande sobre la pregunta de los estorbos, pero queda un instante en que su
+// respuesta venía en vuelo cuando llegó el click: esta bandera evita que el
+// modal se abra en ese caso. Se limpia al arrancar cada llenado.
+let stopPedidoEnLlenado = false;
+
 async function detenerLlenado() {
   if (!llenando) return;   // nada que detener
+  stopPedidoEnLlenado = true;
   const b = $("btn-stop");
   b.disabled = true;
   b.textContent = "Deteniendo…";
@@ -5328,6 +5335,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     }
   }
   llenando = true;
+  stopPedidoEnLlenado = false;   // el Detener del llenado anterior no cuenta aquí
   // En una corrida la caja no se cierra entre facturas: sin esto, las cajitas
   // de grupos de la factura anterior se quedan a la vista hasta el primer
   // sondeo de la nueva.
@@ -5467,6 +5475,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // que es lo que deja al backend cerrar la ventana y cancelar el documento.
     const estorbo = TEXTO_ESTORBO[r.requiere_confirmacion];
     if (estorbo) {
+      // Detener pulsado durante este llenado: el stop manda y el modal no se
+      // abre (2026-07-30). Nada se tocó en el programa de facturación —esta
+      // respuesta es justamente la de "no toqué nada"—, así que basta con
+      // cerrar el llenado como cualquier otra detención.
+      if (stopPedidoEnLlenado) {
+        mensaje("Detenido.", "info");
+        if (secuenciaActiva) detenerSecuencia();
+        return "cancelado";
+      }
       const ok = await abrirDocEnCurso(r.requiere_confirmacion);
       if (ok) {
         // Re-llamada autorizada cuando esta termine de soltar el lock local
