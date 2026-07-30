@@ -4619,6 +4619,7 @@ function filaLineaDetalle(d, l) {
       <td>${producto}</td>
       <td>
         <input type="number" class="det-cant" min="0" step="any" value="${l.cantidad}"
+               onfocus="this.select()" onclick="this.select()"
                onchange="ajustarCantidad(this,${ref})"
                onkeydown="if(event.key==='Enter')this.blur()">
         ${opciones}
@@ -4627,6 +4628,7 @@ function filaLineaDetalle(d, l) {
       </td>
       <td>
         <input type="number" class="det-pct" min="0" max="100" step="any" value="${l.descuento_pct}"
+               onfocus="this.select()" onclick="this.select()"
                onchange="ajustarDescuento(this,${ref})"
                onkeydown="if(event.key==='Enter')this.blur()"> %
         ${ajuste.descuento_pct !== undefined && ajuste.descuento_pct !== null
