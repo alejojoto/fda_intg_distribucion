@@ -2740,8 +2740,13 @@ function pintarInfoLlenado() {
 }
 
 /* VENTANA FLOTANTE (2026-07-27): durante el llenado la ventana del panel se
-   encoge a una caja chiquita y se va ARRIBA; al salir del modo vuelve a su
-   tamaño y posición anteriores. ARRIBA y no abajo (incidente 2026-07-27):
+   encoge a una caja chiquita y se va ARRIBA; al salir del modo vuelve al
+   MARCO FIJO con el que abre el panel. Marco fijo y no "el tamaño de antes"
+   (2026-07-31, pedido del usuario): recordar la geometría previa devolvía la
+   ventana gigante cuando el operador la había maximizado antes del llenado,
+   y un destino que cambia con cada llenado no se puede verificar — con el
+   marco fijo, ver la ventana grande ES la confirmación (ventanaYaGrande).
+   ARRIBA y no abajo (incidente 2026-07-27):
    la ventana es topmost por Win32, y plantada abajo tapaba el Aceptar del
    Detalle — el Invoke de UIA no surte efecto sobre un botón tapado, y cada
    línea pagaba el timeout del reintento. En la franja superior de la Ficha
@@ -2769,41 +2774,46 @@ const ALTO_FLOTANTE = 200;
 // lo suma ella. Con Edge se usa ALTO_FLOTANTE, que ya lo incluye.
 const ALTO_CONTENIDO_FLOTANTE = 170;
 const MARGEN_SUPERIOR = 8;    // aire contra el borde superior de la pantalla
+// Marco fijo del panel completo, para el camino de Edge: espejo de
+// ANCHO_VENTANA / ALTO_VENTANA / MARGEN_SUPERIOR_APERTURA en
+// src/ventana_panel.py (la ventana propia hace la misma cuenta en Python).
+// Si cambian allá, cambian aquí.
+const ANCHO_PANEL = 1280;
+const ALTO_PANEL = 900;
+const MARGEN_SUPERIOR_PANEL = 16;
 let ventanaFlotante = false;
-let geometriaPrevia = null;
-/* AGRANDAR ES LO QUE PUEDE FALLAR EN SILENCIO (incidente 2026-07-30): el
-   operador terminó un llenado y la ventana quedó del tamaño de la barra, con
-   el panel entero adentro y scroll, hasta que la maximizó a mano. El colapso
-   por CSS de arriba no falla nunca; el cambio de tamaño sí, y se daba por
-   hecho ni bien se pedía. Por eso la restauración se marca PENDIENTE y solo se
-   apaga cuando la ventana CONFIRMA que volvió — el vigilante de más abajo la
-   reintenta mientras tanto. Cubre las tres formas de quedarse encogido: el
-   pedido que no aterriza, el puente de la ventana propia todavía sin inyectar
-   y la recarga de la página con la barra plantada. */
+/* AGRANDAR ES LO QUE PUEDE FALLAR EN SILENCIO (incidentes 2026-07-30 y 31):
+   el colapso por CSS no falla nunca; el cambio de tamaño sí, y las dos vías
+   lo daban por hecho con el pedido apenas ACEPTADO — el SetWindowPos de la
+   ventana propia es asíncrono ("aceptado" no es "aplicado") y el resizeTo de
+   Edge no avisa cuando lo ignora, así que el primer llenado quedaba en
+   barrita y nadie reintentaba. Por eso la restauración queda PENDIENTE hasta
+   que la VENTANA MISMA se vea grande (ventanaYaGrande, la verificación por
+   resultado) — el vigilante de más abajo reintenta mientras tanto. Cubre las
+   tres formas de quedarse encogido: el pedido que no aterriza, el puente de
+   la ventana propia todavía sin inyectar y la recarga de la página con la
+   barra plantada. */
 let restauracionPendiente = false;
 let intentosRestaurar = 0;
 const MAX_INTENTOS_RESTAURAR = 10;   // a un intento por segundo
 // La marca de "encogida" vive FUERA de la página: si el operador recarga con
 // la barra plantada, esta página nace sin memoria del encogimiento y nadie
-// volvería a agrandar la ventana. Guarda la geometría anterior cuando la hay
-// (camino de Edge); en la ventana propia basta la marca, porque la geometría
-// la conserva la ventana del lado de Python.
+// volvería a agrandar la ventana. Es solo una marca — el destino ya no se
+// guarda, porque el marco del panel es fijo.
 const CLAVE_ENCOGIDA = "fda.ventanaEncogida";
 
-function recordarEncogida(geometria) {
-  try { localStorage.setItem(CLAVE_ENCOGIDA, JSON.stringify(geometria || {})); } catch (e) {}
+function recordarEncogida() {
+  try { localStorage.setItem(CLAVE_ENCOGIDA, "1"); } catch (e) {}
 }
 
 function olvidarEncogida() {
   try { localStorage.removeItem(CLAVE_ENCOGIDA); } catch (e) {}
 }
 
+// Cualquier valor cuenta como marca: las versiones anteriores guardaban aquí
+// una geometría en JSON y esa marca heredada también debe restaurar.
 try {
-  const anotada = JSON.parse(localStorage.getItem(CLAVE_ENCOGIDA) || "null");
-  if (anotada) {
-    restauracionPendiente = true;
-    if (anotada.ancho) geometriaPrevia = anotada;
-  }
+  if (localStorage.getItem(CLAVE_ENCOGIDA) !== null) restauracionPendiente = true;
 } catch (e) {}
 
 // La API que expone la ventana propia. null cuando el panel se abrió con
@@ -2827,11 +2837,11 @@ function aplicarVentanaFlotante(activo) {
     intentarRestaurar();   // vive aparte porque se reintenta hasta que confirme
     return;
   }
+  recordarEncogida();
   if (api) {
     try {
       Promise.resolve(api.plantar_barra(ALTO_CONTENIDO_FLOTANTE)).catch(e =>
         reportarAlPanel({tipo: "puente-rechazo", activo, detalle: String(e).slice(0, 2000)}));
-      recordarEncogida(null);
       return;   // la ventana propia se pone encima sola: sin Win32 del panel
     } catch (e) {
       // API a medio inyectar (p. ej. plantar_barra todavía ausente): se
@@ -2841,9 +2851,6 @@ function aplicarVentanaFlotante(activo) {
     }
   }
   try {
-    geometriaPrevia = {x: window.screenX, y: window.screenY,
-                       ancho: window.outerWidth, alto: window.outerHeight};
-    recordarEncogida(geometriaPrevia);
     plantarBarraFlotante(ALTO_FLOTANTE);
   } catch (e) {
     // Ventana que no se deja redimensionar (pestaña normal): el modo
@@ -2858,29 +2865,60 @@ function aplicarVentanaFlotante(activo) {
   }).catch(() => {});
 }
 
-// Un intento de devolver la ventana a su tamaño. Repetible a propósito: lo
-// llaman la transición y el vigilante, y ninguno de los dos da nada por hecho.
-// La ventana propia devuelve false y CONSERVA su geometría cuando el pedido no
-// aterriza, así que reintentar todavía la rescata; un false que llega por no
-// haber nada que restaurar solo gasta los intentos, que están acotados.
+// El marco fijo al que vuelve el panel: la misma cuenta que hace
+// geometria_de_apertura en src/ventana_panel.py, contra el área visible.
+function marcoPanel() {
+  const ancho = Math.min(ANCHO_PANEL, screen.availWidth);
+  const alto = Math.max(Math.min(ALTO_PANEL, screen.availHeight - MARGEN_SUPERIOR_PANEL), 1);
+  return {x: Math.max(Math.round((screen.availWidth - ancho) / 2), 0),
+          y: MARGEN_SUPERIOR_PANEL, ancho, alto};
+}
+
+// LA verificación por resultado de la restauración: la ventana está grande de
+// verdad, no "el pedido fue aceptado". El umbral solo distingue la barrita del
+// marco del panel, que aun en un monitor chico es cientos de píxeles más
+// ancho; en una pestaña normal (que no encoge nunca) da true de entrada.
+function ventanaYaGrande() {
+  return window.innerWidth >= ANCHO_FLOTANTE + 60;
+}
+
+// Un intento de devolver la ventana a su marco. Repetible a propósito: lo
+// llaman la transición y el vigilante, y NADA se da por hecho hasta que
+// ventanaYaGrande lo confirme — un true del puente o un resizeTo sin error
+// solo significan "pedido aceptado" (incidente 2026-07-31: ese aceptado se
+// tomaba por aplicado, y cuando el primer intento no aterrizaba la ventana
+// quedaba en barrita sin que nadie reintentara).
 function intentarRestaurar() {
   if (!restauracionPendiente) return;
+  const api = apiVentana();
+  if (ventanaYaGrande()) {
+    restauracionPendiente = false;
+    olvidarEncogida();
+    // La ventana ya está grande, pero el "siempre encima" pudo quedar puesto
+    // (la confirmación puede llegar sin que ESTE tic haya pedido nada);
+    // volver a pedir la restauración es idempotente y lo suelta.
+    if (api) {
+      try { Promise.resolve(api.restaurar()).catch(() => {}); } catch (e) {}
+    } else {
+      fetch("/api/ventana_encima", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({activa: false}),
+      }).catch(() => {});
+    }
+    return;
+  }
   if (++intentosRestaurar > MAX_INTENTOS_RESTAURAR) {
     restauracionPendiente = false;   // no se insiste eternamente: ya quedó en el log
     reportarAlPanel({tipo: "restaurar-agotado", intentos: MAX_INTENTOS_RESTAURAR});
     return;
   }
-  const api = apiVentana();
   if (api) {
     try {
-      Promise.resolve(api.restaurar()).then(ok => {
-        if (!ok) return;   // no aterrizó: el vigilante vuelve a intentarlo
-        restauracionPendiente = false;
-        geometriaPrevia = null;
-        olvidarEncogida();
-      }).catch(e => reportarAlPanel({tipo: "puente-rechazo", activo: false,
-                                     detalle: String(e).slice(0, 2000)}));
-      return;   // la ventana propia se quita el "siempre encima" sola
+      Promise.resolve(api.restaurar()).catch(e =>
+        reportarAlPanel({tipo: "puente-rechazo", activo: false,
+                        detalle: String(e).slice(0, 2000)}));
+      return;   // la confirmación la da ventanaYaGrande en el próximo tic
     } catch (e) {
       reportarAlPanel({tipo: "puente-roto", activo: false, detalle: String(e).slice(0, 2000)});
     }
@@ -2890,16 +2928,10 @@ function intentarRestaurar() {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({activa: false}),
   }).catch(() => {});
-  // Sin geometría no hay a qué volver: puede ser que el puente de la ventana
-  // propia aún no estuviera inyectado, así que se reintenta en vez de darlo
-  // por resuelto.
-  if (!geometriaPrevia) return;
   try {
-    window.resizeTo(geometriaPrevia.ancho, geometriaPrevia.alto);
-    window.moveTo(geometriaPrevia.x, geometriaPrevia.y);
-    geometriaPrevia = null;
-    restauracionPendiente = false;
-    olvidarEncogida();
+    const marco = marcoPanel();
+    window.resizeTo(marco.ancho, marco.alto);
+    window.moveTo(marco.x, marco.y);
   } catch (e) {
     // Ventana que no se deja redimensionar (pestaña normal): el modo
     // llenado por CSS ya colapsó el panel, que es lo esencial.
