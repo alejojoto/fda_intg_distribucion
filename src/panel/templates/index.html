@@ -2279,23 +2279,20 @@
       <label for="configmaq-nombre">Nombre de esta computadora</label>
       <input type="text" id="configmaq-nombre" maxlength="40" placeholder="Ej.: Caja 2">
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
-        Con él aparecen tus llenados en el historial de las demás. Puede ser el
-        tuyo o el del puesto. Se puede cambiar después en AJUSTES.</p>
+        Con él aparecen tus llenados en el historial de las demás; puede ser
+        el tuyo o el del puesto.</p>
     </div>
     <div class="configmaq-campo">
       <label for="configmaq-vendedor">Vendedor con el que facturas</label>
       <select id="configmaq-vendedor"></select>
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
-        Va en el campo Vendedor de cada factura que salga de aquí. Se puede
-        cambiar después en AJUSTES.</p>
+        Va en el campo Vendedor de cada factura que salga de aquí.</p>
     </div>
     <div class="configmaq-campo">
       <label for="configmaq-serie">Serie con la que facturas</label>
       <select id="configmaq-serie"></select>
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
-        Queda como la serie predeterminada de esta computadora. Se puede
-        cambiar después en la barra del panel, tanto la predeterminada como
-        la de una factura puntual.</p>
+        Queda como la serie predeterminada de esta computadora.</p>
     </div>
     <div class="configmaq-campo">
       <label>Día de despacho de esta computadora</label>
@@ -2310,12 +2307,13 @@
         </label>
       </div>
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
-        <b>Mañana:</b> la Fecha a facturar arranca en el día siguiente.
-        <b>Hoy:</b> arranca en el día de hoy. Es la fecha predeterminada de
-        esta computadora: se cambia después en AJUSTES, y también se puede
-        ajustar en la barra del panel antes de cada factura.</p>
+        <b>Mañana:</b> la Fecha a facturar arranca al día siguiente.
+        <b>Hoy:</b> arranca ese mismo día.</p>
     </div>
-    <div class="editor-acciones">
+    <div class="editor-acciones" style="align-items:center">
+      <p class="mut" style="margin:0; font-size:12.5px; flex:1">
+        Nombre y vendedor se cambian luego en AJUSTES; serie y fecha, en la
+        barra del panel antes de cada factura.</p>
       <button class="primario" id="configmaq-guardar" onclick="guardarConfigMaquina()">Guardar y continuar</button>
     </div>
   </div>
