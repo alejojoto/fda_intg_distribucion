@@ -1768,6 +1768,8 @@
     <h3 id="detalle-titulo"></h3>
     <div id="detalle-cuerpo"></div>
     <div class="editor-acciones">
+      <button class="acento" id="detalle-llenar" style="display:none"
+              onclick="llenarDesdeDetalle()">Llenar</button>
       <button onclick="cerrarDetalle()">Cerrar</button>
     </div>
   </div>
@@ -4515,6 +4517,37 @@ function cerrarDetalle() {
   detalleAbierto = null;
 }
 
+const partesDeClave = (clave) => [clave.slice(0, clave.lastIndexOf("|")),
+                                  Number(clave.slice(clave.lastIndexOf("|") + 1))];
+
+const filaDeLista = (pedidoId, parte) =>
+  [...(ultimaLista.pendientes || []), ...(ultimaLista.procesadas || [])]
+    .find(f => f.pedido_id === pedidoId && f.parte === parte);
+
+// ESPEJO de accionesDeFila (si cambian sus condiciones, cambian aquí): los
+// casos en que la factura se llena con `llenar()` tal cual. Los demás —la que
+// tiene otra máquina, la que hay que reabrir— se siguen operando desde su
+// fila, donde el botón pregunta lo que tiene que preguntar (motivo, reemisión).
+function llenadoDirecto(f) {
+  if (!f) return null;
+  if (f.a_mano) return "Llenar";
+  if (f.remota) return null;
+  if (f.estado === "reservada" && secuenciaActiva) return null;
+  if (f.estado === "pendiente" || f.estado === "reservada") return "Llenar";
+  if (f.estado === "error_llenado") return "Reintentar";
+  return null;
+}
+
+// Llenar al pie de la ventana (pedido del usuario 2026-07-30): se revisa el
+// detalle y se llena ahí mismo. La ventana se cierra ANTES de arrancar: el
+// llenado colapsa el panel a la barra de estado y un overlay abierto la taparía.
+function llenarDesdeDetalle() {
+  if (!detalleAbierto) return;
+  const [pedidoId, parte] = partesDeClave(detalleAbierto);
+  cerrarDetalle();
+  llenar(pedidoId, parte);
+}
+
 async function cargarDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
   try {
@@ -4542,6 +4575,10 @@ function pintarVentanaDetalle(clave) {
   $("detalle-titulo").textContent = d
     ? `Pedido ${d.pedido_id}${partes}` : "Detalle del pedido";
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
+  const etiqueta = llenadoDirecto(filaDeLista(...partesDeClave(clave)));
+  const boton = $("detalle-llenar");
+  boton.style.display = etiqueta ? "" : "none";
+  if (etiqueta) boton.textContent = etiqueta;
 }
 
 // El pedido y en cuál de sus facturas se está viendo van en el título de la
@@ -4699,9 +4736,7 @@ const quitarAjuste = (pedidoId, parte, codigo, campo) =>
 // facturar, se editó una campaña de descuento…).
 function refrescarDetalleAbierto() {
   if (!detalleAbierto) return;
-  const corte = detalleAbierto.lastIndexOf("|");
-  cargarDetalle(detalleAbierto.slice(0, corte),
-                Number(detalleAbierto.slice(corte + 1)));
+  cargarDetalle(...partesDeClave(detalleAbierto));
 }
 
 function lineaDeDetalle(pedidoId, parte, codigo) {
