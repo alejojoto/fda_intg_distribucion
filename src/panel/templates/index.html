@@ -5061,6 +5061,8 @@ async function elegirRepetida(boton, pedidoId, parte, codigo, decision) {
 let detalleAbierto = null;            // "pedido|parte" que está en la ventana
 const detalleDatos = {};              // "pedido|parte" → respuesta del panel
 const detalleFallos = {};             // "pedido|parte" → por qué no se pudo traer
+const detalleReq = {};                // "pedido|parte" → nº de la última consulta
+let detalleReabriendo = null;         // clave con /api/refacturar en vuelo (nota "Reabriendo…")
 
 const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 
@@ -5173,6 +5175,10 @@ function llenarDesdeDetalle() {
 
 async function cargarDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
+  // Nº de consulta por factura: una respuesta que llegue fuera de orden se
+  // descarta en vez de pisar a la más nueva — la foto provisional de una
+  // reapertura no puede tapar al detalle editable que la sigue.
+  const req = detalleReq[clave] = (detalleReq[clave] || 0) + 1;
   try {
     const params = new URLSearchParams({
       pedido_id: pedidoId, parte,
@@ -5180,9 +5186,12 @@ async function cargarDetalle(pedidoId, parte) {
       // el detalle enseña el % que se escribiría con la fecha que está puesta.
       fecha_facturar: ($("f-fecha-facturar") || {}).value || "",
     });
-    detalleDatos[clave] = await api("/api/factura/detalle?" + params);
+    const datos = await api("/api/factura/detalle?" + params);
+    if (detalleReq[clave] !== req) return;
+    detalleDatos[clave] = datos;
     delete detalleFallos[clave];
   } catch (e) {
+    if (detalleReq[clave] !== req) return;
     detalleFallos[clave] = e.message;
     delete detalleDatos[clave];
   }
@@ -5237,7 +5246,13 @@ function contenidoDetalle(clave) {
     + (sucursal ? `<div class="mut">${esc(sucursal)}${
         codigoSucursal ? ` · ${esc(codigoSucursal)}` : ""}</div>` : "")
     + `<div>${esc(contexto.join(" · "))}</div>`;
-  const nota = d.editable
+  // Con la reapertura en vuelo, lo que se ve es la foto del documento
+  // anterior: la nota lo dice y pide paciencia, en vez de la de "cerrada"
+  // (que mandaría a hacer justo lo que ya se está haciendo).
+  const nota = (!d.editable && detalleReabriendo === clave)
+    ? `<div class="det-nota">Reabriendo la factura para editarla — puede tardar
+        un poco. Mientras, estas son las cantidades con que salió el documento.</div>`
+    : d.editable
     ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
         Esto es lo que se escribe en el documento; puedes editar los números.</div>`
     : d.origen === "registro"
@@ -6848,6 +6863,15 @@ async function confirmarMotivo() {
   // botón de la fila de abajo y arrancaba un llenado a espaldas de la
   // revisión (visto 2026-07-31).
   abrirDetalleCargando(pedido_id, parte);
+  // Reabrir tarda de verdad cuando el pedido ya salió de la caché — la
+  // recarga completa de la nube, medio minuto medido — y la ventana se
+  // quedaba todo ese rato en "Buscando el detalle…", como pegada (visto
+  // 2026-07-31). Mientras la reapertura viaja se enseña la foto del
+  // documento anterior (dato local, llega en seguida) con su nota de
+  // "Reabriendo…"; sin await a propósito, y si esta respuesta llegara
+  // tarde, el nº de consulta de cargarDetalle la descarta.
+  detalleReabriendo = claveDetalle(pedido_id, parte);
+  cargarDetalle(pedido_id, parte);
   try {
     const r = await api("/api/refacturar", {pedido_id, parte, motivo});
     if (r.aviso) { cerrarDetalle(); mensaje(r.aviso, "info"); await cargar(); return; }
@@ -6855,6 +6879,8 @@ async function confirmarMotivo() {
     cerrarDetalle();
     avisoFactura(pedido_id, parte, e.message);
     return;
+  } finally {
+    detalleReabriendo = null;
   }
   // cargar() antes de traer el detalle: la fila tiene que verse ya como
   // error_llenado propia para que la ventana la pinte editable y con su botón.
