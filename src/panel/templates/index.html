@@ -938,7 +938,7 @@
                                        width:15px; height:15px; vertical-align:-2px;
                                        margin-right:6px; cursor:pointer; }
   #motivo-otro { margin-left:27px; }
-  #motivo-otro:disabled { background:#f4f5f7; }
+  #motivo-otro[readonly] { background:#f4f5f7; cursor:pointer; }
   /* Modal de "Llenar en fila" (2026-07-22): el pedido dividido en varias
      facturas que el corte de la cantidad partiría en dos. Y el de la tasa
      que falta (2026-07-22, pedido del usuario), que sale al dar Llenar.
@@ -5774,15 +5774,32 @@ function abrirMotivo(accion, pedido_id, partes) {
     `<input type="text" id="motivo-otro" placeholder="Escribe cuál es el motivo" required>`;
   const radios = document.querySelectorAll("input[name=motivo-refact]");
   radios[0].checked = true;                   // la primera opción
-  $("motivo-otro").disabled = true;           // el texto solo se abre con "Otro"
-  radios.forEach(r => r.addEventListener("change", () => {
-    const esOtro = document.querySelector("input[name=motivo-refact]:checked").value === "__otro__";
-    $("motivo-otro").disabled = !esOtro;
-    if (esOtro) $("motivo-otro").focus();
-    pintarBotonMotivo();
-  }));
-  pintarBotonMotivo();
+  radios.forEach(r => r.addEventListener("change", () => sincronizarMotivoOtro(true)));
+  // Clic en el campo de texto = elegir "Otro" (2026-07-30, pedido del usuario):
+  // quien va a escribir el motivo no debería tener que pulsar antes el radio.
+  // El navegador enfoca el campo solo tras el mousedown, así que aquí basta con
+  // desbloquearlo.
+  $("motivo-otro").addEventListener("mousedown", () => {
+    const otro = document.querySelector("input[name=motivo-refact][value='__otro__']");
+    if (otro.checked) return;
+    otro.checked = true;
+    sincronizarMotivoOtro(false);
+  });
+  sincronizarMotivoOtro(false);
   $("motivo-overlay").classList.add("visible");
+}
+
+// El texto libre solo se abre con "Otro". Se bloquea con readonly + tabIndex -1
+// (no con `disabled`) porque un campo deshabilitado no dispara el mousedown con
+// el que se elige "Otro"; el tabIndex mantiene el comportamiento anterior de
+// saltarlo al tabular mientras está bloqueado.
+function sincronizarMotivoOtro(enfocar) {
+  const esOtro = document.querySelector("input[name=motivo-refact]:checked").value === "__otro__";
+  const campo = $("motivo-otro");
+  campo.readOnly = !esOtro;
+  campo.tabIndex = esOtro ? 0 : -1;
+  if (esOtro && enfocar) campo.focus();
+  pintarBotonMotivo();
 }
 
 // El botón de confirmar es fijo por acción (2026-07-23): "Descartar" para
