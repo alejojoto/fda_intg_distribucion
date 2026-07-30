@@ -8232,17 +8232,15 @@ const CATALOGOS = {
        // puede corregir: el backend mueve la fila (crea la nueva, borra la
        // vieja). Un feriado calculado no se mueve — su fecha la fija la ley.
        claveEditable: (f) => f.origen === "manual",
-       notaClave: " (la fija el calendario del sistema)",
-       origenDato: "panel"},
-      {campo: "nombre", etiqueta: "Nombre (ej. Decreto por el Clásico Mundial)", obligatorio: true,
-       origenDato: "panel"},
+       notaClave: " (la fija el calendario del sistema)"},
+      {campo: "nombre", etiqueta: "Nombre (ej. Decreto por el Clásico Mundial)", obligatorio: true},
       {campo: "activo", etiqueta: "Activo", tipo: "checkbox"},
     ],
     columnas: [
-      {campo: "fecha", etiqueta: "Fecha", origenDato: "panel"},
-      {campo: "dia_semana", etiqueta: "Día", origenDato: "panel"},
-      {campo: "nombre", etiqueta: "Nombre", origenDato: "panel"},
-      {campo: "tipo", etiqueta: "Tipo", origenDato: "panel"},
+      {campo: "fecha", etiqueta: "Fecha"},
+      {campo: "dia_semana", etiqueta: "Día"},
+      {campo: "nombre", etiqueta: "Nombre"},
+      {campo: "tipo", etiqueta: "Tipo"},
     ],
     // Un feriado desactivado sigue en la lista (esa es la gracia: dice
     // "este día NO cuenta"), pero atenuado para que no se confunda con los
