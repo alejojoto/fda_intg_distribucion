@@ -795,10 +795,10 @@
   /* La estrella va en su propia columna, alineada al borde derecho de la fila
      (el .nom con flex:1 la empuja): así no se pega al nombre ni al check. */
   .desc-cli-row .fav { margin-left:auto; }
-  /* En el catálogo de CLIENTES la estrella va pegada al nombre, no al borde
-     (ahí solo flota el botón "›" — si también flotara la estrella, las dos
-     quedarían adyacentes y la flecha parecería apuntarle). */
-  tr.grupo .fav { margin-left:8px; }
+  /* Misma columna derecha en el catálogo de CLIENTES: ancho fijo para que la
+     estrella quede alineada entre filas, con hueco de sobra al botón "›" para
+     que la flecha no parezca apuntarle. */
+  tr.grupo .fav { float:right; width:18px; text-align:center; margin-left:16px; }
   .desc-mini { font-size:11.5px; padding:2px 7px; }
   /* Pestañas del editor de campaña + árbol de alcance */
   .desc-tabs { display:flex; gap:4px; border-bottom:1px solid #e2e6ec; margin:0 0 12px; }
@@ -1302,7 +1302,7 @@
       <!-- Se oculta en las fases donde el llenado espera al operador (pausa,
            impresión, aviso de Winledger por cerrar): ahí SÍ tiene que tocar
            mouse y teclado. Ver FASES_DEL_OPERADOR en el sondeo de fase. -->
-      <span id="aviso-no-tocar">⚠️ <b>No muevas el mouse ni teclees.</b></span>
+      <span id="aviso-no-tocar">⚠️ <b>No teclees ni cliquees fuera de esta caja durante el llenado.</b></span>
       <!-- Paso de cierre con "Imprimir: sí" (fase 'esperando_impresion'): solo
            se ve mientras el poll de fase la reporte (ver llenar()). Va antes
            del Detener porque es la acción primaria. -->
@@ -8015,17 +8015,29 @@ const CONFIGMAQ_TEXTOS = {
   dia_despacho: "si facturas para hoy o para mañana",
 };
 let resolverConfigMaquina = null;
+// Vista previa (?ver_configuracion=1, atajo "olvidar_configuracion.bat" →
+// opción 1, 2026-07-31): la misma pantalla, pero sin que nada esté realmente
+// pendiente — se ve con los valores YA guardados en vez de en blanco, y se
+// puede cerrar sin llenar nada porque no hay ningún dato roto de por medio.
+let vistaPreviaConfigMaquina = false;
 
 // Devuelve una promesa que resuelve true cuando quedó configurada. Quien la
 // espera (el llenado) puede seguir sin que el operador repita la acción.
-function abrirConfigMaquina(falta) {
-  const pendientes = falta && falta.length
-    ? falta : ["nombre", "vendedor", "serie", "dia_despacho"];
-  const textos = pendientes.map(codigo => CONFIGMAQ_TEXTOS[codigo]).filter(Boolean);
-  const lista = textos.length > 1
-    ? textos.slice(0, -1).join(", ") + " y " + textos[textos.length - 1]
-    : textos[0];
-  $("configmaq-intro").textContent = "Falta " + lista + ".";
+// soloVista=true: nada falta de verdad, es solo para mirar la pantalla.
+function abrirConfigMaquina(falta, soloVista = false) {
+  vistaPreviaConfigMaquina = soloVista;
+  const pendientes = soloVista ? [] : (falta && falta.length
+    ? falta : ["nombre", "vendedor", "serie", "dia_despacho"]);
+  if (soloVista) {
+    $("configmaq-intro").textContent =
+      "Vista previa: nada se borró, son los valores ya guardados en esta computadora.";
+  } else {
+    const textos = pendientes.map(codigo => CONFIGMAQ_TEXTOS[codigo]).filter(Boolean);
+    const lista = textos.length > 1
+      ? textos.slice(0, -1).join(", ") + " y " + textos[textos.length - 1]
+      : textos[0];
+    $("configmaq-intro").textContent = "Falta " + lista + ".";
+  }
   $("configmaq-nombre").value = nombreMaquina || "";
   pintarSelectVendedores($("configmaq-vendedor"), vendedorMaquina);
   const serieVacia = seriePredeterminada
@@ -8059,8 +8071,10 @@ function cerrarConfigMaquina(configurada) {
 }
 
 // Sin cierre por clic afuera ni por Escape (no hay alternativa que elegir),
-// pero intentarlo no se queda mudo: dice por qué el aviso no suelta.
+// pero intentarlo no se queda mudo: dice por qué el aviso no suelta. En vista
+// previa no hay nada pendiente de verdad, así que ahí sí cierra.
 function avisarConfigMaquinaObligatoria() {
+  if (vistaPreviaConfigMaquina) { cerrarConfigMaquina(false); return; }
   $("configmaq-error").textContent =
     "Todos los campos son obligatorios: sin ellos no se puede facturar desde esta computadora.";
   $("configmaq-error").style.display = "";
@@ -8764,7 +8778,7 @@ function pintarClientesAgrupados(filtro) {
       // solo cuántas hay.
       const badge = g.esCadena
         ? ` <span class="badge">cadena · ${g.filas.length} sucursales</span>` : "";
-      html += `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}${badge}${estrellaCliente(g)}
+      html += `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}${badge}
              <button style="float:right" title="Ver detalle" onclick="editarCliente('${esc(g.codigo)}')">›</button>
            </td></tr>`;
     }
@@ -12079,13 +12093,20 @@ $("t-pendientes").querySelector("tbody").innerHTML =
   `<tr><td colspan="8" class="mut"><span class="spinner"></span> Cargando pedidos…</td></tr>`;
 $("t-procesadas").querySelector("tbody").innerHTML =
   `<tr><td colspan="11" class="mut"><span class="spinner"></span> Cargando…</td></tr>`;
-cargar();
+const cargaInicial = cargar();
 consultarTasaBCV();   // en paralelo con cargar(): el BCV puede tardar segundos
 // modo_implantacion viaja en /api/ajustes: se carga ya (no solo al abrir la
 // pestaña AJUSTES) para que el botón "Llenar en fila" de la cabecera de
 // PENDIENTES aparezca correcto desde el primer pintado.
-cargarAjustes();
+const ajustesInicial = cargarAjustes();
 borradorAvisoRevisar();   // si el panel se cerró con un editor a medias, ofrece retomarlo
+// Vista previa de la configuración obligatoria (?ver_configuracion=1, atajo
+// scripts/windows/olvidar_configuracion.bat → opción 1, 2026-07-31): no borra
+// nada, espera a que ambas cargas traigan los valores reales de esta
+// computadora y recién ahí abre la pantalla ya llena con ellos.
+if (new URLSearchParams(window.location.search).get("ver_configuracion") === "1") {
+  Promise.all([cargaInicial, ajustesInicial]).then(() => abrirConfigMaquina([], true));
+}
 </script>
 </body>
 </html>
