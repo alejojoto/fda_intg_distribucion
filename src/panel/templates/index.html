@@ -8114,9 +8114,11 @@ const CATALOGOS = {
     campos: [
       {campo: "cliente_id", etiqueta: "Cliente_id (clave interna)", obligatorio: true,
        origenDato: "appsheet"},
-      // Qué es esta entrada lo decide una PERSONA (usuario 2026-07-29): el
-      // programa no lo deduce de tener o no código de sucursal. En una entrada
-      // que llegó sola arranca sin elegir, y de ahí depende el resto del
+      // Qué es esta entrada NO se deduce de tener o no código de sucursal
+      // (usuario 2026-07-29): lo dice una persona o, desde 2026-07-30, el
+      // catálogo maestro de la app de pedidos (la relación viene declarada;
+      // ver catalogos.sembrar_clientes_desde_agromovil). Solo una entrada que
+      // ni la app conoce arranca sin elegir, y de ahí depende el resto del
       // formulario (ver editorAplicarEtiquetas y los obligatorioSi de abajo).
       {campo: "clasificacion", etiqueta: "Qué es", obligatorio: true, origenDato: "panel",
        opcionesDe: () => opcionesClasificacion()},
@@ -9007,6 +9009,19 @@ function abrirEditor(indice, prefill) {
   if (catalogoActual === "clientes") {
     editorFila.claseActual = clasificacionDe(fila);
     fila.clasificacion = editorFila.claseActual;
+    // Sucursal que la app de pedidos ya colgó de un cliente resuelto (mismo
+    // RIF que otra fila con código): el editor abre con el código y el nombre
+    // del cliente ya puestos, editables — solo falta el código de sucursal.
+    if (fila.clasificacion === "sucursal" && !(fila.codigo_cliente_winledger || "").trim()
+        && (fila.rif || "").trim()) {
+      const hermana = catalogoFilas.find(f => f.cliente_id !== fila.cliente_id
+        && (f.rif || "").trim() === fila.rif.trim()
+        && (f.codigo_cliente_winledger || "").trim());
+      if (hermana) {
+        fila.codigo_cliente_winledger = hermana.codigo_cliente_winledger;
+        fila.nombre_cliente_winledger = hermana.nombre_cliente_winledger || "";
+      }
+    }
   }
   $("editor-titulo").textContent =
     (indice === null ? "Agregar — " : "Editar — ") + def.titulo;
