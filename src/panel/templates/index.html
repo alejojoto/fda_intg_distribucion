@@ -1836,7 +1836,7 @@
 
 <!-- Ventana de UN cliente del catálogo (su botón "Editar"): nombre, marcas y
      sucursales. El editor de una fila se abre ENCIMA de esta. -->
-<div id="cliente-overlay" onclick="if(event.target===this)cerrarVentanaCliente()">
+<div id="cliente-overlay" onclick="if(event.target===this)intentarCerrarVentanaCliente()">
   <div id="cliente-caja">
     <div class="cliente-cabecera">
       <h3 id="cliente-titulo"></h3>
@@ -1844,7 +1844,7 @@
     </div>
     <div id="cliente-cuerpo"></div>
     <div class="editor-acciones">
-      <button onclick="cerrarVentanaCliente()">Cerrar</button>
+      <button onclick="intentarCerrarVentanaCliente()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -2044,14 +2044,14 @@
 <!-- Motivo de "Volver a facturar" y de "Descartar" (queda en el registro,
      auditoría). Cada acción trae sus motivos comunes + "Otro" con texto
      libre; las opciones y el botón los pinta abrirMotivo(). -->
-<div id="motivo-overlay" onclick="if(event.target===this)cerrarMotivo()">
+<div id="motivo-overlay" onclick="if(event.target===this)intentarCerrarMotivo()">
   <div id="motivo-caja">
     <h3 id="motivo-titulo"></h3>
     <p id="motivo-nota" style="display:none"></p>
     <div id="motivo-opciones"></div>
     <div class="editor-acciones">
       <button class="primario" id="motivo-confirmar" onclick="confirmarMotivo()"></button>
-      <button onclick="cerrarMotivo()">Cancelar</button>
+      <button onclick="intentarCerrarMotivo()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2059,7 +2059,7 @@
 <!-- Doble llenado (2026-07-28): la misma factura salió en dos máquinas, así
      que hay dos documentos fiscales y uno tiene que anularse en papel. El
      panel no anula nada: registra cuál queda vivo y quién lo decidió. -->
-<div id="conflicto-overlay" onclick="if(event.target===this)cerrarResolverConflicto()">
+<div id="conflicto-overlay" onclick="if(event.target===this)intentarCerrarResolverConflicto()">
   <div id="conflicto-caja">
     <h3 id="conflicto-titulo"></h3>
     <p id="conflicto-detalle"></p>
@@ -2074,7 +2074,7 @@
     </label>
     <div class="editor-acciones">
       <button class="primario" onclick="confirmarResolverConflicto()">Registrar</button>
-      <button onclick="cerrarResolverConflicto()">Cancelar</button>
+      <button onclick="intentarCerrarResolverConflicto()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2512,6 +2512,8 @@ let confirmSalidaCerrar = null;
 // cfg = {acciones: nodo .editor-acciones del editor, guardar: fn, cerrar: fn}
 // y, para cuando la salida no es cerrar sino IR a otra parte (ej. abrir otra
 // campaña desde la tabla de choques): mensaje/guardarTxt/salirTxt propios.
+// `guardarClase` para los modales donde guardar ES la acción y su botón tiene
+// color propio (el motivo de "Descartar", que va en rojo).
 function pedirConfirmSalida(cfg) {
   if (confirmSalidaCerrar) return;            // ya hay una pregunta a la vista
   const acciones = cfg.acciones;
@@ -2525,7 +2527,7 @@ function pedirConfirmSalida(cfg) {
   msg.className = "confirm-salida-msg";
   msg.textContent = cfg.mensaje || "Hay cambios sin guardar.";
   const bGuardar = document.createElement("button");
-  bGuardar.className = "primario";
+  bGuardar.className = cfg.guardarClase || "primario";
   bGuardar.textContent = cfg.guardarTxt || "Guardar";
   const bSalir = document.createElement("button");
   bSalir.className = "cb-si";                  // rojo: descarta trabajo
@@ -6338,8 +6340,25 @@ function abrirResolverConflicto(pedido_id, parte) {
 }
 
 function cerrarResolverConflicto() {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   conflictoPedido = null;
   $("conflicto-overlay").classList.remove("visible");
+}
+
+// Intento de cierre (Cancelar o clic afuera) con el nº de documento o la nota
+// ya tecleados: son datos que solo tiene el operador con el papel delante, así
+// que se pregunta antes de botarlos.
+function intentarCerrarResolverConflicto() {
+  const tecleado = $("conflicto-doc").value.trim() || $("conflicto-nota").value.trim();
+  if (!tecleado) { cerrarResolverConflicto(); return; }
+  pedirConfirmSalida({
+    acciones: $("conflicto-caja").querySelector(".editor-acciones"),
+    mensaje: "Lo que escribiste no se ha registrado.",
+    guardarTxt: "Registrar",
+    salirTxt: "Salir sin registrar",
+    guardar: confirmarResolverConflicto,
+    cerrar: cerrarResolverConflicto,
+  });
 }
 
 async function confirmarResolverConflicto() {
@@ -6438,8 +6457,30 @@ function llenarFamiliaAjena(pedido_id, parte) {
 }
 
 function cerrarMotivo() {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   motivoPedido = null;
   $("motivo-overlay").classList.remove("visible");
+}
+
+// Intento de cierre (Cancelar o clic afuera) con un motivo escrito en "Otro":
+// elegir una opción de la lista no cuesta nada de rehacer, pero el texto sí.
+// Solo cuenta con "Otro" elegido: pasarse a una opción de la lista deja el
+// texto de lado a propósito, y es esa opción la que se registraría. El botón de
+// guardar ES la acción, con su nombre y su color (ver pintarBotonMotivo).
+function intentarCerrarMotivo() {
+  const campo = $("motivo-otro");
+  const elegido = document.querySelector("input[name=motivo-refact]:checked");
+  const esOtro = elegido && elegido.value === "__otro__";
+  if (!campo || !esOtro || !campo.value.trim()) { cerrarMotivo(); return; }
+  const boton = $("motivo-confirmar");
+  pedirConfirmSalida({
+    acciones: $("motivo-caja").querySelector(".editor-acciones"),
+    mensaje: "Escribiste un motivo sin usar.",
+    guardarTxt: boton.textContent,
+    guardarClase: boton.className,
+    guardar: confirmarMotivo,
+    cerrar: cerrarMotivo,
+  });
 }
 
 async function confirmarMotivo() {
@@ -8837,38 +8878,77 @@ function editarCliente(codigo) {
 }
 
 function cerrarVentanaCliente() {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("cliente-overlay").classList.remove("visible");
   clienteEnEdicion = null;
   if (catalogoActual === "clientes") pintarFilasCatalogo();   // la lista, con lo que se haya cambiado
 }
 
-// Nombre del cliente en el programa de facturación, tecleado en su ventana: la app
-// de pedidos no siempre lo manda y sin él la lista lo rotula con el código pelado.
-// Guarda al salir del campo y solo si cambió.
-async function guardarNombreCliente() {
+// Nombre tecleado que todavía no está guardado. El campo se guarda solo al
+// salir de él, y el clic que cierra la ventana dispara ese guardado primero:
+// `nombreClienteEnVuelo` evita preguntar por uno que ya va en camino. Queda de
+// verdad sin guardar cuando ese guardado falló (el texto sigue en el campo).
+let nombreClienteEnVuelo = null;
+
+function nombreClienteSinGuardar() {
   const inp = $("cliente-nombre");
-  if (!inp || !clienteEnEdicion) return;
+  if (!inp || !clienteEnEdicion) return "";
   const nombre = inp.value.trim();
   const fila = catalogoFilas.find(
     f => (f.codigo_cliente_winledger || "") === clienteEnEdicion);
+  const guardado = ((fila && fila.nombre_cliente_winledger) || "").trim();
+  return (nombre && nombre !== guardado && nombre !== nombreClienteEnVuelo) ? nombre : "";
+}
+
+// Intento de cierre de la ventana del cliente (clic afuera o Cerrar): con el
+// nombre sin guardar pregunta antes de botarlo, igual que los demás editores.
+function intentarCerrarVentanaCliente() {
+  if (!nombreClienteSinGuardar()) { cerrarVentanaCliente(); return; }
+  pedirConfirmSalida({
+    acciones: $("cliente-caja").querySelector(".editor-acciones"),
+    mensaje: "El nombre del cliente quedó sin guardar.",
+    guardar: async () => { if (await guardarNombreCliente()) cerrarVentanaCliente(); },
+    cerrar: cerrarVentanaCliente,
+  });
+}
+
+// Nombre del cliente en el programa de facturación, tecleado en su ventana: la app
+// de pedidos no siempre lo manda y sin él la lista lo rotula con el código pelado.
+// Guarda al salir del campo y solo si cambió. Devuelve si quedó guardado.
+async function guardarNombreCliente() {
+  const inp = $("cliente-nombre");
+  // El cliente se toma al entrar: cerrar la ventana lo pone en null y el
+  // guardado que va en camino se quedaría sin a quién aplicarle el nombre.
+  const codigo = clienteEnEdicion;
+  if (!inp || !codigo) return false;
+  const nombre = inp.value.trim();
+  const fila = catalogoFilas.find(
+    f => (f.codigo_cliente_winledger || "") === codigo);
   const actual = ((fila && fila.nombre_cliente_winledger) || "").trim();
-  if (nombre === actual) return;
-  if (!nombre) { avisoNombreCliente("Escribe el nombre del cliente."); inp.value = actual; return; }
+  if (nombre === actual) return true;
+  if (!nombre) { avisoNombreCliente("Escribe el nombre del cliente."); inp.value = actual; return false; }
+  nombreClienteEnVuelo = nombre;
   try {
-    await api("/api/cliente/nombre", {rif: clienteEnEdicion, nombre});
+    await api("/api/cliente/nombre", {rif: codigo, nombre});
     for (const f of catalogoFilas) {
-      if ((f.codigo_cliente_winledger || "") === clienteEnEdicion)
+      if ((f.codigo_cliente_winledger || "") === codigo)
         f.nombre_cliente_winledger = nombre;
     }
     // El selector de descuentos ya cargado usa el mismo nombre: se sincroniza en
     // memoria para que las dos vistas no queden discrepantes (igual que la marca
     // de cadena, ver guardarCadenaCliente).
     if (descSelector) {
-      const c = descSelector.clientes.find(x => x.rif === clienteEnEdicion);
+      const c = descSelector.clientes.find(x => x.rif === codigo);
       if (c) c.nombre = nombre;
     }
     pintarFilasCatalogo();   // repinta la lista y, con ella, el título de la ventana
-  } catch (e) { avisoNombreCliente("No se pudo guardar el nombre: " + e.message); }
+    return true;
+  } catch (e) {
+    avisoNombreCliente("No se pudo guardar el nombre: " + e.message);
+    return false;
+  } finally {
+    nombreClienteEnVuelo = null;
+  }
 }
 
 function avisoNombreCliente(msg) {
