@@ -1011,7 +1011,7 @@
   #trancon-caja h3, #configmaq-caja h3, #lineas-omitidas-caja h3 { margin:0 0 10px; font-size:14px; }
   #aviso-fam-caja p, #tasa-caja p, #docencurso-caja p, #repetida-caja p,
   #trancon-caja p, #configmaq-caja p, #lineas-omitidas-caja p { margin:0 0 12px; font-size:13.5px; }
-  /* Configuración obligatoria de la máquina (2026-07-29): los dos campos se
+  /* Configuración obligatoria de la máquina (2026-07-29): los campos se
      resuelven DENTRO del aviso — el que falta arranca vacío y con el foco. */
   #configmaq-caja label { display:block; font-weight:600; font-size:13px;
                           margin:0 0 4px; }
@@ -1019,6 +1019,10 @@
   #configmaq-caja input, #configmaq-caja select {
                     width:100%; font-size:14px; padding:6px 8px;
                     border:1px solid #c3c9d4; border-radius:6px; }
+  #configmaq-caja label.desc-todos { display:flex; align-items:center;
+                                      gap:6px; cursor:pointer; }
+  #configmaq-caja input[type=radio] { width:15px; height:15px; padding:0;
+                                      border:none; background:none; cursor:pointer; }
   #configmaq-error { color:#b42318; font-size:13px; margin:0 0 10px; display:none; }
   /* Modal DENTRO de la barrita flotante (2026-07-27): ahí no hay 10vh que
      gastar ni 480px que sobren — la caja se pega arriba y ocupa el ancho de
@@ -1304,14 +1308,13 @@
        y la tasa del día anterior no es la de esa factura. La tasa VIAJA CON CADA LLENADO solo si ya se tiene la
        del día (tasaParaLlenar): entorno.py la registra en Archivos→Tasas de
        Cambio dentro de la puesta a punto de fecha/serie (2026-07-21). La
-       SERIE también viaja: se elige en
-       'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título
-       ('—' = se acepta la que esté). -->
+       SERIE también viaja siempre y es obligatoria: se elige en
+       'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título. -->
   <div class="rutas-barra" id="rutas-barra">
     <div class="campo"><span class="rotulo">Ruta</span><select id="f-ruta" onchange="cambioRuta(this.value)">
       <option value="">Todas</option></select></div>
     <div class="campo"><span class="rotulo">Serie</span><select id="f-serie"
-        title="Se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título. '—' = se acepta la serie que esté."
+        title="Serie con la que sale cada factura de esta computadora. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
         onchange="cambioSerie(this.value)"></select></div>
     <!-- data-atajo="despacho" (2026-07-21): el botón del medio del calendario
          de ESTE campo pone el día de despacho — se factura para el día de
@@ -2186,6 +2189,29 @@
       <select id="configmaq-vendedor"></select>
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
         Va en el campo Vendedor de cada factura que salga de aquí.</p>
+    </div>
+    <div class="configmaq-campo">
+      <label for="configmaq-serie">Serie con la que facturas</label>
+      <select id="configmaq-serie"></select>
+      <p class="mut" style="margin:4px 0 0; font-size:12.5px">
+        Queda como la serie fija de esta computadora. Se puede cambiar en la barra del panel.</p>
+    </div>
+    <div class="configmaq-campo">
+      <label>Día de despacho de esta computadora</label>
+      <div style="display:flex; gap:24px">
+        <label class="desc-todos">
+          <input type="radio" name="configmaq-dia" value="manana">
+          Mañana
+        </label>
+        <label class="desc-todos">
+          <input type="radio" name="configmaq-dia" value="hoy">
+          Hoy
+        </label>
+      </div>
+      <p class="mut" style="margin:4px 0 0; font-size:12.5px">
+        <b>Mañana:</b> la Fecha a facturar arranca en el día siguiente.
+        <b>Hoy:</b> arranca en el día de hoy. Es la fecha estándar de esta
+        computadora; se cambia después en AJUSTES.</p>
     </div>
     <div class="editor-acciones">
       <button class="primario" id="configmaq-guardar" onclick="guardarConfigMaquina()">Guardar y continuar</button>
@@ -3126,7 +3152,9 @@ let babyPredetAplicado = false;      // el gramaje guardado se aplica solo al ab
 const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 
 function pintarSeries() {
-  $("f-serie").innerHTML = `<option value="" ${serieSeleccionada === "" ? "selected" : ""}>—</option>`
+  const vacia = serieSeleccionada
+    ? "" : `<option value="" selected>— Elige una serie —</option>`;
+  $("f-serie").innerHTML = vacia
     + SERIES.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
         ${s}${s === seriePredeterminada ? " ★" : ""}</option>`).join("")
     + `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`;
@@ -7812,26 +7840,46 @@ async function guardarMaquina() {
 let nombreMaquina = "";        // lo que hay guardado ahora en esta máquina
 let vendedorMaquina = "";      // "" = ninguno elegido todavía
 let vendedoresCatalogo = [];   // activos, para los dos selectores
-let configPendiente = [];      // ["nombre", "vendedor"] — lo que falta aquí
+let configPendiente = [];      // códigos de la configuración que falta aquí
+const CONFIGMAQ_TEXTOS = {
+  nombre: "el nombre de esta computadora",
+  vendedor: "el vendedor con el que facturas",
+  serie: "la serie con la que facturas",
+  dia_despacho: "si facturas para hoy o para mañana",
+};
 let resolverConfigMaquina = null;
 
 // Devuelve una promesa que resuelve true cuando quedó configurada. Quien la
 // espera (el llenado) puede seguir sin que el operador repita la acción.
 function abrirConfigMaquina(falta) {
-  const faltaNombre = !falta || falta.includes("nombre");
-  const faltaVendedor = !falta || falta.includes("vendedor");
-  $("configmaq-intro").textContent = (faltaNombre && faltaVendedor)
-    ? "Falta el nombre de esta computadora y el vendedor con el que factura."
-    : (faltaNombre
-        ? "Falta el nombre de esta computadora."
-        : "Falta el vendedor con el que factura esta computadora.");
+  const pendientes = falta && falta.length
+    ? falta : ["nombre", "vendedor", "serie", "dia_despacho"];
+  const textos = pendientes.map(codigo => CONFIGMAQ_TEXTOS[codigo]).filter(Boolean);
+  const lista = textos.length > 1
+    ? textos.slice(0, -1).join(", ") + " y " + textos[textos.length - 1]
+    : textos[0];
+  $("configmaq-intro").textContent = "Falta " + lista + ".";
   $("configmaq-nombre").value = nombreMaquina || "";
   pintarSelectVendedores($("configmaq-vendedor"), vendedorMaquina);
+  const serieVacia = seriePredeterminada
+    ? "" : `<option value="" selected>— Elige una serie —</option>`;
+  $("configmaq-serie").innerHTML = serieVacia + SERIES.map(s =>
+    `<option value="${s}" ${s === seriePredeterminada ? "selected" : ""}>${s}</option>`
+  ).join("");
+  document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
+    r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
+  });
   $("configmaq-error").style.display = "none";
   $("configmaq-overlay").classList.add("visible");
   // El foco al campo que falta: en una instalación nueva se puede teclear de
   // una, sin buscar dónde hacer clic.
-  setTimeout(() => $(faltaNombre ? "configmaq-nombre" : "configmaq-vendedor").focus(), 50);
+  const foco = {
+    nombre: () => $("configmaq-nombre"),
+    vendedor: () => $("configmaq-vendedor"),
+    serie: () => $("configmaq-serie"),
+    dia_despacho: () => document.querySelector("input[name=configmaq-dia]"),
+  };
+  setTimeout(() => (foco[pendientes[0]] || foco.nombre)().focus(), 50);
   return new Promise((resolve) => { resolverConfigMaquina = resolve; });
 }
 
@@ -7843,15 +7891,34 @@ function cerrarConfigMaquina(configurada) {
   }
 }
 
+// Sin cierre por clic afuera ni por Escape (no hay alternativa que elegir),
+// pero intentarlo no se queda mudo: dice por qué el aviso no suelta.
+function avisarConfigMaquinaObligatoria() {
+  $("configmaq-error").textContent =
+    "Todos los campos son obligatorios: sin ellos no se puede facturar desde esta computadora.";
+  $("configmaq-error").style.display = "";
+}
+$("configmaq-overlay").addEventListener("click", (ev) => {
+  if (ev.target === $("configmaq-overlay")) avisarConfigMaquinaObligatoria();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && $("configmaq-overlay").classList.contains("visible"))
+    avisarConfigMaquinaObligatoria();
+});
+
 async function guardarConfigMaquina() {
   const nombre = $("configmaq-nombre").value.trim();
   const codigo = $("configmaq-vendedor").value;
+  const serie = $("configmaq-serie").value;
+  const radioDia = document.querySelector("input[name=configmaq-dia]:checked");
   const error = (texto) => {
     $("configmaq-error").textContent = texto;
     $("configmaq-error").style.display = "";
   };
   if (!nombre) return error("Escribe el nombre de esta computadora.");
   if (!codigo) return error("Elige el vendedor con el que factura esta computadora.");
+  if (!serie) return error("Elige la serie con la que factura esta computadora.");
+  if (!radioDia) return error("Elige si esta computadora factura para hoy o para mañana.");
   const boton = $("configmaq-guardar");
   boton.disabled = true;
   try {
@@ -7863,6 +7930,21 @@ async function guardarConfigMaquina() {
     if (codigo !== (vendedorMaquina || "")) {
       const r = await api("/api/ajustes/vendedor", {codigo});
       vendedorMaquina = codigo;
+      configPendiente = r.configuracion_pendiente || [];
+    }
+    if (serie !== (seriePredeterminada || "") || configPendiente.includes("serie")) {
+      const r = await api("/api/ajustes/serie", {serie});
+      seriePredeterminada = r.serie_predeterminada;
+      serieSeleccionada = r.serie_predeterminada;
+      pintarSeries();
+      configPendiente = r.configuracion_pendiente || [];
+    }
+    const dia = radioDia.value;
+    if (dia !== diaDespacho || configPendiente.includes("dia_despacho")) {
+      const r = await api("/api/ajustes/dia-despacho", {dia});
+      pintarDiaDespacho(r.dia_despacho);
+      $("f-fecha-facturar").value = r.fecha_facturar_sugerida;
+      cambioFechaFacturar();
       configPendiente = r.configuracion_pendiente || [];
     }
     cerrarConfigMaquina(true);

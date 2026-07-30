@@ -1,7 +1,8 @@
 @echo off
 rem ===========================================================================
-rem Olvida el nombre y el vendedor de ESTA computadora, para volver a ver la
-rem pantalla de configuracion obligatoria de una instalacion nueva (2026-07-29).
+rem Olvida el nombre, el vendedor, la serie y el dia de despacho de ESTA
+rem computadora, para volver a ver la pantalla de configuracion obligatoria de
+rem una instalacion nueva (2026-07-29; serie y dia se sumaron el 2026-07-30).
 rem
 rem Es el atajo de doble clic a:
 rem     python scripts\olvidar_configuracion_maquina.py --si
