@@ -2347,8 +2347,10 @@
     <div id="lineas-omitidas-lista"></div>
     <p>El documento que está en pantalla no tiene esos renglones.</p>
     <div class="editor-acciones">
-      <button class="primario" onclick="cerrarLineasOmitidas()">Entendido</button>
-      <button onclick="marcarLineasOmitidasRevisada()">Ya la completé a mano</button>
+      <button class="primario" onclick="cerrarLineasOmitidas()"
+              title="La factura queda marcada por revisar en EN REVISIÓN.">Dejar en revisión</button>
+      <button onclick="marcarLineasOmitidasRevisada()"
+              title="Quita la marca de revisar: la factura queda como está.">Ya está resuelto</button>
     </div>
   </div>
 </div>
@@ -3176,9 +3178,13 @@ function cerrarLineasOmitidas() {
   replantarCajaFlotante();
 }
 
-// "Ya la completé a mano": el operador ya escribió a mano lo que faltó. El
-// botón "Entendido" NO llama a este endpoint — la factura se queda "por
-// revisar" (EN REVISIÓN y PROCESADAS) hasta marcarla (marcarFacturaRevisada).
+// "Ya está resuelto": el problema quedó atendido y la factura sale de "por
+// revisar". No se pregunta CÓMO se resolvió (2026-07-30, decisión del usuario:
+// los dos botones se distinguen por el estado en que dejan la factura, no por
+// lo que hizo el operador — completarla a mano dejó de ser la única salida).
+// "Dejar en revisión" NO llama a este endpoint: la factura se queda "por
+// revisar" (EN REVISIÓN y PROCESADAS) hasta que se marque desde ahí
+// (marcarFacturaRevisada).
 async function marcarLineasOmitidasRevisada() {
   const pedido = lineasOmitidasPedido;
   cerrarLineasOmitidas();
@@ -5754,9 +5760,9 @@ function filaProcesada(f, enFamilia) {
     <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
 }
 
-// Botón "Revisada" del renglón de líneas omitidas, y "Ya la completé a mano"
-// del aviso que se abre al terminar el llenado (marcarLineasOmitidasRevisada):
-// el operador ya vio qué faltó y despacha la factura tal como quedó.
+// Botón "Revisada" del renglón de líneas omitidas, y "Ya está resuelto" del
+// aviso que se abre al terminar el llenado (marcarLineasOmitidasRevisada): el
+// operador ya vio qué faltó y da el problema por cerrado.
 async function marcarFacturaRevisada(pedido_id, parte) {
   try {
     await api("/api/factura_revisada", {pedido_id, parte});
