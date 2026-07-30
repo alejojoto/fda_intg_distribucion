@@ -9862,7 +9862,9 @@ function pintarListaDescuentos() {
       ${conf}
       <div class="card-acciones">
         <button class="btn-verde" onclick="editarDescuento('${d.id}')">Editar</button>
-        <button class="${d.activo ? "btn-ambar" : "btn-azul"}" onclick="desactivarDescuento('${d.id}', ${d.activo ? 0 : 1})">${d.activo ? "Desactivar" : "Activar"}</button>
+        <button class="${d.activo ? "btn-ambar" : "btn-azul"}" onclick="${d.activo
+          ? `confirmarBorrar(this, () => desactivarDescuento('${d.id}', 0), 'Confirmar desactivar')`
+          : `desactivarDescuento('${d.id}', 1)`}">${d.activo ? "Desactivar" : "Activar"}</button>
         <button class="btn-rojo" onclick="confirmarBorrar(this, () => eliminarDescuento('${d.id}'))">Eliminar</button>${
         (modoImplantacion || modoAdmin) ? ` <button class="btn-rojo" title="Borra la campaña por completo y en todos los equipos, sin pasar por la papelera. Solo existe en modo prueba o modo admin."
                 onclick="confirmarBorrar(this, () => eliminarDescuentoDefinitivo('${d.id}'))">Borrar de verdad</button>` : ""}
