@@ -36,6 +36,37 @@
      propio del SVG: sobre la cabecera oscura queda como una placa. */
   header #logo { display:block; border-radius:7px; flex-shrink:0; }
   .mock { background:#b54708; color:#fff; padding:3px 10px; border-radius:4px; font-size:12px; font-weight:600; }
+  /* Botón de estado de la nube (2026-07-30): mundito en la cabecera con el
+     detalle en un desplegable anclado (no un popup). Verde = conectado y al
+     día; ámbar = conectado pero con datos viejos; rojo = sin conexión. Solo
+     lleva texto al lado cuando hay algo que decir. */
+  #nube-envoltorio { position:relative; margin-left:auto; }
+  #nube-boton { background:none; border:none; color:#c9d3e6; cursor:pointer;
+                display:flex; align-items:center; gap:6px; padding:4px 7px;
+                border-radius:6px; font-size:12px; position:relative; }
+  #nube-boton:hover { background:rgba(255,255,255,.1); color:#fff; }
+  #nube-badge { position:absolute; left:17px; top:13px; width:11px; height:11px;
+                border-radius:50%; font-size:8px; line-height:11px; text-align:center;
+                color:#fff; font-weight:700; border:1.5px solid #1d2433; }
+  .nube-ok #nube-badge { background:#15803d; }
+  .nube-tarde #nube-badge { background:#d97706; }
+  .nube-caida #nube-badge { background:#dc2626; }
+  #nube-popover { position:absolute; right:0; top:calc(100% + 9px); width:305px;
+                  background:#fff; color:#1f2430; border:1px solid #d5d9e2;
+                  border-radius:9px; box-shadow:0 10px 26px rgba(0,0,0,.22);
+                  padding:12px 14px; z-index:40; font-size:13px; text-align:left;
+                  cursor:default; font-weight:400; }
+  #nube-popover h3 { margin:0 0 8px; font-size:13.5px; display:flex;
+                     align-items:center; gap:7px; }
+  .nube-punto { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .nube-fila { display:flex; justify-content:space-between; gap:12px; padding:3px 0; }
+  .nube-fila span:last-child { color:#5b6474; text-align:right; }
+  .nube-nota { color:#5b6474; margin:4px 0 2px; }
+  #nube-popover button { margin-top:9px; width:100%; padding:6px 0;
+                         border:1px solid #c9cfdb; border-radius:6px;
+                         background:#f4f6fa; cursor:pointer; font-size:12.5px; }
+  #nube-popover button:hover:not(:disabled) { background:#e9edf5; }
+  #nube-popover button:disabled { opacity:.6; cursor:default; }
   /* Barra rápida del modo prueba (2026-07-29, pedido del usuario): los mismos
      switches de ADMIN → Ajustes de admin, a un clic y sin cambiar de pestaña.
      Vive DENTRO del header (segunda línea, de ahí el flex-basis) para que el
@@ -1109,6 +1140,23 @@
   <h1>Asistente de llenado — Finca Dos Aguas</h1>
   {% if modo_mock %}<span class="mock">MODO SIMULACIÓN — no toca la app real</span>{% endif %}
   <span class="mock" id="banderas-prueba" title="Apágalas en el .env — o en src/settings.py si es MODO_PRUEBA_IMPLANTACION — y reinicia el panel (PLAN.md 4.6); la entrada MODO ADMIN se apaga en ADMIN → Ajustes de admin"{% if not banderas_prueba %} style="display:none"{% endif %}>MODO PRUEBA — {{ banderas_prueba|join(" · ") }}</span>
+  <!-- Estado de la nube (2026-07-30): el mundito dice de un vistazo si esta
+       computadora está viendo lo de las demás; el desplegable trae el detalle
+       y la acción. El mismo botón lo abre y lo cierra. -->
+  <div id="nube-envoltorio" class="nube-ok">
+    <button id="nube-boton" type="button" onclick="alternarNube()"
+            title="Estado de la conexión con la nube">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="9"/>
+        <ellipse cx="12" cy="12" rx="4.2" ry="9"/>
+        <path d="M3.6 9h16.8M3.6 15h16.8"/>
+      </svg>
+      <span id="nube-badge"></span>
+      <span id="nube-texto"></span>
+    </button>
+    <div id="nube-popover" style="display:none"></div>
+  </div>
   <!-- Barra rápida (2026-07-29, pedido del usuario): atajo a los switches que
        se mueven todo el tiempo mientras se prueba. No guarda estado propio —
        mueve los controles de ADMIN → Ajustes de admin y guarda por el mismo
@@ -3928,9 +3976,15 @@ async function cargar() {
     // aquí sale si se ofrece devolverlas a pendientes.
     llenadasPrueba = d.llenadas_prueba || 0;
     pintarOlvidarPrueba();
-    // Semilla del sondeo de 20 s: viene calculada del mismo estado remoto que
-    // esta respuesta ya trajo, sin un viaje extra a Supabase.
+    // Semilla del sondeo: con la 017 viene de la misma RPC que usa el sondeo;
+    // sin ella, calculada del estado remoto que esta respuesta ya trajo. Nula
+    // si la nube no respondió — se conserva la firma que había.
     if (d.firma_compartida) firmaCompartida = d.firma_compartida;
+    if (d.nube) {
+      nube.catalogos_ts = d.nube.catalogos_ts;
+      nube.carga_ts = d.nube.carga_ts;
+      pintarNube();
+    }
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
     rutaPredeterminada = d.ruta_predeterminada || "";
     seriePredeterminada = d.serie_predeterminada || "";
@@ -3966,17 +4020,139 @@ async function cargar() {
 // refresca pipeline, espejo y catálogos (diaria); aquí solo se dispara cada
 // 10 min, nunca durante un llenado ni con una confirmación pendiente.
 const REFRESCO_AUTO_MS = 10 * 60 * 1000;
+// Cuerpo compartido entre el intervalo y el botón "Actualizar" del estado de
+// la nube: mismo camino, misma guardia. Devuelve false si un llenado manda.
+async function refrescarTodo() {
+  if (llenando || secuenciaActiva || esperandoLogin) return false;
+  await api("/api/refrescar", {});
+  await cargar();
+  pintarAvisoFecha();   // con el panel abierto de un día para otro, el ": hoy" del rótulo pasaría a ser mentira
+  consultarTasaBCV();   // asíncrona a propósito: nunca retrasa la lista
+  return true;
+}
 setInterval(async () => {
-  if (llenando || secuenciaActiva || esperandoLogin) return;
   try {
-    await api("/api/refrescar", {});
-    await cargar();
-    pintarAvisoFecha();   // con el panel abierto de un día para otro, el ": hoy" del rótulo pasaría a ser mentira
-    consultarTasaBCV();   // asíncrona a propósito: nunca retrasa la lista
+    await refrescarTodo();
   } catch (e) {
     console.warn("Refresco automático falló:", e.message);   // silencioso: reintenta en 10 min
   }
 }, REFRESCO_AUTO_MS);
+
+// --- Botón de estado de la nube (2026-07-30) -------------------------------
+// El sondeo de 5 s ya trae todo lo necesario: aquí solo se guarda lo último
+// visto y se pinta. "ok" = el último sondeo respondió; "caida" = la nube (o
+// el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
+// lleva demasiado sin aterrizar una carga completa.
+let nube = {estado: "ok", ultimoOk: null, catalogos_ts: null, carga_ts: null};
+let nubeAbierto = false;
+
+const NUBE_TARDE_MS = 20 * 60 * 1000;   // dos refrescos de 10 min sin aterrizar
+
+function nubeClase() {
+  if (nube.estado === "caida") return "nube-caida";
+  const ref = nube.carga_ts ? new Date(nube.carga_ts).getTime() : null;
+  if (ref && Date.now() - ref > NUBE_TARDE_MS) return "nube-tarde";
+  return "nube-ok";
+}
+
+function haceTexto(ts) {
+  if (!ts) return "sin datos aún";
+  const ms = Date.now() - (typeof ts === "number" ? ts : new Date(ts).getTime());
+  if (isNaN(ms) || ms < 0) return "sin datos aún";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return "hace " + s + " s";
+  const m = Math.round(s / 60);
+  if (m < 60) return "hace " + m + " min";
+  const h = Math.floor(m / 60);
+  return "hace " + h + " h" + (m % 60 ? " " + (m % 60) + " min" : "");
+}
+
+function fechaCortaNube(iso) {
+  const hoy = new Date();
+  const hoyIso = hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0")
+               + "-" + String(hoy.getDate()).padStart(2, "0");
+  if (iso === hoyIso) return "de hoy";
+  return "del " + iso.slice(8, 10) + "/" + iso.slice(5, 7);
+}
+
+function armarPopoverNube(clase) {
+  const color = clase === "nube-caida" ? "#dc2626"
+              : clase === "nube-tarde" ? "#d97706" : "#15803d";
+  const titulo = clase === "nube-caida" ? "Sin conexión con la nube"
+                                        : "Conectado a la nube";
+  let html = `<h3><span class="nube-punto" style="background:${color}"></span>${titulo}</h3>`;
+  if (clase === "nube-caida") {
+    html += `<div class="nube-nota">Lo que hagan las otras computadoras puede `
+          + `no verse al día. Se reintenta solo cada pocos segundos.</div>`;
+  }
+  html += `<div class="nube-fila" title="Se revisan solos cada 5 segundos.">`
+        + `<span>Pedidos y facturas</span><span>`
+        + (nube.ultimoOk ? "revisados " + haceTexto(nube.ultimoOk) : "sin datos aún")
+        + `</span></div>`;
+  html += `<div class="nube-fila" title="Se actualizan solos: al abrir, cada `
+        + `10 minutos y al detectarse un cambio hecho en otra computadora.">`
+        + `<span>Descuentos y catálogos</span><span>`
+        + (nube.catalogos_ts ? "actualizados " + haceTexto(nube.catalogos_ts)
+                             : "sin datos aún")
+        + `</span></div>`;
+  const t = (typeof ultimoBCV !== "undefined" && ultimoBCV && ultimoBCV.tasa)
+          ? ultimoBCV : null;
+  html += `<div class="nube-fila"><span>Tasa BCV</span><span>`
+        + (t ? String(t.tasa).replace(".", ",")
+               + (t.fecha_valor ? " · " + fechaCortaNube(t.fecha_valor) : "")
+             : "sin datos aún")
+        + `</span></div>`;
+  if (llenando || secuenciaActiva) {
+    html += `<div class="nube-nota">El llenado en curso manda: se actualiza al terminar.</div>`;
+  } else {
+    const rotulo = clase === "nube-caida" ? "Reintentar ahora" : "Actualizar todo ahora";
+    html += `<button id="nube-actualizar" type="button" onclick="actualizarNubeAhora()">${rotulo}</button>`;
+  }
+  return html;
+}
+
+function pintarNube() {
+  const env = document.getElementById("nube-envoltorio");
+  if (!env) return;
+  const clase = nubeClase();
+  env.className = clase;
+  document.getElementById("nube-badge").textContent =
+      clase === "nube-caida" ? "✕" : clase === "nube-tarde" ? "!" : "✓";
+  document.getElementById("nube-texto").textContent =
+      clase === "nube-caida" ? "Sin conexión"
+    : clase === "nube-tarde" ? haceTexto(nube.carga_ts) : "";
+  const pop = document.getElementById("nube-popover");
+  if (!nubeAbierto) { pop.style.display = "none"; return; }
+  pop.innerHTML = armarPopoverNube(clase);
+  pop.style.display = "block";
+}
+
+function alternarNube() {
+  nubeAbierto = !nubeAbierto;
+  pintarNube();
+}
+
+// Clic fuera cierra el desplegable (es un menú anclado que el operador abrió,
+// no un aviso inesperado: esos solo se cierran con sus botones).
+document.addEventListener("click", (ev) => {
+  if (nubeAbierto && !ev.target.closest("#nube-envoltorio")) {
+    nubeAbierto = false;
+    pintarNube();
+  }
+});
+
+async function actualizarNubeAhora() {
+  const b = document.getElementById("nube-actualizar");
+  if (b) { b.disabled = true; b.textContent = "Actualizando…"; }
+  try {
+    await refrescarTodo();
+    await sondearCompartido();
+  } catch (e) {
+    mensaje("No se pudo actualizar: " + e.message, "error");
+  }
+  pintarNube();
+}
+pintarNube();   // primer pintado: el ✓ no espera al primer tic del sondeo
 
 // Sondeo del estado compartido (2026-07-24; afinado 2026-07-28): el refresco
 // pesado de arriba es cada 10 minutos, y en ese hueco el panel no se enteraba
@@ -3996,11 +4172,24 @@ async function sondearCompartido() {
   try {
     const r = await api("/api/estados_compartidos?firma=" +
                         encodeURIComponent(firmaCompartida));
-    if (r.pausado) return;
+    if (r.pausado) {
+      // "llenado" no cambia el semáforo (es una pausa, no una caída).
+      if (r.motivo === "sin_conexion") { nube.estado = "caida"; pintarNube(); }
+      return;
+    }
+    nube.estado = "ok";
+    nube.ultimoOk = Date.now();
+    if (r.nube) {
+      nube.catalogos_ts = r.nube.catalogos_ts;
+      nube.carga_ts = r.nube.carga_ts;
+    }
+    pintarNube();
     const cambio = r.cambio;
     firmaCompartida = r.firma;
     if (cambio) cargar();
   } catch (_) { /* sondeo informativo: un fallo puntual no interrumpe nada */
+    nube.estado = "caida";   // el propio asistente no contestó: mismo aviso
+    pintarNube();
   } finally {
     sondeoEnVuelo = false;
   }
