@@ -2476,6 +2476,40 @@ const ALTO_CONTENIDO_FLOTANTE = 170;
 const MARGEN_SUPERIOR = 8;    // aire contra el borde superior de la pantalla
 let ventanaFlotante = false;
 let geometriaPrevia = null;
+/* AGRANDAR ES LO QUE PUEDE FALLAR EN SILENCIO (incidente 2026-07-30): el
+   operador terminó un llenado y la ventana quedó del tamaño de la barra, con
+   el panel entero adentro y scroll, hasta que la maximizó a mano. El colapso
+   por CSS de arriba no falla nunca; el cambio de tamaño sí, y se daba por
+   hecho ni bien se pedía. Por eso la restauración se marca PENDIENTE y solo se
+   apaga cuando la ventana CONFIRMA que volvió — el vigilante de más abajo la
+   reintenta mientras tanto. Cubre las tres formas de quedarse encogido: el
+   pedido que no aterriza, el puente de la ventana propia todavía sin inyectar
+   y la recarga de la página con la barra plantada. */
+let restauracionPendiente = false;
+let intentosRestaurar = 0;
+const MAX_INTENTOS_RESTAURAR = 10;   // a un intento por segundo
+// La marca de "encogida" vive FUERA de la página: si el operador recarga con
+// la barra plantada, esta página nace sin memoria del encogimiento y nadie
+// volvería a agrandar la ventana. Guarda la geometría anterior cuando la hay
+// (camino de Edge); en la ventana propia basta la marca, porque la geometría
+// la conserva la ventana del lado de Python.
+const CLAVE_ENCOGIDA = "fda.ventanaEncogida";
+
+function recordarEncogida(geometria) {
+  try { localStorage.setItem(CLAVE_ENCOGIDA, JSON.stringify(geometria || {})); } catch (e) {}
+}
+
+function olvidarEncogida() {
+  try { localStorage.removeItem(CLAVE_ENCOGIDA); } catch (e) {}
+}
+
+try {
+  const anotada = JSON.parse(localStorage.getItem(CLAVE_ENCOGIDA) || "null");
+  if (anotada) {
+    restauracionPendiente = true;
+    if (anotada.ancho) geometriaPrevia = anotada;
+  }
+} catch (e) {}
 
 // La API que expone la ventana propia. null cuando el panel se abrió con
 // Edge o en una pestaña normal.
@@ -2486,17 +2520,23 @@ function apiVentana() {
 function aplicarVentanaFlotante(activo) {
   if (activo === ventanaFlotante) return;   // solo en las transiciones
   ventanaFlotante = activo;
+  restauracionPendiente = !activo;
+  intentosRestaurar = 0;
   const api = apiVentana();
   // La línea de decisión del diagnóstico a distancia: si esta marca no
   // aparece en el log del panel, la transición ni ocurrió (el fallo está
   // aguas arriba); si dice "fallback" en la ventana propia, el puente no
   // estaba inyectado.
   reportarAlPanel({tipo: "flotante", activo, camino: api ? "pywebview" : "fallback"});
+  if (!activo) {
+    intentarRestaurar();   // vive aparte porque se reintenta hasta que confirme
+    return;
+  }
   if (api) {
     try {
-      const pedido = activo ? api.plantar_barra(ALTO_CONTENIDO_FLOTANTE) : api.restaurar();
-      Promise.resolve(pedido).catch(e =>
+      Promise.resolve(api.plantar_barra(ALTO_CONTENIDO_FLOTANTE)).catch(e =>
         reportarAlPanel({tipo: "puente-rechazo", activo, detalle: String(e).slice(0, 2000)}));
+      recordarEncogida(null);
       return;   // la ventana propia se pone encima sola: sin Win32 del panel
     } catch (e) {
       // API a medio inyectar (p. ej. plantar_barra todavía ausente): se
@@ -2506,15 +2546,10 @@ function aplicarVentanaFlotante(activo) {
     }
   }
   try {
-    if (activo) {
-      geometriaPrevia = {x: window.screenX, y: window.screenY,
-                         ancho: window.outerWidth, alto: window.outerHeight};
-      plantarBarraFlotante(ALTO_FLOTANTE);
-    } else if (geometriaPrevia) {
-      window.resizeTo(geometriaPrevia.ancho, geometriaPrevia.alto);
-      window.moveTo(geometriaPrevia.x, geometriaPrevia.y);
-      geometriaPrevia = null;
-    }
+    geometriaPrevia = {x: window.screenX, y: window.screenY,
+                       ancho: window.outerWidth, alto: window.outerHeight};
+    recordarEncogida(geometriaPrevia);
+    plantarBarraFlotante(ALTO_FLOTANTE);
   } catch (e) {
     // Ventana que no se deja redimensionar (pestaña normal): el modo
     // llenado por CSS ya colapsó el panel, que es lo esencial.
@@ -2524,9 +2559,64 @@ function aplicarVentanaFlotante(activo) {
   fetch("/api/ventana_encima", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({activa: activo}),
+    body: JSON.stringify({activa: true}),
   }).catch(() => {});
 }
+
+// Un intento de devolver la ventana a su tamaño. Repetible a propósito: lo
+// llaman la transición y el vigilante, y ninguno de los dos da nada por hecho.
+// La ventana propia devuelve false y CONSERVA su geometría cuando el pedido no
+// aterriza, así que reintentar todavía la rescata; un false que llega por no
+// haber nada que restaurar solo gasta los intentos, que están acotados.
+function intentarRestaurar() {
+  if (!restauracionPendiente) return;
+  if (++intentosRestaurar > MAX_INTENTOS_RESTAURAR) {
+    restauracionPendiente = false;   // no se insiste eternamente: ya quedó en el log
+    reportarAlPanel({tipo: "restaurar-agotado", intentos: MAX_INTENTOS_RESTAURAR});
+    return;
+  }
+  const api = apiVentana();
+  if (api) {
+    try {
+      Promise.resolve(api.restaurar()).then(ok => {
+        if (!ok) return;   // no aterrizó: el vigilante vuelve a intentarlo
+        restauracionPendiente = false;
+        geometriaPrevia = null;
+        olvidarEncogida();
+      }).catch(e => reportarAlPanel({tipo: "puente-rechazo", activo: false,
+                                     detalle: String(e).slice(0, 2000)}));
+      return;   // la ventana propia se quita el "siempre encima" sola
+    } catch (e) {
+      reportarAlPanel({tipo: "puente-roto", activo: false, detalle: String(e).slice(0, 2000)});
+    }
+  }
+  fetch("/api/ventana_encima", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({activa: false}),
+  }).catch(() => {});
+  // Sin geometría no hay a qué volver: puede ser que el puente de la ventana
+  // propia aún no estuviera inyectado, así que se reintenta en vez de darlo
+  // por resuelto.
+  if (!geometriaPrevia) return;
+  try {
+    window.resizeTo(geometriaPrevia.ancho, geometriaPrevia.alto);
+    window.moveTo(geometriaPrevia.x, geometriaPrevia.y);
+    geometriaPrevia = null;
+    restauracionPendiente = false;
+    olvidarEncogida();
+  } catch (e) {
+    // Ventana que no se deja redimensionar (pestaña normal): el modo
+    // llenado por CSS ya colapsó el panel, que es lo esencial.
+  }
+}
+
+// El vigilante: fuera del modo llenado, la ventana tiene que estar entera.
+// Solo hace algo si quedó una restauración sin confirmar.
+setInterval(() => {
+  if (document.body.classList.contains("modo-llenado")) return;
+  intentarRestaurar();
+}, 1000);
 
 // La caja se planta arriba, centrada, con el alto que se le pase — el borde
 // superior queda fijo, así que crecer por un modal la extiende hacia abajo.
