@@ -7208,9 +7208,11 @@ const CATALOGOS = {
     // Obligatorios (usuario 2026-07-25): sin el cliente_id AppSheet no se puede
     // ubicar un cliente creado a mano; el RIF y el código Winledger son la
     // identidad fiscal/ERP.
-    // La sucursal es opcional: una sola sucursal no obliga a repetir el cliente
-    // en un campo aparte — pero SI se le pone nombre de sucursal, su código pasa
-    // a ser obligatorio (no queda una sucursal a medias).
+    // Los dos nombres se sumaron el 2026-07-30, tras encontrar clientes
+    // rotulados con su código pelado: el del cliente hace falta siempre porque
+    // rotula su grupo en la lista; el de la sucursal solo en las sucursales
+    // (en un cliente independiente ese campo es el nombre que llega de la app
+    // de pedidos, y no siempre llega).
     campos: [
       {campo: "cliente_id", etiqueta: "Cliente_id (clave interna)", obligatorio: true,
        origenDato: "appsheet"},
@@ -7229,11 +7231,13 @@ const CATALOGOS = {
       // programa o de la app de pedidos) pero se puede corregir a mano: la app
       // no siempre la manda, y sin ella la lista rotula al cliente con su
       // código pelado (pedido del usuario 2026-07-29).
-      {campo: "nombre_cliente_winledger", etiqueta: "Nombre del cliente",
+      {campo: "nombre_cliente_winledger", etiqueta: "Nombre del cliente", obligatorio: true,
        origenDato: "winledger"},
       {campo: "sucursal_nombre", etiqueta: "Nombre de la sucursal",
        etiquetaSegun: (get) => get("clasificacion") === "sucursal"
          ? "Nombre de la sucursal" : "Nombre en la app de pedidos",
+       obligatorioSi: (get) => get("clasificacion") === "sucursal",
+       etiquetaCond: "obligatorio en sucursales",
        origenDato: "appsheet"},
       // Solo las CADENAS necesitan código de sucursal: el cliente de sucursal
       // única factura directo por RIF (CONTRATOS.md 4.3) y el llenado ni toca
@@ -8215,6 +8219,7 @@ function editorDerivarCampos() {
     if (fuente.value.trim()) el.value = presentacionDeCodigo(fuente.value);
   }
   editorCopiarRif();
+  editorCopiarNombreCliente();
 }
 
 // El RIF y el código de cliente en Winledger son el mismo dato: el catálogo
@@ -8231,6 +8236,24 @@ function editorCopiarRif() {
   if (escrito !== "" && escrito !== (rif.dataset.auto || "")) return;   // lo tocó una persona
   rif.value = codigo.value.trim();
   rif.dataset.auto = rif.value;
+}
+
+// La razón social ya viaja en el catálogo por el JOIN con clientes_winledger:
+// pedirla otra vez repetiría un dato conocido, y una variante tecleada pisaría
+// el nombre de toda la cadena.
+function editorCopiarNombreCliente() {
+  const codigo = $("ed-codigo_cliente_winledger"), nom = $("ed-nombre_cliente_winledger");
+  if (!codigo || !nom || nom.disabled) return;
+  const escrito = nom.value.trim();
+  if (escrito !== "" && escrito !== (nom.dataset.auto || "")) return;
+  const codigoEscrito = codigo.value.trim();
+  const conocida = catalogoFilas.find(f =>
+    (f.codigo_cliente_winledger || "").trim() === codigoEscrito
+    && (f.nombre_cliente_winledger || "").trim() !== ""
+  );
+  // Evita que al cambiar el código se pise la razón social de otro grupo.
+  nom.value = conocida ? (conocida.nombre_cliente_winledger || "").trim() : "";
+  nom.dataset.auto = nom.value;
 }
 
 // Barra de acento de los obligatorios (mismo diseño que el editor de
