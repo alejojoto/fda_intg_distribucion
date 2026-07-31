@@ -2607,6 +2607,19 @@ function mensaje(texto, tipo, trabajando) {
   actualizarStatusbar();
 }
 
+// Acciones que tardan segundos en verse (pedido del usuario 2026-07-31):
+// descartar una factura escribe en la nube y después recarga la lista entera —
+// unos 5 s en los que el panel se quedaba mudo y parecía que el clic no había
+// entrado. La barra de arriba dice desde el primer momento qué se está
+// haciendo, con el punto giratorio, y el aviso del resultado la reemplaza.
+// Devuelve la función que la borra, para los caminos que avisan en otro lado
+// (sobre la fila) o que terminan sin nada que decir; borra solo si el texto
+// sigue siendo el suyo, para no pisar lo que haya puesto un paso posterior.
+function avisarTrabajando(texto) {
+  mensaje(texto, "info");
+  return () => { if ($("mensaje-texto").textContent === texto) mensaje("", ""); };
+}
+
 // Solo el equipo admin, y solo con el switch "ver detalle técnico" prendido.
 // modoAdmin es la variable global que setea cargarAjustes()/aplicarModoAdmin().
 function verDetalleTecnico() {
@@ -5923,10 +5936,11 @@ async function crearClienteDesdeRevision(i) {
 async function marcarCruceCreado(i) {
   const p = listaRevisionVisible[i];
   if (!p) return;
+  avisarTrabajando("Devolviendo el pedido a la cola…");
   try {
     await api("/api/revision/cruce-rechazado/limpiar", {cliente_id: p.cliente_id});
+    await cargar();
     mensaje("El pedido vuelve a la cola de facturas.", "info");
-    cargar();
   } catch (e) {
     mensaje(e.message, "error");
   }
@@ -6046,9 +6060,11 @@ function filaProcesada(f, enFamilia) {
 // aviso que se abre al terminar el llenado (marcarLineasOmitidasRevisada): el
 // operador ya vio qué faltó y da el problema por cerrado.
 async function marcarFacturaRevisada(pedido_id, parte) {
+  const listo = avisarTrabajando("Marcando la factura como revisada…");
   try {
     await api("/api/factura_revisada", {pedido_id, parte});
-    cargar();
+    await cargar();
+    listo();
   } catch (e) {
     mensaje("No se pudo marcar la factura como revisada: " + e.message, "error");
   }
@@ -6966,6 +6982,9 @@ async function confirmarMotivo() {
     // (la lista todavía está fresca). Si las hay, se pregunta después.
     const hermanas = hermanasSinLlenar(pedido_id, partes);
     cerrarMotivo();
+    const listo = avisarTrabajando(partes.length === 1
+      ? "Descartando la factura…"
+      : `Descartando ${partes.length} facturas…`);
     // Error de otra máquina (2026-07-29): primero se le quita el candado con el
     // mismo motivo. /api/tomar_factura es el único camino que CONFIRMA contra
     // la nube que el estado compartido quedó libre — si no responde, no se
@@ -6978,12 +6997,14 @@ async function confirmarMotivo() {
         await api("/api/tomar_factura", {pedido_id, parte, motivo});
       } catch (e) {
         await cargar();
+        listo();
         avisoFactura(pedido_id, parte, `No se pudo descartar: ${e.message}`);
         return;
       }
     }
-    const {hechas, fallidas} = await aplicarMotivo(pedido_id, partes, motivo);
+    const {hechas, fallidas, aviso} = await aplicarMotivo(pedido_id, partes, motivo);
     await cargar();
+    if (aviso) mensaje(aviso, "info"); else listo();
     for (const f of fallidas) avisoFactura(pedido_id, f.parte, `No se pudo descartar: ${f.msg}`);
     if (hechas && hermanas.length) preguntarHermanas(pedido_id, motivo, hermanas);
     return;
@@ -6998,10 +7019,12 @@ async function confirmarMotivo() {
   // motivo al log del panel, que es la traza para revisar después) y recién
   // entonces el llenado normal, que la reclama para esta como cualquier otra.
   if (accion === "tomar") {
+    const listo = avisarTrabajando("Tomando la factura…");
     try {
       const r = await api("/api/tomar_factura", {pedido_id, parte, motivo});
       mensaje(r.aviso, "alerta");
     } catch (e) {
+      listo();
       avisoFactura(pedido_id, parte, e.message);
       return;
     }
@@ -7065,9 +7088,15 @@ function avisoFactura(pedido_id, parte, msg) {
 }
 
 // Descarta las partes indicadas, una por una para que el fallo de una no se
-// lleve a las demás. Devuelve cuántas quedaron hechas y el detalle de las que
-// fallaron (el llamador las avisa DESPUÉS de repintar, sobre la fila fresca).
+// lleve a las demás. Devuelve cuántas quedaron hechas, el detalle de las que
+// fallaron (el llamador las avisa DESPUÉS de repintar, sobre la fila fresca) y
+// el texto del aviso de éxito, que el llamador pone también después de
+// repintar: el "Descartando…" giratorio tiene que durar hasta que el cambio se
+// vea en la tabla, no apagarse a mitad de camino.
 async function aplicarMotivo(pedido_id, partes, motivo) {
+  // Cómo nombrar cada factura se resuelve ANTES de tocarla: sale de la lista
+  // que está en pantalla, y para cuando toque avisar ya se habrá recargado.
+  const refs = new Map(partes.map(p => [p, refFacturaUbicable(pedido_id, p)]));
   const hechas = [], fallidas = [];
   for (const parte of partes) {
     try {
@@ -7077,11 +7106,12 @@ async function aplicarMotivo(pedido_id, partes, motivo) {
       fallidas.push({parte, msg: e.message});
     }
   }
+  let aviso = "";
   if (hechas.length === 1)
-    mensaje(`${refFacturaUbicable(pedido_id, hechas[0])} quedó descartada.`, "info");
+    aviso = `${refs.get(hechas[0])} quedó descartada.`;
   else if (hechas.length)
-    mensaje(`${pedido_id}: ${hechas.length} facturas (partes ${hechas.join(", ")}) quedaron descartadas.`, "info");
-  return {hechas: hechas.length, fallidas};
+    aviso = `${pedido_id}: ${hechas.length} facturas (partes ${hechas.join(", ")}) quedaron descartadas.`;
+  return {hechas: hechas.length, fallidas, aviso};
 }
 
 // --- Las facturas hermanas de un pedido dividido (pedido del usuario
@@ -7131,8 +7161,12 @@ async function confirmarHermanas() {
   // Con el check marcado se vuelve a abrir el diálogo de motivo, ya apuntando
   // a esas partes: pueden descartarse por una razón distinta a la primera.
   if (otroMotivo) { abrirMotivo("descartar", pedido_id, partes); return; }
-  const {fallidas} = await aplicarMotivo(pedido_id, partes, motivo);
+  const listo = avisarTrabajando(partes.length === 1
+    ? "Descartando la otra factura…"
+    : `Descartando las otras ${partes.length} facturas…`);
+  const {fallidas, aviso} = await aplicarMotivo(pedido_id, partes, motivo);
   await cargar();
+  if (aviso) mensaje(aviso, "info"); else listo();
   for (const f of fallidas) avisoFactura(pedido_id, f.parte, `No se pudo descartar: ${f.msg}`);
 }
 
