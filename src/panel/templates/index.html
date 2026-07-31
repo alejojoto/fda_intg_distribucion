@@ -1116,6 +1116,10 @@
   #previo-caja { width:min(960px, 96vw); margin-top:4vh; padding:20px 22px; }
   #previo-caja h3 { font-size:16px; }
   #previo-cajitas { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  /* Salto de renglón dictado por el usuario (2026-07-31): qué se factura
+     arriba (ruta, fecha, tasa) y cómo sale el documento abajo (serie, cuánto,
+     impresión). */
+  #previo-cajitas .cj-salto { flex-basis:100%; height:0; }
   #previo-cajitas .cajita { padding:7px 14px; min-width:88px; }
   #previo-cajitas .cj-rot { font-size:11.5px; }
   #previo-cajitas .cj-val { font-size:16px; }
@@ -2338,8 +2342,6 @@
     <div class="editor-acciones">
       <button class="primario" id="tasa-usar" onclick="llenarConTasaDelAviso()">Llenar con esta tasa</button>
       <button id="tasa-despacho" onclick="llenarParaDespachoDesdeAviso()"></button>
-      <button id="tasa-sin" onclick="llenarSinTasa()"
-              title="No se toca Tasas de Cambio: la factura sale con el Cambio que el programa de facturación tenga en ese momento. Útil solo si ya registraste la tasa allá a mano.">Llenar sin tocar la tasa</button>
       <button onclick="pararPorTasa()">Parar</button>
     </div>
   </div>
@@ -6148,12 +6150,13 @@ function abrirAvisoTasa(motivo, llenado) {
     ? `Todavía no hay tasa para el ${fecha.split("-").reverse().join("/")}`
     : "Todavía no hay tasa para el día a facturar";
   $("tasa-motivo").textContent = motivo;
-  // Solo el hecho que hay que sopesar, sin mandados: el aviso avisa y el
-  // operador decide (feedback del usuario 2026-07-22 — la versión anterior
-  // decía "escríbela a mano en el campo Tasa", que es trabajo que nadie pidió).
+  // La tasa es obligatoria (2026-07-31, regla del usuario): sin ella no se
+  // llena. El aviso trae el campo con la última conocida ya escrita, así que
+  // pedir que se confirme o se corrija ahí mismo no es mandar a hacer trabajo
+  // afuera — es la única acción que falta, y está a un teclazo.
   $("tasa-consecuencia").textContent =
-    "Sin registrar ninguna, la factura sale con el Cambio que el programa de facturación tenga "
-    + "en ese momento — puede ser 0 o el de otro día.";
+    "Escríbela aquí para llenar: sin una tasa registrada la factura saldría con el Cambio "
+    + "que el programa de facturación tenga en ese momento, que puede ser 0 o el de otro día.";
 
   // El campo llega con la última tasa conocida ya escrita: el camino corto es
   // el correcto, y corregirla es escribir encima.
@@ -6251,14 +6254,10 @@ function llenarParaDespachoDesdeAviso() {
   if (l) llenar(l.pedido_id, l.parte, l.autorizarCancelar);
 }
 
-// "Llenar sin tocar la tasa": el llenado tal cual, sin registrar ninguna en
-// Winledger (el documento sale con el Cambio que el sistema tenga). Es la
-// salida para cuando el operador ya la puso a mano allá.
-function llenarSinTasa() {
-  const l = llenadoEsperandoTasa;
-  cerrarAvisoTasa();
-  if (l) llenar(l.pedido_id, l.parte, l.autorizarCancelar, true);
-}
+// Retirado el 2026-07-31 (regla del usuario): "Llenar sin tocar la tasa" era la
+// salida para llenar sin registrar ninguna, y ahora sin tasa no se llena. Quien
+// ya la puso a mano en el programa la escribe también aquí: registrar la misma
+// dos veces no cambia el documento.
 
 // "Parar": no se manda ni una tecla a Winledger. Si venía de "Llenar en
 // fila", la secuencia se detiene también — nadie quedó llenando.
@@ -7665,15 +7664,28 @@ async function pedirDescuentosDelLote(cola) {
   if (previoResolver) pintarPrevioLote();
 }
 
-function pintarPrevioLote() {
+// Falta la tasa que va a registrarse en el documento (2026-07-31, regla del
+// usuario): sin ella no se llena, ni aquí ni desde la barra. En modo prueba con
+// la puesta a punto saltada no aplica: ahí la tasa no se toca a propósito.
+const previoSinTasa = () => !saltandoTasa() && !tasaParaLlenar();
+
+// El botón dice qué falta y se apaga hasta que esté: la fila, la cantidad
+// escrita o la tasa. Va aparte de pintarPrevioLote porque el tecleo de la tasa
+// lo mueve sin repintar las cajitas (perdería el foco).
+function pintarBotonPrevio() {
   const n = previoCola.length;
   const btn = $("previo-llenar");
   // Sin facturas no hay nada que llenar (la ruta que se acaba de elegir puede
   // no tener pendientes), y con la lista en vuelo el lote todavía no es firme.
-  btn.disabled = previoCargando || !n;
+  btn.disabled = previoCargando || !n || previoSinTasa();
   btn.textContent = previoCargando ? "Rehaciendo la fila…"
     : previoSinCantidad() ? "Escribe cuántas facturas"
+    : previoSinTasa() ? "Escribe la tasa para llenar"
     : `Llenar ${n} factura${n === 1 ? "" : "s"}`;
+}
+
+function pintarPrevioLote() {
+  pintarBotonPrevio();
   // Qué va a pasar, en una línea: el mismo dato que las notas de los radios de
   // impresión, dicho sobre ESTE lote — es la última vista antes de arrancar.
   $("previo-proceso").textContent = imprimirEnFila()
@@ -7804,6 +7816,36 @@ function pintarPrevioCajitas() {
       <span class="cj-rot">${esc(rot)}</span>${control}</label>`;
   const cajitas = [];
 
+  // Orden dictado por el usuario (2026-07-31): arriba de qué se factura (ruta,
+  // fecha, tasa) y, en un renglón aparte, cómo sale el documento (serie, cuánto
+  // y si se imprime).
+  // Cambiar la ruta rehace el lote entero: es el filtro del que sale la fila.
+  const rutas = [["", "todas"], ...(ultimaLista.rutas || []).map(r => [r, nombreRuta(r)])];
+  if (ultimaLista.hay_sin_ruta) rutas.push(["__sin_ruta__", "sin ruta"]);
+  cajitas.push(editable("Ruta",
+    `<select class="cj-edit" onchange="previoRutaElegida(this.value)">${
+      opciones(rutas, rutaSeleccionada)}</select>`));
+
+  const iso = $("f-fecha-facturar").value;
+  cajitas.push(saltandoPuestaAPunto("fecha")
+    ? fija("Fecha a facturar", "no se toca", true)
+    : editable("Fecha a facturar",
+        `<input type="date" class="cj-edit" value="${esc(iso)}"
+                onchange="previoFechaElegida(this.value)">`, !iso));
+
+  // Sin la tasa del día no se llena nada (2026-07-31, regla del usuario): el
+  // campo la pide en vez de anunciar que no se registra, y el botón de abajo
+  // queda apagado hasta que esté escrita.
+  const tasa = tasaParaLlenar();
+  cajitas.push(saltandoTasa()
+    ? fija("Tasa", "no se registra", true)
+    : editable("Tasa",
+        `<input type="text" class="cj-edit" inputmode="decimal" autocomplete="off"
+                value="${esc($("f-tasa").value)}" placeholder="escríbela"
+                oninput="previoTasaTecleada(this)">`, !tasa));
+
+  cajitas.push(`<span class="cj-salto"></span>`);
+
   cajitas.push(saltandoPuestaAPunto("serie")
     ? fija("Serie", "no se elige", true)
     : editable("Serie",
@@ -7813,37 +7855,10 @@ function pintarPrevioCajitas() {
                    serieSeleccionada)}</select>`,
         !serieSeleccionada));
 
-  const iso = $("f-fecha-facturar").value;
-  cajitas.push(saltandoPuestaAPunto("fecha")
-    ? fija("Fecha a facturar", "no se toca", true)
-    : editable("Fecha a facturar",
-        `<input type="date" class="cj-edit" value="${esc(iso)}"
-                onchange="previoFechaElegida(this.value)">`, !iso));
-
-  const tasa = tasaParaLlenar();
-  cajitas.push(saltandoTasa()
-    ? fija("Tasa", "no se registra", true)
-    : editable("Tasa",
-        `<input type="text" class="cj-edit" inputmode="decimal" autocomplete="off"
-                value="${esc($("f-tasa").value)}" placeholder="no se registra"
-                oninput="previoTasaTecleada(this)">`, !tasa));
-
-  // Cambiar la ruta rehace el lote entero: es el filtro del que sale la fila.
-  const rutas = [["", "todas"], ...(ultimaLista.rutas || []).map(r => [r, nombreRuta(r)])];
-  if (ultimaLista.hay_sin_ruta) rutas.push(["__sin_ruta__", "sin ruta"]);
-  cajitas.push(editable("Ruta",
-    `<select class="cj-edit" onchange="previoRutaElegida(this.value)">${
-      opciones(rutas, rutaSeleccionada)}</select>`));
-
-  cajitas.push(editable("Imprimir",
-    `<select class="cj-edit" onchange="previoImpresionElegida(this.value)">${
-      opciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
-    imprimirEnFila()));
-
   // La cantidad también se elige AQUÍ (2026-07-31, pedido del usuario): el mismo
-  // menú de la barra, y cambiarlo rehace la fila a la vista. Va de última porque
-  // sus opciones salen de las dos cajitas anteriores: la ruta ("ruta completa"
-  // solo con una elegida) y la impresión (qué números se ofrecen).
+  // menú de la barra, y cambiarlo rehace la fila a la vista. Sus opciones salen
+  // de la ruta ("ruta completa" solo con una elegida) y de la impresión (qué
+  // números se ofrecen).
   // El <select> repite el hover de la opción elegida: cerrado no se ve el title
   // de los <option>, y "ruta completa" o "pedido completo" no se explican solos.
   // Se acomoda antes de pintar para que el menú no pueda quedar sin ninguna
@@ -7862,6 +7877,11 @@ function pintarPrevioCajitas() {
            ><span class="cj-suf">facturas</span>`
         : "")
     + `</span>`));
+
+  cajitas.push(editable("Imprimir",
+    `<select class="cj-edit" onchange="previoImpresionElegida(this.value)">${
+      opciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
+    imprimirEnFila()));
 
   // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
   // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
@@ -7894,12 +7914,18 @@ function previoFechaElegida(iso) {
 
 // Tecleo: NO se repinta la cajita (se perdería el foco a media tasa). Se mueve
 // el campo de la barra —que es de donde sale lo que viaja— y se actualizan solo
-// el color de la cajita y los avisos.
+// el color de la cajita, los avisos y el botón.
+// Lo tecleado queda marcado como escrito A MANO (igual que "Llenar con esta
+// tasa" del aviso del llenado suelto): es una decisión del operador y manda
+// sobre lo que el BCV tenga o le falte a ese día — si no, escribir justo el
+// número auto-llenado no desbloquearía nada.
 function previoTasaTecleada(campo) {
   $("f-tasa").value = campo.value;
+  tasaAutoBCV = null;
   pintarAvisoBCV();
   campo.closest(".cajita").classList.toggle("ojo", !tasaParaLlenar());
   pintarPrevioAvisos();
+  pintarBotonPrevio();
 }
 
 // Cambiar la ruta rehace la fila: la lista se vuelve a pedir filtrada y el lote
@@ -8051,8 +8077,8 @@ function pintarPrevioAvisos() {
       + `puesta al empezar cada una. Elígela aquí mismo, arriba.`);
   const motivoTasa = saltandoTasa() ? null : motivoTasaAusente();
   if (motivoTasa)
-    avisos.push(`${motivoTasa} Ninguna factura del lote registra tasa: todas `
-      + `salen con el Cambio que el programa tenga. Puedes escribirla aquí mismo.`);
+    avisos.push(`${motivoTasa} Escríbela aquí arriba, en Tasa: sin ella no se `
+      + `llena ${n === 1 ? "la factura" : "ninguna factura del lote"}.`);
   if (previoFamiliaEstirada) {
     const f = previoFamiliaEstirada;
     avisos.push(`El pedido ${f.pedido_id}${f.cliente ? ` (${f.cliente})` : ""} se `
