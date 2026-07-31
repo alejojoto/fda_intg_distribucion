@@ -124,11 +124,9 @@
                   flex-wrap:wrap; margin-bottom:2px; font-size:12.5px;
                   color:var(--warn); }
   .filtro-aviso b { font-size:13px; }
-  /* Punto ámbar latiendo: llama el ojo a la barra sin ocupar sitio. */
+  /* Punto ámbar fijo: llama el ojo a la barra sin ocupar sitio ni titilar. */
   .filtro-aviso .punto { width:9px; height:9px; border-radius:50%;
-                         background:#f59e0b; flex-shrink:0;
-                         animation:filtro-late 1.6s ease-in-out infinite; }
-  @keyframes filtro-late { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+                         background:#f59e0b; flex-shrink:0; }
   /* Cada filtro puesto, con su × para quitarlo desde el propio aviso. */
   .filtro-chip { display:inline-flex; align-items:center; gap:5px;
                  background:#fff; border:1px solid #f5c98a; border-radius:10px;
@@ -1729,7 +1727,8 @@
          su consecuencia (la lista no está completa), y trae la acción resuelta
          ahí mismo — cada filtro se quita con su × y todos juntos con el botón.
          Lo pinta pintarEstadoFiltros; arranca oculto porque el panel abre sin
-         filtros (salvo la ruta predeterminada, que se marca al primer pintado). -->
+         filtros que denunciar — la ruta predeterminada de la máquina se aplica
+         al abrir pero no cuenta como filtro (ver rutaFiltrando). -->
     <div class="filtro-aviso" id="filtro-aviso" style="display:none">
       <span class="punto"></span>
       <span><b>Filtro activo</b> · no se muestra la lista completa</span>
@@ -4378,11 +4377,15 @@ function filtros() {
 // filtran por buscador y ruta — las fechas y "Llenadas en esta máquina" son exclusivas
 // de PROCESADAS (ver cambiarTab). Cada entrada trae ya el nombre del filtro que
 // la quita, porque el aviso los ofrece uno por uno.
+//
+// La ruta PREDETERMINADA de esta máquina no cuenta (2026-07-31, pedido del
+// usuario): quien fija su ruta con ★ trabaja siempre esa y ver el aviso en
+// cada pantalla sería ruido permanente. Cualquier OTRA ruta sí cuenta.
 function filtrosActivos(tab) {
   const activos = [];
   const buscar = ($("f-buscar").value || "").trim();
   if (buscar) activos.push({cual: "buscar", texto: `Buscar: ${buscar}`});
-  if (rutaSeleccionada) activos.push({cual: "ruta", texto: `Ruta: ${
+  if (rutaFiltrando()) activos.push({cual: "ruta", texto: `Ruta: ${
     rutaSeleccionada === "__sin_ruta__" ? "(sin ruta)" : nombreRuta(rutaSeleccionada)}`});
   if (tab === "procesadas") {
     const dma = (iso) => iso.split("-").reverse().join("/");
@@ -4391,6 +4394,12 @@ function filtrosActivos(tab) {
     if ($("f-solo-aqui").checked) activos.push({cual: "solo_aqui", texto: "Llenadas en esta máquina"});
   }
   return activos;
+}
+
+// La ruta puesta recorta la lista, sí, pero solo se denuncia como filtro cuando
+// NO es la predeterminada de la máquina (ver filtrosActivos).
+function rutaFiltrando() {
+  return rutaSeleccionada !== "" && rutaSeleccionada !== rutaPredeterminada;
 }
 
 // El catálogo tiene su propio campo de texto y, en Feriados, además el tipo.
@@ -4417,7 +4426,7 @@ function pintarEstadoFiltros() {
   const tab = tabActiva();
   const activos = filtrosActivos(tab);
   $("filtros-barra").classList.toggle("filtrando", activos.length > 0);
-  $("f-ruta").classList.toggle("filtro-on", rutaSeleccionada !== "");
+  $("f-ruta").classList.toggle("filtro-on", rutaFiltrando());
   $("campo-solo-aqui").classList.toggle(
     "filtro-on", tab === "procesadas" && $("f-solo-aqui").checked);
   $("filtro-aviso").style.display = activos.length ? "" : "none";
@@ -4669,6 +4678,10 @@ async function cambioRuta(valor) {
       mensaje(e.message, "error");
     }
     pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
+    // Hacerla predeterminada la saca de los filtros que se denuncian, así que
+    // la barra y el conteo se destiñen en el acto (la lista es la misma: no se
+    // reconsulta).
+    repintar();
     return;
   }
   rutaSeleccionada = valor;
@@ -5295,8 +5308,8 @@ setInterval(latido, LATIDO_MS);
 
 function repintar() {
   const revision = ultimaLista.revision || [];
-  // Cubre el pintado inicial y los refrescos: la ruta predeterminada de la
-  // máquina ya es un filtro puesto desde que el panel abre.
+  // Cubre el pintado inicial y los refrescos (la ruta predeterminada de la
+  // máquina se aplica al abrir, pero no cuenta como filtro: ver rutaFiltrando).
   pintarEstadoFiltros();
   // El contador del tab cuenta lo que hay POR LLENAR: la lista trae también
   // las partes ya listas de un pedido a medias (para que se vea completo),
