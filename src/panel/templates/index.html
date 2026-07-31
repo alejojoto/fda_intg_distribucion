@@ -370,14 +370,13 @@
      botón con su propio color ámbar. Clase, no id (2026-07-31, pedido del
      usuario): el mismo control, idéntico y de primero, se repite en las
      ventanas de revisión/prellenado (previoBabyMix/detalleBabyMix). */
-  .babymix-fila { display:flex; gap:14px; align-items:center;
+  .babymix-fila { display:flex; gap:14px; align-items:center; margin-left:10px;
                   padding:6px 12px; border:1px solid #fcd34d;
                   border-radius:8px; background:#fffbeb; font-size:13.5px; }
-  /* Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8): va después de
-     Baby Mix con doble espacio de separación (margen 10px + gap 10px de la
-     barra). Por ahora es SOLO la parte visual del flujo por lotes: el botón
-     sigue llenando UNA factura y deteniéndose. */
-  #enfila-bloque { display:flex; gap:10px; align-items:center; margin-left:10px;
+  /* Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8): SOLO la parte
+     visual del flujo por lotes: el botón sigue llenando UNA factura y
+     deteniéndose. */
+  #enfila-bloque { display:flex; gap:10px; align-items:center;
                    padding:6px 12px; border:1px solid #cbd2dc; border-radius:8px;
                    background:#fff; font-size:13.5px; flex-wrap:wrap; }
   #enfila-bloque label { cursor:pointer; white-space:nowrap; font-weight:600; }
@@ -385,9 +384,6 @@
                                      width:15px; height:15px; accent-color:#1d4ed8;
                                      vertical-align:-2px; cursor:pointer; margin-right:3px; }
   #enfila-bloque select { padding:4px 7px; }
-  /* El reemplazo de esa barra en producción (2026-07-28): mismo doble espacio
-     contra Baby Mix que tenía el bloque al que sustituye. */
-  #btn-llenar-siguiente { margin-left:10px; }
   .babymix-fila b { color:var(--warn); }
   .babymix-fila label { cursor:pointer; white-space:nowrap; font-weight:600; }
   .babymix-fila input[type=radio] { padding:0; border:none; background:none;
@@ -1598,19 +1594,9 @@
   </div>
 
   <!-- Botonera de llenado en su propia fila (2026-07-20): va a crecer con
-       más controles a futuro. Baby Mix va primero y el bloque "Llenar en
-       fila" la sigue con doble espacio de separación. -->
+       más controles a futuro. Baby Mix va de último, a la derecha (2026-07-31,
+       pedido del usuario). -->
   <div class="barra" id="llenado-barra">
-    <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
-         y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
-         Arranca en 125 g (el que se está gastando). BORRAR este bloque (y la
-         CSS .babymix-fila, y babyMixControl() más abajo) cuando se acaben los
-         paquetes de 125 g. -->
-    <div class="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
-      <b>Baby Mix</b>
-      <label><input type="radio" name="f-bm" value="125" checked onchange="guardarGramajeBaby(this.value)"> 125 g</label>
-      <label><input type="radio" name="f-bm" value="150" onchange="guardarGramajeBaby(this.value)"> 150 g</label>
-    </div>
     <!-- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) — SOLO la
          parte visual del flujo por lotes, en el orden dictado por el usuario:
          qué llenar, Imprimir sí/no y el botón. Es un DROPDOWN cuyas opciones
@@ -1676,6 +1662,17 @@
          las guardas de llenar(). -->
     <button class="primario" id="btn-llenar-siguiente" onclick="llenarSiguiente()"
             title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en el programa de facturación.">Llenar siguiente</button>
+    <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
+         y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
+         Arranca en 125 g (el que se está gastando). De último, a la derecha
+         (2026-07-31, pedido del usuario). BORRAR este bloque (y la CSS
+         .babymix-fila, y babyMixControl() más abajo) cuando se acaben los
+         paquetes de 125 g. -->
+    <div class="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
+      <b>Baby Mix</b>
+      <label><input type="radio" name="f-bm" value="125" checked onchange="guardarGramajeBaby(this.value)"> 125 g</label>
+      <label><input type="radio" name="f-bm" value="150" onchange="guardarGramajeBaby(this.value)"> 150 g</label>
+    </div>
   </div>
 
   <!-- Doble llenado sin resolver (2026-07-28): franja roja fija hasta que
@@ -6079,10 +6076,10 @@ function fijoDetalle(clave) {
   const llenable = llenadoDirecto(filaDeLista(...partesDeClave(clave)))
     || detalleReabriendo === clave;
   if (!llenable) return cabecera;
-  // Baby Mix de primero (2026-07-31, pedido del usuario): misma posición que
-  // en la barra del panel.
-  const cajitas = [babyMixControl(), cajitaFecha(), cajitaTasa(), cajitaSerie(),
-                   cajitaImpresion(), cajitaEmpresa()].join("");
+  // Baby Mix de último, a la derecha (2026-07-31, pedido del usuario): misma
+  // posición que en la barra del panel.
+  const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
+                   cajitaImpresion(), cajitaEmpresa(), babyMixControl()].join("");
   return cabecera
     + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
     + `<div id="detalle-avisos">${htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))}</div>`;
@@ -8599,7 +8596,7 @@ const cajitaImpresion = () => cajitaEditable("Imprimir",
   imprimirEnFila());
 
 // Baby Mix también se revisa antes de llenar (2026-07-31, pedido del usuario):
-// IDÉNTICO al de la barra —mismo toggle, color y de primero, a la izquierda—
+// IDÉNTICO al de la barra —mismo toggle, color y de último, a la derecha—
 // en vez de una cajita más: es el único control temporal que necesita llamar
 // la atención, y las demás cajitas se quedan sin resaltar. El radio comparte
 // name="f-bm" con el de la barra, así que el navegador los mantiene
@@ -8656,9 +8653,6 @@ function pintarPrevioCajitas() {
 
   cajitas.push(`<span class="cj-salto"></span>`);
 
-  // Baby Mix de primero en este renglón (2026-07-31, pedido del usuario): la
-  // misma posición —a la izquierda— que tiene en la barra del panel.
-  cajitas.push(babyMixControl());
   cajitas.push(cajitaSerie());
 
   // La cantidad también se elige AQUÍ (2026-07-31, pedido del usuario): el mismo
@@ -8679,6 +8673,9 @@ function pintarPrevioCajitas() {
 
   cajitas.push(cajitaImpresion());
   cajitas.push(cajitaEmpresa());
+  // Baby Mix de último, a la derecha (2026-07-31, pedido del usuario): misma
+  // posición que en la barra del panel.
+  cajitas.push(babyMixControl());
 
   $("previo-cajitas").innerHTML = cajitas.join("");
 }
