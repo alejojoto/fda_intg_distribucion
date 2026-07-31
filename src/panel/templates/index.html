@@ -4581,8 +4581,6 @@ async function cargar() {
     if (d.nube) {
       nube.carga_ts = d.nube.carga_ts;
       nube.espejo_activo = d.nube.espejo_activo;
-      nube.cambios_por_enviar = d.nube.cambios_por_enviar;
-      nube.cambios_recientes_30min = d.nube.cambios_recientes_30min;
       pintarNube();
     }
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
@@ -4651,8 +4649,7 @@ setInterval(async () => {
 // visto y se pinta. "ok" = el último sondeo respondió; "caida" = la nube (o
 // el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
 // lleva demasiado sin aterrizar una carga completa.
-let nube = {estado: "ok", ultimoOk: null, carga_ts: null,
-            espejo_activo: true, cambios_por_enviar: null, cambios_recientes_30min: null};
+let nube = {estado: "ok", ultimoOk: null, carga_ts: null, espejo_activo: true};
 let nubeAbierto = false;
 let cargaFallo = false;   // la última /api/facturas no aterrizó (ver cargar())
 
@@ -4700,22 +4697,6 @@ function armarPopoverNube(clase) {
           + (nube.ultimoOk ? haceTexto(nube.ultimoOk) : "sin datos aún")
           + `</span></div>`;
   }
-  // Envío a la nube (el espejo): un camino aparte de la lectura de arriba —
-  // se puede leer bien y fallar al escribir. Con el espejo caído no se pone un
-  // número (el último quedaría desactualizado); con el espejo en pie el 0 es
-  // real desde el arranque, porque la puesta al día ya corrió en la precarga.
-  const espejoOk = nube.espejo_activo !== false;
-  html += `<div class="nube-fila" title="Facturas de esta máquina que todavía no `
-        + `les llegan a las otras computadoras.">`
-        + `<span>Cambios por enviar</span><span>`
-        + (espejoOk ? (nube.cambios_por_enviar || 0) : "sin conexión")
-        + `</span></div>`;
-  html += `<div class="nube-fila" title="Todo lo que se tocó en cualquier `
-        + `computadora en la última media hora: facturas, clientes, `
-        + `descuentos, feriados, tasas.">`
-        + `<span>Cambios recientes</span><span>`
-        + (espejoOk ? (nube.cambios_recientes_30min || 0) : "sin conexión")
-        + `</span></div>`;
   if (llenando || secuenciaActiva) {
     html += `<div class="nube-nota">El llenado en curso manda: se actualiza al terminar.</div>`;
   } else {
@@ -4800,8 +4781,6 @@ async function sondearCompartido() {
     if (r.nube) {
       nube.carga_ts = r.nube.carga_ts;
       nube.espejo_activo = r.nube.espejo_activo;
-      nube.cambios_por_enviar = r.nube.cambios_por_enviar;
-      nube.cambios_recientes_30min = r.nube.cambios_recientes_30min;
     }
     pintarNube();
     const cambio = r.cambio;
