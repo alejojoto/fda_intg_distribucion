@@ -443,7 +443,11 @@
   tr.abre-detalle td { cursor:default; }
   tr.abre-detalle:hover td { background:#eaf0fb; }
   .detalle-cab { font-size:12.5px; margin-bottom:8px; }
-  #detalle-cuerpo table { font-size:12.5px; }
+  /* width:auto pisa el 100% global: las cajas de cantidad y descuento van
+     pegadas al nombre del producto — repartidas a lo ancho de la ventana
+     obligaban a leer cada línea barriendo la pantalla de lado a lado
+     (pedido del usuario 2026-07-31). */
+  #detalle-cuerpo table { font-size:12.5px; width:auto; max-width:100%; }
   #detalle-cuerpo th, #detalle-cuerpo td { padding:5px 8px; vertical-align:middle; }
   #detalle-cuerpo td.det-num { color:var(--mut); width:26px; }
   /* Los títulos de las columnas se quedan a la vista al bajar por las líneas,
@@ -5458,6 +5462,26 @@ function llenadoDirecto(f) {
   return null;
 }
 
+// ESPEJO del resto de accionesDeFila: los casos que no llenan directo porque
+// primero preguntan su causa — reabrir una cerrada ("Volver a llenar") o
+// quitarle una tomada a otra máquina ("Llenar igual"). El pie de la ventana
+// ofrece la misma salida que la fila (pedido del usuario 2026-07-31: toda
+// ruta con causa termina en la pantalla de prellenado): el diálogo del motivo
+// sale por encima y esta ventana, que queda debajo, se convierte en el
+// prellenado cuando la acción aterriza.
+function reabrirDesdeDetalle(f) {
+  if (!f) return null;
+  if (f.remota)
+    return f.refacturable
+      ? {texto: "Volver a llenar", abrir: volverAFacturar}
+      : ["reservada", "llenando", "error_llenado"].includes(f.estado)
+        ? {texto: "Llenar igual", abrir: tomarIgual}
+        : null;
+  if (["completada", "descartada", "facturada_a_mano"].includes(f.estado))
+    return {texto: "Volver a llenar", abrir: volverAFacturar};
+  return null;
+}
+
 // Llenar al pie de la ventana (pedido del usuario 2026-07-30): se revisa el
 // prellenado y se llena ahí mismo. La ventana se cierra ANTES de arrancar: el
 // llenado colapsa el panel a la barra de estado y un overlay abierto la taparía.
@@ -5468,6 +5492,13 @@ function llenarDesdeDetalle() {
   if (!detalleAbierto) return;
   const [pedidoId, parte] = partesDeClave(detalleAbierto);
   const fila = filaDeLista(pedidoId, parte) || {};
+  // Cerrada o tomada por otra máquina: el pie pregunta la causa encima de
+  // esta misma ventana (no se cierra — al confirmar se vuelve el prellenado).
+  if (!llenadoDirecto(fila)) {
+    const reabrir = reabrirDesdeDetalle(fila);
+    if (reabrir) reabrir.abrir(pedidoId, parte);
+    return;
+  }
   cerrarDetalle();
   if (previoResolver) salirDelPrevio(false);
   // El pedido cuya familia repartió otra máquina pide su motivo igual que
@@ -5518,15 +5549,31 @@ function pintarVentanaDetalle(clave) {
 
 // El botón del pie: la etiqueta de llenadoDirecto con el mismo candado de la
 // tasa que el lote (2026-07-31, regla del usuario) — sin la tasa del día no se
-// llena, y el botón dice qué falta.
+// llena, y el botón dice qué falta. En una cerrada o tomada por otra máquina
+// ofrece la acción de su fila (reabrirDesdeDetalle); mientras la reapertura
+// viaja queda deshabilitado diciendo qué se espera.
 function pintarBotonDetalle() {
-  const etiqueta = detalleAbierto
-    && llenadoDirecto(filaDeLista(...partesDeClave(detalleAbierto)));
   const boton = $("detalle-llenar");
-  boton.style.display = etiqueta ? "" : "none";
-  if (!etiqueta) return;
-  boton.disabled = sinTasaParaLlenar();
-  boton.textContent = boton.disabled ? "Escribe la tasa para llenar" : etiqueta;
+  if (!detalleAbierto) { boton.style.display = "none"; return; }
+  if (detalleReabriendo === detalleAbierto) {
+    boton.style.display = "";
+    boton.disabled = true;
+    boton.textContent = "Reabriendo la factura…";
+    return;
+  }
+  const fila = filaDeLista(...partesDeClave(detalleAbierto));
+  const etiqueta = llenadoDirecto(fila);
+  if (etiqueta) {
+    boton.style.display = "";
+    boton.disabled = sinTasaParaLlenar();
+    boton.textContent = boton.disabled ? "Escribe la tasa para llenar" : etiqueta;
+    return;
+  }
+  const reabrir = reabrirDesdeDetalle(fila);
+  boton.style.display = reabrir ? "" : "none";
+  if (!reabrir) return;
+  boton.disabled = false;
+  boton.textContent = reabrir.texto;
 }
 
 // La cabecera compacta: cliente y sucursal en una sola línea, el contexto del
@@ -5572,7 +5619,11 @@ function cabeceraDetalle(clave) {
 // que poner a punto y queda solo la cabecera.
 function fijoDetalle(clave) {
   const cabecera = cabeceraDetalle(clave);
-  if (!llenadoDirecto(filaDeLista(...partesDeClave(clave)))) return cabecera;
+  // La reapertura en vuelo cuenta como llenable: la revisión (cajitas y
+  // avisos) sale de una, aunque las líneas sigan siendo la foto del documento.
+  const llenable = llenadoDirecto(filaDeLista(...partesDeClave(clave)))
+    || detalleReabriendo === clave;
+  if (!llenable) return cabecera;
   const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
                    cajitaImpresion(), cajitaBaby(), cajitaEmpresa()].join("");
   return cabecera
@@ -5602,7 +5653,7 @@ function contenidoDetalle(clave) {
         Esto es lo que se escribe en el documento; puedes editar los números.</div>`
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
-      : `<div class="det-nota">Esta factura ya está cerrada: para cambiarle algo, vuelve a llenarla.</div>`;
+      : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
   return `
     ${nota}
     <table><thead><tr>
@@ -7192,20 +7243,24 @@ async function confirmarMotivo() {
     return;
   }
   // "Llenar igual": primero se le quita el candado a la otra máquina (con el
-  // motivo al log del panel, que es la traza para revisar después) y recién
-  // entonces el llenado normal, que la reclama para esta como cualquier otra.
+  // motivo al log del panel, que es la traza para revisar después). Ya no
+  // llena a ciegas (pedido del usuario 2026-07-31, toda ruta con causa
+  // termina en el prellenado): la factura queda libre y su ventana se abre
+  // como en cualquier otro llenado individual — el Llenar del pie la reclama.
+  // La ventana va abierta ANTES de tocar el servidor, por lo mismo que en la
+  // reapertura de abajo: que la lista no quede descubierta mientras viaja.
   if (accion === "tomar") {
-    const listo = avisarTrabajando("Tomando la factura…");
+    abrirDetalleCargando(pedido_id, parte);
     try {
       const r = await api("/api/tomar_factura", {pedido_id, parte, motivo});
       mensaje(r.aviso, "alerta");
     } catch (e) {
-      listo();
+      cerrarDetalle();
       avisoFactura(pedido_id, parte, e.message);
       return;
     }
     await cargar();
-    await llenar(pedido_id, parte);
+    await cargarDetalle(pedido_id, parte);
     return;
   }
   // A diferencia de "Llenar igual" (accion "tomar"), esto reabre un documento
@@ -7220,6 +7275,11 @@ async function confirmarMotivo() {
   // con el modal del motivo ya cerrado. Un segundo clic ahí caía sobre el
   // botón de la fila de abajo y arrancaba un llenado a espaldas de la
   // revisión (visto 2026-07-31).
+  // La marca de reapertura va puesta ANTES del primer pintado: con ella la
+  // ventana sale de una como pantalla de prellenado (cajitas y avisos de la
+  // puesta a punto, pie en "Reabriendo…"), no como la foto pelada de un
+  // documento cerrado (pedido del usuario 2026-07-31).
+  detalleReabriendo = claveDetalle(pedido_id, parte);
   abrirDetalleCargando(pedido_id, parte);
   // Reabrir tarda de verdad cuando el pedido ya salió de la caché — la
   // recarga completa de la nube, medio minuto medido — y la ventana se
@@ -7228,7 +7288,6 @@ async function confirmarMotivo() {
   // documento anterior (dato local, llega en seguida) con su nota de
   // "Reabriendo…"; sin await a propósito, y si esta respuesta llegara
   // tarde, el nº de consulta de cargarDetalle la descarta.
-  detalleReabriendo = claveDetalle(pedido_id, parte);
   cargarDetalle(pedido_id, parte);
   try {
     const r = await api("/api/refacturar", {pedido_id, parte, motivo});
