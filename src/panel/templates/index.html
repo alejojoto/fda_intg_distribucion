@@ -2122,7 +2122,7 @@
       <p class="mut" style="margin:10px 14px 8px">
         Llenados que no terminaron perfectos: la factura falló a mitad de
         camino o el documento quedó con líneas de menos. Cada una se queda
-        aquí hasta reintentarla, descartarla o marcarla revisada.</p>
+        aquí hasta volver a llenarla, descartarla o mandarla a procesadas.</p>
       <div class="tabla-scroll"><table id="t-llenados">
         <thead><tr>
           <th>Pedido</th><th>Cliente</th><th>Ruta</th><th>Qué pasó</th><th></th>
@@ -6761,11 +6761,18 @@ function pintarLlenadosPorRevisar(lista) {
           ? "Marcada para volver a llenar."
           : `${falloHace(f.fecha_cargado)}: ${detalle}`)
       : `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas || "").replaceAll("\n", "<br>")}`;
+    // Líneas omitidas: DOS salidas (2026-08-01, pedido del usuario). Antes
+    // solo estaba "Revisada", que despachaba la factura sin decir dónde
+    // quedaba; y la otra salida real —rehacer el documento con todas las
+    // líneas— obligaba a buscar la factura en PROCESADAS. La primaria es
+    // dejarla como salió: lo que faltó suele resolverse aparte.
     const acciones = f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
-      : `<button class="acento" title="Ya viste qué faltó y la factura queda como está."
-           onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`;
+      : `<button class="acento" title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
+           onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Mandar a procesadas</button>
+         <button title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
+           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`;
     return `
     <tr${filaDetalle(f)}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
@@ -6988,9 +6995,11 @@ function filaProcesada(f, enFamilia) {
     <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="12"></td></tr>`;
 }
 
-// Botón "Revisada" del renglón de líneas omitidas, y "Ya está resuelto" del
-// aviso que se abre al terminar el llenado (marcarLineasOmitidasRevisada): el
-// operador ya vio qué faltó y da el problema por cerrado.
+// La misma acción con tres rótulos, uno por lo que se ve en cada lugar:
+// "Mandar a procesadas" en EN REVISIÓN (de ahí sale la factura), "Revisada" en
+// el renglón de PROCESADAS (donde ya está: lo que se apaga es el aviso) y "Ya
+// está resuelto" en el aviso de fin de llenado (marcarLineasOmitidasRevisada).
+// En los tres el operador ya vio qué faltó y da el problema por cerrado.
 async function marcarFacturaRevisada(pedido_id, parte) {
   const listo = avisarTrabajando("Marcando la factura como revisada…");
   try {
