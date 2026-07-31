@@ -1112,6 +1112,27 @@
   #previo-cajitas .cajita { padding:7px 14px; min-width:88px; }
   #previo-cajitas .cj-rot { font-size:11.5px; }
   #previo-cajitas .cj-val { font-size:16px; }
+  /* Cada cajita es su propio control (2026-07-31, pedido del usuario): lo que
+     esté mal se corrige AQUÍ, sin cancelar el lote para ir a la barra de
+     arriba. El control va desnudo dentro de la cajita —es la cajita la que se
+     ve como campo— y por eso el hover se resalta entera. */
+  #previo-cajitas label.cajita { cursor:pointer; }
+  #previo-cajitas label.cajita:hover { border-color:#9aa5b5; }
+  #previo-cajitas label.cajita:focus-within { border-color:#1d4ed8;
+                                              box-shadow:0 0 0 2px rgba(29,78,216,.18); }
+  #previo-cajitas .cj-edit { font:inherit; font-size:16px; font-weight:600;
+                             border:none; background:none; padding:0; margin:0;
+                             color:inherit; cursor:pointer; outline:none; }
+  #previo-cajitas select.cj-edit { appearance:none; padding-right:14px;
+                                   background:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'>\
+<path d='M0 0l5 6 5-6z' fill='%236b7280'/></svg>") right center no-repeat; }
+  #previo-cajitas input.cj-edit { width:110px; cursor:text; }
+  #previo-cajitas input.cj-edit[type=date] { width:135px; cursor:pointer; }
+  /* El iconito nativo sobra: el calendario propio ya abre con un clic en
+     cualquier parte del campo (mismo criterio que los demás campos de fecha). */
+  #previo-cajitas input[type=date]::-webkit-calendar-picker-indicator { display:none; }
+  #previo-cajitas .cajita.ojo .cj-edit { color:#b54708; }
   /* Ámbar en la cajita = ese dato no lo pone el asistente y la factura sale con
      lo que el programa de facturación tenga puesto. */
   .cajita.ojo { background:#fef0c7; border-color:#fde68a; }
@@ -7437,11 +7458,17 @@ const enFilaPrefijo = () =>
 // una revisión abierta, y arrancarSecuencia no deja entrar a otra.
 let previoResolver = null;
 let previoCola = [];              // la fila EXACTA que se está mostrando
+let previoMeta = 0;               // cuántas facturas se pidieron (para rehacer la fila)
+let previoSaltar = null;          // pedido excluido por el aviso de familia
+let previoCargando = false;       // la lista se está rehaciendo (cambió la ruta)
 let previoDescuentos = null;      // resumen del servidor; null = todavía en vuelo
 let previoDescuentosFallo = "";
 
-function revisarLotePrevio(cola) {
+function revisarLotePrevio(cola, meta, saltarPedido) {
   previoCola = cola;
+  previoMeta = meta;
+  previoSaltar = saltarPedido;
+  previoCargando = false;
   previoDescuentos = null;
   previoDescuentosFallo = "";
   pintarPrevioLote();
@@ -7482,7 +7509,12 @@ async function pedirDescuentosDelLote(cola) {
 
 function pintarPrevioLote() {
   const n = previoCola.length;
-  $("previo-llenar").textContent = `Llenar ${n} factura${n === 1 ? "" : "s"}`;
+  const btn = $("previo-llenar");
+  // Sin facturas no hay nada que llenar (la ruta que se acaba de elegir puede
+  // no tener pendientes), y con la lista en vuelo el lote todavía no es firme.
+  btn.disabled = previoCargando || !n;
+  btn.textContent = previoCargando ? "Rehaciendo la fila…"
+    : `Llenar ${n} factura${n === 1 ? "" : "s"}`;
   // Qué va a pasar, en una línea: el mismo dato que las notas de los radios de
   // impresión, dicho sobre ESTE lote — es la última vista antes de arrancar.
   $("previo-proceso").textContent = imprimirEnFila()
@@ -7490,9 +7522,8 @@ function pintarPrevioLote() {
        «Continuar» para que revises la impresión y el papel.`.replace(/\s+/g, " ")
     : `Se llenan una tras otra, sin pausas: no se imprime nada ni se espera
        confirmación entre una factura y la siguiente.`.replace(/\s+/g, " ");
-  $("previo-cajitas").innerHTML = cajitasPrevio().join("");
-  $("previo-avisos").innerHTML = avisosPrevio().map(
-    t => `<div class="previo-ojo">${esc(t)}</div>`).join("");
+  pintarPrevioCajitas();
+  pintarPrevioAvisos();
   const filas = previoCola.map(c => filaDeLista(c.pedido_id, c.parte) || c);
   const lineas = filas.reduce((total, f) => total + (f.cantidad_lineas || 0), 0);
   const conDescuento = previoDescuentos
@@ -7506,7 +7537,12 @@ function pintarPrevioLote() {
   $("previo-lista").innerHTML = `<table><thead><tr>
       <th></th><th>Pedido</th><th>Cliente</th>
       <th class="previo-num">Líneas</th><th class="previo-desc">Descuento</th>
-    </tr></thead><tbody>${filas.map(filaPrevio).join("")}</tbody></table>`;
+    </tr></thead><tbody>${filas.length
+      ? filas.map(filaPrevio).join("")
+      : `<tr><td colspan="5" class="mut">${previoCargando
+          ? "Rehaciendo la fila con la ruta elegida…"
+          : "Esta ruta no tiene facturas pendientes. Elige otra o cancela."
+        }</td></tr>`}</tbody></table>`;
 }
 
 function filaPrevio(f, i) {
@@ -7543,49 +7579,167 @@ function descuentoPrevio(f) {
 // Los datos que deciden en qué documento cae cada factura del lote. En ámbar
 // va lo que el asistente NO va a poner: ahí la factura sale con lo que el
 // programa de facturación tenga puesto en ese momento.
-function cajitasPrevio() {
-  const caj = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
+// Cada cajita es EDITABLE (2026-07-31, pedido del usuario): lo que esté mal se
+// corrige aquí mismo y el lote se actualiza a la vista, en vez de obligar a
+// cancelar, arreglarlo en la barra de arriba y volver a lanzar. Las que el modo
+// prueba deja fuera de la puesta a punto sí quedan de solo lectura: ahí no hay
+// nada que elegir porque ese dato no se va a tocar.
+function pintarPrevioCajitas() {
+  const opciones = (lista, actual) => lista.map(([valor, texto]) =>
+    `<option value="${esc(valor)}"${valor === actual ? " selected" : ""}>${esc(texto)}</option>`).join("");
+  const fija = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
       <span class="cj-rot">${esc(rot)}</span>
       <span class="cj-val">${esc(val)}</span></div>`;
+  const editable = (rot, control, ojo) => `<label class="cajita${ojo ? " ojo" : ""}">
+      <span class="cj-rot">${esc(rot)}</span>${control}</label>`;
   const cajitas = [];
+
   cajitas.push(saltandoPuestaAPunto("serie")
-    ? caj("Serie", "no se elige", true)
-    : caj("Serie", serieSeleccionada || "la que esté puesta", !serieSeleccionada));
+    ? fija("Serie", "no se elige", true)
+    : editable("Serie",
+        `<select class="cj-edit" onchange="previoSerieElegida(this.value)">${
+          opciones([["", "la que esté puesta"],
+                    ...SERIES.map(s => [s, s + (s === seriePredeterminada ? " ★" : "")])],
+                   serieSeleccionada)}</select>`,
+        !serieSeleccionada));
+
   const iso = $("f-fecha-facturar").value;
   cajitas.push(saltandoPuestaAPunto("fecha")
-    ? caj("Fecha a facturar", "no se toca", true)
-    : caj("Fecha a facturar", iso ? dmaCorto(iso) : "—", !iso));
+    ? fija("Fecha a facturar", "no se toca", true)
+    : editable("Fecha a facturar",
+        `<input type="date" class="cj-edit" value="${esc(iso)}"
+                onchange="previoFechaElegida(this.value)">`, !iso));
+
   const tasa = tasaParaLlenar();
   cajitas.push(saltandoTasa()
-    ? caj("Tasa", "no se registra", true)
-    : caj("Tasa", tasa || "no se registra", !tasa));
-  cajitas.push(caj("Ruta", rutaSeleccionada === "" ? "todas"
-    : rutaSeleccionada === "__sin_ruta__" ? "sin ruta"
-    : nombreRuta(rutaSeleccionada)));
-  cajitas.push(caj("Imprimir", imprimirEnFila() ? "sí" : "no", imprimirEnFila()));
+    ? fija("Tasa", "no se registra", true)
+    : editable("Tasa",
+        `<input type="text" class="cj-edit" inputmode="decimal" autocomplete="off"
+                value="${esc($("f-tasa").value)}" placeholder="no se registra"
+                oninput="previoTasaTecleada(this)">`, !tasa));
+
+  // Cambiar la ruta rehace el lote entero: es el filtro del que sale la fila.
+  const rutas = [["", "todas"], ...(ultimaLista.rutas || []).map(r => [r, nombreRuta(r)])];
+  if (ultimaLista.hay_sin_ruta) rutas.push(["__sin_ruta__", "sin ruta"]);
+  cajitas.push(editable("Ruta",
+    `<select class="cj-edit" onchange="previoRutaElegida(this.value)">${
+      opciones(rutas, rutaSeleccionada)}</select>`));
+
+  cajitas.push(editable("Imprimir",
+    `<select class="cj-edit" onchange="previoImpresionElegida(this.value)">${
+      opciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
+    imprimirEnFila()));
+
   // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
   // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
+  // De solo lectura: se cambia en ADMIN, no a un clic de arrancar una corrida.
   const p999 = $("prueba-emp-999");
-  if (p999 && p999.checked) cajitas.push(caj("Empresa", "999 (prueba)", true));
-  return cajitas;
+  if (p999 && p999.checked) cajitas.push(fija("Empresa", "999 (prueba)", true));
+
+  $("previo-cajitas").innerHTML = cajitas.join("");
+}
+
+function previoSerieElegida(valor) {
+  cambioSerie(valor);          // fija serieSeleccionada y repinta el selector de la barra
+  pintarPrevioCajitas();
+  pintarPrevioAvisos();
+}
+
+// La fecha manda sobre la tasa (cambioFechaFacturar repone la del día) y sobre
+// los descuentos (las campañas se resuelven contra ella), así que se repinta
+// todo y el resumen se vuelve a pedir.
+function previoFechaElegida(iso) {
+  if (!iso) { pintarPrevioCajitas(); return; }   // vaciarla no es una opción aquí
+  $("f-fecha-facturar").value = iso;
+  cambioFechaFacturar();
+  pintarPrevioCajitas();
+  previoDescuentos = null;
+  previoDescuentosFallo = "";
+  pintarPrevioLote();
+  pedirDescuentosDelLote(previoCola);
+}
+
+// Tecleo: NO se repinta la cajita (se perdería el foco a media tasa). Se mueve
+// el campo de la barra —que es de donde sale lo que viaja— y se actualizan solo
+// el color de la cajita y los avisos.
+function previoTasaTecleada(campo) {
+  $("f-tasa").value = campo.value;
+  pintarAvisoBCV();
+  campo.closest(".cajita").classList.toggle("ojo", !tasaParaLlenar());
+  pintarPrevioAvisos();
+}
+
+// Cambiar la ruta rehace la fila: la lista se vuelve a pedir filtrada y el lote
+// se recalcula con el mismo criterio con que se lanzó (cantidad, pedido
+// completo o ruta completa). El pedido saltado no sobrevive: era una decisión
+// sobre una familia de la ruta anterior.
+async function previoRutaElegida(valor) {
+  if (valor === rutaSeleccionada) return;
+  rutaSeleccionada = valor;
+  $("f-ruta").value = valor;
+  previoCargando = true;
+  pintarPrevioLote();
+  try {
+    await cargar();
+  } finally {
+    previoCargando = false;
+  }
+  if (!previoResolver) return;      // se cerró mientras la lista viajaba
+  pintarCantidades();               // "ruta completa" puede dejar de existir
+  previoSaltar = null;
+  previoCola = colaDelLote(metaDelModo(previoMeta), null);
+  previoMeta = previoCola.length;
+  previoDescuentos = null;
+  previoDescuentosFallo = "";
+  pintarPrevioCajitas();
+  pintarPrevioLote();
+  if (previoCola.length) pedirDescuentosDelLote(previoCola);
+}
+
+// Cuántas facturas pide el modo elegido AHORA (la cantidad de un lote de "ruta
+// completa" o de "pedido completo" cambia con la ruta; la numérica no).
+function metaDelModo(metaPedida) {
+  const hay = pendientesLlenables();
+  if (rutaCompletaEnFila) return hay.length;
+  if (completaEnFila) return hay.length ? familiaDelSiguiente().partes : 0;
+  return metaPedida;
+}
+
+function previoImpresionElegida(valor) {
+  const radio = document.querySelector(
+    `input[name="enfila-imp"][value="${valor}"]`);
+  if (radio) radio.checked = true;
+  pintarCantidades();          // las cantidades ofrecidas dependen del papel
+  pintarPrevioCajitas();
+  pintarPrevioLote();          // la línea de proceso cambia con la impresión
 }
 
 // Lo que hay que sopesar antes de dar el sí, con su consecuencia sobre el lote
 // entero (no sobre una factura suelta, que es como lo dicen los avisos del
-// llenado individual).
-function avisosPrevio() {
+// llenado individual). Se repinta solo, sin tocar las cajitas: cada aviso
+// desaparece en cuanto se corrige su cajita, incluso a media tecla.
+function pintarPrevioAvisos() {
   const avisos = [];
   const n = previoCola.length;
   if (!saltandoPuestaAPunto("serie") && !serieSeleccionada)
     avisos.push(`No hay serie elegida: ${n === 1 ? "la factura sale" :
       `las ${n} facturas salen`} con la que el programa de facturación tenga `
-      + `puesta al empezar cada una.`);
+      + `puesta al empezar cada una. Elígela aquí mismo, arriba.`);
   const motivoTasa = saltandoTasa() ? null : motivoTasaAusente();
   if (motivoTasa)
     avisos.push(`${motivoTasa} Ninguna factura del lote registra tasa: todas `
-      + `salen con el Cambio que el programa tenga.`);
-  return avisos;
+      + `salen con el Cambio que el programa tenga. Puedes escribirla aquí mismo.`);
+  $("previo-avisos").innerHTML = avisos.map(
+    t => `<div class="previo-ojo">${esc(t)}</div>`).join("");
 }
+
+// La fila que le toca a un lote: las llenables de la lista YA filtrada (ruta,
+// fechas, búsqueda), en su orden, hasta la cantidad pedida. La usan el arranque
+// y la revisión previa, que la rehace cuando ahí se cambia de ruta.
+const colaDelLote = (meta, saltarPedido) => pendientesLlenables()
+  .filter(f => !saltarPedido || f.pedido_id !== saltarPedido)
+  .slice(0, meta)
+  .map(f => ({pedido_id: f.pedido_id, parte: f.parte}));
 
 // Arranque de una corrida NUEVA: aparta la fila en el estado compartido y, con
 // lo que quedó apartado, fija el objetivo y reinicia la cuenta. reintentarEnFila
@@ -7607,16 +7761,20 @@ async function arrancarSecuencia(meta, saltarPedido = null) {
     });
     return;
   }
-  const cola = pendientesLlenables()
-    .filter(f => !saltarPedido || f.pedido_id !== saltarPedido)
-    .slice(0, meta)
-    .map(f => ({pedido_id: f.pedido_id, parte: f.parte}));
+  let cola = colaDelLote(meta, saltarPedido);
   if (!cola.length) { mensaje("No hay pendientes.", "info"); return; }
   // Nada se aparta ni se toca hasta que el operador vea con qué se va a llenar
   // y diga que sí (2026-07-30). Va aquí y no en el botón porque este es el
   // único punto por el que pasan TODOS los arranques de corrida, y con la fila
   // ya resuelta: las tres salidas del aviso de familia arman colas distintas.
-  if (!await revisarLotePrevio(cola)) return;
+  if (!await revisarLotePrevio(cola, meta, saltarPedido)) return;
+  // Desde la revisión se puede cambiar la ruta, y eso rehace la fila entera:
+  // lo que se aparta es lo que quedó A LA VISTA al confirmar, nunca lo que se
+  // había calculado al pulsar el botón.
+  cola = previoCola;
+  meta = previoMeta;
+  saltarPedido = previoSaltar;
+  if (!cola.length) { mensaje("No hay pendientes.", "info"); return; }
   reservandoLote = true;
   try {
     await api("/api/reservar_lote", {facturas: cola});
