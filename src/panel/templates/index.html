@@ -2051,6 +2051,26 @@
         <b>Navegador:</b> opción de respaldo, por si la ventana propia se queda
         pegada durante un llenado.</p>
     </div>
+    <!-- Fecha de corte de producción (2026-07-31, pedido del usuario): la
+         implantación es gradual, así que el corte se mueve cada tantos días y
+         no puede seguir siendo una línea de settings.py que haya que editar y
+         publicar. Vive en ADMIN porque decide qué ve TODO el mundo, y fuera
+         del modo admin (como el selector de Carga): cambiar el corte es
+         operación real, no una opción de prueba. -->
+    <div class="ajustes-bloque" id="corte-bloque" style="display:none">
+      <h3>Fecha de corte de producción</h3>
+      <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
+        ofrecen en ninguna parte: son los que se facturaron a mano antes de
+        arrancar con el asistente. Muévela hacia adelante a medida que avance
+        la implantación, para que los días viejos que ya no se van a llenar
+        dejen de estorbar en pendientes y en revisión. Vale para todos los
+        equipos: cada uno la toma en su próximo refresco.</p>
+      <div class="ajustes-fila">
+        <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
+        <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
+      </div>
+      <div id="corte-confirma" style="display:none"></div>
+    </div>
   </section>
 
   <section id="sec-revision" class="tab-panel" style="display:none">
@@ -2703,6 +2723,9 @@ let esMaquinaAdmin = false;
 // Última copia de las opciones de modo prueba leídas de /api/ajustes: la usa
 // guardarOpcionesPrueba para no pisar los saltos de la 001 al pasar a la 999.
 let opcionesPrueba = null;
+// Fecha vigente del corte de producción; la repinta /api/ajustes y la usa el
+// control de ADMIN para saber si hay algo que cambiar.
+let corteProduccion = "";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g,
@@ -9805,6 +9828,8 @@ async function cargarAjustes() {
     pintarDiaDespacho(d.dia_despacho);
     pintarVentanaPanel(d.ventana);
     pintarBotonesCatalogos();
+    corteProduccion = d.corte_produccion || "";
+    $("corte-fecha").value = corteProduccion;
     // Cierre asistido de implantación (ASISTENTE_PRUEBA_IMPLANTACION en ESTA
     // máquina): habilita el borrado definitivo de datos de prueba y demás usos
     // de modoImplantacion. Se lee de /api/ajustes.
@@ -9816,8 +9841,10 @@ async function cargarAjustes() {
     esMaquinaAdmin = !!d.es_maquina_admin;
     $("ajustes-admin-bloque").style.display = esMaquinaAdmin ? "" : "none";
     $("ventana-bloque").style.display = esMaquinaAdmin ? "" : "none";
+    $("corte-bloque").style.display = esMaquinaAdmin ? "" : "none";
     $("admin-modo-chk").checked = modoAdmin;
     pintarOpcionesPrueba(d.opciones_prueba);
+    pintarBotonCorte();
     refrescarVistasModoPrueba();
   } catch (e) {
     mensaje("No se pudieron cargar los ajustes: " + e.message, "error");
@@ -9858,6 +9885,13 @@ function pintarVentanaPanel(v) {
           .forEach(r => { r.checked = r.value === ventanaPanel; });
 }
 
+function pintarBotonCorte() {
+  const inp = $("corte-fecha");
+  const btn = $("corte-btn");
+  if (!inp || !btn) return;
+  btn.disabled = !inp.value || inp.value === corteProduccion;
+}
+
 // Se guarda al marcar, sin botón aparte (igual que el día de despacho), y no se
 // anuncia: el radio ya lo dice y el efecto se ve al reabrir el asistente.
 async function guardarVentanaPanel(v) {
@@ -9868,6 +9902,78 @@ async function guardarVentanaPanel(v) {
     pintarVentanaPanel(anterior);   // el radio no se queda marcando lo que no se guardó
     mensaje("No se pudo guardar cómo abre el panel: " + e.message, "error");
   }
+}
+
+// Confirmación en dos pasos con el confirmar DESPLAZADO (pedido del usuario
+// 2026-07-31). A propósito no usa confirmarBorrar ni confirmarSinQuitar: esos
+// ponen el "Confirmar" justo donde estaba el botón que se acaba de pulsar, y
+// acá lo que se busca es que ninguna repetición de clics en el mismo punto
+// pueda mover el corte. El botón original se queda en su sitio, deshabilitado:
+// ocultarlo encogería la fila y subiría el confirmar hacia el cursor.
+function pedirCambioCorte() {
+  const inp = $("corte-fecha");
+  const btn = $("corte-btn");
+  const caja = $("corte-confirma");
+  if (!inp || !btn || !caja) return;
+  const nueva = inp.value;
+  if (!nueva || nueva === corteProduccion) return;
+  const vigente = corteProduccion || "";
+  const haciaAtras = !!vigente && nueva < vigente;
+  const finRango = haciaAtras
+    ? (() => { const d = calDesdeISO(vigente); d.setDate(d.getDate() - 1); return calISO(d); })()
+    : nueva;
+  const aviso = haciaAtras
+    ? `El corte se mueve hacia atrás: los pedidos del ${calDMY(nueva)} al ${calDMY(finRango)} vuelven a ofrecerse como pendientes en todos los equipos. Si alguno ya se facturó a mano, puede terminar facturado dos veces.`
+    : `Los pedidos anteriores al ${calDMY(nueva)} dejan de aparecer en todos los equipos. Los que ya se llenaron siguen en PROCESADAS.`;
+  let cerrado = false;
+  const reponer = () => {
+    if (cerrado) return;
+    cerrado = true;
+    clearTimeout(tHabilitar);
+    clearTimeout(tVuelta);
+    caja.innerHTML = "";
+    caja.className = "";
+    caja.style.display = "none";
+    pintarBotonCorte();
+  };
+  caja.className = haciaAtras ? "aviso-sensible" : "";
+  caja.style.display = "";
+  caja.innerHTML = `
+    <div style="margin:0 0 8px" class="${haciaAtras ? "" : "mut"}">${esc(aviso)}</div>
+    <div class="confirmar-borrar">
+      <button class="cb-si ok" id="corte-conf-si" disabled>Sí, mover el corte al ${esc(calDMY(nueva))}</button>
+      <button class="cb-no" id="corte-conf-no">Cancelar</button>
+    </div>`;
+  btn.disabled = true;
+  const si = $("corte-conf-si");
+  const no = $("corte-conf-no");
+  const tHabilitar = setTimeout(() => { si.disabled = false; }, 400);   // retardo anti doble-clic
+  const tVuelta = setTimeout(reponer, 7000);   // confirmación olvidada = clic accidental esperando
+  no.onclick = reponer;
+  si.onclick = async () => {
+    clearTimeout(tHabilitar);
+    clearTimeout(tVuelta);
+    si.disabled = true;
+    no.disabled = true;
+    mensaje("Cambiando la fecha de corte…", "info", true);
+    let r;
+    try {
+      r = await api("/api/ajustes/corte-produccion", {fecha: nueva});
+    } catch (e) {
+      reponer();
+      mensaje("No se pudo cambiar la fecha de corte: " + e.message, "error");
+      return;
+    }
+    corteProduccion = r.corte_produccion || "";
+    inp.value = corteProduccion;
+    // El resultado se anuncia con las listas ya rehechas: el corte cambia qué
+    // pedidos se ofrecen, y decir "listo" con los viejos todavía en pantalla
+    // se leería como que no pasó nada.
+    try { await cargar(); } catch (e) { /* cargar() ya avisa su propio fallo */ }
+    reponer();
+    mensaje(`Corte de producción movido al ${calDMY(corteProduccion)}.`
+            + (r.aviso ? ` ${r.aviso}` : ""), r.aviso ? "alerta" : "exito");
+  };
 }
 
 // Confirmación del guardado de "Esta máquina": va en el propio bloque de
@@ -13652,6 +13758,10 @@ let calPop = null;     // el div del calendario (existe solo mientras está abie
 
 const calPad = (n) => String(n).padStart(2, "0");
 const calISO = (d) => `${d.getFullYear()}-${calPad(d.getMonth() + 1)}-${calPad(d.getDate())}`;
+const calDMY = (iso) => {
+  const d = calDesdeISO(iso);
+  return d ? `${calPad(d.getDate())}/${calPad(d.getMonth() + 1)}/${d.getFullYear()}` : "";
+};
 
 // "aaaa-mm-dd" → Date local, o null si el campo está vacío/a medio teclear.
 // Se arma por partes (no new Date(iso)) porque el string ISO pelado lo
