@@ -4131,7 +4131,7 @@ function aplicarFiltros() {
   paginacion.revision.pagina = 1;
   paginacion.procesadas.pagina = 1;
   pintarEstadoFiltros();   // la barra se tiñe ya, sin esperar a la consulta
-  cargar();
+  return cargar();
 }
 
 // Limpiar fechas: vacía SOLO el rango Desde/Hasta y vuelve a la vista estándar
@@ -4271,6 +4271,7 @@ async function cambioRuta(valor) {
   if (valor === HACER_PREDET) {
     // Fija la ruta seleccionada como predeterminada de ESTA máquina y la
     // deja seleccionada (se reajusta y selecciona a la vez).
+    avisarTrabajando("Fijando la ruta predeterminada…");
     try {
       const r = await api("/api/ajustes/ruta", {ruta: rutaSeleccionada});
       rutaPredeterminada = r.ruta_predeterminada;
@@ -4282,7 +4283,9 @@ async function cambioRuta(valor) {
     return;
   }
   rutaSeleccionada = valor;
-  aplicarFiltros();
+  const listo = avisarTrabajando("Cambiando de ruta…");
+  await aplicarFiltros();
+  listo();
 }
 
 function cambiarTab(tab) {
