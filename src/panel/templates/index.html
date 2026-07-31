@@ -567,6 +567,51 @@
   .cajita.actual { border-color:#1d4ed8; box-shadow:0 0 0 2px rgba(29,78,216,.18); }
   /* Los grupos van juntos y despegados de serie/fecha/línea: son otra cosa. */
   #info-grupos { display:flex; flex-wrap:wrap; gap:6px; margin-left:6px; }
+  /* ☰ Ver detalle (2026-07-31, retoma del pendiente 53): el ÚNICO control
+     clickeable de la fila de cajitas — las demás siguen siendo solo lectura.
+     Pausa el llenado y convierte la caja en la vista del pedido. */
+  #btn-ver-pedido { font:inherit; text-align:left; cursor:pointer; margin-left:auto; }
+  #btn-ver-pedido:hover:not(:disabled) { border-color:#9aa5b5; background:#f7f9fc; }
+  #btn-ver-pedido:disabled { opacity:.55; cursor:default; }
+  /* Hover de un grupo: qué cantidad y qué descuento toca a cada producto.
+     En HTML propio y hacia ARRIBA: la caja flotante vive pegada al borde
+     superior de la pantalla y es chiquita — un tooltip nativo (o uno hacia
+     abajo) caería fuera de la ventana y no se vería. Compacto a propósito:
+     tiene que caber en el alto de la caja; el detalle completo vive en ☰. */
+  #info-grupos .cajita { position:relative; }
+  .cj-tip { display:none; position:absolute; bottom:calc(100% + 4px); left:0;
+            z-index:30; background:#1d2433; color:#fff; border-radius:5px;
+            padding:4px 7px; font-size:10.5px; line-height:1.35;
+            pointer-events:none; overflow:hidden; max-width:380px; }
+  .cj-tip.der { left:auto; right:0; }
+  #info-grupos .cajita:hover > .cj-tip { display:block; }
+  .cj-tip .tp-fila { display:flex; gap:8px; white-space:nowrap; }
+  .cj-tip .tp-nom { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .cj-tip .tp-cant { min-width:34px; text-align:right; font-weight:600; }
+  .cj-tip .tp-pct { min-width:34px; text-align:right; color:#6ee7b7; }
+  /* VISTA «VER PEDIDO» (☰): con la pausa confirmada, la caja del llenado se
+     convierte en una ventana del pedido — arriba solo ▶ Reanudar (y el propio
+     ☰, que la cierra sin reanudar); debajo, las líneas en el orden en que se
+     llenan, solo lectura. La ventana se corre al borde izquierdo
+     (plantar_detalle) y al cerrar la vista vuelve a su sitio. */
+  #ver-pedido { display:none; }
+  body.modo-ver-pedido #mensaje, body.modo-ver-pedido #llenado-info,
+  body.modo-ver-pedido #statusbar #seguridad { display:none; }
+  body.modo-ver-pedido #ver-pedido { display:block; }
+  #ver-pedido-cabecera { display:flex; align-items:center; gap:8px; }
+  #ver-pedido-titulo { flex:1; font-size:12px; color:var(--mut);
+                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #ver-pedido-cuerpo { overflow-y:auto; margin-top:6px; }
+  #ver-pedido-cuerpo table { width:100%; border-collapse:collapse; font-size:12px; }
+  #ver-pedido-cuerpo thead th { position:sticky; top:0; background:#fff; z-index:1;
+                                text-align:left; font-size:10.5px; color:var(--mut); }
+  #ver-pedido-cuerpo th, #ver-pedido-cuerpo td { padding:3px 6px;
+                                border-bottom:1px solid #eef1f5; }
+  #ver-pedido-cuerpo .vp-num { text-align:right; white-space:nowrap; }
+  /* La línea por la que va el llenado, resaltada como su cajita; las ya
+     escritas quedan tenues — se ve de un vistazo dónde paró el robot. */
+  #ver-pedido-cuerpo tr.vp-escrita td { color:var(--mut); }
+  #ver-pedido-cuerpo tr.vp-actual td { background:#e0eaff; }
   #mensaje.error { background:#fee4e2; color:var(--err); }
   #mensaje.info { background:#e0eaff; color:#1d4ed8; }
   #mensaje.alerta { background:#fef0c7; color:var(--warn); }
@@ -1465,6 +1510,11 @@
       <div class="cajita" id="info-linea-caja" style="display:none">
         <span class="cj-rot">Línea</span><span class="cj-val" id="info-linea">—</span></div>
       <div id="info-grupos"></div>
+      <!-- El único clic de la fila (2026-07-31): pausa el llenado y, con la
+           pausa confirmada por el backend, abre la vista del pedido. -->
+      <button type="button" class="cajita" id="btn-ver-pedido" style="display:none"
+              onclick="alternarVerPedido()">
+        <span class="cj-rot">Pedido</span><span class="cj-val">☰ Ver detalle</span></button>
     </div>
     <div id="seguridad">
       <!-- Se oculta en las fases donde el llenado espera al operador (pausa,
@@ -1477,6 +1527,19 @@
       <button id="btn-ya-imprimi" class="acento" onclick="confirmarImpresionUsuario()"
               style="display:none" title="Sigue con la siguiente factura de la corrida.">Continuar</button>
       <button id="btn-stop" class="peligro" onclick="detenerLlenado()">■ Detener</button>
+    </div>
+    <!-- Vista «VER PEDIDO» (☰, 2026-07-31): reemplaza a las tres filas de
+         arriba mientras está abierta. Solo lectura; se sale con ▶ (reanuda)
+         o con el mismo ☰ (cierra y deja la pausa puesta). -->
+    <div id="ver-pedido">
+      <div id="ver-pedido-cabecera">
+        <button class="acento" id="btn-vp-reanudar" onclick="cerrarVerPedido(true)"
+                title="La caja vuelve a su sitio y el llenado sigue por donde iba.">▶ Reanudar</button>
+        <span id="ver-pedido-titulo"></span>
+        <button type="button" onclick="cerrarVerPedido(false)"
+                title="Cierra el pedido; el llenado queda en pausa.">☰ Cerrar</button>
+      </div>
+      <div id="ver-pedido-cuerpo"></div>
     </div>
   </div>
 
@@ -2849,6 +2912,10 @@ function actualizarModoLlenado() {
                  llenadoDeOtraVentana;
   document.body.classList.toggle("modo-llenado", activo);
   if (!activo) avanceLlenado = null;
+  // Fuera del modo llenado la vista ☰ no tiene sentido: si quedó abierta por
+  // un camino que no pasó por el finally de llenar(), se cierra aquí — sin
+  // esto el statusbar del panel grande quedaría con sus filas escondidas.
+  if (!activo && (verPedidoAbierto || verPedidoPendiente)) cerrarVerPedido(false);
   // La ventana PRIMERO: es lo esencial del modo. Las cajitas y el título son
   // accesorios — si algún día revientan, no pueden llevarse el plantado.
   aplicarVentanaFlotante(activo);
@@ -2895,6 +2962,13 @@ function pintarInfoLlenado() {
   // aparece con la primera línea de verdad.
   $("info-linea-caja").style.display = hayLineas && av.linea ? "" : "none";
   if (hayLineas && av.linea) $("info-linea").textContent = `${av.linea} de ${av.total}`;
+  // Hover de cada grupo: sus productos con cantidad y descuento (2026-07-31).
+  // Sale de las mismas líneas que ya viajan en el avance; con un servidor
+  // viejo que no las mande, simplemente no hay hover.
+  const porGrupo = {};
+  if (hayLineas) (av.lineas || []).forEach(l => {
+    (porGrupo[l.grupo] = porGrupo[l.grupo] || []).push(l);
+  });
   $("info-grupos").innerHTML = !hayLineas ? "" : (av.grupos || []).map(g => {
     const pcts = g.descuentos || [];
     // Un solo porcentaje se dice tal cual; varios, como rango (el detalle
@@ -2905,12 +2979,26 @@ function pintarInfoLlenado() {
     const clases = ["cajita"];
     if (desc) clases.push("con-desc");
     if (g.nombre === av.grupo_actual) clases.push("actual");
+    const filasTip = (porGrupo[g.nombre] || []).map(l => `
+      <div class="tp-fila"><span class="tp-nom">${esc(l.producto || l.codigo || "")}</span>
+        <span class="tp-cant">${fmtCantidad(l.cantidad)}</span>
+        <span class="tp-pct">${l.descuento ? `${pctCorto(l.descuento)}%` : "—"}</span></div>`).join("");
     return `<div class="${clases.join(" ")}">
       <span class="cj-rot">${esc(g.nombre)}</span>
       <span class="cj-val">${g.lineas}${
         desc ? ` · <span class="cj-pct">${esc(desc)}</span>` : ""}</span>
+      ${filasTip ? `<div class="cj-tip">${filasTip}</div>` : ""}
     </div>`;
   }).join("");
+  // El hover se pinta hacia arriba y no puede salirse de la caja: a las
+  // cajitas de la mitad derecha se les alinea a su borde derecho, y el alto se
+  // recorta a lo que haya entre la fila y el borde superior de la ventana.
+  $("info-grupos").querySelectorAll(".cj-tip").forEach(tip => {
+    const r = tip.parentElement.getBoundingClientRect();
+    if (r.left + r.width / 2 > ANCHO_FLOTANTE / 2) tip.classList.add("der");
+    tip.style.maxHeight = Math.max(Math.round(r.top) - 10, 34) + "px";
+  });
+  pintarBotonVerPedido();
 }
 
 /* VENTANA FLOTANTE (2026-07-27): durante el llenado la ventana del panel se
@@ -2948,6 +3036,10 @@ const ALTO_FLOTANTE = 200;
 // lo suma ella. Con Edge se usa ALTO_FLOTANTE, que ya lo incluye.
 const ALTO_CONTENIDO_FLOTANTE = 170;
 const MARGEN_SUPERIOR = 8;    // aire contra el borde superior de la pantalla
+// Vista «☰ Ver detalle»: la ventana se pega al borde IZQUIERDO para no tapar
+// cantidad ni precio en el documento. Espejo de MARGEN_LATERAL_DETALLE en
+// src/ventana_app.py (la ventana propia hace la misma cuenta en Python).
+const MARGEN_LATERAL_DETALLE = 8;
 // Marco fijo del panel completo, para el camino de Edge: espejo de
 // ANCHO_VENTANA / ALTO_VENTANA / MARGEN_SUPERIOR_APERTURA en
 // src/ventana_panel.py (la ventana propia hace la misma cuenta en Python).
@@ -3164,6 +3256,15 @@ function crecerVentanaPorModal(idCaja) {
    corrida con la caja un poco fuera de sitio. */
 function replantarCajaFlotante() {
   if (!ventanaFlotante) return;
+  // La vista ☰ no sobrevive a un replantado (arranca otra factura, se cierra
+  // un modal): la caja vuelve a ser la barra. Estado directo y no
+  // cerrarVerPedido, que llama aquí — sería un círculo.
+  if (verPedidoAbierto) {
+    verPedidoAbierto = false;
+    verPedidoPendiente = false;
+    document.body.classList.remove("modo-ver-pedido");
+    pintarBotonVerPedido();
+  }
   const api = apiVentana();
   if (api) {
     // Espejo de crecerVentanaPorModal (arreglo 2026-07-29): en la ventana
@@ -3210,6 +3311,9 @@ let pausaPedida = false;
 async function alternarPausa() {
   const b = $("btn-pausa");
   const pausando = !pausaPedida;
+  // ▶ del operador con un ☰ esperando la pausa: manda él — el ☰ deja de
+  // esperar (si no, la vista se abriría sobre un llenado que ya arrancó).
+  if (!pausando && verPedidoPendiente) { verPedidoPendiente = false; pintarBotonVerPedido(); }
   b.disabled = true;
   try {
     const r = await api(pausando ? "/api/pausar_llenado" : "/api/reanudar_llenado", {});
@@ -3232,6 +3336,176 @@ function pintarBotonPausa() {
   const b = $("btn-pausa");
   b.textContent = pausaPedida ? "▶ Reanudar" : "⏸ Pausar";
   b.className = pausaPedida ? "acento" : "";
+}
+
+/* --- ☰ Ver detalle del pedido (2026-07-31, retoma del pendiente 53) --------
+   El único clic de la fila de cajitas. Pulsa ⏸ por dentro y abre la vista
+   RECIÉN cuando el backend confirma la fase 'pausado' (lección del intento
+   revertido ese mismo día: el 200 del pedido de pausa no significa que el
+   robot paró — el congelado real llega en el próximo punto de pausa). Con la
+   vista abierta la ventana se corre al borde IZQUIERDO (plantar_detalle) y
+   crece hacia abajo lo que pida el pedido; arriba quedan solo ▶ Reanudar y el
+   propio ☰, que la cierra dejando la pausa puesta. Al reanudar, la caja
+   vuelve a su sitio ANTES de seguir: el robot no puede arrancar con la
+   ventana encima de los botones del programa de facturación. */
+let facturaEnCurso = null;        // {pedido_id, parte} del llenado de ESTA ventana
+let verPedidoAbierto = false;
+let verPedidoPendiente = false;   // ☰ pulsado: esperando la pausa confirmada
+let verPedidoFirma = null;        // qué composición/línea está pintada (evita repintar)
+
+async function alternarVerPedido() {
+  if (verPedidoAbierto) { cerrarVerPedido(false); return; }
+  if (verPedidoPendiente || !llenando) return;
+  if (faseActual === "pausado") { abrirVerPedido(); return; }
+  verPedidoPendiente = true;
+  pintarBotonVerPedido();
+  if (pausaPedida) return;        // la pausa ya viene en camino (⏸ del operador)
+  try {
+    const r = await api("/api/pausar_llenado", {});
+    if (r.sin_llenado) { verPedidoPendiente = false; pintarBotonVerPedido(); return; }
+    pausaPedida = true;
+    pintarBotonPausa();
+  } catch (e) {
+    verPedidoPendiente = false;
+    pintarBotonVerPedido();
+    mensaje("No se pudo pausar el llenado: " + e.message, "error");
+  }
+}
+
+function abrirVerPedido() {
+  verPedidoPendiente = false;
+  verPedidoAbierto = true;
+  verPedidoFirma = null;
+  document.body.classList.add("modo-ver-pedido");
+  pintarVerPedido();
+  plantarVentanaVerPedido();
+}
+
+// reanudar=false (☰ otra vez, o la fase se movió por otro lado): la caja
+// vuelve a su sitio y la pausa queda — se sale con ▶. reanudar=true
+// (▶ Reanudar): además sigue el llenado, solo después de que la ventana
+// confirmó que volvió a ser la barra chiquita.
+async function cerrarVerPedido(reanudar) {
+  verPedidoPendiente = false;
+  if (verPedidoAbierto) {
+    verPedidoAbierto = false;
+    document.body.classList.remove("modo-ver-pedido");
+    pintarBotonVerPedido();
+    replantarCajaFlotante();
+  }
+  if (!reanudar) return;
+  await esperarBarraChica();
+  try {
+    await api("/api/reanudar_llenado", {});
+    pausaPedida = false;
+    pintarBotonPausa();
+  } catch (e) {
+    mensaje("No se pudo reanudar el llenado: " + e.message, "error");
+  }
+}
+
+// Verificación por resultado con tope: la ventana DE VERDAD volvió al alto de
+// barra (el replantado es asíncrono — "aceptado" no es "aplicado"). Si en
+// ~1,5 s no confirma, se reanuda igual: el replantado ya quedó pedido y el
+// operador conserva la escapatoria de mover la ventana a mano.
+async function esperarBarraChica() {
+  if (!ventanaFlotante || ventanaYaGrande()) return;   // pestaña normal: nada que esperar
+  for (let i = 0; i < 15; i++) {
+    if (window.innerHeight <= ALTO_CONTENIDO_FLOTANTE + 90) return;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  reportarAlPanel({tipo: "ver-pedido",
+                   detalle: "la barra no confirmó su alto antes de reanudar"});
+}
+
+// La ventana de la vista: mismo ancho de la barra, pegada al borde IZQUIERDO
+// (para no tapar cantidad ni precio en el documento) y con el alto que pida
+// el pedido, recortado contra la pantalla; si no cabe, la tabla scrollea.
+function plantarVentanaVerPedido() {
+  if (!verPedidoAbierto) return;
+  const cuerpo = $("ver-pedido-cuerpo");
+  cuerpo.style.maxHeight = "";
+  const contenido = $("statusbar").offsetHeight + 10;  // lo único visible en este modo
+  const disponible = Math.max(screen.availHeight - MARGEN_SUPERIOR * 2, 200);
+  const alto = Math.min(contenido, disponible);
+  if (alto < contenido)
+    cuerpo.style.maxHeight =
+      Math.max(cuerpo.offsetHeight - (contenido - alto), 80) + "px";
+  const api = apiVentana();
+  if (api) {
+    try {
+      if (typeof api.plantar_detalle === "function") {
+        Promise.resolve(api.plantar_detalle(alto)).catch(e =>
+          reportarAlPanel({tipo: "puente-rechazo", origen: "ver-pedido",
+                           detalle: String(e).slice(0, 2000)}));
+      } else {
+        // Ventana abierta con una versión sin plantar_detalle (el proceso no
+        // se reinicia con el pull): al menos crece centrada — la vista sirve.
+        reportarAlPanel({tipo: "ver-pedido",
+                         detalle: "ventana sin plantar_detalle: crece centrada"});
+        Promise.resolve(api.plantar_barra(alto)).catch(() => {});
+      }
+      return;
+    } catch (e) {
+      reportarAlPanel({tipo: "puente-roto", origen: "ver-pedido",
+                       detalle: String(e).slice(0, 2000)});
+    }
+  }
+  try {
+    const cromo = Math.max(window.outerHeight - window.innerHeight, 0);
+    window.resizeTo(ANCHO_FLOTANTE,
+                    Math.min(alto + cromo, screen.availHeight - MARGEN_SUPERIOR));
+    window.moveTo(MARGEN_LATERAL_DETALLE, MARGEN_SUPERIOR);
+  } catch (e) { /* pestaña normal: la vista se ve igual, sin mover la ventana */ }
+}
+
+// Las líneas en el orden en que se llenan, solo lectura, con la línea en curso
+// resaltada y las ya escritas tenues. La firma evita repintar (y perder el
+// scroll) en cada vuelta del sondeo mientras nada cambió.
+function pintarVerPedido() {
+  if (!verPedidoAbierto) return;
+  const av = avanceLlenado || {};
+  const lineas = av.lineas || [];
+  const ref = facturaEnCurso
+    ? refFactura(facturaEnCurso.pedido_id, facturaEnCurso.parte) : "";
+  $("ver-pedido-titulo").textContent = (ref ? `Pedido ${ref}` : "")
+    + (av.linea ? ` · línea ${av.linea} de ${av.total}` : "");
+  const firma = `${ref}|${lineas.length}|${av.linea || 0}`;
+  if (firma === verPedidoFirma) return;
+  verPedidoFirma = firma;
+  $("ver-pedido-cuerpo").innerHTML = !lineas.length
+    ? `<div class="det-nota">Todavía no hay líneas que mostrar.</div>`
+    : `<table><thead><tr><th></th><th>Producto</th>
+         <th class="vp-num">Cantidad</th><th class="vp-num">Descuento</th>
+       </tr></thead><tbody>${lineas.map((l, i) => {
+        const n = i + 1;
+        const clase = n === av.linea ? "vp-actual" : n < av.linea ? "vp-escrita" : "";
+        return `<tr${clase ? ` class="${clase}"` : ""}>
+          <td class="det-num">${n}</td>
+          <td>${esc(l.producto || l.codigo || "")}</td>
+          <td class="vp-num">${fmtCantidad(l.cantidad)}</td>
+          <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
+        </tr>`;
+      }).join("")}</tbody></table>`;
+}
+
+// ☰ solo se ofrece cuando el clic es tolerado: entre líneas (ese camino
+// devuelve solo el primer plano al programa de facturación) o con la pausa ya
+// confirmada. En la puesta a punto un clic mata el llenado (pendiente 53,
+// causa 1): ahí se ve, pero deshabilitado y diciendo por qué.
+function pintarBotonVerPedido() {
+  const b = $("btn-ver-pedido");
+  const av = avanceLlenado;
+  const visible = llenando && !!(av && av.total);
+  b.style.display = visible ? "" : "none";
+  if (!visible) return;
+  const tolerado = faseActual === "lineas" || faseActual === "pausado";
+  b.disabled = !tolerado || verPedidoPendiente || $("btn-stop").disabled;
+  b.title = verPedidoPendiente
+    ? "Pausando: el pedido se abre cuando el paso en curso termine."
+    : tolerado
+      ? "Pausa el llenado y muestra el pedido completo; ▶ sigue por donde iba."
+      : "Disponible cuando empiecen las líneas.";
 }
 
 // --- Detener el llenado: botón "Detener" ------------------------------------
@@ -6488,6 +6762,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     }
   }
   llenando = true;
+  // Qué factura está en pantalla, para la vista ☰ del pedido (título y
+  // referencia) sin depender de la fila de la lista.
+  facturaEnCurso = {pedido_id, parte};
   stopPedidoEnLlenado = false;   // el Detener del llenado anterior no cuenta aquí
   // En una corrida la caja no se cierra entre facturas: sin esto, las cajitas
   // de grupos de la factura anterior se quedan a la vista hasta el primer
@@ -6537,6 +6814,13 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       avanceLlenado = f.avance || null;
       pintarInfoLlenado();
       pintarTituloVentana();
+      // ☰: la vista del pedido abre RECIÉN con la pausa confirmada, y se
+      // cierra sola si la fase se movió por otro lado (▶ desde otra ventana,
+      // el llenado terminó, saltó el trancón) — ANTES de que cualquier modal
+      // crezca la ventana sobre la vista.
+      if (verPedidoPendiente && f.fase === "pausado") abrirVerPedido();
+      else if (verPedidoAbierto && f.fase !== "pausado") cerrarVerPedido(false);
+      else if (verPedidoAbierto) pintarVerPedido();
       // Trancón: el llenado quedó congelado esperando el sí/no de reiniciar
       // Winledger. El aviso sale (y se va) siguiendo la fase del servidor.
       if (f.fase === "pregunta_trancon") abrirTrancon(f.detalle);
@@ -6863,6 +7147,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // del servidor), se cierra aquí — el mensaje del error dice qué pasó.
     cerrarTrancon();
     $("btn-ya-imprimi").style.display = "none";
+    // La vista ☰ no sobrevive al llenado: si quedó abierta (o esperando la
+    // pausa), se cierra sin reanudar — ya no hay qué reanudar.
+    cerrarVerPedido(false);
+    facturaEnCurso = null;
     llenando = false;
     faseActual = null;        // antes de marcarLlenando: de ahí sale el título
     marcarLlenando(false);
