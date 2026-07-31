@@ -1513,29 +1513,6 @@
         La Fecha a facturar arranca en el día elegido y el botón del calendario
         lo repone con un clic; en cualquier factura se puede cambiar a mano.</p>
     </div>
-    <!-- Modo viejo (2026-07-31): respaldo del operador si una actualización
-         sale lenta o con fallas — el interruptor pone esta máquina en el canal
-         "estable" (la última versión declarada estable, ver
-         scripts/mandar_a_produccion.py --estable) y el lanzador hace el cambio
-         real de versión en el próximo arranque, igual que el canal de Ajustes
-         de admin. Visible en todos los equipos a propósito: es el operador
-         quien lo necesita cuando el modo nuevo no le sirve. -->
-    <div class="ajustes-bloque">
-      <h3>Versión del programa</h3>
-      <div class="ajustes-fila">
-        <label class="desc-todos">
-          <input type="checkbox" id="modo-viejo-chk"
-                 onchange="guardarModoViejo(this.checked)">
-          Usar el modo viejo</label>
-        <span class="prueba-nota"
-              title="El cambio de versión lo hace el lanzador al arrancar, así que esta sesión sigue con la que ya cargó.">Se aplica al reabrir el asistente</span>
-      </div>
-      <p class="mut" style="margin:8px 0 0">
-        Con el modo viejo, este equipo trabaja con la versión estable anterior
-        del programa y deja de recibir actualizaciones hasta que se desmarque.
-        Sirve si una actualización sale lenta o con fallas: márcalo, reabre el
-        asistente y sigue trabajando mientras se corrige.</p>
-    </div>
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
       <div class="cat-btns" id="cat-btns"></div>
@@ -1586,6 +1563,29 @@
         definitivo (sin papelera y en todos los equipos) de clientes y
         campañas de descuento creados a mano. Solo existe en el equipo
         designado admin.</p>
+      <!-- Modo viejo (2026-07-31, pedido del usuario): NO es una preferencia
+           de este equipo sino del parque entero — se guarda como ajuste global
+           (asistente_ajustes) y cada máquina lo baja en su refresco. Va FUERA
+           de #ajustes-admin-opciones por el mismo motivo que la fila "Carga":
+           ese contenedor se oculta con el modo admin apagado, y de la versión
+           vieja hay que poder volver sin prender nada más. -->
+      <div class="ajustes-fila">
+        <b class="rotulo">Versión:</b>
+        <label class="desc-todos"
+               title="Manda a todas las computadoras de producción a la última versión estable. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
+          <input type="checkbox" id="modo-viejo-chk"
+                 onchange="guardarModoViejo(this.checked)">
+          Modo viejo en producción</label>
+        <span class="prueba-nota" id="modo-viejo-nota" style="display:none"
+              title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Activo en todas las computadoras</span>
+      </div>
+      <p class="mut" style="margin:8px 0 0">
+        Manda a <b>todas las computadoras de producción</b> a la última versión
+        estable y las deja ahí, sin recibir actualizaciones, hasta que se
+        desmarque. Es para cuando una actualización sale lenta o con fallas: se
+        marca, siguen facturando con lo que ya servía, y se corrige con calma.
+        Cada computadora lo toma al reabrir el asistente; este equipo no se
+        mueve, para poder arreglar mientras tanto.</p>
       <!-- Opciones del modo prueba (2026-07-25, fusión modo admin + modo
            prueba, PLAN.md pendiente 31): el contenedor entero se oculta con
            el switch apagado (pintarOpcionesPrueba) — pedido del usuario
@@ -7095,11 +7095,10 @@ function pintarOpcionesPrueba(op) {
     // Canal vacío = automático por equipo, que es como nace toda instalación:
     // en el servidor admin ese automático ES desarrollo, así que se pinta Dev
     // (la opción "Automático" se retiró el 2026-07-29, pedido del usuario).
-    // Con el modo viejo (canal "estable") ninguno de los dos radios queda
-    // marcado: esa elección vive en su propio interruptor de AJUSTES.
+    // El canal "estable" (modo viejo) lo pone el ajuste global, no estos
+    // radios: en el equipo admin nunca se fija, así que no lo contemplan.
     $("prueba-canal-produccion").checked = op.canal === "produccion";
-    $("prueba-canal-desarrollo").checked = op.canal !== "produccion" && op.canal !== "estable";
-    $("modo-viejo-chk").checked = op.canal === "estable";
+    $("prueba-canal-desarrollo").checked = op.canal !== "produccion";
   }
   const es999 = $("prueba-emp-999").checked;
   // En la 999 la puesta a punto es mínima: tasa, fecha y serie NUNCA se ponen,
@@ -7149,13 +7148,7 @@ async function guardarOpcionesPrueba() {
       saltar_serie: es999 ? !!g.saltar_serie : $("prueba-saltar-serie").checked,
       ver_detalle_tecnico: $("prueba-ver-tecnico").checked,
       marcar_procesadas: $("prueba-procesadas-si").checked,
-      // Con el modo viejo puesto ningún radio está marcado: no se manda el
-      // campo, para que un guardado de otra opción no saque a la máquina del
-      // canal estable sin que nadie lo haya pedido. Marcar un radio a
-      // conciencia sí lo manda y apaga el modo viejo — una sola fuente de
-      // verdad: el canal.
-      canal: $("prueba-canal-produccion").checked ? "produccion"
-           : $("prueba-canal-desarrollo").checked ? "desarrollo" : undefined,
+      canal: $("prueba-canal-produccion").checked ? "produccion" : "desarrollo",
     });
     pintarOpcionesPrueba(r.opciones_prueba);
     pintarBanderasPrueba();   // los indicadores de la barra siguen a los switches
@@ -7197,6 +7190,7 @@ async function cargarAjustes() {
     esMaquinaAdmin = !!d.es_maquina_admin;
     $("ajustes-admin-bloque").style.display = esMaquinaAdmin ? "" : "none";
     $("admin-modo-chk").checked = modoAdmin;
+    pintarModoViejo(d.modo_viejo);
     pintarOpcionesPrueba(d.opciones_prueba);
     refrescarVistasModoPrueba();
   } catch (e) {
@@ -7230,18 +7224,24 @@ async function guardarDiaDespacho(dia) {
   }
 }
 
-// Modo viejo (2026-07-31): el interruptor escribe el canal "estable" (o
-// devuelve la máquina al automático) y el cambio real de versión lo hace el
-// lanzador en el próximo arranque. No se anuncia nada al guardar — el check y
-// la nota del bloque ya lo dicen; solo se avisa si el guardado falló.
+// Modo viejo (2026-07-31): ajuste de TODAS las computadoras de producción, no
+// de este equipo. Se guarda compartido y cada máquina lo aplica al reabrir el
+// asistente. El guardado no se anuncia (el check y su nota ya lo dicen), pero
+// sí se avisa cuando no se pudo compartir: ahí el hecho importa — las demás
+// computadoras siguieron con su versión.
+function pintarModoViejo(activo) {
+  $("modo-viejo-chk").checked = !!activo;
+  $("modo-viejo-nota").style.display = activo ? "" : "none";
+}
+
 async function guardarModoViejo(activo) {
   try {
     const r = await api("/api/ajustes/modo-viejo", {activo});
-    if (opcionesPrueba) opcionesPrueba.canal = r.modo_viejo ? "estable" : "";
-    pintarOpcionesPrueba(opcionesPrueba);   // los radios del canal admin siguen al cambio
+    pintarModoViejo(r.modo_viejo);
+    if (r.aviso) mensaje(r.aviso, "alerta");
   } catch (e) {
-    $("modo-viejo-chk").checked = !activo;   // el check no se queda marcando lo que no se guardó
-    mensaje("No se pudo guardar el modo viejo: " + e.message, "error");
+    pintarModoViejo(!activo);   // el check no se queda marcando lo que no se guardó
+    mensaje("No se pudo cambiar el modo viejo: " + e.message, "error");
   }
 }
 
