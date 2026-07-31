@@ -845,6 +845,11 @@
   .desc-cli-row .nom { flex:1; }
   .desc-cli-row .badge, tr.grupo .badge { font-size:10.5px; color:#15803d; border:1px solid #9dcfae;
                          border-radius:10px; padding:0 6px; }
+  /* Entrada por resolver con pedidos frenados en revisión: es la prioridad de
+     la pestaña y se marca distinto del verde informativo de "cadena". */
+  .badge-espera { font-size:10.5px; font-weight:600; color:var(--warn);
+                  background:#fff4e5; border:1px solid #f5c98a;
+                  border-radius:10px; padding:0 6px; white-space:nowrap; }
   .fav { cursor:pointer; font-size:15px; line-height:1; }
   /* La estrella va en su propia columna, alineada al borde derecho de la fila
      (el .nom con flex:1 la empuja): así no se pega al nombre ni al check. */
@@ -9522,6 +9527,13 @@ function pintarClientesAgrupados(filtro) {
                           prueba, filas: []});
     grupos.get(codigo).filas.push([f, i]);
   });
+  // Dentro de las entradas por resolver, primero las que ya frenan pedidos
+  // (2026-07-31, pedido del usuario): cada una tiene facturas esperando en
+  // revisión y es prioridad — repartidas en el orden alfabético se perdían
+  // entre las que nadie espera. A igual cantidad queda el orden de siempre.
+  const pendientes = grupos.get(GRUPO_PENDIENTES);
+  if (pendientes)
+    pendientes.filas.sort(([a], [b]) => (b.pedidos_esperando || 0) - (a.pedidos_esperando || 0));
   let lista = [...grupos.values()];
   // Cadena efectiva (misma regla que la ficha del cliente): el override manual
   // manda; si es NULL, la automática (≥2 sucursales o con código de sucursal).
@@ -9593,7 +9605,8 @@ function pintarClientesAgrupados(filtro) {
            </td></tr>`;
       }
       const [f, i] = par;
-      html += filaSucursalHtml(f, i, g.sueltas, {suelta: g.sueltas, falta: faltaDeEntrada(f)});
+      html += filaSucursalHtml(f, i, g.sueltas, {suelta: g.sueltas, falta: faltaDeEntrada(f),
+                                                 esperando: f.pedidos_esperando || 0});
     } else {
       // Cadena o cliente de sucursal única, más visible que antes (pedido del
       // usuario 2026-07-30): el detalle de cada sucursal ya no se lista aquí,
@@ -9624,9 +9637,11 @@ function catCambiarPestana(id) {
 // cliente de prueba): se muestra con su clave interna. `opciones.falta` es el
 // texto de lo que le impide facturar (ver faltaDeEntrada): se pinta bajo el
 // nombre y cambia el botón, para que el operador sepa qué va a completar antes
-// de abrir la ventana.
+// de abrir la ventana. `opciones.esperando` = pedidos frenados en revisión por
+// esta entrada: la marca que distingue a las que urgen de las que pueden
+// esperar.
 function filaSucursalHtml(f, i, conEditar, opciones) {
-  const {suelta = false, falta = "", conToggleActivo = false} = opciones || {};
+  const {suelta = false, falta = "", conToggleActivo = false, esperando = 0} = opciones || {};
   // "Borrar de verdad" (modo prueba de implantación o modo admin): solo en
   // la ventana de UN cliente y solo sobre un cruce creado a mano en
   // el panel (origen 'manual') — los del catálogo real no se tocan.
@@ -9653,8 +9668,15 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
          <input type="checkbox" class="switch" disabled></label>`
     : `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
          <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`;
+  // La marca va pegada al nombre para verse de un vistazo; el detalle de qué
+  // le falta sigue en su renglón de abajo.
+  const marcaEsperando = falta && esperando
+    ? ` <span class="badge-espera" title="Hasta que esta entrada no esté completa, ${
+        esperando === 1 ? "esa factura no sale" : "esas facturas no salen"}.">${
+        esperando === 1 ? "1 pedido esperando" : `${esperando} pedidos esperando`}</span>`
+    : "";
   return `<tr>
-    <td style="padding-left:26px">${nombre}${suelta
+    <td style="padding-left:26px">${nombre}${marcaEsperando}${suelta
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
         ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
