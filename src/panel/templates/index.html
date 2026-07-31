@@ -560,6 +560,20 @@
   /* El grupo por el que va el llenado AHORA. Anillo por sombra y no por borde
      más grueso: así el resalte no mueve ni un pixel a las cajitas vecinas. */
   .cajita.actual { border-color:#1d4ed8; box-shadow:0 0 0 2px rgba(29,78,216,.18); }
+  /* Ocupa su propio renglón porque el nombre del producto suele ser largo, y
+     el ellipsis evita que empuje la caja flotante. */
+  .cajita.linea-actual { flex-basis:100%; min-width:0; }
+  .cajita.linea-actual .cj-val { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cajita.linea-actual .cj-sec { font-weight:400; color:var(--mut); }
+  /* CAJITAS QUE ABREN SU MENÚ (2026-07-31, pedido del usuario): lo que se ve
+     en la barra del llenado se edita ahí mismo. Se marcan pulsables — sin un
+     borde que las mueva — porque nada más en la caja flotante se clickea. */
+  .cajita-menu { cursor:pointer; }
+  .cajita-menu:hover { border-color:#94a3b8; background:#f7f9fc; }
+  .cajita-menu.con-desc:hover { background:#dcfce7; }
+  .cajita-menu:focus-visible { outline:2px solid #1d4ed8; outline-offset:1px; }
+  #info-burger { justify-content:center; }
+  #info-burger .cj-val { font-size:15px; line-height:1.1; }
   /* Los grupos van juntos y despegados de serie/fecha/línea: son otra cosa. */
   #info-grupos { display:flex; flex-wrap:wrap; gap:6px; margin-left:6px; }
   #mensaje.error { background:#fee4e2; color:var(--err); }
@@ -1190,6 +1204,32 @@
   body.modo-llenado #docencurso-caja { margin-top:6px; padding:10px 14px; }
   body.modo-llenado #docencurso-caja h3 { margin:0 0 8px; }
   body.modo-llenado #docencurso-caja .editor-acciones { margin-top:0; }
+  /* EL PEDIDO COMPLETO DENTRO DE LA VENTANITA (decisión del usuario
+     2026-07-31): la ventana del detalle se abre también desde el dashboard,
+     y ahí NO se agranda la ventana — la tabla se compacta y hace scroll sola
+     (#detalle-cuerpo ya trae overflow:auto). */
+  body.modo-llenado #detalle-caja { margin-top:4px; padding:8px 10px;
+                    width:98vw; max-height:calc(100vh - 8px); }
+  body.modo-llenado #detalle-caja > h3 { margin:0 0 6px; font-size:12.5px; }
+  body.modo-llenado #detalle-cuerpo table { font-size:11.5px; }
+  body.modo-llenado #detalle-cuerpo th,
+  body.modo-llenado #detalle-cuerpo td { padding:3px 5px; }
+  body.modo-llenado #detalle-caja .editor-acciones { margin-top:6px; }
+  /* MENÚ DE UN SOLO DATO (fecha, tasa): no da para la ventana del detalle. Va
+     por encima de ella (z-index 19) porque desde el detalle no se abre, pero
+     sí puede quedar uno abierto detrás si el operador encadena cajitas. */
+  #dash-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                  display:none; z-index:21; align-items:flex-start;
+                  justify-content:center; overflow-y:auto; }
+  #dash-overlay.visible { display:flex; }
+  #dash-caja { background:#fff; border-radius:10px; padding:12px 14px;
+               margin-top:6px; width:min(420px, 96vw);
+               box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #dash-caja > h3 { margin:0 0 10px; font-size:13.5px; }
+  #dash-caja input { font-size:14px; padding:5px 8px; width:150px;
+                     border:1px solid #c3c9d4; border-radius:6px; }
+  #dash-caja input:focus { outline:2px solid #1d4ed8; outline-offset:1px; }
+  #dash-nota { font-size:12px; color:var(--mut); margin:8px 0 0; }
   /* La consecuencia de NO registrar ninguna tasa, en el mismo ámbar de los
      avisos pendientes de la barra: es lo que el operador tiene que sopesar. */
   #tasa-consecuencia { background:#fef0c7; color:#b54708; border-radius:6px;
@@ -1408,11 +1448,33 @@
     <div id="llenado-info">
       <div class="cajita" title="Se elige en 'Seleccionar Serie TD' al abrir la Ficha. '—' = se acepta la serie que esté.">
         <span class="cj-rot">Serie</span><span class="cj-val" id="info-serie">—</span></div>
-      <div class="cajita"><span class="cj-rot">Fecha a facturar</span>
+      <div class="cajita cajita-menu" tabindex="0" onclick="menuDashCampoFecha()"
+           title="Ábrela para cambiar la fecha a facturar."><span class="cj-rot">Fecha a facturar</span>
         <span class="cj-val" id="info-fecha">—</span></div>
-      <div class="cajita" id="info-linea-caja" style="display:none">
+      <!-- La tasa no estaba en la barra del llenado (pedido del usuario
+           2026-07-31): con el panel colapsado era el único de los tres datos
+           del documento que no se veía ni se podía corregir. -->
+      <div class="cajita cajita-menu" tabindex="0" onclick="menuDashCampoTasa()"
+           title="Ábrela para cambiar la tasa."><span class="cj-rot">Tasa</span>
+        <span class="cj-val" id="info-tasa">—</span></div>
+      <div class="cajita cajita-menu" id="info-linea-caja" tabindex="0"
+           onclick="menuDashLinea()" style="display:none"
+           title="Ábrela para revisar la línea que se está escribiendo.">
         <span class="cj-rot">Línea</span><span class="cj-val" id="info-linea">—</span></div>
       <div id="info-grupos"></div>
+      <!-- El pedido completo, al final de la fila (pedido del usuario
+           2026-07-31): abre la misma ventana de detalle de la lista. -->
+      <div class="cajita cajita-menu" id="info-burger" tabindex="0"
+           onclick="menuDashPedido()" title="El pedido completo, editable">
+        <span class="cj-rot">Pedido</span><span class="cj-val">☰</span></div>
+      <!-- Pedido del usuario 2026-07-31: en la caja flotante no se ve que
+           lleva la línea que se está escribiendo. -->
+      <div class="cajita linea-actual cajita-menu" id="info-linea-detalle"
+           tabindex="0" onclick="menuDashLinea()" style="display:none"
+           title="Ábrela para revisar la línea que se está escribiendo.">
+        <span class="cj-rot">Llenando ahora</span>
+        <span class="cj-val" id="info-linea-detalle-val"></span>
+      </div>
     </div>
     <div id="seguridad">
       <!-- Se oculta en las fases donde el llenado espera al operador (pausa,
@@ -2014,6 +2076,28 @@
       <button class="acento" id="detalle-llenar" style="display:none"
               onclick="llenarDesdeDetalle()">Llenar</button>
       <button onclick="cerrarDetalle()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menú de UN dato del dashboard: fecha a facturar o tasa (2026-07-31). No
+     cierra por clic afuera: se abre para escribir un número y la ventana del
+     llenado es chica, así que un clic de más no puede llevárselo. -->
+<div id="dash-overlay">
+  <div id="dash-caja">
+    <h3 id="dash-titulo"></h3>
+    <div id="dash-cuerpo"></div>
+    <p id="dash-nota"></p>
+    <div class="editor-acciones" id="dash-acciones-campo">
+      <button class="primario" onclick="guardarMenuDashCampo()">Guardar</button>
+      <button onclick="cerrarMenuDashCampo()">Cancelar</button>
+    </div>
+    <!-- Salidas cuando lo editado ya está escrito en el documento abierto
+         (regla del usuario 2026-07-31): arreglarlo a mano, o descartar la
+         ficha y volver a llenarla con lo nuevo. -->
+    <div class="editor-acciones" id="dash-acciones-cambio" style="display:none">
+      <button class="primario" onclick="cambioLoResuelvoAMano()">Lo cambio a mano</button>
+      <button class="peligro" onclick="reiniciarLlenadoPorCambio()">Descartar y volver a llenar</button>
     </div>
   </div>
 </div>
@@ -2799,6 +2883,7 @@ function pintarInfoLlenado() {
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
   $("info-fecha").textContent = iso ? dmaCorto(iso) : "—";
+  $("info-tasa").textContent = $("f-tasa").value.trim() || "—";
   const av = avanceLlenado;
   const hayLineas = !!(av && av.total);
   // Los grupos se saben desde antes de la primera línea (mientras se ajusta el
@@ -2813,15 +2898,233 @@ function pintarInfoLlenado() {
     const desc = !pcts.length ? ""
       : pcts.length === 1 ? `${pctCorto(pcts[0])}%`
       : `${pctCorto(pcts[0])}–${pctCorto(pcts[pcts.length - 1])}%`;
-    const clases = ["cajita"];
+    const clases = ["cajita", "cajita-menu"];
     if (desc) clases.push("con-desc");
     if (g.nombre === av.grupo_actual) clases.push("actual");
-    return `<div class="${clases.join(" ")}">
+    return `<div class="${clases.join(" ")}" tabindex="0"
+                 title="Ábrelo para revisar las líneas de este grupo."
+                 onclick="menuDashGrupo('${esc(g.nombre)}')">
       <span class="cj-rot">${esc(g.nombre)}</span>
       <span class="cj-val">${g.lineas}${
         desc ? ` · <span class="cj-pct">${esc(desc)}</span>` : ""}</span>
     </div>`;
   }).join("");
+  const li = hayLineas ? av.linea_info : null;
+  $("info-linea-detalle").style.display = li && av.linea ? "" : "none";
+  $("info-linea-detalle").title = li ? (li.codigo || "") : "";
+  $("info-linea-detalle-val").innerHTML = li && av.linea ? (
+    `${esc(li.producto)}`
+    + ` <span class="cj-sec">· ${fmtCantidad(li.cantidad)}</span>`
+    + (li.descuento > 0 ? ` <span class="cj-pct">· ${pctCorto(li.descuento)}%</span>` : "")
+  ) : "";
+}
+
+/* MENÚS DEL DASHBOARD (2026-07-31, pedido del usuario). Cada cajita de la
+   barra del llenado abre lo suyo para revisarlo y corregirlo sin salir de la
+   ventanita: la fecha y la tasa en un menú de un dato; la línea en curso, un
+   grupo y el pedido entero en la ventana de detalle de siempre, filtrada.
+   Mientras un menú está abierto el llenado se PAUSA solo y sigue al cerrarlo:
+   lo que se edita es justo lo que el robot está por escribir. La pausa que
+   pide el menú se distingue de la que pide el operador con ⏸ — si pulsa
+   ▶ Reanudar con un menú abierto, manda él: el menú se cierra y no se
+   reanuda dos veces. */
+let facturaEnCurso = null;       // {pedido_id, parte} del llenado en curso
+let pausaPorMenuDash = false;    // la pausa la pidió un menú, no el operador
+let menuDashCampo = null;        // "fecha" | "tasa" mientras el menú chico está abierto
+let detalleDesdeDash = false;    // la ventana de detalle la abrió el dashboard
+let detalleFiltro = null;        // {codigos:[…], titulo} = solo esas líneas
+
+async function pausarPorMenuDash() {
+  if (!llenando || pausaPedida) return;
+  try {
+    const r = await api("/api/pausar_llenado", {});
+    if (r.sin_llenado) return;
+    pausaPorMenuDash = true;
+    pausaPedida = true;
+    pintarBotonPausa();
+  } catch (e) {
+    // Pausar es una ayuda, no un requisito: el menú se abre igual y lo que se
+    // guarde rige desde el próximo llenado de esa factura.
+  }
+}
+
+async function reanudarPorMenuDash() {
+  if (!pausaPorMenuDash) return;
+  pausaPorMenuDash = false;
+  try {
+    await api("/api/reanudar_llenado", {});
+    pausaPedida = false;
+    pintarBotonPausa();
+  } catch (e) {
+    mensaje("No se pudo reanudar el llenado: " + e.message, "error");
+  }
+}
+
+// El ▶ del operador se lleva por delante cualquier menú abierto: deja de ser
+// el menú quien maneja la pausa (por eso pausaPorMenuDash se apaga primero).
+function cerrarMenusDash() {
+  pausaPorMenuDash = false;
+  if ($("dash-overlay").classList.contains("visible")) cerrarMenuDashCampo();
+  if (detalleDesdeDash) cerrarDetalle();
+}
+
+// --- Menú de un dato: fecha a facturar y tasa -------------------------------
+const menuDashCampoFecha = () => abrirMenuDashCampo("fecha");
+const menuDashCampoTasa = () => abrirMenuDashCampo("tasa");
+
+async function abrirMenuDashCampo(campo) {
+  menuDashCampo = campo;
+  const esFecha = campo === "fecha";
+  const origen = $(esFecha ? "f-fecha-facturar" : "f-tasa");
+  $("dash-titulo").textContent = esFecha ? "Fecha a facturar" : "Tasa";
+  $("dash-cuerpo").innerHTML = esFecha
+    ? `<input type="date" id="dash-valor" value="${esc(origen.value)}"
+              min="${esc(origen.min || "")}" max="${esc(origen.max || "")}">`
+    : `<input type="text" id="dash-valor" inputmode="decimal"
+              value="${esc(origen.value)}">`;
+  // Hecho + consecuencia: los dos se escriben en la puesta a punto, ANTES de
+  // las líneas, así que el documento abierto ya salió con lo que había.
+  $("dash-nota").textContent = llenando
+    ? "El documento abierto ya se ajustó con lo que estaba puesto; lo que "
+      + "cambies aquí rige desde la próxima factura."
+    : "";
+  $("dash-acciones-campo").style.display = "";
+  $("dash-acciones-cambio").style.display = "none";
+  $("dash-overlay").classList.add("visible");
+  const campoValor = $("dash-valor");
+  // Es un menú de un solo dato: se teclea y se sale por teclado, sin buscar
+  // el botón con el mouse mientras el llenado espera.
+  campoValor.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") { ev.preventDefault(); guardarMenuDashCampo(); }
+    else if (ev.key === "Escape") { ev.preventDefault(); cerrarMenuDashCampo(); }
+  });
+  campoValor.focus();
+  campoValor.select();
+  await pausarPorMenuDash();
+}
+
+function guardarMenuDashCampo() {
+  const cual = menuDashCampo;
+  const destino = $(cual === "fecha" ? "f-fecha-facturar" : "f-tasa");
+  const valor = $("dash-valor").value;
+  const cambio = valor !== destino.value;
+  if (cambio) {
+    destino.value = valor;
+    // Los campos de la barra tienen su propia lógica colgada del change (la
+    // tasa del día, el aviso del BCV): se dispara para no duplicarla aquí.
+    destino.dispatchEvent(new Event("change"));
+  }
+  // Fecha y tasa se escriben en la puesta a punto, antes que las líneas: con
+  // un llenado en curso, lo nuevo NUNCA entra en el documento abierto.
+  const yaEscrito = cambio && llenando;
+  cerrarMenuDashCampo({sinReanudar: yaEscrito});
+  if (yaEscrito) preguntarPorCambioYaEscrito(cual === "fecha" ? "la fecha nueva" : "la tasa nueva");
+}
+
+function cerrarMenuDashCampo({sinReanudar = false} = {}) {
+  $("dash-overlay").classList.remove("visible");
+  menuDashCampo = null;
+  pintarInfoLlenado();          // la cajita muestra lo que quedó
+  if (!sinReanudar) reanudarPorMenuDash();
+}
+
+/* LO QUE YA SE ESCRIBIÓ NO SE CAMBIA A ESCONDIDAS (regla del usuario
+   2026-07-31). Un ajuste guardado mientras se llena rige desde el próximo
+   llenado de esa factura; si el documento abierto ya salió con lo anterior, el
+   llenado NO sigue como si nada: se queda en pausa y el operador elige entre
+   arreglarlo él en el programa o descartar la ficha y volver a llenarla con lo
+   nuevo. Las dos son suyas — el asistente no descarta ningún documento por su
+   cuenta (CONTRATOS.md 3.1). */
+function preguntarPorCambioYaEscrito(que) {
+  $("dash-titulo").textContent = "Eso ya está en el documento";
+  $("dash-cuerpo").innerHTML = `<p class="mut" style="margin:0">
+    El documento abierto salió con lo anterior: ${esc(que)} solo entra si se
+    vuelve a llenar.</p>`;
+  $("dash-nota").textContent = "";
+  $("dash-acciones-campo").style.display = "none";
+  $("dash-acciones-cambio").style.display = "";
+  $("dash-overlay").classList.add("visible");
+}
+
+/* El robot recibe las líneas UNA sola vez, al arrancar: `api_llenar` aplica
+   ahí los ajustes del operador y no vuelve a leerlos. Por eso la pregunta no
+   se limita a las líneas ya escritas — con un llenado en curso sobre ESA
+   factura, nada de lo que se guarde entra en el documento abierto, tampoco lo
+   de las líneas que faltan. Que el cargador relea a mitad de corrida es lo que
+   queda pendiente (PLAN.md 53(c)); mientras tanto se dice y se decide. */
+function cambioNoEntraEnElDocumento(pedidoId, parte) {
+  return !!(llenando && facturaEnCurso
+            && facturaEnCurso.pedido_id === pedidoId
+            && facturaEnCurso.parte === parte);
+}
+
+function cambioLoResuelvoAMano() {
+  $("dash-overlay").classList.remove("visible");
+  // La pausa deja de ser del menú y pasa a ser del operador: el documento
+  // queda a su disposición hasta que pulse ▶.
+  pausaPorMenuDash = false;
+  if (detalleDesdeDash) cerrarDetalle();
+  if (llenando)
+    mensaje("En pausa: el documento está a tu disposición. Pulsa ▶ Reanudar "
+            + "cuando termines.", "info", false);
+}
+
+async function reiniciarLlenadoPorCambio() {
+  const f = facturaEnCurso;
+  $("dash-overlay").classList.remove("visible");
+  pausaPorMenuDash = false;
+  if (detalleDesdeDash) cerrarDetalle();
+  if (!f) return;
+  // El STOP manda también sobre la pausa (el llenado lo ve en su próximo punto
+  // de pausa), así que no hace falta reanudar antes de detener. El botón sí se
+  // devuelve a ⏸: el llenado nuevo arranca sin pausa (`api_llenar` limpia la
+  // huérfana) y dejarlo en ▶ mentiría sobre el estado.
+  pausaPedida = false;
+  pintarBotonPausa();
+  await detenerLlenado();
+  if (!await esperarFinDelLlenado()) {
+    mensaje("El llenado sigue deteniéndose; cuando pare, vuelve a dar Llenar "
+            + "sobre esa factura.", "alerta");
+    return;
+  }
+  // autorizarCancelar: el documento a medias que quedó en pantalla se descarta
+  // — es la cancelación que el operador acaba de autorizar con este botón.
+  llenar(f.pedido_id, f.parte, true);
+}
+
+async function esperarFinDelLlenado(msMax = 25000) {
+  const t0 = Date.now();
+  while (llenando && Date.now() - t0 < msMax)
+    await new Promise(listo => setTimeout(listo, 300));
+  return !llenando;
+}
+
+// --- Menús de líneas: la que se llena, un grupo y el pedido entero ----------
+// Los tres abren la MISMA ventana de detalle de la lista (con sus cantidades y
+// descuentos editables), filtrada por las líneas que toca mirar. Reusarla, y
+// no una tabla nueva, es lo que hace que editar desde el dashboard guarde por
+// el mismo camino que editar desde la lista.
+// Los tres devuelven la promesa de la apertura (no la esperan): así el banco
+// puede aguardarla, y quien encadene menús no se pisa con la carga anterior.
+function menuDashLinea() {
+  const li = (avanceLlenado || {}).linea_info;
+  return li ? abrirDetalleDelLlenado([li.codigo], li.producto) : null;
+}
+
+function menuDashGrupo(nombre) {
+  const codigos = ((avanceLlenado || {}).lineas || [])
+    .filter(l => l.grupo === nombre).map(l => l.codigo);
+  return abrirDetalleDelLlenado(codigos, nombre);
+}
+
+const menuDashPedido = () => abrirDetalleDelLlenado(null, null);
+
+async function abrirDetalleDelLlenado(codigos, titulo) {
+  if (!facturaEnCurso) return;
+  detalleFiltro = codigos ? {codigos, titulo} : null;
+  detalleDesdeDash = true;
+  await abrirDetalle(facturaEnCurso.pedido_id, facturaEnCurso.parte);
+  await pausarPorMenuDash();
 }
 
 /* VENTANA FLOTANTE (2026-07-27): durante el llenado la ventana del panel se
@@ -3121,6 +3424,10 @@ let pausaPedida = false;
 async function alternarPausa() {
   const b = $("btn-pausa");
   const pausando = !pausaPedida;
+  // ▶ del operador con un menú del dashboard abierto (2026-07-31): el menú se
+  // va y la pausa vuelve a ser suya — si el menú también reanudara, el
+  // llenado arrancaría dos veces.
+  if (pausaPorMenuDash) cerrarMenusDash();
   b.disabled = true;
   try {
     const r = await api(pausando ? "/api/pausar_llenado" : "/api/reanudar_llenado", {});
@@ -5266,6 +5573,11 @@ function cerrarDetalle() {
   $("detalle-overlay").classList.remove("visible");
   detalleAbierto = null;
   detalleTocado = false;
+  detalleFiltro = null;
+  if (detalleDesdeDash) {
+    detalleDesdeDash = false;
+    reanudarPorMenuDash();
+  }
 }
 
 // Cantidades, descuentos y las opciones de cada línea se guardan solas, pero
@@ -5353,12 +5665,17 @@ function pintarVentanaDetalle(clave) {
   if (clave !== detalleAbierto) return;
   const d = detalleDatos[clave];
   const partes = d && d.total_partes > 1 ? ` · factura ${d.parte} de ${d.total_partes}` : "";
+  // Abierta desde una cajita del dashboard: manda lo que esa cajita decía
+  // (el grupo, el producto en curso), que es lo que el operador fue a mirar.
+  const foco = detalleFiltro && detalleFiltro.titulo ? `${detalleFiltro.titulo} · ` : "";
   $("detalle-titulo").textContent = d
-    ? `Pedido ${d.pedido_id}${partes}` : "Detalle del pedido";
+    ? `${foco}Pedido ${d.pedido_id}${partes}` : "Detalle del pedido";
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
   const etiqueta = llenadoDirecto(filaDeLista(...partesDeClave(clave)));
   const boton = $("detalle-llenar");
-  boton.style.display = etiqueta ? "" : "none";
+  // Con la factura llenándose ahora mismo no se ofrece volver a llenarla: el
+  // servidor lo negaría igual ("ya hay un llenado en curso").
+  boton.style.display = etiqueta && !llenando ? "" : "none";
   if (etiqueta) boton.textContent = etiqueta;
 }
 
@@ -5407,13 +5724,22 @@ function contenidoDetalle(clave) {
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: para cambiarle algo, vuelve a llenarla.</div>`;
+  // Abierta desde una cajita del dashboard: se muestran solo sus líneas, y se
+  // dice por dónde está el pedido entero para que el recorte no se confunda
+  // con "esto es todo lo que lleva la factura".
+  const lineas = detalleFiltro
+    ? d.lineas.filter(l => detalleFiltro.codigos.includes(l.codigo_winledger))
+    : d.lineas;
+  const recorte = detalleFiltro
+    ? `<div class="det-nota">De las ${d.lineas.length} líneas de la factura;
+        el pedido completo se abre con ☰.</div>` : "";
   return `
-    <div class="detalle-cab">${cabecera}${nota}</div>
+    <div class="detalle-cab">${cabecera}${nota}${recorte}</div>
     <table><thead><tr>
       <th></th><th>Producto</th><th style="width:180px">Cantidad</th>
       <th style="width:150px">Descuento</th>
     </tr></thead><tbody>
-      ${d.lineas.map(l => filaLineaDetalle(d, l)).join("")}
+      ${lineas.map(l => filaLineaDetalle(d, l)).join("")}
     </tbody></table>
     <div class="det-error" id="det-error-${esc(clave)}" style="display:none"></div>`;
 }
@@ -5562,6 +5888,11 @@ async function guardarAjuste(pedidoId, parte, codigo, cuerpo) {
   }
   await cargarDetalle(pedidoId, parte);
   cargar();     // el chip de la fila cuenta las líneas ajustadas
+  if (cambioNoEntraEnElDocumento(pedidoId, parte)) {
+    const l = lineaDeDetalle(pedidoId, parte, codigo);
+    preguntarPorCambioYaEscrito(
+      `el cambio en ${(l && l.descripcion) || codigo}`);
+  }
 }
 
 // Cliente y sucursal de una factura, resueltos para mostrar (2026-07-31): el
@@ -6235,6 +6566,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     }
   }
   llenando = true;
+  // Qué factura está en pantalla, para que los menús del dashboard sepan cuál
+  // abrir sin depender de la fila de la lista (2026-07-31).
+  facturaEnCurso = {pedido_id, parte};
   stopPedidoEnLlenado = false;   // el Detener del llenado anterior no cuenta aquí
   // En una corrida la caja no se cierra entre facturas: sin esto, las cajitas
   // de grupos de la factura anterior se quedan a la vista hasta el primer
@@ -6611,6 +6945,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     cerrarTrancon();
     $("btn-ya-imprimi").style.display = "none";
     llenando = false;
+    // Un menú del dashboard abierto al terminar el llenado quedaría pausando
+    // algo que ya no existe: se cierra con el llenado.
+    cerrarMenusDash();
+    facturaEnCurso = null;
     faseActual = null;        // antes de marcarLlenando: de ahí sale el título
     marcarLlenando(false);
     // El encadenado espera la recarga: sin ella, pendientesLlenables() aún
