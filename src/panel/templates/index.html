@@ -1207,12 +1207,14 @@
   body.modo-llenado #docencurso-caja { margin-top:6px; padding:10px 14px; }
   body.modo-llenado #docencurso-caja h3 { margin:0 0 8px; }
   body.modo-llenado #docencurso-caja .editor-acciones { margin-top:0; }
-  /* EL PEDIDO COMPLETO DENTRO DE LA VENTANITA (decisión del usuario
-     2026-07-31): la ventana del detalle se abre también desde el dashboard,
-     y ahí NO se agranda la ventana — la tabla se compacta y hace scroll sola
-     (#detalle-cuerpo ya trae overflow:auto). */
-  body.modo-llenado #detalle-caja { margin-top:4px; padding:8px 10px;
-                    width:98vw; max-height:calc(100vh - 8px); }
+  /* EL PEDIDO COMPLETO ABIERTO DESDE EL DASHBOARD (2026-07-31). El alto va en
+     PÍXELES y no en vh: la ventana del llenado mide 240 px de contenido, así
+     que un tope relativo se mediría contra ella misma y la caja no podría
+     crecer nunca (crecerVentanaPorModal lee su offsetHeight para pedir el alto
+     a la ventana). Con 520 px cabe en cualquier pantalla y una factura de 25
+     líneas hace scroll adentro (#detalle-cuerpo ya trae overflow:auto). */
+  body.modo-llenado #detalle-caja { margin-top:6px; padding:10px 12px;
+                    width:min(720px, 98vw); max-height:520px; }
   body.modo-llenado #detalle-caja > h3 { margin:0 0 6px; font-size:12.5px; }
   body.modo-llenado #detalle-cuerpo table { font-size:11.5px; }
   body.modo-llenado #detalle-cuerpo th,
@@ -2994,6 +2996,7 @@ async function abrirMenuDashCampo(campo) {
   $("dash-acciones-campo").style.display = "";
   $("dash-acciones-cambio").style.display = "none";
   $("dash-overlay").classList.add("visible");
+  crecerVentanaPorModal("dash-caja");
   const campoValor = $("dash-valor");
   // Es un menú de un solo dato: se teclea y se sale por teclado, sin buscar
   // el botón con el mouse mientras el llenado espera.
@@ -3028,7 +3031,10 @@ function cerrarMenuDashCampo({sinReanudar = false} = {}) {
   $("dash-overlay").classList.remove("visible");
   menuDashCampo = null;
   pintarInfoLlenado();          // la cajita muestra lo que quedó
-  if (!sinReanudar) reanudarPorMenuDash();
+  if (!sinReanudar) {
+    replantarCajaFlotante();    // sin la pregunta detrás, vuelve a la barra
+    reanudarPorMenuDash();
+  }
 }
 
 /* LO QUE YA SE ESCRIBIÓ NO SE CAMBIA A ESCONDIDAS (regla del usuario
@@ -3063,6 +3069,7 @@ function cambioNoEntraEnElDocumento(pedidoId, parte) {
 
 function cambioLoResuelvoAMano() {
   $("dash-overlay").classList.remove("visible");
+  replantarCajaFlotante();
   // La pausa deja de ser del menú y pasa a ser del operador: el documento
   // queda a su disposición hasta que pulse ▶.
   pausaPorMenuDash = false;
@@ -3075,6 +3082,7 @@ function cambioLoResuelvoAMano() {
 async function reiniciarLlenadoPorCambio() {
   const f = facturaEnCurso;
   $("dash-overlay").classList.remove("visible");
+  replantarCajaFlotante();
   pausaPorMenuDash = false;
   if (detalleDesdeDash) cerrarDetalle();
   if (!f) return;
@@ -3127,6 +3135,10 @@ async function abrirDetalleDelLlenado(codigos, titulo) {
   detalleFiltro = codigos ? {codigos, titulo} : null;
   detalleDesdeDash = true;
   await abrirDetalle(facturaEnCurso.pedido_id, facturaEnCurso.parte);
+  // Un pedido de 25 líneas no se lee en la caja del llenado: la ventana crece
+  // mientras la ventana esté abierta y vuelve a la barra al cerrarla, igual
+  // que los modales de la tasa y la factura repetida.
+  crecerVentanaPorModal("detalle-caja");
   await pausarPorMenuDash();
 }
 
@@ -3153,17 +3165,24 @@ async function abrirDetalleDelLlenado(codigos, titulo) {
    por Win32. Si es una pestaña normal, que ignora resizeTo, se sigue igual:
    el panel queda colapsado por CSS pero con la ventana del tamaño de
    siempre. */
-const ANCHO_FLOTANTE = 560;
+// 2026-07-31: de 560 a 760. Con las cajitas del dashboard (serie, fecha, tasa,
+// línea, los grupos y el ☰) la fila envolvía a dos y tres renglones y no se
+// leía nada. Los números son FIJOS a propósito: medir la barra y ajustar la
+// ventana a ella es lo que congeló la ventana en Windows (Ronda 4 del pendiente
+// 38) — si hace falta más sitio, se sube esta constante a mano.
+const ANCHO_FLOTANTE = 760;
 // 2026-07-29: +30 px al sumar la fila de cajitas (serie, fecha, línea y
 // grupos). Con el alto viejo el contenido quedaba EXACTO, sin holgura, y un
 // mensaje de tres líneas —el aviso de Winledger con su texto, el más largo que
 // sale— empujaba el ■ Detener fuera de la caja. Se crece hacia abajo, que es
 // hacia donde hay campos de teclado y no botones (ver el comentario de arriba).
-const ALTO_FLOTANTE = 200;
+// 2026-07-31: +70 más, por el renglón de "Llenando ahora" y para que la fila de
+// cajitas respire (el operador la mira de reojo mientras el robot escribe).
+const ALTO_FLOTANTE = 270;
 // El mismo alto pero SIN la barra de título: es lo que se le pasa a la
 // ventana propia, que solo puede saber de este lado cuánto mide su marco y
 // lo suma ella. Con Edge se usa ALTO_FLOTANTE, que ya lo incluye.
-const ALTO_CONTENIDO_FLOTANTE = 170;
+const ALTO_CONTENIDO_FLOTANTE = 240;
 const MARGEN_SUPERIOR = 8;    // aire contra el borde superior de la pantalla
 // Marco fijo del panel completo, para el camino de Edge: espejo de
 // ANCHO_VENTANA / ALTO_VENTANA / MARGEN_SUPERIOR_APERTURA en
@@ -5579,6 +5598,7 @@ function cerrarDetalle() {
   detalleFiltro = null;
   if (detalleDesdeDash) {
     detalleDesdeDash = false;
+    replantarCajaFlotante();   // la ventana vuelve al tamaño de la barra
     reanudarPorMenuDash();
   }
 }
