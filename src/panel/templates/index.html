@@ -2767,6 +2767,28 @@ function actualizarStatusbar() {
   actualizarModoLlenado();
 }
 
+/* Un llenado que salió de OTRA ventana de esta misma computadora (2026-07-31,
+   reporte del usuario). El modo llenado lo prendía SOLO la ventana desde la que
+   se pulsó Llenar: abriendo el panel en una segunda pestaña y llenando desde
+   ahí, la ventana del panel se quedaba entera y DETRÁS de la Ficha mientras el
+   robot escribía. La regla que pidió el usuario es "siempre al frente mientras
+   llena", sin importar quién lo arrancó.
+   El dato no cuesta ninguna consulta nueva: el sondeo del estado compartido ya
+   vuelve pausado con motivo 'llenado' mientras el turno de llenado corre. */
+const AVISO_LLENADO_OTRA_VENTANA =
+  "Llenando una factura desde otra ventana de esta computadora…";
+let llenadoDeOtraVentana = false;
+
+function marcarLlenadoDeOtraVentana(activo) {
+  if (activo === llenadoDeOtraVentana) return;
+  llenadoDeOtraVentana = activo;
+  // El texto no es decoración: sin mensaje, la barra de estado se oculta y el
+  // modo llenado dejaría esta ventana encogida y vacía.
+  if (activo) { mensaje(AVISO_LLENADO_OTRA_VENTANA, "info"); return; }
+  if ($("mensaje-texto").textContent === AVISO_LLENADO_OTRA_VENTANA) mensaje("", "");
+  else actualizarStatusbar();   // el aviso ya lo pisó otra cosa: solo recalcular
+}
+
 // MODO LLENADO (PLAN.md pendiente 8, visión del usuario 2026-07-23): mientras
 // hay un llenado en curso — o la corrida quedó esperando el login o pausada
 // por un fallo — el panel entero se colapsa y solo queda la barra de estado
@@ -2777,7 +2799,8 @@ function actualizarStatusbar() {
 function actualizarModoLlenado() {
   const pausadoPorFallo = $("btn-reintentar-fila").style.display !== "none";
   const activo = llenando || relanzandoTrasConfirmacion || secuenciaActiva ||
-                 esperandoLogin || pausadoPorFallo || esperandoEnvioPlataforma;
+                 esperandoLogin || pausadoPorFallo || esperandoEnvioPlataforma ||
+                 llenadoDeOtraVentana;
   document.body.classList.toggle("modo-llenado", activo);
   if (!activo) avanceLlenado = null;
   // La ventana PRIMERO: es lo esencial del modo. Las cajitas y el título son
@@ -4728,10 +4751,14 @@ async function sondearCompartido() {
     const r = await api("/api/estados_compartidos?firma=" +
                         encodeURIComponent(firmaCompartida));
     if (r.pausado) {
-      // "llenado" no cambia el semáforo (es una pausa, no una caída).
+      // "llenado" no cambia el semáforo (es una pausa, no una caída), pero sí
+      // dice que en esta computadora hay un llenado en curso que NO salió de
+      // aquí: esta ventana también se encoge y se pone encima de la Ficha.
       if (r.motivo === "sin_conexion") { nube.estado = "caida"; pintarNube(); }
+      marcarLlenadoDeOtraVentana(r.motivo === "llenado");
       return;
     }
+    marcarLlenadoDeOtraVentana(false);
     nube.estado = "ok";
     nube.ultimoOk = Date.now();
     if (r.nube) {
