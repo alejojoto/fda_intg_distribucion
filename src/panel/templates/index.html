@@ -4683,19 +4683,19 @@ function armarPopoverNube(clase) {
           + `</span></div>`;
   }
   // Envío a la nube (el espejo): un camino aparte de la lectura de arriba —
-  // se puede leer bien y fallar al escribir. "sin conexión" cuando el
-  // espejo está caído, en vez del último número (quedaría desactualizado).
+  // se puede leer bien y fallar al escribir. Con el espejo caído no se pone un
+  // número (el último quedaría desactualizado); con el espejo en pie el 0 es
+  // real desde el arranque, porque la puesta al día ya corrió en la precarga.
   const espejoOk = nube.espejo_activo !== false;
-  html += `<div class="nube-fila" title="Facturas de esta máquina que en el `
-        + `último refresco le faltaban llegar a las otras computadoras.">`
+  html += `<div class="nube-fila" title="Facturas de esta máquina que todavía no `
+        + `les llegan a las otras computadoras.">`
         + `<span>Cambios por enviar</span><span>`
-        + (!espejoOk ? "sin conexión"
-           : (nube.cambios_por_enviar === null ? "sin datos aún" : nube.cambios_por_enviar))
+        + (espejoOk ? (nube.cambios_por_enviar || 0) : "sin conexión")
         + `</span></div>`;
-  html += `<div class="nube-fila" title="Facturas cerradas en cualquier computadora.">`
-        + `<span>Cambios en los últimos 30 minutos</span><span>`
-        + (!espejoOk ? "sin datos"
-           : (nube.cambios_recientes_30min === null ? "sin datos aún" : nube.cambios_recientes_30min))
+  html += `<div class="nube-fila" title="Facturas cerradas en cualquier `
+        + `computadora en la última media hora.">`
+        + `<span>Cambios recientes</span><span>`
+        + (espejoOk ? (nube.cambios_recientes_30min || 0) : "sin conexión")
         + `</span></div>`;
   if (llenando || secuenciaActiva) {
     html += `<div class="nube-nota">El llenado en curso manda: se actualiza al terminar.</div>`;
