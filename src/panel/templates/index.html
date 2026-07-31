@@ -2310,8 +2310,11 @@
      factura. Así que "Llenar en fila" ya no pregunta "¿seguro?" y en su lugar
      enseña con qué se va a llenar y qué facturas entran. Se abre con la fila
      YA resuelta (después del aviso de familia): lo que se ve es exactamente lo
-     que se va a apartar y llenar. -->
-<div id="previo-overlay" onclick="if(event.target===this)cerrarPrevioLote()">
+     que se va a apartar y llenar.
+     El clic afuera PREGUNTA (2026-07-31, pedido del usuario) en cuanto se tocó
+     algo o la ventana lleva un rato abierta: revisar y ajustar el lote es
+     trabajo, y perderlo de un clic distraído obliga a rehacerlo entero. -->
+<div id="previo-overlay" onclick="if(event.target===this)intentarCerrarPrevio()">
   <div id="previo-caja">
     <h3>Revisa antes de llenar en fila</h3>
     <p id="previo-proceso" class="mut"></p>
@@ -4704,8 +4707,9 @@ function armarPopoverNube(clase) {
         + `<span>Cambios por enviar</span><span>`
         + (espejoOk ? (nube.cambios_por_enviar || 0) : "sin conexión")
         + `</span></div>`;
-  html += `<div class="nube-fila" title="Facturas cerradas en cualquier `
-        + `computadora en la última media hora.">`
+  html += `<div class="nube-fila" title="Todo lo que se tocó en cualquier `
+        + `computadora en la última media hora: facturas, clientes, `
+        + `descuentos, feriados, tasas.">`
         + `<span>Cambios recientes</span><span>`
         + (espejoOk ? (nube.cambios_recientes_30min || 0) : "sin conexión")
         + `</span></div>`;
@@ -5100,18 +5104,18 @@ function accionesDeFila(f) {
   //     "Llenar igual" (2026-07-26 / 2026-07-28), que le quita el candado con
   //     motivo. Es otra cosa: ahí no hay documento firme, hay un llenado que
   //     nadie está terminando.
-  //     Un error de allá lleva ADEMÁS "Descartar" (2026-07-29): decir "se
-  //     descarta desde allá" dejaba trancada una factura que ya no hace falta
-  //     (salió a mano, el cliente la anuló) cuando ese equipo no está
-  //     disponible — llenarla de nuevo aquí no era la salida.
+  //     Lleva ADEMÁS "Descartar" (2026-07-29, extendido a apartada/llenando
+  //     2026-07-31): decir "se descarta desde allá" dejaba trancada una
+  //     factura que ya no hace falta (salió a mano, el cliente la anuló)
+  //     cuando ese equipo no está disponible — "Llenar igual" no sirve si lo
+  //     que corresponde es NO facturarla, y antes esa fila solo forzaba a
+  //     llenarla igual.
   if (f.remota)
     return f.refacturable
       ? `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`
       : ["reservada", "llenando", "error_llenado"].includes(f.estado)
         ? `<button onclick="tomarIgual('${id}',${f.parte})">Llenar igual</button>` +
-          (f.estado === "error_llenado"
-            ? `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`
-            : "")
+          `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`
         : "";
   // "reservada" propia = la cola del lote de ESTA máquina. Mientras la corrida
   // AVANZA no lleva "Llenar" (2026-07-26): esa factura la llena el lote cuando
@@ -6774,15 +6778,23 @@ const ACCIONES_MOTIVO = {
     titulo: (id, partes) => partes.length > 1
       ? `Descartar ${partes.length} facturas de ${id} (partes ${partes.join(", ")}) — ¿por qué?`
       : `Descartar ${refFactura(id, partes[0])} — ¿por qué?`,
-    // Solo cuando el llenado falló en OTRA máquina (2026-07-29): descartarla
-    // aquí la cierra en todas, y lo que quedó a medias allá no lo puede
-    // resolver este panel.
+    // Cuando la fila es de OTRA máquina (2026-07-29, ampliado a apartada/
+    // llenando 2026-07-31): descartarla aquí la cierra en todas. Con un error
+    // de allá puede haber quedado un documento a medias que este panel no
+    // puede resolver; apartada o llenando todavía no tiene documento firme.
     nota: (id, partes) => {
       const f = filaDeFactura(id, partes[0]);
       if (!f || !f.remota) return "";
-      return `El llenado falló en '${f.maquina || "otra máquina"}'. Descartarla `
-           + "aquí la cierra para todas las máquinas; si allá quedó un documento "
-           + "a medias, hay que cancelarlo en ese equipo.";
+      const maquina = f.maquina || "otra máquina";
+      const situacion = f.estado === "error_llenado"
+        ? `El llenado falló en '${maquina}'.`
+        : f.estado === "llenando"
+          ? `'${maquina}' la está llenando ahora mismo.`
+          : `'${maquina}' la tiene apartada.`;
+      return `${situacion} Descartarla aquí la cierra para todas las máquinas`
+           + (f.estado === "error_llenado"
+              ? "; si allá quedó un documento a medias, hay que cancelarlo en ese equipo."
+              : ".");
     },
     opciones: ["Ya se facturó a mano",
                "El cliente anuló el pedido",
@@ -7641,6 +7653,15 @@ let previoFamiliaEstirada = null;
 // solo se olvidan al abrir otra revisión.
 let previoQuitados = [];
 let previoQuitando = null;        // pedido con la pregunta abierta en su renglón
+// Un clic afuera no puede llevarse la revisión (2026-07-31, pedido del usuario).
+// Esta ventana es para LEER —y desde que las cajitas se editan, para ajustar el
+// lote—: perderla de un clic distraído obliga a rehacer la puesta a punto y a
+// volver a sacar de la fila lo que ya se había sacado. Dos disparadores, porque
+// revisar sin tocar nada también es trabajo: se tocó algo, o lleva un rato
+// abierta.
+let previoTocado = false;
+let previoAbiertoEn = 0;
+const PREVIO_LECTURA_MS = 5000;
 
 function revisarLotePrevio(cola, meta, saltarPedido) {
   previoCola = cola;
@@ -7652,6 +7673,8 @@ function revisarLotePrevio(cola, meta, saltarPedido) {
   previoCargando = false;
   previoDescuentos = null;
   previoDescuentosFallo = "";
+  previoTocado = false;
+  previoAbiertoEn = Date.now();
   pintarPrevioLote();
   // Los descuentos se piden EN PARALELO: la ventana abre con lo que el panel
   // ya tiene en la lista y esa columna se completa sola al llegar la
@@ -7664,7 +7687,41 @@ function revisarLotePrevio(cola, meta, saltarPedido) {
 function cerrarPrevioLote() { salirDelPrevio(false); }
 function confirmarPrevioLote() { salirDelPrevio(true); }
 
+// Cualquier ajuste al lote cuenta como cambio: se escucha en la caja entera
+// (que se repinta con cada ajuste) y no control por control. La botonera queda
+// fuera a propósito — Llenar y Cancelar son salidas, no ajustes, y ahí adentro
+// va también la pregunta de salida.
+for (const evento of ["input", "change", "click"])
+  $("previo-caja").addEventListener(evento, (ev) => {
+    if (ev.target.closest(".editor-acciones")) return;
+    // Un clic suelto en la caja (o seleccionar texto) no es un ajuste: solo
+    // cuentan los botones, y los campos por su propio input/change.
+    if (ev.type === "click" && !ev.target.closest("button")) return;
+    previoTocado = true;
+  });
+
+// Solo lo usa el clic afuera: el botón Cancelar es salida deliberada.
+function intentarCerrarPrevio() {
+  const hubo = previoTocado || Date.now() - previoAbiertoEn >= PREVIO_LECTURA_MS;
+  if (!hubo) { cerrarPrevioLote(); return; }
+  const acciones = $("previo-caja").querySelector(".editor-acciones");
+  pedirConfirmSalida({
+    acciones,
+    mensaje: previoTocado
+      ? "Estás ajustando el lote que se va a llenar."
+      : "Estás revisando el lote que se va a llenar.",
+    salirTxt: "Cancelar el llenado",
+    salirClase: "",
+    seguirTxt: "Seguir aquí",
+    cerrar: cerrarPrevioLote,
+    // Con la fila larga la botonera queda debajo del borde: sin esto el clic
+    // afuera parecería no haber hecho nada.
+    alMostrar: () => acciones.scrollIntoView({block: "nearest"}),
+  });
+}
+
 function salirDelPrevio(seguir) {
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("previo-overlay").classList.remove("visible");
   const decidir = previoResolver;
   previoResolver = null;
