@@ -2755,6 +2755,9 @@ let confirmSalidaCerrar = null;
 // de salir va neutro (`salirClase: ""`), no en rojo de descarte.
 // `alMostrar` corre con la pregunta ya puesta, para las cajas que tienen que
 // volver a medirse (la ventanita flotante del llenado).
+// `sinSeguir` quita el botón "Seguir editando" (2026-07-31): para la revisión
+// del lote, "Guardar" YA ES la salida azul que hace falta (arranca el llenado
+// de una vez) y un tercer botón que solo cierra la pregunta sería redundante.
 function pedirConfirmSalida(cfg) {
   if (confirmSalidaCerrar) return;            // ya hay una pregunta a la vista
   const acciones = cfg.acciones;
@@ -2778,7 +2781,8 @@ function pedirConfirmSalida(cfg) {
   bSeguir.textContent = cfg.seguirTxt || "Seguir editando";   // Cancelar de la pregunta, de último
   fila.append(msg);
   if (cfg.guardar) fila.append(bGuardar);
-  fila.append(bSalir, bSeguir);
+  fila.append(bSalir);
+  if (!cfg.sinSeguir) fila.append(bSeguir);
   acciones.append(fila);
   const t = setTimeout(() => { bSalir.disabled = false; }, 400);
   const cerrarPregunta = () => {
@@ -7699,10 +7703,18 @@ for (const evento of ["input", "change", "click"])
   });
 
 // Solo lo usa el clic afuera: el botón Cancelar es salida deliberada.
+// La app entera dice "Llenar" en azul para esa acción (2026-07-31, pedido del
+// usuario): "Seguir aquí" no cabía en ese lenguaje y encima solo volvía a la
+// ventana sin llenar nada. Con la fila lista para llenar, el botón azul YA ES
+// esa acción — el mismo texto del botón real ("Llenar N facturas") y arranca
+// el llenado de una vez, sin volver a pasar por la ventana. Mientras falte
+// algo (tasa, cantidad) no hay atajo que ofrecer: se cae al "Seguir aquí" de
+// siempre, que solo cierra la pregunta.
 function intentarCerrarPrevio() {
   const hubo = previoTocado || Date.now() - previoAbiertoEn >= PREVIO_LECTURA_MS;
   if (!hubo) { cerrarPrevioLote(); return; }
   const acciones = $("previo-caja").querySelector(".editor-acciones");
+  const listoParaLlenar = !$("previo-llenar").disabled;
   pedirConfirmSalida({
     acciones,
     mensaje: previoTocado
@@ -7710,7 +7722,9 @@ function intentarCerrarPrevio() {
       : "Estás revisando el lote que se va a llenar.",
     salirTxt: "Cancelar el llenado",
     salirClase: "",
-    seguirTxt: "Seguir aquí",
+    ...(listoParaLlenar
+      ? {guardar: confirmarPrevioLote, guardarTxt: $("previo-llenar").textContent, sinSeguir: true}
+      : {seguirTxt: "Seguir aquí"}),
     cerrar: cerrarPrevioLote,
     // Con la fila larga la botonera queda debajo del borde: sin esto el clic
     // afuera parecería no haber hecho nada.
@@ -8250,12 +8264,12 @@ function avisoFamiliaEstirada() {
   // ABRE con este pedido, "llenar 0" no es una salida).
   if (f.hayConQueRellenar) salidas.push(
     `<button title="Este pedido queda pendiente, completo, para otro lote."
-       onclick="previoFamiliaFuera(true)">Sacarlo: llenar ${pedidas} con los `
-    + `pedidos siguientes</button>`);
+       onclick="previoFamiliaFuera(true)">Sacar el pedido: llenar ${pedidas} `
+    + `con los siguientes</button>`);
   if (sinEl >= 1) salidas.push(
     `<button title="La fila se corta justo antes de este pedido, que queda `
     + `pendiente completo." onclick="previoFamiliaFuera(false)">Llenar solo `
-    + `${sinEl} y dejarlo fuera</button>`);
+    + `${sinEl} y dejar el pedido fuera</button>`);
   return `<div class="pap-ojo">El pedido ${esc(f.pedido_id)}${
       f.cliente ? ` (${esc(f.cliente)})` : ""} se divide en ${f.total} facturas y `
     + `la cantidad elegida lo partía por la mitad. Un pedido dividido se llena `
