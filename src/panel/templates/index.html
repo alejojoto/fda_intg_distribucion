@@ -1524,7 +1524,10 @@
       <!-- Se oculta en las fases donde el llenado espera al operador (pausa,
            impresión, aviso de Winledger por cerrar): ahí SÍ tiene que tocar
            mouse y teclado. Ver FASES_DEL_OPERADOR en el sondeo de fase. -->
-      <span id="aviso-no-tocar">⚠️ <b>No teclees ni cliquees fuera de esta caja durante el llenado.</b></span>
+      <!-- Sin excepción de "fuera de esta caja" (2026-07-31): un click DENTRO
+           de la caja también roba el foco y tumba el llenado. Lo único
+           seguro son los botones de pausa. -->
+      <span id="aviso-no-tocar">⚠️ <b>No muevas el mouse ni teclees durante el llenado. Lo único que puedes tocar son los botones de pausa.</b></span>
       <!-- Paso de cierre con "Imprimir: sí" (fase 'esperando_impresion'): solo
            se ve mientras el poll de fase la reporte (ver llenar()). Va antes
            del Detener porque es la acción primaria. -->
