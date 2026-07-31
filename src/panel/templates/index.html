@@ -464,6 +464,9 @@
   .det-error { color:#a12a2a; font-size:12px; margin-top:6px; }
   .det-nota { color:var(--mut); font-size:11.5px; margin-top:3px; }
   .det-nota.alerta { color:#b54708; }
+  /* La nota general (qué son estos números) abre el cuerpo desde que la
+     cabecera vive en #detalle-fijo: aire antes de la tabla. */
+  #detalle-cuerpo > .det-nota { margin:0 0 8px; }
   /* Línea que se mandó a llenar pero no entró al documento: se tachan solo las
      cifras — el nombre y el motivo tienen que leerse bien. */
   tr.linea-no-escrita td:nth-child(3), tr.linea-no-escrita td:nth-child(4) {
@@ -726,11 +729,15 @@
   #detalle-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
                      display:none; z-index:19; align-items:flex-start; justify-content:center; }
   #detalle-overlay.visible { display:flex; }
+  /* Abierta DESDE la revisión del lote (que vive en 20): sube por encima de
+     ella; la clase la pone abrirDetalle y se va al cerrar. */
+  #detalle-overlay.sobre-previo { z-index:21; }
   #detalle-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
                   width:min(860px, 94vw); max-height:85vh; overflow:hidden;
                   display:flex; flex-direction:column;
                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
-  #detalle-caja > h3, #detalle-caja > .editor-acciones { flex:none; }
+  #detalle-caja > h3, #detalle-caja > #detalle-fijo,
+  #detalle-caja > .editor-acciones { flex:none; }
   #detalle-caja > h3 { margin:0 0 12px; font-size:14px; }
   #detalle-cuerpo { flex:1 1 auto; min-height:0; overflow:auto; }
   #detalle-caja > .editor-acciones { border-top:1px solid #e2e6ec; padding-top:12px; }
@@ -1112,42 +1119,46 @@
      las de la barrita del llenado y la lista con aire. */
   #previo-caja { width:min(960px, 96vw); margin-top:4vh; padding:20px 22px; }
   #previo-caja h3 { font-size:16px; }
-  #previo-cajitas { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  /* .pap-cajitas: la puesta a punto en cajitas. La comparten la revisión del
+     lote (#previo-cajitas) y la ventana de una factura (#detalle-cajitas),
+     que desde 2026-07-31 es la pantalla de prellenado del llenado individual. */
+  .pap-cajitas { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
   /* Salto de renglón dictado por el usuario (2026-07-31): qué se factura
      arriba (ruta, fecha, tasa) y cómo sale el documento abajo (serie, cuánto,
      impresión). */
-  #previo-cajitas .cj-salto { flex-basis:100%; height:0; }
-  #previo-cajitas .cajita { padding:7px 14px; min-width:88px; }
-  #previo-cajitas .cj-rot { font-size:11.5px; }
-  #previo-cajitas .cj-val { font-size:16px; }
+  .pap-cajitas .cj-salto { flex-basis:100%; height:0; }
+  .pap-cajitas .cajita { padding:7px 14px; min-width:88px; }
+  .pap-cajitas .cj-rot { font-size:11.5px; }
+  .pap-cajitas .cj-val { font-size:16px; }
   /* Cada cajita es su propio control (2026-07-31, pedido del usuario): lo que
      esté mal se corrige AQUÍ, sin cancelar el lote para ir a la barra de
      arriba. El control va desnudo dentro de la cajita —es la cajita la que se
      ve como campo— y por eso el hover se resalta entera. */
-  #previo-cajitas label.cajita { cursor:pointer; }
-  #previo-cajitas label.cajita:hover { border-color:#9aa5b5; }
-  #previo-cajitas label.cajita:focus-within { border-color:#1d4ed8;
+  .pap-cajitas label.cajita { cursor:pointer; }
+  .pap-cajitas label.cajita:hover { border-color:#9aa5b5; }
+  .pap-cajitas label.cajita:focus-within { border-color:#1d4ed8;
                                               box-shadow:0 0 0 2px rgba(29,78,216,.18); }
-  #previo-cajitas .cj-edit { font:inherit; font-size:16px; font-weight:600;
+  .pap-cajitas .cj-edit { font:inherit; font-size:16px; font-weight:600;
                              border:none; background:none; padding:0; margin:0;
                              color:inherit; cursor:pointer; outline:none; }
-  #previo-cajitas select.cj-edit { appearance:none; padding-right:14px;
+  .pap-cajitas select.cj-edit { appearance:none; padding-right:14px;
                                    background:url("data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'>\
 <path d='M0 0l5 6 5-6z' fill='%236b7280'/></svg>") right center no-repeat; }
-  #previo-cajitas input.cj-edit { width:110px; cursor:text; }
-  #previo-cajitas input.cj-edit[type=date] { width:135px; cursor:pointer; }
+  .pap-cajitas input.cj-edit { width:110px; cursor:text; }
+  .pap-cajitas input.cj-edit[type=date] { width:135px; cursor:pointer; }
   /* El iconito nativo sobra: el calendario propio ya abre con un clic en
      cualquier parte del campo (mismo criterio que los demás campos de fecha). */
-  #previo-cajitas input[type=date]::-webkit-calendar-picker-indicator { display:none; }
-  #previo-cajitas .cajita.ojo .cj-edit { color:#b54708; }
+  .pap-cajitas input[type=date]::-webkit-calendar-picker-indicator { display:none; }
+  .pap-cajitas .cajita.ojo .cj-edit { color:#b54708; }
   /* Ámbar en la cajita = ese dato no lo pone el asistente y la factura sale con
      lo que el programa de facturación tenga puesto. */
   .cajita.ojo { background:#fef0c7; border-color:#fde68a; }
   .cajita.ojo .cj-val { color:#b54708; }
-  #previo-avisos { display:flex; flex-direction:column; gap:6px; margin:0 0 10px; }
-  #previo-avisos .previo-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
-                               padding:8px 10px; font-size:13px; line-height:1.45; }
+  #previo-avisos, #detalle-avisos { display:flex; flex-direction:column; gap:6px;
+                                    margin:0 0 10px; }
+  .pap-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
+             padding:8px 10px; font-size:13px; line-height:1.45; }
   /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
      las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
      la lista ni a cancelar la corrida. */
@@ -2046,6 +2057,11 @@
 <div id="detalle-overlay" onclick="if(event.target===this)intentarCerrarDetalle()">
   <div id="detalle-caja">
     <h3 id="detalle-titulo"></h3>
+    <!-- Cabecera + puesta a punto FUERA del scroll: en una factura llenable
+         esta ventana es la pantalla de prellenado (2026-07-31, pedido del
+         usuario) y esos datos se quedan a la vista mientras se bajan las
+         líneas. -->
+    <div id="detalle-fijo"></div>
     <div id="detalle-cuerpo"></div>
     <div class="editor-acciones">
       <button class="acento" id="detalle-llenar" style="display:none"
@@ -2306,7 +2322,7 @@
   <div id="previo-caja">
     <h3>Revisa antes de llenar en fila</h3>
     <p id="previo-proceso" class="mut"></p>
-    <div id="previo-cajitas"></div>
+    <div id="previo-cajitas" class="pap-cajitas"></div>
     <div id="previo-avisos"></div>
     <div id="previo-resumen" class="mut"></div>
     <div id="previo-lista"></div>
@@ -5075,12 +5091,21 @@ function resumenFamilia(partes) {
 // `completada` conserva su botón "Volver a llenar" (reabrir y rellenar) también
 // dentro de PENDIENTES: mientras el pedido no cierre completo todavía puede
 // aparecer un problema en un documento ya llenado (regla del usuario 2026-07-22).
+// El botón de llenar UNA factura ya no llena a ciegas (2026-07-31, pedido del
+// usuario): abre la ventana del detalle, que es la pantalla de prellenado —
+// ahí se revisan serie, tasa, fecha y líneas, y se llena. Mismo destino que el
+// clic en el renglón; el botón lo deja a la vista con el nombre de la acción.
+const botonPrellenado = (f, etiqueta, clase) =>
+  `<button${clase ? ` class="${clase}"` : ""} onclick="abrirDetalle('${
+    esc(f.pedido_id)}',${f.parte}${f.tiene_detalle === false ? ",true" : ""})">${
+    etiqueta}</button>`;
+
 function accionesDeFila(f) {
   const id = esc(f.pedido_id);
   // Pendiente vieja fuera de la ventana (fila VIRTUAL, sin registro local): no
-  // hay nada que reabrir, se llena directo.
+  // hay nada que reabrir, va directo a su prellenado.
   if (f.a_mano)
-    return `<button onclick="llenar('${id}',${f.parte})">Llenar</button>`;
+    return botonPrellenado(f, "Llenar");
   // Filas de OTRA máquina, dos caminos según cómo la tenga:
   //   • Ya CERRADA allá (lista o descartada): "Volver a llenar", igual que una
   //     propia (2026-07-28, CONTRATOS §3.2). Reabrirla emite un documento
@@ -5115,14 +5140,17 @@ function accionesDeFila(f) {
   // Llenada en esta sesión de prueba (sin registro): el único botón que aplica
   // es llenarla otra vez — no hay documento cerrado que reabrir ni registro que
   // descartar. Lleva el sí de repetición puesto: lo dice el propio botón, así
-  // que volver a preguntarlo sobraría.
+  // que volver a preguntarlo sobraría. Sigue llenando directo, sin prellenado:
+  // es un atajo solo de prueba y el Llenar de la ventana no carga ese sí.
   if (f.estado === "llenada_prueba")
     return `<button class="acento" onclick="llenar('${id}',${f.parte},false,false,true)">Llenar otra vez</button>`;
   if (f.estado === "pendiente" || f.estado === "reservada")
-    return `<button class="acento" onclick="${f.familia_ajena ? "llenarFamiliaAjena" : "llenar"}('${id}',${f.parte})">Llenar</button>` +
+    // La familia ajena también pasa por el prellenado: su pregunta del motivo
+    // la despacha el Llenar de la ventana (llenarDesdeDetalle).
+    return botonPrellenado(f, "Llenar", "acento") +
            `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
   if (f.estado === "error_llenado")
-    return `<button class="acento" onclick="llenar('${id}',${f.parte})">Reintentar</button>` +
+    return botonPrellenado(f, "Reintentar", "acento") +
            `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
   // Estados cerrados por el usuario — completada (reemitir), descartada
   // (recuperar) y las viejas facturada_a_mano: un SOLO botón "Volver a
@@ -5334,6 +5362,9 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   if (sinDetalle) sinDetalleGuardado.add(clave);
   else sinDetalleGuardado.delete(clave);
   pintarVentanaDetalle(clave);      // lo que ya se haya traído antes, de una vez
+  // Abierta desde la revisión del lote: por encima de ella (los renglones del
+  // previo también abren su detalle, 2026-07-31).
+  $("detalle-overlay").classList.toggle("sobre-previo", !!previoResolver);
   $("detalle-overlay").classList.add("visible");
   if (sinDetalle) return;
   await cargarDetalle(pedidoId, parte);
@@ -5352,14 +5383,19 @@ function abrirDetalleCargando(pedidoId, parte) {
   delete detalleDatos[clave];
   sinDetalleGuardado.delete(clave); // reabrir la vuelve a armar: sí habrá detalle
   pintarVentanaDetalle(clave);      // "Buscando el detalle…"
+  $("detalle-overlay").classList.toggle("sobre-previo", !!previoResolver);
   $("detalle-overlay").classList.add("visible");
 }
 
 function cerrarDetalle() {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("detalle-overlay").classList.remove("visible");
+  $("detalle-overlay").classList.remove("sobre-previo");
   detalleAbierto = null;
   detalleTocado = false;
+  // De vuelta a la revisión del lote: lo tecleado aquí (la tasa sobre todo) se
+  // refleja en sus cajitas, que quedaron pintadas con el valor de antes.
+  if (previoResolver) { pintarPrevioCajitas(); pintarPrevioAvisos(); pintarBotonPrevio(); }
 }
 
 // Cantidades, descuentos y las opciones de cada línea se guardan solas, pero
@@ -5407,12 +5443,20 @@ function llenadoDirecto(f) {
 }
 
 // Llenar al pie de la ventana (pedido del usuario 2026-07-30): se revisa el
-// detalle y se llena ahí mismo. La ventana se cierra ANTES de arrancar: el
+// prellenado y se llena ahí mismo. La ventana se cierra ANTES de arrancar: el
 // llenado colapsa el panel a la barra de estado y un overlay abierto la taparía.
+// Si se llegó desde la revisión del lote, llenar ESTA es abandonar el lote
+// (pedido del usuario 2026-07-31): la revisión se cierra sin arrancar la
+// corrida — nada estaba apartado todavía — y se relanza después si hace falta.
 function llenarDesdeDetalle() {
   if (!detalleAbierto) return;
   const [pedidoId, parte] = partesDeClave(detalleAbierto);
+  const fila = filaDeLista(pedidoId, parte) || {};
   cerrarDetalle();
+  if (previoResolver) salirDelPrevio(false);
+  // El pedido cuya familia repartió otra máquina pide su motivo igual que
+  // siempre: llenarlo desde aquí no puede saltarse esa pregunta.
+  if (fila.familia_ajena) { llenarFamiliaAjena(pedidoId, parte); return; }
   llenar(pedidoId, parte);
 }
 
@@ -5451,30 +5495,34 @@ function pintarVentanaDetalle(clave) {
   // igual de la clave: la ventana siempre dice de cuál factura habla.
   $("detalle-titulo").textContent = d
     ? `Pedido ${d.pedido_id}${partes}` : `Pedido ${partesDeClave(clave)[0]}`;
+  $("detalle-fijo").innerHTML = fijoDetalle(clave);
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
-  const etiqueta = llenadoDirecto(filaDeLista(...partesDeClave(clave)));
-  const boton = $("detalle-llenar");
-  boton.style.display = etiqueta ? "" : "none";
-  if (etiqueta) boton.textContent = etiqueta;
+  pintarBotonDetalle();
 }
 
-// El pedido y en cuál de sus facturas se está viendo van en el título de la
-// ventana, así que aquí quedan el cliente, la ruta y el resto del encabezado.
-function contenidoDetalle(clave) {
-  // Sin líneas guardadas no hay detalle que armar, y no es un fallo: se dice
-  // como lo que es (nota gris), no en rojo de error.
-  if (sinDetalleGuardado.has(clave))
-    return `<div class="det-nota">${AVISO_SIN_DETALLE}</div>`;
-  if (detalleFallos[clave])
-    return `<div class="det-error">${esc(detalleFallos[clave])}</div>`;
-  const d = detalleDatos[clave];
-  if (!d) return `<span class="mut">Buscando el detalle…</span>`;
-  // El encabezado va SIEMPRE, también en una factura ya llenada (2026-07-31):
-  // se abría un documento emitido sin ver de quién era. Manda la fila de la
-  // lista —trae cliente y sucursal resueltos igual que su columna— y el detalle
-  // completa los códigos: de una procesada cuyo pedido ya salió de la caché, el
-  // detalle no manda más que el pedido.
-  const fila = filaDeLista(d.pedido_id, d.parte) || {};
+// El botón del pie: la etiqueta de llenadoDirecto con el mismo candado de la
+// tasa que el lote (2026-07-31, regla del usuario) — sin la tasa del día no se
+// llena, y el botón dice qué falta.
+function pintarBotonDetalle() {
+  const etiqueta = detalleAbierto
+    && llenadoDirecto(filaDeLista(...partesDeClave(detalleAbierto)));
+  const boton = $("detalle-llenar");
+  boton.style.display = etiqueta ? "" : "none";
+  if (!etiqueta) return;
+  boton.disabled = sinTasaParaLlenar();
+  boton.textContent = boton.disabled ? "Escribe la tasa para llenar" : etiqueta;
+}
+
+// La cabecera compacta: cliente y sucursal en una sola línea, el contexto del
+// pedido en otra. Va SIEMPRE, también en una factura ya llenada (2026-07-31):
+// se abría un documento emitido sin ver de quién era. Manda la fila de la
+// lista —trae cliente y sucursal resueltos igual que su columna— y el detalle,
+// si ya llegó, completa los códigos y el nº de líneas: de una procesada cuyo
+// pedido ya salió de la caché, el detalle no manda más que el pedido.
+function cabeceraDetalle(clave) {
+  const [pedidoId, parte] = partesDeClave(clave);
+  const d = detalleDatos[clave] || {};
+  const fila = filaDeLista(pedidoId, parte) || {};
   const {cliente, sucursal} = clienteYSucursal({
     nombre_cliente: fila.nombre_cliente,
     nombre_sucursal: fila.nombre_sucursal,
@@ -5487,14 +5535,46 @@ function contenidoDetalle(clave) {
   const contexto = [fila.ruta || d.ruta,
                     (fila.fecha_orden_salida || d.fecha_orden_salida || "").slice(0, 10),
                     fila.causa_salida || d.causa_salida,
-                    `${d.lineas.length} ${d.lineas.length === 1 ? "línea" : "líneas"}`,
+                    d.lineas
+                      ? `${d.lineas.length} ${d.lineas.length === 1 ? "línea" : "líneas"}`
+                      : null,
                    ].filter(Boolean);
-  const cabecera = (cliente
-      ? `<div>${esc(cliente)}${d.cliente_codigo_winledger
-          ? ` · ${esc(d.cliente_codigo_winledger)}` : ""}</div>` : "")
-    + (sucursal ? `<div class="mut">${esc(sucursal)}${
-        codigoSucursal ? ` · ${esc(codigoSucursal)}` : ""}</div>` : "")
-    + `<div>${esc(contexto.join(" · "))}</div>`;
+  const quien = (cliente
+      ? `${esc(cliente)}${d.cliente_codigo_winledger
+          ? ` · ${esc(d.cliente_codigo_winledger)}` : ""}` : "")
+    + (sucursal ? ` <span class="mut">— ${esc(sucursal)}${
+        codigoSucursal ? ` · ${esc(codigoSucursal)}` : ""}</span>` : "");
+  if (!quien && !contexto.length) return "";
+  return `<div class="detalle-cab">${quien ? `<div>${quien}</div>` : ""}${
+    contexto.length ? `<div>${esc(contexto.join(" · "))}</div>` : ""}</div>`;
+}
+
+// En una factura llenable la ventana es la pantalla de PRELLENADO (2026-07-31,
+// pedido del usuario): debajo de la cabecera van las mismas cajitas de puesta
+// a punto de la revisión del lote —sin ruta (la del pedido ya está arriba) ni
+// cantidad (aquí siempre es una)— y sus avisos. En una ya cerrada no hay nada
+// que poner a punto y queda solo la cabecera.
+function fijoDetalle(clave) {
+  const cabecera = cabeceraDetalle(clave);
+  if (!llenadoDirecto(filaDeLista(...partesDeClave(clave)))) return cabecera;
+  const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
+                   cajitaImpresion(), cajitaBaby(), cajitaEmpresa()].join("");
+  return cabecera
+    + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
+    + `<div id="detalle-avisos">${htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))}</div>`;
+}
+
+// El pedido y su factura van en el título, y el cliente con el contexto en la
+// cabecera fija (fijoDetalle): aquí quedan la nota y la tabla de líneas.
+function contenidoDetalle(clave) {
+  // Sin líneas guardadas no hay detalle que armar, y no es un fallo: se dice
+  // como lo que es (nota gris), no en rojo de error.
+  if (sinDetalleGuardado.has(clave))
+    return `<div class="det-nota">${AVISO_SIN_DETALLE}</div>`;
+  if (detalleFallos[clave])
+    return `<div class="det-error">${esc(detalleFallos[clave])}</div>`;
+  const d = detalleDatos[clave];
+  if (!d) return `<span class="mut">Buscando el detalle…</span>`;
   // Con la reapertura en vuelo, lo que se ve es la foto del documento
   // anterior: la nota lo dice y pide paciencia, en vez de la de "cerrada"
   // (que mandaría a hacer justo lo que ya se está haciendo).
@@ -5508,7 +5588,7 @@ function contenidoDetalle(clave) {
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: para cambiarle algo, vuelve a llenarla.</div>`;
   return `
-    <div class="detalle-cab">${cabecera}${nota}</div>
+    ${nota}
     <table><thead><tr>
       <th></th><th>Producto</th><th style="width:180px">Cantidad</th>
       <th style="width:150px">Descuento</th>
@@ -5935,7 +6015,7 @@ function pintarLlenadosPorRevisar(lista, hayPedidosSinDatos) {
           : `${falloHace(f.fecha_cargado)}: ${detalle}`)
       : `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas || "").replaceAll("\n", "<br>")}`;
     const acciones = f.tipo === "error"
-      ? `<button class="acento" onclick="llenar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
+      ? `${botonPrellenado(f, "Reintentar", "acento")}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Ya viste qué faltó y la factura queda como está."
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`;
@@ -7450,14 +7530,14 @@ function pintarBarraEnFila() {
   sincronizarCantidades();   // la opción "ruta completa" depende de este mismo gate
 }
 
-// El botón de producción: llena la PRIMERA pendiente de la lista — la misma
-// que tomaría la corrida — por el camino individual de siempre, que llena y se
-// detiene. Sin confirmación previa, igual que el "Llenar" de cada fila
-// (CONTRATOS.md 3.2).
+// El botón de producción: abre el prellenado de la PRIMERA pendiente de la
+// lista — la misma que tomaría la corrida. Igual que el "Llenar" de cada fila
+// (2026-07-31, pedido del usuario): se revisa en la ventana y se llena desde
+// ahí, por el camino individual de siempre, que llena y se detiene.
 function llenarSiguiente() {
   const f = pendientesLlenables()[0];
   if (!f) { mensaje("No hay pendientes.", "info"); return; }
-  llenar(f.pedido_id, f.parte);
+  abrirDetalle(f.pedido_id, f.parte, f.tiene_detalle === false);
 }
 
 // --- Espera de envío a la plataforma (2026-07-28, TEMPORAL) -----------------
@@ -7656,9 +7736,10 @@ async function pedirDescuentosDelLote(cola) {
 }
 
 // Falta la tasa que va a registrarse en el documento (2026-07-31, regla del
-// usuario): sin ella no se llena, ni aquí ni desde la barra. En modo prueba con
-// la puesta a punto saltada no aplica: ahí la tasa no se toca a propósito.
-const previoSinTasa = () => !saltandoTasa() && !tasaParaLlenar();
+// usuario): sin ella no se llena — ni el lote ni una factura suelta desde su
+// prellenado. En modo prueba con la puesta a punto saltada no aplica: ahí la
+// tasa no se toca a propósito.
+const sinTasaParaLlenar = () => !saltandoTasa() && !tasaParaLlenar();
 
 // El botón dice qué falta y se apaga hasta que esté: la fila, la cantidad
 // escrita o la tasa. Va aparte de pintarPrevioLote porque el tecleo de la tasa
@@ -7668,9 +7749,9 @@ function pintarBotonPrevio() {
   const btn = $("previo-llenar");
   // Sin facturas no hay nada que llenar (la ruta que se acaba de elegir puede
   // no tener pendientes), y con la lista en vuelo el lote todavía no es firme.
-  btn.disabled = previoCargando || !n || previoSinTasa();
+  btn.disabled = previoCargando || !n || sinTasaParaLlenar();
   btn.textContent = previoCargando ? "Rehaciendo la fila…"
-    : previoSinTasa() ? "Escribe la tasa para llenar"
+    : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
     : `Llenar ${n} factura${n === 1 ? "" : "s"}`;
 }
 
@@ -7747,11 +7828,16 @@ function filaPrevio(f, i) {
     - (previoFamiliaEstirada.total - previoFamiliaEstirada.dentro)
     ? ` <span class="previo-extra">entra para no partir el pedido</span>` : "";
   // El − saca esta factura de la fila (2026-07-31, pedido del usuario). No borra
-  // nada: el pedido sigue pendiente y lo llena otro lote.
-  return `<tr${fam ? ` class="previo-fam"` : ""}>
+  // nada: el pedido sigue pendiente y lo llena otro lote. Su clic corta aparte
+  // para no abrir de paso el detalle, que desde 2026-07-31 se abre pulsando el
+  // renglón — igual que en la lista de afuera — encima de esta revisión.
+  return `<tr class="${((fam ? "previo-fam " : "") + "abre-detalle").trim()}"
+      title="Clic para ver el detalle del pedido"
+      onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
+        f.tiene_detalle === false ? ",true" : ""})">
     <td class="previo-n"><button class="previo-menos"
         title="Saca esta factura de la fila. El pedido queda pendiente para otro lote."
-        onclick="previoQuitarFactura('${esc(f.pedido_id)}')">−</button>${i + 1}</td>
+        onclick="event.stopPropagation();previoQuitarFactura('${esc(f.pedido_id)}')">−</button>${i + 1}</td>
     <td>${esc(f.pedido_id)}${parte}${extra}</td>
     <td>${esc(f.razon_social || f.cliente_id || "")}</td>
     <td class="previo-num">${f.cantidad_lineas ?? ""}</td>
@@ -7812,22 +7898,85 @@ function descuentoPrevio(f) {
   return `<span class="pct">${esc(texto)}</span>${parcial}`;
 }
 
-// Los datos que deciden en qué documento cae cada factura del lote. En ámbar
-// va lo que el asistente NO va a poner: ahí la factura sale con lo que el
-// programa de facturación tenga puesto en ese momento.
+// --- Cajitas de puesta a punto (compartidas) --------------------------------
+// Los datos que deciden en qué documento cae cada factura. En ámbar va lo que
+// el asistente NO va a poner: ahí la factura sale con lo que el programa de
+// facturación tenga puesto en ese momento.
+// Los ladrillos y las cajitas comunes los comparten la revisión del lote y la
+// ventana de una factura —su pantalla de prellenado desde 2026-07-31—: mismos
+// datos, mismos controles; cambia solo qué se repinta al tocarlos (ver
+// repintarPuestaAPunto).
+const cajitaOpciones = (lista, actual) => lista.map(([valor, texto]) =>
+  `<option value="${esc(valor)}"${valor === actual ? " selected" : ""}>${esc(texto)}</option>`).join("");
+const cajitaFija = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
+    <span class="cj-rot">${esc(rot)}</span>
+    <span class="cj-val">${esc(val)}</span></div>`;
+const cajitaEditable = (rot, control, ojo, hover) => `<label class="cajita${
+    ojo ? " ojo" : ""}"${hover ? ` title="${esc(hover)}"` : ""}>
+    <span class="cj-rot">${esc(rot)}</span>${control}</label>`;
+
+const cajitaFecha = () => saltandoPuestaAPunto("fecha")
+  ? cajitaFija("Fecha a facturar", "no se toca", true)
+  : cajitaEditable("Fecha a facturar",
+      `<input type="date" class="cj-edit" value="${esc($("f-fecha-facturar").value)}"
+              onchange="cajitaFechaElegida(this.value)">`,
+      !$("f-fecha-facturar").value);
+
+// Sin la tasa del día no se llena nada (2026-07-31, regla del usuario): el
+// campo la pide en vez de anunciar que no se registra, y el botón de llenar
+// queda apagado hasta que esté escrita.
+const cajitaTasa = () => saltandoTasa()
+  ? cajitaFija("Tasa", "no se registra", true)
+  : cajitaEditable("Tasa",
+      `<input type="text" class="cj-edit" inputmode="decimal" autocomplete="off"
+              value="${esc($("f-tasa").value)}" placeholder="escríbela"
+              oninput="cajitaTasaTecleada(this)">`, !tasaParaLlenar());
+
+const cajitaSerie = () => saltandoPuestaAPunto("serie")
+  ? cajitaFija("Serie", "no se elige", true)
+  : cajitaEditable("Serie",
+      `<select class="cj-edit" onchange="cajitaSerieElegida(this.value)">${
+        cajitaOpciones([["", "la que esté puesta"],
+                        ...SERIES.map(s => [s, s + (s === seriePredeterminada ? " ★" : "")])],
+                       serieSeleccionada)}</select>`,
+      !serieSeleccionada);
+
+const cajitaImpresion = () => cajitaEditable("Imprimir",
+  `<select class="cj-edit" onchange="cajitaImpresionElegida(this.value)">${
+    cajitaOpciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
+  imprimirEnFila());
+
+// Baby Mix también se revisa antes de llenar (2026-07-31, pedido del usuario):
+// el mismo estado del selector TEMPORAL de la barra, guardado en esta máquina.
+const cajitaBaby = () => cajitaEditable("Baby Mix",
+  `<select class="cj-edit" onchange="cajitaBabyElegida(this.value)">${
+    cajitaOpciones([["125", "125 g"], ["150", "150 g"]], gramajeBaby())}</select>`,
+  false,
+  "Temporal hasta agotar los paquetes de 125 g: las líneas de Baby Mix salen "
+  + "con el gramaje elegido. La elección queda guardada en esta máquina.");
+
+// La empresa solo se nombra cuando NO es la de producción: contra la 999 se
+// llena con el relleno fijo de prueba y el documento no corresponde al pedido.
+// De solo lectura: se cambia en ADMIN, no a un clic de llenar.
+const cajitaEmpresa = () => {
+  const p999 = $("prueba-emp-999");
+  return (p999 && p999.checked) ? cajitaFija("Empresa", "999 (prueba)", true) : "";
+};
+
+// Puede haber DOS ventanas con puesta a punto abiertas a la vez (el detalle se
+// abre encima de la revisión del lote): un cambio en cualquiera repinta ambas,
+// que leen el mismo estado de la barra.
+function repintarPuestaAPunto() {
+  if (previoResolver) { pintarPrevioCajitas(); pintarPrevioAvisos(); pintarBotonPrevio(); }
+  if (detalleAbierto) pintarVentanaDetalle(detalleAbierto);
+}
+
 // Cada cajita es EDITABLE (2026-07-31, pedido del usuario): lo que esté mal se
 // corrige aquí mismo y el lote se actualiza a la vista, en vez de obligar a
 // cancelar, arreglarlo en la barra de arriba y volver a lanzar. Las que el modo
 // prueba deja fuera de la puesta a punto sí quedan de solo lectura: ahí no hay
 // nada que elegir porque ese dato no se va a tocar.
 function pintarPrevioCajitas() {
-  const opciones = (lista, actual) => lista.map(([valor, texto]) =>
-    `<option value="${esc(valor)}"${valor === actual ? " selected" : ""}>${esc(texto)}</option>`).join("");
-  const fija = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
-      <span class="cj-rot">${esc(rot)}</span>
-      <span class="cj-val">${esc(val)}</span></div>`;
-  const editable = (rot, control, ojo) => `<label class="cajita${ojo ? " ojo" : ""}">
-      <span class="cj-rot">${esc(rot)}</span>${control}</label>`;
   const cajitas = [];
 
   // Orden dictado por el usuario (2026-07-31): arriba de qué se factura (ruta,
@@ -7836,38 +7985,16 @@ function pintarPrevioCajitas() {
   // Cambiar la ruta rehace el lote entero: es el filtro del que sale la fila.
   const rutas = [["", "todas"], ...(ultimaLista.rutas || []).map(r => [r, nombreRuta(r)])];
   if (ultimaLista.hay_sin_ruta) rutas.push(["__sin_ruta__", "sin ruta"]);
-  cajitas.push(editable("Ruta",
+  cajitas.push(cajitaEditable("Ruta",
     `<select class="cj-edit" onchange="previoRutaElegida(this.value)">${
-      opciones(rutas, rutaSeleccionada)}</select>`));
+      cajitaOpciones(rutas, rutaSeleccionada)}</select>`));
 
-  const iso = $("f-fecha-facturar").value;
-  cajitas.push(saltandoPuestaAPunto("fecha")
-    ? fija("Fecha a facturar", "no se toca", true)
-    : editable("Fecha a facturar",
-        `<input type="date" class="cj-edit" value="${esc(iso)}"
-                onchange="previoFechaElegida(this.value)">`, !iso));
-
-  // Sin la tasa del día no se llena nada (2026-07-31, regla del usuario): el
-  // campo la pide en vez de anunciar que no se registra, y el botón de abajo
-  // queda apagado hasta que esté escrita.
-  const tasa = tasaParaLlenar();
-  cajitas.push(saltandoTasa()
-    ? fija("Tasa", "no se registra", true)
-    : editable("Tasa",
-        `<input type="text" class="cj-edit" inputmode="decimal" autocomplete="off"
-                value="${esc($("f-tasa").value)}" placeholder="escríbela"
-                oninput="previoTasaTecleada(this)">`, !tasa));
+  cajitas.push(cajitaFecha());
+  cajitas.push(cajitaTasa());
 
   cajitas.push(`<span class="cj-salto"></span>`);
 
-  cajitas.push(saltandoPuestaAPunto("serie")
-    ? fija("Serie", "no se elige", true)
-    : editable("Serie",
-        `<select class="cj-edit" onchange="previoSerieElegida(this.value)">${
-          opciones([["", "la que esté puesta"],
-                    ...SERIES.map(s => [s, s + (s === seriePredeterminada ? " ★" : "")])],
-                   serieSeleccionada)}</select>`,
-        !serieSeleccionada));
+  cajitas.push(cajitaSerie());
 
   // La cantidad también se elige AQUÍ (2026-07-31, pedido del usuario): el mismo
   // menú de la barra, y cambiarlo rehace la fila a la vista. Sus opciones salen
@@ -7880,59 +8007,65 @@ function pintarPrevioCajitas() {
   // distinta de la que se va a llenar.
   acomodarCantidadAlModo();
   const elegida = opcionesDeCantidad().find(o => o.valor === valorCantidadActual());
-  cajitas.push(editable("Llenar",
+  cajitas.push(cajitaEditable("Llenar",
     `<select class="cj-edit"${
         elegida && elegida.hover ? ` title="${esc(elegida.hover)}"` : ""
       } onchange="previoCantidadElegida(this.value)">${opcionesCantidadHtml()}</select>`));
 
-  cajitas.push(editable("Imprimir",
-    `<select class="cj-edit" onchange="previoImpresionElegida(this.value)">${
-      opciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
-    imprimirEnFila()));
-
-  // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
-  // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
-  // De solo lectura: se cambia en ADMIN, no a un clic de arrancar una corrida.
-  const p999 = $("prueba-emp-999");
-  if (p999 && p999.checked) cajitas.push(fija("Empresa", "999 (prueba)", true));
+  cajitas.push(cajitaImpresion());
+  cajitas.push(cajitaBaby());
+  cajitas.push(cajitaEmpresa());
 
   $("previo-cajitas").innerHTML = cajitas.join("");
 }
 
-function previoSerieElegida(valor) {
+function cajitaSerieElegida(valor) {
   cambioSerie(valor);          // fija serieSeleccionada y repinta el selector de la barra
-  pintarPrevioCajitas();
-  pintarPrevioAvisos();
+  repintarPuestaAPunto();
+}
+
+function cajitaBabyElegida(gramaje) {
+  const radio = document.querySelector(`input[name="f-bm"][value="${gramaje}"]`);
+  if (radio) radio.checked = true;
+  guardarGramajeBaby(gramaje);
+  repintarPuestaAPunto();
 }
 
 // La fecha manda sobre la tasa (cambioFechaFacturar repone la del día) y sobre
-// los descuentos (las campañas se resuelven contra ella), así que se repinta
-// todo y el resumen se vuelve a pedir.
-function previoFechaElegida(iso) {
-  if (!iso) { pintarPrevioCajitas(); return; }   // vaciarla no es una opción aquí
+// los descuentos (las campañas se resuelven contra ella): en el lote se vuelve
+// a pedir el resumen y en el detalle se recarga la factura, que enseña sus
+// descuentos contra la fecha puesta.
+function cajitaFechaElegida(iso) {
+  if (!iso) { repintarPuestaAPunto(); return; }   // vaciarla no es una opción aquí
   $("f-fecha-facturar").value = iso;
   cambioFechaFacturar();
-  pintarPrevioCajitas();
-  previoDescuentos = null;
-  previoDescuentosFallo = "";
-  pintarPrevioLote();
-  pedirDescuentosDelLote(previoCola);
+  if (previoResolver) {
+    previoDescuentos = null;
+    previoDescuentosFallo = "";
+    pintarPrevioLote();
+    pedirDescuentosDelLote(previoCola);
+  }
+  if (detalleAbierto) {
+    pintarVentanaDetalle(detalleAbierto);
+    if (!sinDetalleGuardado.has(detalleAbierto))
+      cargarDetalle(...partesDeClave(detalleAbierto));
+  }
 }
 
 // Tecleo: NO se repinta la cajita (se perdería el foco a media tasa). Se mueve
 // el campo de la barra —que es de donde sale lo que viaja— y se actualizan solo
-// el color de la cajita, los avisos y el botón.
+// el color de la cajita, los avisos y el botón de la ventana abierta.
 // Lo tecleado queda marcado como escrito A MANO (igual que "Llenar con esta
 // tasa" del aviso del llenado suelto): es una decisión del operador y manda
 // sobre lo que el BCV tenga o le falte a ese día — si no, escribir justo el
 // número auto-llenado no desbloquearía nada.
-function previoTasaTecleada(campo) {
+function cajitaTasaTecleada(campo) {
   $("f-tasa").value = campo.value;
   tasaAutoBCV = null;
   pintarAvisoBCV();
   campo.closest(".cajita").classList.toggle("ojo", !tasaParaLlenar());
-  pintarPrevioAvisos();
-  pintarBotonPrevio();
+  if (previoResolver) { pintarPrevioAvisos(); pintarBotonPrevio(); }
+  if (detalleAbierto) { pintarDetalleAvisos(); pintarBotonDetalle(); }
 }
 
 // Cambiar la ruta rehace la fila: la lista se vuelve a pedir filtrada y el lote
@@ -8044,34 +8177,52 @@ function previoQuitarSinReponer() {
   rehacerPrevioLote();
 }
 
-// La impresión decide qué cantidades se ofrecen (con papel no hay "otro…" ni
-// "ruta completa"), así que cambiarla puede mover la cantidad vigente: la fila
-// se rehace para que lo que está a la vista sea lo que se va a llenar.
-function previoImpresionElegida(valor) {
+// La impresión decide qué cantidades se ofrecen en el lote (con papel no hay
+// "otro…" ni "ruta completa"), así que cambiarla puede mover la cantidad
+// vigente: la fila se rehace para que lo que está a la vista sea lo que se va
+// a llenar.
+function cajitaImpresionElegida(valor) {
   const radio = document.querySelector(
     `input[name="enfila-imp"][value="${valor}"]`);
   if (radio) radio.checked = true;
   pintarCantidades();          // las cantidades ofrecidas dependen del papel
-  rehacerPrevioLote();         // la línea de proceso también cambia con esto
+  if (previoResolver) rehacerPrevioLote();  // la línea de proceso también cambia
+  if (detalleAbierto) pintarVentanaDetalle(detalleAbierto);
 }
 
-// Lo que hay que sopesar antes de dar el sí, con su consecuencia sobre el lote
-// entero (no sobre una factura suelta, que es como lo dicen los avisos del
-// llenado individual). Se repinta solo, sin tocar las cajitas: cada aviso
-// desaparece en cuanto se corrige su cajita, incluso a media tecla.
-function pintarPrevioAvisos() {
+// Lo que hay que sopesar antes de dar el sí, con su consecuencia dicha para n
+// facturas. Compartido: la revisión del lote lo dice sobre el lote entero y la
+// ventana de prellenado sobre su única factura. Se repinta solo, sin tocar las
+// cajitas: cada aviso desaparece en cuanto se corrige su cajita, incluso a
+// media tecla.
+function avisosPuestaAPunto(n) {
   const avisos = [];
-  const n = previoCola.length;
   if (!saltandoPuestaAPunto("serie") && !serieSeleccionada)
     avisos.push(`No hay serie elegida: ${n === 1 ? "la factura sale" :
       `las ${n} facturas salen`} con la que el programa de facturación tenga `
-      + `puesta al empezar cada una. Elígela aquí mismo, arriba.`);
+      + `puesta al empezar${n === 1 ? "" : " cada una"}. Elígela aquí mismo, arriba.`);
   const motivoTasa = saltandoTasa() ? null : motivoTasaAusente();
   if (motivoTasa)
     avisos.push(`${motivoTasa} Escríbela aquí arriba, en Tasa: sin ella no se `
       + `llena ${n === 1 ? "la factura" : "ninguna factura del lote"}.`);
-  $("previo-avisos").innerHTML = avisos.map(
-    t => `<div class="previo-ojo">${esc(t)}</div>`).join("") + avisoFamiliaEstirada();
+  return avisos;
+}
+
+const htmlAvisosPuestaAPunto = (avisos) =>
+  avisos.map(t => `<div class="pap-ojo">${esc(t)}</div>`).join("");
+
+function pintarPrevioAvisos() {
+  $("previo-avisos").innerHTML =
+    htmlAvisosPuestaAPunto(avisosPuestaAPunto(previoCola.length))
+    + avisoFamiliaEstirada();
+}
+
+// El div de avisos del detalle existe solo con la factura llenable (lo crea
+// fijoDetalle): tecleando la tasa se refresca aparte para no repintar las
+// cajitas y perder el foco.
+function pintarDetalleAvisos() {
+  const div = $("detalle-avisos");
+  if (div) div.innerHTML = htmlAvisosPuestaAPunto(avisosPuestaAPunto(1));
 }
 
 // El pedido dividido que el corte partía por la mitad (2026-07-31, pedido del
@@ -8097,7 +8248,7 @@ function avisoFamiliaEstirada() {
     `<button title="La fila se corta justo antes de este pedido, que queda `
     + `pendiente completo." onclick="previoFamiliaFuera(false)">Llenar solo `
     + `${sinEl} y dejarlo fuera</button>`);
-  return `<div class="previo-ojo">El pedido ${esc(f.pedido_id)}${
+  return `<div class="pap-ojo">El pedido ${esc(f.pedido_id)}${
       f.cliente ? ` (${esc(f.cliente)})` : ""} se divide en ${f.total} facturas y `
     + `la cantidad elegida lo partía por la mitad. Un pedido dividido se llena `
     + `entero o no se llena: la fila entra estirada a ${n} facturas para `
