@@ -2134,10 +2134,20 @@
          líneas. -->
     <div id="detalle-fijo"></div>
     <div id="detalle-cuerpo"></div>
+    <!-- Salidas de la ventana (2026-07-31, pedido del usuario): mientras no se
+         toque nada, "Volver". En cuanto se ajusta una línea esa salida se parte
+         en las dos que el operador necesita distinguir —"Guardar cambios" y
+         "Descartar cambios"—: un "Cerrar" a secas después de cambiar un
+         descuento se lee como que el cambio no quedó, sobre todo llegando desde
+         la revisión del lote. Descartar va de último: es el que deshace. -->
     <div class="editor-acciones">
       <button class="acento" id="detalle-llenar" style="display:none"
               onclick="llenarDesdeDetalle()">Llenar</button>
-      <button onclick="cerrarDetalle()">Cerrar</button>
+      <button class="primario" id="detalle-guardar" style="display:none"
+              onclick="guardarYVolverDetalle()">Guardar cambios</button>
+      <button id="detalle-volver" onclick="cerrarDetalle()">Volver</button>
+      <button id="detalle-descartar" style="display:none"
+              onclick="descartarCambiosDetalle()">Descartar cambios</button>
     </div>
   </div>
 </div>
@@ -2829,8 +2839,12 @@ let confirmSalidaCerrar = null;
 // `sinSeguir` quita el botón "Seguir editando" (2026-07-31): para la revisión
 // del lote, "Guardar" YA ES la salida azul que hace falta (arranca el llenado
 // de una vez) y un tercer botón que solo cierra la pregunta sería redundante.
+// `alReponer` corre al deshacer la pregunta: los botones vuelven todos visibles
+// (se repone `display:""` a lo que se ocultó), así que el editor cuya botonera
+// depende del estado —el detalle, con su Volver / Guardar / Descartar— la
+// vuelve a pintar en vez de quedarse con los tres a la vista.
 function pedirConfirmSalida(cfg) {
-  if (confirmSalidaCerrar) return;            // ya hay una pregunta a la vista
+  if (confirmSalidaCerrar) return false;      // ya hay una pregunta a la vista
   const acciones = cfg.acciones;
   // Ocultar los botones normales sin quitarlos (el HTML del editor es fijo y no
   // se repinta): se reponen tal cual al resolver.
@@ -2861,12 +2875,14 @@ function pedirConfirmSalida(cfg) {
     fila.remove();
     previos.forEach(el => el.style.display = "");
     confirmSalidaCerrar = null;
+    if (cfg.alReponer) cfg.alReponer();
   };
   confirmSalidaCerrar = cerrarPregunta;
   bSeguir.onclick = cerrarPregunta;
   bGuardar.onclick = () => { cerrarPregunta(); cfg.guardar(); };
   bSalir.onclick = () => { cerrarPregunta(); cfg.cerrar(); };
   if (cfg.alMostrar) cfg.alMostrar();
+  return true;
 }
 
 function actualizarStatusbar() {
@@ -5618,6 +5634,12 @@ const detalleDatos = {};              // "pedido|parte" → respuesta del panel
 const detalleFallos = {};             // "pedido|parte" → por qué no se pudo traer
 const detalleReq = {};                // "pedido|parte" → nº de la última consulta
 let detalleReabriendo = null;         // clave con /api/refacturar en vuelo (nota "Reabriendo…")
+// Cómo estaban los ajustes al ABRIR la ventana: es a lo que vuelve "Descartar
+// cambios" (2026-07-31, pedido del usuario). Los ajustes se guardan al
+// teclearlos —así no se pierde nada si el panel se cierra—, así que deshacerlos
+// es reponer esta foto línea por línea, no dejar de mandar nada.
+let detalleOriginal = null;           // {clave, ajustes:{código:{…}}, repetidas:{código:decisión}}
+let detalleAjustesEnVuelo = [];       // ajustes tecleados que todavía viajan
 const sinDetalleGuardado = new Set(); // claves abiertas cuya factura no guardó sus líneas
 const AVISO_SIN_DETALLE = `De esta factura no quedó guardado el detalle: se marcó
   a mano, la llenó otra máquina, o se llenó antes de que el panel guardara sus
@@ -5652,6 +5674,8 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
   detalleTocado = false;
+  detalleOriginal = null;
+  detalleAjustesEnVuelo = [];
   delete detalleFallos[clave];
   if (sinDetalle) sinDetalleGuardado.add(clave);
   else sinDetalleGuardado.delete(clave);
@@ -5673,6 +5697,8 @@ function abrirDetalleCargando(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
   detalleTocado = false;
+  detalleOriginal = null;
+  detalleAjustesEnVuelo = [];
   delete detalleFallos[clave];
   delete detalleDatos[clave];
   sinDetalleGuardado.delete(clave); // reabrir la vuelve a armar: sí habrá detalle
@@ -5683,36 +5709,148 @@ function abrirDetalleCargando(pedidoId, parte) {
 
 function cerrarDetalle() {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
+  const seTocoAlgo = detalleTocado;
   $("detalle-overlay").classList.remove("visible");
   $("detalle-overlay").classList.remove("sobre-previo");
   detalleAbierto = null;
   detalleTocado = false;
+  detalleOriginal = null;
   // De vuelta a la revisión del lote: lo tecleado aquí (la tasa sobre todo) se
   // refleja en sus cajitas, que quedaron pintadas con el valor de antes.
   if (previoResolver) { pintarPrevioCajitas(); pintarPrevioAvisos(); pintarBotonPrevio(); }
+  // Y su renglón: los descuentos y el "a mano" del lote se resumieron ANTES de
+  // este ajuste, así que sin volver a pedirlos el operador vuelve a una fila que
+  // sigue diciendo el porcentaje viejo — justo lo que se lee como "no se guardó".
+  if (previoResolver && seTocoAlgo) pedirDescuentosDelLote(previoCola);
 }
 
 // Cantidades, descuentos y las opciones de cada línea se guardan solas, pero
 // ajustarlas es trabajo largo: un clic afuera no puede llevarse la ventana en
 // medio. Igual que en la del cliente, se escucha en el cuerpo (que se repinta
-// entero con cada ajuste) y no control por control.
+// entero con cada ajuste) y no control por control. Desde el 2026-07-31 esa
+// misma marca cambia el pie: haber tocado algo es lo que parte "Volver" en
+// "Guardar cambios" y "Descartar cambios".
 let detalleTocado = false;
-$("detalle-cuerpo").addEventListener("change", () => { detalleTocado = true; });
+$("detalle-cuerpo").addEventListener("change", marcarDetalleTocado);
 $("detalle-cuerpo").addEventListener("click", (ev) => {
-  if (ev.target.closest("button")) detalleTocado = true;
+  if (ev.target.closest("button")) marcarDetalleTocado();
 });
 
-// Solo lo usa el clic afuera: el botón Cerrar es salida deliberada.
+function marcarDetalleTocado() {
+  if (detalleTocado) return;
+  detalleTocado = true;
+  pintarBotonDetalle();
+}
+
+// La pregunta de salida se queda con la botonera (deja los botones ocultos):
+// mientras esté puesta, el pie NO se repinta.
+let detallePreguntandoSalida = false;
+
+// Solo lo usa el clic afuera: los botones del pie son salidas deliberadas.
+// La pregunta ofrece las mismas dos salidas que el pie, para que "descartar"
+// signifique lo mismo se llegue por donde se llegue.
 function intentarCerrarDetalle() {
   if (!detalleTocado) { cerrarDetalle(); return; }
-  pedirConfirmSalida({
+  detallePreguntandoSalida = pedirConfirmSalida({
     acciones: $("detalle-caja").querySelector(".editor-acciones"),
-    mensaje: "Estás ajustando esta factura; lo que cambiaste ya quedó guardado.",
-    salirTxt: "Cerrar el detalle",
+    mensaje: "Hiciste cambios en esta factura.",
+    guardar: guardarYVolverDetalle,
+    guardarTxt: "Guardar cambios",
+    salirTxt: "Descartar cambios",
     salirClase: "",
     seguirTxt: "Seguir aquí",
-    cerrar: cerrarDetalle,
+    cerrar: descartarCambiosDetalle,
+    alReponer: () => { detallePreguntandoSalida = false; pintarBotonDetalle(); },
   });
+}
+
+// Cómo estaban los ajustes de esta factura al abrir la ventana. Se toma con el
+// PRIMER detalle que llega tras abrirla: de ahí en adelante cada tecleo ya la
+// modifica, y esta foto es lo único que sabe a qué volver.
+function fotoDeAjustes(clave, d) {
+  const ajustes = {}, repetidas = {};
+  (d.lineas || []).forEach(l => {
+    const a = l.ajuste || {};
+    ajustes[l.codigo_winledger] = {
+      cantidad: a.cantidad === undefined ? null : a.cantidad,
+      origen: a.origen || "manual",
+      descuento_pct: a.descuento_pct === undefined ? null : a.descuento_pct,
+    };
+    if (l.filas_sumadas > 1)
+      repetidas[l.codigo_winledger] = l.decision_repetida || "sumar";
+  });
+  return {clave, ajustes, repetidas};
+}
+
+// "Guardar cambios": lo tecleado ya viajó (cada campo se guarda al salir de él),
+// así que esto espera a que aterrice el último y recién ahí vuelve. Importa
+// porque el change del campo se dispara justo al pulsar este botón: si el panel
+// rechaza el número (una cantidad en cero, un descuento fuera de rango), la
+// ventana se queda abierta con el error a la vista en vez de salir prometiendo
+// un cambio que no quedó.
+async function guardarYVolverDetalle() {
+  const boton = $("detalle-guardar");
+  boton.disabled = true;
+  const antes = boton.textContent;
+  boton.textContent = "Guardando…";
+  const resultados = await Promise.all(detalleAjustesEnVuelo);
+  boton.disabled = false;
+  boton.textContent = antes;
+  if (resultados.includes(false)) return;   // el error quedó dentro de la ventana
+  cerrarDetalle();
+}
+
+// "Descartar cambios": repone línea por línea lo que había al abrir la ventana
+// (cantidad con su origen, descuento y la decisión del producto repetido) y
+// vuelve. Solo se manda lo que de verdad cambió.
+async function descartarCambiosDetalle() {
+  const clave = detalleAbierto;
+  const foto = detalleOriginal;
+  const boton = $("detalle-descartar");
+  boton.disabled = true;
+  boton.textContent = "Deshaciendo…";
+  await Promise.all(detalleAjustesEnVuelo);   // no pisar con lo viejo un ajuste que aún viaja
+  // Después de esperarlos: el detalle se relee entero con cada ajuste que
+  // aterriza, y comparar contra la copia de antes dejaría el último sin deshacer.
+  const d = detalleDatos[clave];
+  const [pedidoId, parte] = partesDeClave(clave);
+  const igual = (a, b) => (a === undefined || a === null ? null : a)
+                       === (b === undefined || b === null ? null : b);
+  try {
+    for (const l of (d && foto && foto.clave === clave ? d.lineas : [])) {
+      const orig = foto.ajustes[l.codigo_winledger];
+      if (!orig) continue;
+      const act = l.ajuste || {};
+      if (!igual(act.cantidad, orig.cantidad)
+          || !igual(act.descuento_pct, orig.descuento_pct)
+          || (orig.cantidad !== null && !igual(act.origen, orig.origen)))
+        await api("/api/factura/ajuste-linea", {
+          pedido_id: pedidoId, parte, codigo_winledger: l.codigo_winledger,
+          cantidad: orig.cantidad, origen: orig.origen,
+          descuento_pct: orig.descuento_pct,
+        });
+      const decision = foto.repetidas[l.codigo_winledger];
+      if (decision && decision !== l.decision_repetida)
+        await api("/api/factura/repetida", {
+          pedido_id: pedidoId, parte, codigo_winledger: l.codigo_winledger,
+          decision,
+        });
+    }
+  } catch (e) {
+    // No se pudo deshacer: la ventana NO se cierra — el operador tiene que
+    // enterarse de que sus números siguen puestos.
+    boton.disabled = false;
+    boton.textContent = "Descartar cambios";
+    const caja = $(`det-error-${clave}`);
+    if (caja) { caja.textContent = `No se pudieron deshacer los cambios: ${e.message}`;
+                caja.style.display = ""; }
+    await cargarDetalle(pedidoId, parte);
+    return;
+  }
+  boton.disabled = false;
+  boton.textContent = "Descartar cambios";
+  cerrarDetalle();
+  cargar();     // el chip de "a mano" de la fila vuelve a su cuenta
 }
 
 const partesDeClave = (clave) => [clave.slice(0, clave.lastIndexOf("|")),
@@ -5762,9 +5900,10 @@ function reabrirDesdeDetalle(f) {
 // Si se llegó desde la revisión del lote, llenar ESTA es abandonar el lote
 // (pedido del usuario 2026-07-31): la revisión se cierra sin arrancar la
 // corrida — nada estaba apartado todavía — y se relanza después si hace falta.
-function llenarDesdeDetalle() {
+async function llenarDesdeDetalle() {
   if (!detalleAbierto) return;
-  const [pedidoId, parte] = partesDeClave(detalleAbierto);
+  const clave = detalleAbierto;
+  const [pedidoId, parte] = partesDeClave(clave);
   const fila = filaDeLista(pedidoId, parte) || {};
   // Cerrada o tomada por otra máquina: el pie pregunta la causa encima de
   // esta misma ventana (no se cierra — al confirmar se vuelve el prellenado).
@@ -5772,6 +5911,18 @@ function llenarDesdeDetalle() {
     const reabrir = reabrirDesdeDetalle(fila);
     if (reabrir) reabrir.abrir(pedidoId, parte);
     return;
+  }
+  // Lo recién tecleado puede estar viajando todavía (el change del campo se
+  // dispara al pulsar este botón): se espera a que quede guardado para llenar
+  // con ese número y no con el anterior. Rechazado, no se llena: el error se
+  // queda a la vista. Sin nada en vuelo no se espera nada — el llenado arranca
+  // en el mismo clic, como siempre.
+  if (detalleAjustesEnVuelo.length) {
+    $("detalle-llenar").disabled = true;
+    const ajustes = await Promise.all(detalleAjustesEnVuelo);
+    if (detalleAbierto !== clave) return;
+    pintarBotonDetalle();
+    if (ajustes.includes(false)) return;
   }
   cerrarDetalle();
   if (previoResolver) salirDelPrevio(false);
@@ -5797,6 +5948,10 @@ async function cargarDetalle(pedidoId, parte) {
     const datos = await api("/api/factura/detalle?" + params);
     if (detalleReq[clave] !== req) return;
     detalleDatos[clave] = datos;
+    // Primer detalle desde que se abrió la ventana: es a esto a lo que vuelve
+    // "Descartar cambios".
+    if (!detalleOriginal && clave === detalleAbierto)
+      detalleOriginal = fotoDeAjustes(clave, datos);
     delete detalleFallos[clave];
   } catch (e) {
     if (detalleReq[clave] !== req) return;
@@ -5821,12 +5976,28 @@ function pintarVentanaDetalle(clave) {
   pintarBotonDetalle();
 }
 
-// El botón del pie: la etiqueta de llenadoDirecto con el mismo candado de la
+// El pie entero: el botón de llenar y las salidas, que cambian según se haya
+// tocado algo (2026-07-31, pedido del usuario).
+function pintarBotonDetalle() {
+  // Con la pregunta de salida puesta, la botonera es de ella (dejó los botones
+  // ocultos): repintarlos aquí los sacaría al lado de la pregunta. Al deshacerse
+  // vuelve a pasar por aquí (alReponer).
+  if (detallePreguntandoSalida) return;
+  pintarBotonLlenarDetalle();
+  // Con cambios hechos, "Volver" a secas no dice qué pasa con ellos: se
+  // reemplaza por las dos salidas que sí lo dicen.
+  const hayCambios = detalleTocado;
+  $("detalle-volver").style.display = hayCambios ? "none" : "";
+  $("detalle-guardar").style.display = hayCambios ? "" : "none";
+  $("detalle-descartar").style.display = hayCambios ? "" : "none";
+}
+
+// El botón de llenar: la etiqueta de llenadoDirecto con el mismo candado de la
 // tasa que el lote (2026-07-31, regla del usuario) — sin la tasa del día no se
 // llena, y el botón dice qué falta. En una cerrada o tomada por otra máquina
 // ofrece la acción de su fila (reabrirDesdeDetalle); mientras la reapertura
 // viaja queda deshabilitado diciendo qué se espera.
-function pintarBotonDetalle() {
+function pintarBotonLlenarDetalle() {
   const boton = $("detalle-llenar");
   if (!detalleAbierto) { boton.style.display = "none"; return; }
   // Sin detalle guardado no hay sobre qué reintentar ni motivo que reabrir
@@ -5843,7 +6014,11 @@ function pintarBotonDetalle() {
   if (etiqueta) {
     boton.style.display = "";
     boton.disabled = sinTasaParaLlenar();
-    boton.textContent = boton.disabled ? "Escribe la tasa para llenar" : etiqueta;
+    // Llegando desde la revisión del lote, llenar ESTA deja el lote sin arrancar
+    // (llenarDesdeDetalle): el botón lo dice antes de pulsarlo.
+    boton.textContent = boton.disabled ? "Escribe la tasa para llenar"
+      : (previoResolver && etiqueta === "Llenar") ? "Llenar esta factura sola"
+      : etiqueta;
     return;
   }
   const reabrir = reabrirDesdeDetalle(fila);
@@ -6072,7 +6247,21 @@ function lineaDeDetalle(pedidoId, parte, codigo) {
   return d ? d.lineas.find(l => l.codigo_winledger === codigo) : null;
 }
 
-async function guardarAjuste(pedidoId, parte, codigo, cuerpo) {
+// El ajuste sale al salir del campo y queda anotado mientras viaja: "Guardar
+// cambios" espera a que aterricen todos antes de volver, para no dar por bueno
+// un número que el panel todavía puede rechazar.
+function guardarAjuste(pedidoId, parte, codigo, cuerpo) {
+  const viaje = enviarAjuste(pedidoId, parte, codigo, cuerpo);
+  detalleAjustesEnVuelo.push(viaje);
+  viaje.then(() => {
+    detalleAjustesEnVuelo = detalleAjustesEnVuelo.filter(v => v !== viaje);
+  });
+  return viaje;
+}
+
+// Devuelve si el ajuste quedó guardado (nunca lanza: el fallo se cuenta dentro
+// de la ventana, que es donde el operador está mirando).
+async function enviarAjuste(pedidoId, parte, codigo, cuerpo) {
   const clave = claveDetalle(pedidoId, parte);
   try {
     await api("/api/factura/ajuste-linea",
@@ -6082,10 +6271,11 @@ async function guardarAjuste(pedidoId, parte, codigo, cuerpo) {
     if (caja) { caja.textContent = e.message; caja.style.display = ""; }
     // El valor rechazado no se queda en pantalla: se recarga lo que hay guardado.
     await cargarDetalle(pedidoId, parte);
-    return;
+    return false;
   }
   await cargarDetalle(pedidoId, parte);
   cargar();     // el chip de la fila cuenta las líneas ajustadas
+  return true;
 }
 
 // Cliente y sucursal de una factura, resueltos para mostrar (2026-07-31): el
