@@ -110,6 +110,50 @@
   #filtros-barra { margin-bottom:0; padding:10px 14px; background:#fff;
                    border:1px solid #e2e6ec; border-bottom:none;
                    border-radius:0 8px 0 0; }
+  /* --- Filtro activo (2026-07-31, pedido del usuario) ----------------------
+     Con cualquier filtro puesto la lista deja de estar completa, y eso tiene
+     que verse ANTES de leer la lista: la barra entera se tiñe de ámbar (el
+     mismo color de atención de los chips despacho-difiere/por-revisar) con una
+     franja gruesa a la izquierda, cada campo que está filtrando se marca solo,
+     y arriba sale el aviso con lo que está filtrando y cómo quitarlo. */
+  #filtros-barra.filtrando { background:#fffaf3; border-color:#f5c98a;
+                             box-shadow:inset 4px 0 0 #f59e0b; }
+  /* El aviso ocupa la fila completa de la barra (la barra envuelve), así queda
+     arriba de los campos y no compitiendo por el espacio con ellos. */
+  .filtro-aviso { flex-basis:100%; display:flex; align-items:center; gap:8px;
+                  flex-wrap:wrap; margin-bottom:2px; font-size:12.5px;
+                  color:var(--warn); }
+  .filtro-aviso b { font-size:13px; }
+  /* Punto ámbar latiendo: llama el ojo a la barra sin ocupar sitio. */
+  .filtro-aviso .punto { width:9px; height:9px; border-radius:50%;
+                         background:#f59e0b; flex-shrink:0;
+                         animation:filtro-late 1.6s ease-in-out infinite; }
+  @keyframes filtro-late { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+  /* Cada filtro puesto, con su × para quitarlo desde el propio aviso. */
+  .filtro-chip { display:inline-flex; align-items:center; gap:5px;
+                 background:#fff; border:1px solid #f5c98a; border-radius:10px;
+                 padding:2px 4px 2px 9px; font-size:11.5px; font-weight:600;
+                 color:#b54708; max-width:280px; }
+  .filtro-chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .filtro-chip button { padding:0; margin:0; width:17px; height:17px; flex-shrink:0;
+                        border:none; background:transparent; color:#b54708;
+                        font-size:14px; line-height:1; border-radius:5px;
+                        display:flex; align-items:center; justify-content:center; }
+  .filtro-chip button:hover { background:#fde8c8; }
+  .filtro-aviso .quitar-todos { padding:2px 9px; font-size:11.5px; font-weight:600;
+                                color:#b54708; background:#fff; border-color:#f5c98a;
+                                border-radius:10px; }
+  .filtro-aviso .quitar-todos:hover { background:#fde8c8; }
+  /* Campos que están filtrando ahora mismo. Los de texto y fecha se marcan
+     solos por su estado (con texto escrito / con valor); la ruta y la casilla
+     llevan la clase desde pintarEstadoFiltros. */
+  .buscador > input:not(:placeholder-shown),
+  #filtros-barra .campo-fecha.tiene-valor > input,
+  select.filtro-on { border-color:#f59e0b; background:#fffaf3; }
+  /* Solo color: un recuadro alrededor de la casilla movería la barra entera
+     cada vez que se marca (la barra alinea por abajo). */
+  #campo-solo-aqui.filtro-on { color:#b54708; font-weight:600; }
+  #campo-solo-aqui.filtro-on input { accent-color:#f59e0b; }
   #sec-pendientes, #sec-procesadas, #sec-revision { border-top-right-radius:0; }
   .campo { display:flex; flex-direction:column; font-size:12px; color:var(--mut); gap:3px; }
   /* Casilla de filtro: los demás campos de la barra llevan su etiqueta encima,
@@ -1538,6 +1582,16 @@
        histórico (ver cambiarPagina), y un rango Desde/Hasta consulta ese tramo
        exacto, tan atrás como se quiera. -->
   <div class="barra" id="filtros-barra">
+    <!-- Aviso de filtro activo (2026-07-31): enuncia el hecho (hay filtros) y
+         su consecuencia (la lista no está completa), y trae la acción resuelta
+         ahí mismo — cada filtro se quita con su × y todos juntos con el botón.
+         Lo pinta pintarEstadoFiltros; arranca oculto porque el panel abre sin
+         filtros (salvo la ruta predeterminada, que se marca al primer pintado). -->
+    <div class="filtro-aviso" id="filtro-aviso" style="display:none">
+      <span class="punto"></span>
+      <span><b>Filtro activo</b> · no se muestra la lista completa</span>
+      <span id="filtro-aviso-chips" style="display:contents"></span>
+    </div>
     <div class="campo">Buscar<span class="buscador">
         <input type="text" id="f-buscar" style="width:260px"
             placeholder="pedido, cliente, sucursal, ruta, tipo, Nº doc…"
@@ -3847,35 +3901,101 @@ function filtros() {
        + "&solo_aqui=" + ($("f-solo-aqui").checked ? "1" : "");
 }
 
-// ¿Hay algún filtro activo sobre la lista de esta tab? No es una hipótesis:
-// cada control mira su propio valor vigente (pedido del usuario 2026-07-31,
-// "avisa que mientras estés filtrando no estás viendo todos los resultados").
-// PENDIENTES y EN REVISIÓN solo filtran por buscador y ruta (las fechas y
-// "solo esta máquina" son exclusivas de PROCESADAS, ver cambiarTab). El
-// catálogo filtra con su propio campo de texto y, en Feriados, además con
-// el tipo (feriadoClase).
-function hayFiltroActivo(tab) {
-  if (tab === "catalogo") {
-    const texto = (($("cat-filtro") || {}).value || "").trim() !== "";
-    const tipo = catalogoActual === "feriados" && feriadoClase !== "todas";
-    return texto || tipo;
-  }
-  const buscar = ($("f-buscar").value || "").trim() !== "";
-  const ruta = rutaSeleccionada !== "";
+// --- Filtro activo (2026-07-31, pedido del usuario) --------------------------
+// Mientras haya un filtro puesto la lista NO está completa, y eso se ve en tres
+// sitios a la vez: la barra de filtros teñida con el campo culpable marcado, el
+// aviso de arriba con lo que filtra y su ×, y el conteo del pie en ámbar.
+//
+// Qué cuenta como filtro depende de la tab: PENDIENTES y EN REVISIÓN solo
+// filtran por buscador y ruta — las fechas y "solo esta máquina" son exclusivas
+// de PROCESADAS (ver cambiarTab). Cada entrada trae ya el nombre del filtro que
+// la quita, porque el aviso los ofrece uno por uno.
+function filtrosActivos(tab) {
+  const activos = [];
+  const buscar = ($("f-buscar").value || "").trim();
+  if (buscar) activos.push({cual: "buscar", texto: `Buscar: ${buscar}`});
+  if (rutaSeleccionada) activos.push({cual: "ruta", texto: `Ruta: ${
+    rutaSeleccionada === "__sin_ruta__" ? "(sin ruta)" : nombreRuta(rutaSeleccionada)}`});
   if (tab === "procesadas") {
-    const fechas = !!($("f-desde").value || $("f-hasta").value);
-    return buscar || ruta || fechas || $("f-solo-aqui").checked;
+    const dma = (iso) => iso.split("-").reverse().join("/");
+    if ($("f-desde").value) activos.push({cual: "desde", texto: `Desde: ${dma($("f-desde").value)}`});
+    if ($("f-hasta").value) activos.push({cual: "hasta", texto: `Hasta: ${dma($("f-hasta").value)}`});
+    if ($("f-solo-aqui").checked) activos.push({cual: "solo_aqui", texto: "Solo esta máquina"});
   }
-  return buscar || ruta;
+  return activos;
 }
 
-// Etiqueta que acompaña el conteo cuando hayFiltroActivo dio true: el mismo
-// aviso en los tres sitios que muestran un conteo (pie de paginación y los dos
-// formatos de cat-conteo), para que diga siempre lo mismo.
+// El catálogo tiene su propio campo de texto y, en Feriados, además el tipo.
+function hayFiltroActivo(tab) {
+  if (tab === "catalogo")
+    return ((($("cat-filtro") || {}).value || "").trim() !== "")
+        || (catalogoActual === "feriados" && feriadoClase !== "todas");
+  return filtrosActivos(tab).length > 0;
+}
+
+// Etiqueta que acompaña el conteo cuando hay filtro: el mismo aviso en los tres
+// sitios que muestran un conteo (pie de paginación y los dos formatos de
+// cat-conteo), para que diga siempre lo mismo.
 function chipFiltroActivo(filtroActivo) {
   return filtroActivo
-    ? `<span class="chip chip-filtro" title="No se muestra la lista completa: hay un filtro activo. Bórralo para ver todo.">Filtro activo</span>`
+    ? `<span class="chip chip-filtro" title="No se muestra la lista completa: hay un filtro activo. Quítalo para ver todo.">Filtro activo</span>`
     : "";
+}
+
+// Pinta el estado de la barra de filtros: el tinte ámbar, la marca de los
+// campos que no se marcan solos (la ruta y la casilla; los de texto y fecha lo
+// hacen por CSS según su valor) y el aviso de arriba con un chip por filtro.
+function pintarEstadoFiltros() {
+  const tab = tabActiva();
+  const activos = filtrosActivos(tab);
+  $("filtros-barra").classList.toggle("filtrando", activos.length > 0);
+  $("f-ruta").classList.toggle("filtro-on", rutaSeleccionada !== "");
+  $("campo-solo-aqui").classList.toggle(
+    "filtro-on", tab === "procesadas" && $("f-solo-aqui").checked);
+  $("filtro-aviso").style.display = activos.length ? "" : "none";
+  // "Quitar todos" solo con dos o más: con uno solo repetiría la × del chip.
+  $("filtro-aviso-chips").innerHTML = activos.map(a => `
+    <span class="filtro-chip"><span>${esc(a.texto)}</span>
+      <button type="button" title="Quitar este filtro"
+              onclick="quitarFiltro('${a.cual}')">&times;</button></span>`).join("")
+    + (activos.length > 1
+        ? `<button type="button" class="quitar-todos" onclick="quitarFiltros()">Quitar todos</button>`
+        : "");
+}
+
+// Qué tab se está viendo. La barra de filtros solo existe en las tres que
+// listan facturas, así que basta con mirar cuál de ellas está activa.
+function tabActiva() {
+  return ["pendientes", "procesadas", "revision"]
+    .find(t => $("tab-" + t) && $("tab-" + t).classList.contains("activa")) || "pendientes";
+}
+
+// Deja UN filtro en su valor neutro, sin recargar: quitarFiltro/quitarFiltros
+// consultan UNA sola vez al final, no una por filtro quitado.
+function soltarFiltro(cual) {
+  if (cual === "buscar") $("f-buscar").value = "";
+  else if (cual === "ruta") {
+    rutaSeleccionada = "";
+    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
+  } else if (cual === "desde" || cual === "hasta") {
+    $("f-" + cual).value = "";
+    actualizarXFecha("f-" + cual);
+    sincronizarRangosFecha();   // el otro extremo suelta su tope cruzado
+  } else if (cual === "solo_aqui") $("f-solo-aqui").checked = false;
+}
+
+// Quita UN filtro desde su chip del aviso y recarga la lista.
+function quitarFiltro(cual) {
+  soltarFiltro(cual);
+  aplicarFiltros();
+}
+
+// Quita todos los de la tab a la vista de un golpe. Los que no aplican a esta
+// tab no se tocan: en PENDIENTES, borrar un rango de fechas que solo filtra
+// PROCESADAS sería un cambio invisible en la lista que se está mirando.
+function quitarFiltros() {
+  for (const a of filtrosActivos(tabActiva())) soltarFiltro(a.cual);
+  aplicarFiltros();
 }
 
 // --- PROCESADAS: histórico progresivo (2026-07-23; por escalones 2026-07-28) -
@@ -3924,6 +4044,7 @@ function aplicarFiltros() {
   paginacion.pendientes.pagina = 1;
   paginacion.revision.pagina = 1;
   paginacion.procesadas.pagina = 1;
+  pintarEstadoFiltros();   // la barra se tiñe ya, sin esperar a la consulta
   cargar();
 }
 
@@ -4043,6 +4164,7 @@ function limpiarBuscador(id, fn) {
 let timerBusqueda = null;
 function filtroBusquedaDinamico() {
   clearTimeout(timerBusqueda);
+  pintarEstadoFiltros();   // la marca de "filtrando" no espera a la consulta
   timerBusqueda = setTimeout(aplicarFiltros, 300);
 }
 
@@ -4099,6 +4221,9 @@ function cambiarTab(tab) {
   // "Solo esta máquina" es de PROCESADAS: es la única lista que trae facturas
   // de otras laptops (ver campo-solo-aqui).
   $("campo-solo-aqui").style.display = tab === "procesadas" ? "" : "none";
+  // Cambiar de tab cambia QUÉ filtra (las fechas y la casilla solo cuentan en
+  // PROCESADAS): el aviso se repinta con los de la tab que queda a la vista.
+  pintarEstadoFiltros();
   // DESCUENTOS, AJUSTES y ADMIN dejan bajar la página completa; las demás
   // tabs quedan encapsuladas a la ventana (solo su tabla hace scroll).
   document.body.classList.toggle("tab-libre", tab === "descuentos" || tab === "ajustes" || tab === "admin");
@@ -4700,6 +4825,9 @@ setInterval(latido, LATIDO_MS);
 
 function repintar() {
   const revision = ultimaLista.revision || [];
+  // Cubre el pintado inicial y los refrescos: la ruta predeterminada de la
+  // máquina ya es un filtro puesto desde que el panel abre.
+  pintarEstadoFiltros();
   // El contador del tab cuenta lo que hay POR LLENAR: la lista trae también
   // las partes ya listas de un pedido a medias (para que se vea completo),
   // y esas no son trabajo (2026-07-22).
