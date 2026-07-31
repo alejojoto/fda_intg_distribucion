@@ -1865,6 +1865,29 @@
         botón del calendario la repone con un clic, y en cualquier factura se
         puede cambiar a mano.</p>
     </div>
+    <!-- Modo viejo (2026-07-31): respaldo del operador si una actualización
+         sale lenta o con fallas — el interruptor pone esta máquina en el canal
+         "estable" (la última versión declarada estable, ver
+         scripts/mandar_a_produccion.py --estable) y el lanzador hace el cambio
+         real de versión en el próximo arranque, igual que el canal de Ajustes
+         de admin. Visible en todos los equipos a propósito: es el operador
+         quien lo necesita cuando el modo nuevo no le sirve. -->
+    <div class="ajustes-bloque">
+      <h3>Versión del programa</h3>
+      <div class="ajustes-fila">
+        <label class="desc-todos">
+          <input type="checkbox" id="modo-viejo-chk"
+                 onchange="guardarModoViejo(this.checked)">
+          Usar el modo viejo</label>
+        <span class="prueba-nota"
+              title="El cambio de versión lo hace el lanzador al arrancar, así que esta sesión sigue con la que ya cargó.">Se aplica al reabrir el asistente</span>
+      </div>
+      <p class="mut" style="margin:8px 0 0">
+        Con el modo viejo, este equipo trabaja con la versión estable anterior
+        del programa y deja de recibir actualizaciones hasta que se desmarque.
+        Sirve si una actualización sale lenta o con fallas: márcalo, reabre el
+        asistente y sigue trabajando mientras se corrige.</p>
+    </div>
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
       <div class="cat-btns" id="cat-btns"></div>
@@ -9820,8 +9843,11 @@ function pintarOpcionesPrueba(op) {
     // Canal vacío = automático por equipo, que es como nace toda instalación:
     // en el servidor admin ese automático ES desarrollo, así que se pinta Dev
     // (la opción "Automático" se retiró el 2026-07-29, pedido del usuario).
+    // Con el modo viejo (canal "estable") ninguno de los dos radios queda
+    // marcado: esa elección vive en su propio interruptor de AJUSTES.
     $("prueba-canal-produccion").checked = op.canal === "produccion";
-    $("prueba-canal-desarrollo").checked = op.canal !== "produccion";
+    $("prueba-canal-desarrollo").checked = op.canal !== "produccion" && op.canal !== "estable";
+    $("modo-viejo-chk").checked = op.canal === "estable";
   }
   const es999 = $("prueba-emp-999").checked;
   // En la 999 la puesta a punto es mínima: tasa, fecha y serie NUNCA se ponen,
@@ -9871,7 +9897,13 @@ async function guardarOpcionesPrueba() {
       saltar_serie: es999 ? !!g.saltar_serie : $("prueba-saltar-serie").checked,
       ver_detalle_tecnico: $("prueba-ver-tecnico").checked,
       marcar_procesadas: $("prueba-procesadas-si").checked,
-      canal: $("prueba-canal-produccion").checked ? "produccion" : "desarrollo",
+      // Con el modo viejo puesto ningún radio está marcado: no se manda el
+      // campo, para que un guardado de otra opción no saque a la máquina del
+      // canal estable sin que nadie lo haya pedido. Marcar un radio a
+      // conciencia sí lo manda y apaga el modo viejo — una sola fuente de
+      // verdad: el canal.
+      canal: $("prueba-canal-produccion").checked ? "produccion"
+           : $("prueba-canal-desarrollo").checked ? "desarrollo" : undefined,
     });
     pintarOpcionesPrueba(r.opciones_prueba);
     pintarBanderasPrueba();   // los indicadores de la barra siguen a los switches
@@ -10049,6 +10081,21 @@ function pedirCambioCorte() {
     mensaje(`Corte de producción movido al ${calDMY(corteProduccion)}.`
             + (r.aviso ? ` ${r.aviso}` : ""), r.aviso ? "alerta" : "exito");
   };
+}
+
+// Modo viejo (2026-07-31): el interruptor escribe el canal "estable" (o
+// devuelve la máquina al automático) y el cambio real de versión lo hace el
+// lanzador en el próximo arranque. No se anuncia nada al guardar — el check y
+// la nota del bloque ya lo dicen; solo se avisa si el guardado falló.
+async function guardarModoViejo(activo) {
+  try {
+    const r = await api("/api/ajustes/modo-viejo", {activo});
+    if (opcionesPrueba) opcionesPrueba.canal = r.modo_viejo ? "estable" : "";
+    pintarOpcionesPrueba(opcionesPrueba);   // los radios del canal admin siguen al cambio
+  } catch (e) {
+    $("modo-viejo-chk").checked = !activo;   // el check no se queda marcando lo que no se guardó
+    mensaje("No se pudo guardar el modo viejo: " + e.message, "error");
+  }
 }
 
 // Confirmación del guardado de "Esta máquina": va en el propio bloque de
