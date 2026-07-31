@@ -1700,7 +1700,7 @@
     <div class="tabla-scroll"><table id="t-procesadas">
       <thead><tr>
         <th>Pedido</th><th>Cliente y sucursal</th><th>Ruta</th><th>Fecha pedido</th><th>Líneas</th>
-        <th>Nº doc</th><th>Detalle</th><th>Procesada</th><th>Máquina</th><th>Estado</th><th></th>
+        <th>Nº doc</th><th>Serie</th><th>Detalle</th><th>Procesada</th><th>Máquina</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody></tbody>
     </table></div>
@@ -6063,9 +6063,9 @@ function pintarProcesadas(familias) {
       <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(clienteEnLinea(f0))}</td>
       <td>${esc(f0.ruta || "")}</td>
       <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
-      <td colspan="7" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
+      <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
     </tr>` + partes.map(f => filaProcesada(f, true)).join("");
-  }).join("") || `<tr><td colspan="11" class="mut">Nada registrado todavía.</td></tr>`;
+  }).join("") || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
 function filaProcesada(f, enFamilia) {
@@ -6091,7 +6091,7 @@ function filaProcesada(f, enFamilia) {
   const conflicto = f.conflicto ? `
     <tr class="fila-conflicto${f.conflicto_abierto ? " abierto" : ""}"
         data-factura-key="${clave}">
-      <td colspan="11">
+      <td colspan="12">
         <span>${esc(f.conflicto).replaceAll("\n", "<br>")}</span>
         ${f.conflicto_abierto && !f.remota
           ? `<button class="peligro" onclick="abrirResolverConflicto('${esc(f.pedido_id)}',${f.parte})">Resolver</button>`
@@ -6104,7 +6104,7 @@ function filaProcesada(f, enFamilia) {
   const omitidas = f.lineas_omitidas ? `
     <tr class="fila-omitidas${f.revision_pendiente ? " pendiente" : ""}"
         data-factura-key="${clave}">
-      <td colspan="11">
+      <td colspan="12">
         ${f.revision_pendiente
           ? `<span>Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas).replaceAll("\n", "<br>")}</span>
              <button class="acento" onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`
@@ -6120,6 +6120,7 @@ function filaProcesada(f, enFamilia) {
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.numero_documento || "")}</td>
+      <td>${esc(f.serie || "")}</td>
       <td class="${f.a_mano ? "mut" : "detalle-error"}">${esc(detalle)}${
         reemisiones ? `<div class="mut">${esc(reemisiones).replaceAll("\n", "<br>")}</div>` : ""}</td>
       <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}</td>
@@ -6127,7 +6128,7 @@ function filaProcesada(f, enFamilia) {
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>${conflicto}${omitidas}
-    <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
+    <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="12"></td></tr>`;
 }
 
 // Botón "Revisada" del renglón de líneas omitidas, y "Ya está resuelto" del
@@ -13331,7 +13332,7 @@ mensaje("", "");   // estado inicial: barra oculta
 $("t-pendientes").querySelector("tbody").innerHTML =
   `<tr><td colspan="8" class="mut"><span class="spinner"></span> Cargando pedidos…</td></tr>`;
 $("t-procesadas").querySelector("tbody").innerHTML =
-  `<tr><td colspan="11" class="mut"><span class="spinner"></span> Cargando…</td></tr>`;
+  `<tr><td colspan="12" class="mut"><span class="spinner"></span> Cargando…</td></tr>`;
 const cargaInicial = cargar();
 consultarTasaBCV();   // en paralelo con cargar(): el BCV puede tardar segundos
 // modo_implantacion viaja en /api/ajustes: se carga ya (no solo al abrir la
