@@ -270,12 +270,16 @@
                display:flex; flex-direction:column; margin-bottom:0; }
   .tabla-scroll { flex:1; min-height:0; overflow:auto; }
   /* EN REVISIÓN junta dos listas como subtabs (2026-07-31), con el mismo
-     estilo píldora de .desc-subtabs (ver arriba). La barra solo aparece
-     cuando AMBAS listas tienen algo — con una sola, su panel ocupa toda la
-     vista sin selector de por medio (pedido del usuario: "si no hay tareas
-     llenadas por revisar, solo se ve los que no se pueden facturar y
-     viceversa"). Ver actualizarSubtabsRevision. */
+     estilo píldora de .desc-subtabs (ver arriba). La barra de botones solo
+     aparece cuando AMBAS listas tienen algo — con una sola, su panel ocupa
+     toda la vista sin selector de por medio (pedido del usuario: "si no hay
+     tareas llenadas por revisar, solo se ve los que no se pueden facturar y
+     viceversa"). Con una sola lista sigue sin haber botones, pero el nombre
+     de esa categoría se mantiene visible como título fijo (2026-08-01,
+     pedido del usuario: sin título se perdía cuál de las dos vistas era).
+     Ver actualizarSubtabsRevision. */
   #rev-subtabs { flex-shrink:0; }
+  .rev-titulo-solo { margin:14px 14px 0; font-size:14px; font-weight:600; }
   .rev-panel { flex:1; min-height:0; display:flex; flex-direction:column; }
   .tabla-scroll thead th { position:sticky; top:0; background:#fafbfc; z-index:1;
                            box-shadow:0 1px 0 #e2e6ec; }
@@ -2097,7 +2101,8 @@
        actuar, para que el error no rebote entre listas — y los pedidos que
        aún no se pueden facturar por datos que faltan. La barra de subtabs
        (ver actualizarSubtabsRevision) solo aparece cuando AMBAS tienen algo;
-       con una sola, su panel ocupa toda la vista sin selector de por medio. -->
+       con una sola, su panel ocupa toda la vista sin selector de por medio,
+       pero conserva el título de esa categoría. -->
   <section id="sec-revision" class="tab-panel" style="display:none">
     <div id="rev-subtabs" style="display:none"></div>
     <div id="rev-panel-llenados" class="rev-panel">
@@ -6695,11 +6700,15 @@ function pintarLlenadosPorRevisar(lista) {
 
 // --- Subtabs de EN REVISIÓN (2026-07-31) ------------------------------------
 // Mismo estilo píldora que el resto del panel (.desc-subtabs, ver AJUSTES →
-// Clientes y DESCUENTOS). La barra solo se pinta si AMBAS listas tienen algo:
-// con una sola, su panel ocupa toda la vista y no hace falta elegir (pedido
-// del usuario: "si no hay tareas llenadas por revisar, solo se ve los que no
-// se pueden facturar y viceversa").
+// Clientes y DESCUENTOS). Los botones solo se pintan si AMBAS listas tienen
+// algo: con una sola, su panel ocupa toda la vista y no hace falta elegir
+// (pedido del usuario: "si no hay tareas llenadas por revisar, solo se ve
+// los que no se pueden facturar y viceversa"). Con una sola lista tampoco
+// hay botones, pero se deja el nombre de esa categoría como título fijo
+// (2026-08-01, pedido del usuario: sin título no se distinguía cuál de las
+// dos vistas era).
 let subtabRevisionActiva = "llenados";   // "llenados" | "datos"
+const TITULO_SUBTAB_REVISION = {llenados: "Llenados por revisar", datos: "Pedidos que no se pueden facturar"};
 
 function actualizarSubtabsRevision(nLlenados, nDatos) {
   // Si la lista de la vista activa se vació, se pasa a la que sí tiene algo.
@@ -6709,11 +6718,13 @@ function actualizarSubtabsRevision(nLlenados, nDatos) {
   const subtab = (id, txt, n, st) => `<button class="desc-subtab ${st}${
     subtabRevisionActiva === id ? " activa" : ""}" data-subtab="${id}"
     onclick="irASubtabRevision('${id}')">${txt}<span class="cuenta">${n}</span></button>`;
-  $("rev-subtabs").style.display = ambas ? "" : "none";
+  $("rev-subtabs").style.display = (nLlenados || nDatos) ? "" : "none";
   $("rev-subtabs").innerHTML = ambas
     ? subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
       + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")
-    : "";
+    : (nLlenados || nDatos)
+      ? `<h4 class="rev-titulo-solo">${TITULO_SUBTAB_REVISION[subtabRevisionActiva]}</h4>`
+      : "";
   $("rev-panel-llenados").style.display = subtabRevisionActiva === "llenados" ? "" : "none";
   $("rev-panel-datos").style.display = subtabRevisionActiva === "datos" ? "" : "none";
 }
