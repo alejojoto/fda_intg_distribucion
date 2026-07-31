@@ -3850,6 +3850,7 @@ let rutaSeleccionada = "";           // "" = todas; "__sin_ruta__" = sin Ruta No
 let rutaPredeterminada = "";         // por máquina (config_dispositivo)
 let rutaPredetAplicada = false;      // la predeterminada se aplica solo al abrir
 const HACER_PREDET = "__hacer_predet__";
+const QUITAR_PREDET = "__quitar_predet__";
 
 // Series de pedidos vistas en Winledger (imagen del usuario 2026-07-19).
 // Solo el CAMPO por ahora: la lógica de series se define parte por parte;
@@ -4687,17 +4688,69 @@ function filtroBusquedaDinamico() {
 // Nombre corto de una ruta para el dropdown ("Ruta LPG" → "LPG").
 const nombreRuta = (r) => r.replace(/^ruta\s+/i, "");
 
+// Cómo se nombra una ruta en un menú o en un botón: corto, como el dropdown.
+const etiquetaRutaCorta = (r) => r === "__sin_ruta__" ? "(sin ruta)" : nombreRuta(r);
+
+// Cómo se nombra una ruta DENTRO de una frase: "" son todas, el centinela son
+// los pedidos que vienen sin ruta y el resto va por su nombre corto.
+const etiquetaRuta = (r) => r === "" ? "todas las rutas"
+  : r === "__sin_ruta__" ? "los pedidos sin ruta" : nombreRuta(r);
+
+// Facturas por llenar que el filtro de ruta está dejando fuera (2026-07-31):
+// con la ruta del día terminada, "0 pendientes" es cierto solo dentro de esa
+// ruta — el resto del trabajo sigue ahí, en otra.
+function pendientesFueraDeLaRuta() {
+  const porRuta = ultimaLista.pendientes_por_ruta || {};
+  return Object.entries(porRuta)
+    .filter(([r]) => r !== rutaSeleccionada)
+    .reduce((total, [, n]) => total + n, 0);
+}
+
+// La última opción del menú dice SIEMPRE lo que va a pasar (2026-07-31): la
+// misma "Hacer predeterminada la ruta actual", elegida con "Todas" puesto,
+// BORRABA la ruta guardada sin avisar — pasó el 19-jul, 16 segundos después de
+// fijarla, y desde entonces el panel abría sin filtro.
+function opcionRutaPredet() {
+  if (rutaSeleccionada && rutaSeleccionada !== rutaPredeterminada)
+    return `<option value="${HACER_PREDET}">★ Hacer predeterminada la ruta actual</option>`;
+  if (rutaPredeterminada)
+    return `<option value="${QUITAR_PREDET}">Quitar la ruta predeterminada (${
+      esc(etiquetaRutaCorta(rutaPredeterminada))})</option>`;
+  return "";
+}
+
 function pintarRutas(rutas, haySinRuta) {
   const opciones = [["", "Todas"], ...(rutas || []).map(r => [r, nombreRuta(r)])];
   if (haySinRuta) opciones.push(["__sin_ruta__", "(sin ruta)"]);
+  // La ruta puesta y la predeterminada tienen su opción aunque ya no les quede
+  // ninguna factura: sin ella el <select> cae en "Todas" y aparenta que el
+  // filtro no está puesto cuando sí lo está.
+  for (const r of [rutaSeleccionada, rutaPredeterminada])
+    if (r && !opciones.some(([valor]) => valor === r))
+      opciones.push([r, etiquetaRutaCorta(r)]);
   const sel = $("f-ruta");
   sel.innerHTML = opciones.map(([valor, texto]) => `
     <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
       ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
-    + `<option value="${HACER_PREDET}">★ Hacer predeterminada la ruta actual</option>`;
+    + opcionRutaPredet();
 }
 
 async function cambioRuta(valor) {
+  if (valor === QUITAR_PREDET) {
+    avisarTrabajando("Quitando la ruta predeterminada…");
+    try {
+      await api("/api/ajustes/ruta", {ruta: ""});
+      rutaPredeterminada = "";
+      mensaje("Esta máquina ya no tiene ruta predeterminada: el panel abre sin filtro de ruta.", "info");
+    } catch (e) {
+      mensaje(e.message, "error");
+    }
+    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
+    // Sin predeterminada, la ruta que esté puesta pasa a contar como filtro:
+    // la barra y el conteo se tiñen en el acto (la lista no cambia).
+    repintar();
+    return;
+  }
   if (valor === HACER_PREDET) {
     // Fija la ruta seleccionada como predeterminada de ESTA máquina y la
     // deja seleccionada (se reajusta y selecciona a la vez).
@@ -5436,7 +5489,12 @@ function estadoParaTitulo() {
   const n = pend.length;
   let texto;
   if (!n) {
-    texto = "sin pendientes";
+    // La ruta puesta no puede hacer que la barra diga que no queda trabajo: lo
+    // que falta sigue ahí, en otra ruta (2026-07-31, pedido del usuario).
+    const fuera = rutaSeleccionada ? pendientesFueraDeLaRuta() : 0;
+    texto = fuera
+      ? `sin pendientes en ${etiquetaRuta(rutaSeleccionada)} · ${fuera} en otras rutas`
+      : "sin pendientes";
   } else {
     const base = n === 1 ? "1 pendiente" : `${n} pendientes`;
     const desglose = desglosePendientes(pend);
@@ -6452,7 +6510,26 @@ function pintarPendientes(familias) {
       <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
     </tr>` + partes.map(f => filaPendiente(f, true)).join("");
   }).join("")
-    || `<tr><td colspan="8" class="mut">Sin facturas pendientes con estos filtros.</td></tr>`;
+    || `<tr><td colspan="8" class="mut">${avisoPendientesVacio()}</td></tr>`;
+}
+
+// Lista de pendientes vacía (2026-07-31, pedido del usuario): con una ruta
+// puesta, "sin facturas" se leía como que ya no queda nada por facturar en todo
+// el día. El aviso dice qué ruta se quedó sin trabajo, cuánto queda fuera y trae
+// el cambio de ruta resuelto aquí mismo — un botón por ruta con su cuenta.
+function avisoPendientesVacio() {
+  const porRuta = ultimaLista.pendientes_por_ruta || {};
+  const otras = Object.entries(porRuta)
+    .filter(([r, n]) => r !== rutaSeleccionada && n > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (!rutaSeleccionada || !otras.length)
+    return "Sin facturas pendientes con estos filtros.";
+  const total = otras.reduce((t, [, n]) => t + n, 0);
+  const cuantas = total === 1 ? "queda 1 factura" : `quedan ${total} facturas`;
+  const botones = otras.map(([r, n]) => `<button onclick="cambioRuta('${esc(r)}')"
+      title="Pasa el filtro a esta ruta.">${esc(etiquetaRutaCorta(r))} (${n})</button>`).join(" ");
+  return `En ${esc(etiquetaRuta(rutaSeleccionada))} no quedan facturas pendientes,
+    pero ${cuantas} en otras rutas. Cambia de ruta para llenarlas: ${botones}`;
 }
 
 // `enFamilia`: la parte cuelga de una cabecera que ya dice pedido y cliente,
