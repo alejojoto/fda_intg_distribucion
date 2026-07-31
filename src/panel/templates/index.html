@@ -5555,6 +5555,9 @@ function pintarVentanaDetalle(clave) {
 function pintarBotonDetalle() {
   const boton = $("detalle-llenar");
   if (!detalleAbierto) { boton.style.display = "none"; return; }
+  // Sin detalle guardado no hay sobre qué reintentar ni motivo que reabrir
+  // (2026-07-31, pedido del usuario): la ventana se queda con Cerrar solo.
+  if (sinDetalleGuardado.has(detalleAbierto)) { boton.style.display = "none"; return; }
   if (detalleReabriendo === detalleAbierto) {
     boton.style.display = "";
     boton.disabled = true;
