@@ -4570,6 +4570,7 @@ async function cargar() {
     const d = await api("/api/facturas?" + filtros());
     ultimaLista = d;
     listaCargada = true;   // desde aquí el título de la ventana ya puede contar
+    if (d.version) versionAsistente = d.version;
     // Llenadas en esta prueba (marca en memoria del servidor, sin registro): de
     // aquí sale si se ofrece devolverlas a pendientes.
     llenadasPrueba = d.llenadas_prueba || 0;
@@ -4983,6 +4984,26 @@ const TITULO_FASE = {
 let faseActual = null;      // última fase que devolvió /api/fase_llenado
 let tituloPuesto = null;    // lo último escrito: cambiarlo es un viaje a la ventana
 let listaCargada = false;   // la lista llegó al menos una vez (ver cargar)
+let versionAsistente = "";  // instalador · commit corto; la manda /api/facturas (ver cargar)
+
+// "13 Ruta Norte, 9 Ruta Sur, 4 sin ruta" — mismo criterio de agrupar que el
+// filtro de ruta del panel (2026-07-31, pedido del usuario: de un vistazo,
+// en qué ruta está el trabajo pendiente). Con un solo grupo el desglose no
+// suma nada sobre la cuenta ya dicha ("12 pendientes: 12 sin ruta" es ruido).
+function desglosePendientes(pend) {
+  const porRuta = new Map();
+  let sinRuta = 0;
+  for (const f of pend) {
+    if (!f.ruta) { sinRuta++; continue; }
+    const nombre = nombreRuta(f.ruta);
+    porRuta.set(nombre, (porRuta.get(nombre) || 0) + 1);
+  }
+  if (porRuta.size + (sinRuta ? 1 : 0) <= 1) return "";
+  const partes = [...porRuta.entries()].sort((a, b) => b[1] - a[1])
+    .map(([nombre, c]) => `${c} ${nombre}`);
+  if (sinRuta) partes.push(`${sinRuta} sin ruta`);
+  return partes.join(", ");
+}
 
 function estadoParaTitulo() {
   if (llenando || secuenciaActiva) {
@@ -4996,9 +5017,17 @@ function estadoParaTitulo() {
   // pendientes" mentiría en la barra hasta el próximo intento. Mientras tanto
   // queda el nombre pelado, que es con lo que abre la ventana.
   if (!listaCargada) return null;
-  const n = pendientesLlenables().length;
-  if (!n) return "sin pendientes";
-  return n === 1 ? "1 pendiente" : `${n} pendientes`;
+  const pend = pendientesLlenables();
+  const n = pend.length;
+  let texto;
+  if (!n) {
+    texto = "sin pendientes";
+  } else {
+    const base = n === 1 ? "1 pendiente" : `${n} pendientes`;
+    const desglose = desglosePendientes(pend);
+    texto = desglose ? `${base}: ${desglose}` : base;
+  }
+  return versionAsistente ? `${versionAsistente} · ${texto}` : texto;
 }
 
 function pintarTituloVentana() {
