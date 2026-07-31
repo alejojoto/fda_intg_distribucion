@@ -1086,27 +1086,25 @@
                                        margin-right:6px; cursor:pointer; }
   #motivo-otro { margin-left:27px; }
   #motivo-otro[readonly] { background:#f4f5f7; cursor:pointer; }
-  /* Modal de "Llenar en fila" (2026-07-22): el pedido dividido en varias
-     facturas que el corte de la cantidad partiría en dos. Y el de la tasa
-     que falta (2026-07-22, pedido del usuario), que sale al dar Llenar.
-     Los dos SÍ son preguntas — hay salidas distintas entre las que elegir — y
-     por eso interrumpen. */
-  #aviso-fam-overlay, #tasa-overlay, #docencurso-overlay, #repetida-overlay,
+  /* Modal de la tasa que falta (2026-07-22, pedido del usuario), que sale al
+     dar Llenar, y sus hermanos: SÍ son preguntas — hay salidas distintas entre
+     las que elegir — y por eso interrumpen. */
+  #tasa-overlay, #docencurso-overlay, #repetida-overlay,
   #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay {
                        position:fixed; inset:0; background:rgba(29,36,51,.45);
                        display:none; z-index:20; align-items:flex-start; justify-content:center; }
-  #aviso-fam-overlay.visible, #tasa-overlay.visible, #docencurso-overlay.visible,
+  #tasa-overlay.visible, #docencurso-overlay.visible,
   #repetida-overlay.visible, #trancon-overlay.visible,
   #configmaq-overlay.visible, #lineas-omitidas-overlay.visible,
   #previo-overlay.visible { display:flex; }
-  #aviso-fam-caja, #tasa-caja, #docencurso-caja, #repetida-caja, #trancon-caja,
+  #tasa-caja, #docencurso-caja, #repetida-caja, #trancon-caja,
   #configmaq-caja, #lineas-omitidas-caja, #previo-caja {
                     background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                     width:min(480px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
-  #aviso-fam-caja h3, #tasa-caja h3, #docencurso-caja h3, #repetida-caja h3,
+  #tasa-caja h3, #docencurso-caja h3, #repetida-caja h3,
   #trancon-caja h3, #configmaq-caja h3, #lineas-omitidas-caja h3,
   #previo-caja h3 { margin:0 0 10px; font-size:14px; }
-  #aviso-fam-caja p, #tasa-caja p, #docencurso-caja p, #repetida-caja p,
+  #tasa-caja p, #docencurso-caja p, #repetida-caja p,
   #trancon-caja p, #configmaq-caja p, #lineas-omitidas-caja p { margin:0 0 12px; font-size:13.5px; }
   /* Revisión previa de la corrida (2026-07-30): lleva una tabla con el lote
      entero, así que no cabe en los 480 px de los demás avisos. Grande a
@@ -1156,6 +1154,11 @@
   #previo-avisos { display:flex; flex-direction:column; gap:6px; margin:0 0 10px; }
   #previo-avisos .previo-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
                                padding:8px 10px; font-size:13px; line-height:1.45; }
+  /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
+     las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
+     la lista ni a cancelar la corrida. */
+  #previo-avisos .previo-acciones { display:flex; flex-wrap:wrap; gap:8px; margin-top:7px; }
+  #previo-avisos .previo-acciones button { padding:3px 10px; font-size:12.5px; }
   #previo-resumen { font-size:13px; margin:0 0 6px; }
   /* La lista crece con el lote (una corrida de ruta completa pasa de 40
      facturas): scrollea por dentro para que la botonera nunca quede fuera de
@@ -1183,9 +1186,19 @@
   #previo-lista .previo-pregunta td { background:#f6f7f9; }
   #previo-lista .previo-pregunta button { margin-left:8px; padding:3px 9px;
                                           font-size:12.5px; }
+  /* El pedido dividido que el corte partía por la mitad (2026-07-31): sus
+     facturas van en ámbar, el mismo color del aviso que las explica, para que
+     se vea de un vistazo cuáles hicieron crecer la fila. */
+  #previo-lista .previo-fam td { background:#fffaeb; }
+  #previo-lista .previo-extra { color:#b54708; font-size:11.5px; }
   #previo-lista .previo-num { text-align:right; width:52px; }
   #previo-lista .previo-desc { width:130px; }
   #previo-lista .previo-desc .pct { color:#047857; font-weight:600; }
+  /* Lo que el operador sacó de la fila queda a la vista y se puede devolver
+     (2026-07-31): sin esto, un − de más obliga a cancelar la corrida entera. */
+  #previo-sacados { font-size:12.5px; color:var(--mut); margin:8px 0 0;
+                    display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  #previo-sacados button { padding:2px 9px; font-size:12.5px; }
   /* Configuración obligatoria de la máquina (2026-07-29): los campos se
      resuelven DENTRO del aviso — el que falta arranca vacío y con el foco. */
   #configmaq-caja label { display:block; font-weight:600; font-size:13px;
@@ -1241,10 +1254,6 @@
   /* Cuatro salidas no caben en una fila de 480px: que envuelvan y queden
      alineadas a la derecha, con Parar de último. */
   #tasa-caja .editor-acciones { flex-wrap:wrap; }
-  /* Aviso de familia: los botones APILADOS (2026-07-31). Cada salida dice
-     cuántas facturas salen, y esos rótulos no caben en cuatro columnas de
-     480 px sin partirse en tres renglones cada uno. */
-  #aviso-fam-caja .editor-acciones { flex-direction:column; align-items:stretch; gap:8px; }
   /* Aviso de impresión (2026-07-22, pedido del usuario): antes era un modal
      con "no volver a mostrar" que había que despachar en cada lote. Ahora es
      un aviso en línea, del mismo estilo ámbar que el de la fecha/tasa
@@ -2285,32 +2294,17 @@
   </div>
 </div>
 
-<!-- Pedido dividido en varias facturas que la cantidad elegida partiría por
-     la mitad (PLAN.md pendiente 8). Es el ÚNICO modal del flujo: no informa,
-     pregunta — cada caso es una decisión distinta sobre facturas concretas.
-     Tres salidas (2026-07-26): el lote se estira hasta cerrar el pedido, se
-     queda corto justo antes de él, o lo salta y llena el cupo con los
-     siguientes. -->
-<div id="aviso-fam-overlay" onclick="if(event.target===this)cerrarAvisoFamilia()">
-  <div id="aviso-fam-caja">
-    <h3>Este pedido se divide en varias facturas</h3>
-    <p id="aviso-fam-texto"></p>
-    <div class="editor-acciones">
-      <button class="primario" id="aviso-fam-juntas" onclick="familiaLlenarJuntas()"></button>
-      <button id="aviso-fam-saltar" onclick="familiaSaltar()"></button>
-      <button id="aviso-fam-menos" onclick="familiaLlenarMenos()"></button>
-      <button onclick="cerrarAvisoFamilia()">Cancelar</button>
-    </div>
-  </div>
-</div>
-
 <!-- Revisión previa de la corrida (2026-07-30, pedido del usuario): mandar
      facturas en serie compromete de una vez la SERIE, la fecha y la tasa del
      lote entero, y una vez arrancado no hay dónde corregirlas factura por
      factura. Así que "Llenar en fila" ya no pregunta "¿seguro?" y en su lugar
-     enseña con qué se va a llenar y qué facturas entran. Se abre con la fila
-     YA resuelta (después del aviso de familia): lo que se ve es exactamente lo
-     que se va a apartar y llenar.
+     enseña con qué se va a llenar y qué facturas entran. Lo que se ve es
+     exactamente lo que se va a apartar y llenar.
+     ÚNICA ventana del flujo desde el 2026-07-31 (pedido del usuario): antes,
+     un pedido dividido que el corte partía por la mitad preguntaba en un modal
+     APARTE y previo. Se retiró: esa decisión es sobre facturas concretas, y
+     aquí se ven — la fila entra estirada para no partirlo y el aviso trae las
+     otras dos salidas, sin sacar al operador de la lista.
      El clic afuera PREGUNTA (2026-07-31, pedido del usuario) en cuanto se tocó
      algo o la ventana lleva un rato abierta: revisar y ajustar el lote es
      trabajo, y perderlo de un clic distraído obliga a rehacerlo entero. -->
@@ -2322,6 +2316,7 @@
     <div id="previo-avisos"></div>
     <div id="previo-resumen" class="mut"></div>
     <div id="previo-lista"></div>
+    <div id="previo-sacados"></div>
     <div class="editor-acciones">
       <button class="primario" id="previo-llenar" onclick="confirmarPrevioLote()"></button>
       <button onclick="cerrarPrevioLote()">Cancelar</button>
@@ -2589,7 +2584,6 @@ let destranquesEnFila = [];
 // bucle. Al segundo, la corrida se pausa y decide el operador.
 let destranquesPorFactura = {};
 const TOPE_DESTRANQUES_FACTURA = 2;
-let familiaEnAviso = null;   // la familia del aviso abierto (juntas/saltar)
 // Espera del login de Winledger (2026-07-23): si el operador da Llenar antes
 // de abrir la app o iniciar sesión, el panel NO da error — espera aquí y
 // reanuda solo. Solo se entra como consecuencia de un Llenar (nunca aparece
@@ -7442,59 +7436,6 @@ function familiaPartidaPorElCorte(n, p = pendientesLlenables()) {
   };
 }
 
-function abrirAvisoFamilia(f) {
-  familiaEnAviso = f;
-  const extra = f.total - f.dentro;
-  const menos = cantidadEnFila - f.dentro;
-  const totalJuntas = cantidadEnFila + extra;
-  $("aviso-fam-texto").textContent =
-    `El pedido ${f.pedido_id}${f.cliente ? " (" + f.cliente + ")" : ""} se divide en ` +
-    `${f.total} facturas y con ${cantidadEnFila} solo ` +
-    `${f.dentro === 1 ? "entraría 1" : "entrarían " + f.dentro}. ` +
-    `Un pedido dividido se llena entero o no se llena: elige cómo cierra el lote. ` +
-    `Después ves la lista completa y ahí puedes ajustarla.`;
-  $("aviso-fam-juntas").textContent =
-    `Llenar las ${f.total} juntas (salen ${totalJuntas} facturas)`;
-  $("aviso-fam-saltar").style.display = f.hayConQueRellenar ? "" : "none";
-  // Cuántas salen va en el RÓTULO, no en el hover (2026-07-31, pedido del
-  // usuario): "Saltar este pedido" a secas se leía como llenar menos, cuando en
-  // realidad la cantidad pedida sale completa con los pedidos que siguen.
-  $("aviso-fam-saltar").textContent = cantidadEnFila === 1
-    ? `Saltar este pedido (sale 1 con el pedido siguiente)`
-    : `Saltar este pedido (salen ${cantidadEnFila} con los pedidos siguientes)`;
-  $("aviso-fam-saltar").title =
-    `Este pedido queda pendiente, completo.`;
-  // Quedarse corto solo existe si antes del pedido hay algo que llenar: si la
-  // familia abre la fila, "llenar 0" no es una salida.
-  $("aviso-fam-menos").style.display = menos >= 1 ? "" : "none";
-  $("aviso-fam-menos").textContent =
-    `Llenar solo ${menos} factura${menos > 1 ? "s" : ""}`;
-  $("aviso-fam-menos").title =
-    `El lote se corta justo antes de este pedido, que queda pendiente completo.`;
-  $("aviso-fam-overlay").classList.add("visible");
-}
-
-function cerrarAvisoFamilia() {
-  $("aviso-fam-overlay").classList.remove("visible");
-}
-
-// Las salidas del aviso componen la corrida de verdad (2026-07-26): "juntas"
-// estira la meta hasta cerrar la familia completa; "saltar" excluye ese pedido
-// y llena el cupo con las siguientes; "menos" corta el lote justo antes de la
-// familia y la deja pendiente entera.
-function familiaLlenarJuntas() {
-  cerrarAvisoFamilia();
-  arrancarSecuencia(cantidadEnFila + familiaEnAviso.total - familiaEnAviso.dentro);
-}
-function familiaSaltar() {
-  cerrarAvisoFamilia();
-  arrancarSecuencia(cantidadEnFila, familiaEnAviso.pedido_id);
-}
-function familiaLlenarMenos() {
-  cerrarAvisoFamilia();
-  arrancarSecuencia(cantidadEnFila - familiaEnAviso.dentro);
-}
-
 // "Pedido completo": el pedido que toca AHORA (el primero de la fila) y
 // cuántas de sus facturas siguen pendientes — las que se llenarían. Vienen
 // CONTIGUAS al frente de la lista (el backend ordena por fecha, pedido y
@@ -7593,10 +7534,11 @@ function terminarEsperaEnvioPlataforma() {
 // "Pedido completo" arranca sin avisar nada: ese botón EXISTE para no partir
 // pedidos, así que "el siguiente viene doble" es su comportamiento normal, no
 // una novedad que valga interrumpir (pedido del usuario 2026-07-26; el aviso
-// informativo que salía ahí se retiró). En modo numérico sigue habiendo un paso
-// antes: qué facturas entran cuando el corte partiría un pedido. La impresión
-// no pregunta nada: su aviso está a la vista en la barra mientras "Imprimir:
-// sí" esté elegido (2026-07-22).
+// informativo que salía ahí se retiró). El modo numérico tampoco pregunta nada
+// antes (2026-07-31, pedido del usuario): el pedido dividido que el corte
+// partiría se resuelve DENTRO de la revisión, donde sus facturas están a la
+// vista. La impresión no pregunta nada: su aviso está a la vista en la barra
+// mientras "Imprimir: sí" esté elegido (2026-07-22).
 function lanzarEnFila() {
   // Validaciones que abortan con aviso van ANTES de abrir nada: no tiene
   // sentido enseñar un lote que igual no va a arrancar.
@@ -7614,8 +7556,6 @@ function lanzarEnFila() {
   // hay corte que pueda partir un pedido en dos lotes y nada que preguntar.
   if (rutaCompletaEnFila) { arrancarSecuencia(pendientesLlenables().length); return; }
   if (otroEnFila) { cantidadEnFila = parseInt($("enfila-otro").value, 10); }
-  const familia = familiaPartidaPorElCorte(cantidadEnFila);
-  if (familia) { abrirAvisoFamilia(familia); return; }
   arrancarSecuencia(cantidadEnFila);
 }
 
@@ -7631,20 +7571,22 @@ const enFilaPrefijo = () =>
 // corregirlas factura por factura. Por eso "Llenar en fila" ya no pregunta
 // "¿seguro?": abre esta ventana con la puesta a punto que va a usar y las
 // facturas que va a llenar, y de ahí sale a llenar o se cancela.
-// Se abre con la fila YA resuelta (después del aviso de familia), así que lo
-// que se lee es exactamente lo que se va a apartar.
+// Es la ÚNICA ventana del flujo (2026-07-31): el pedido dividido que el corte
+// partiría entra aquí ya estirado, y las otras salidas se eligen sobre la lista
+// —donde se ven las facturas de las que se está hablando— en vez de en un modal
+// previo que preguntaba a ciegas.
 // `previoResolver` es la promesa que espera la decisión: mientras exista hay
 // una revisión abierta, y arrancarSecuencia no deja entrar a otra.
 let previoResolver = null;
 let previoCola = [];              // la fila EXACTA que se está mostrando
 let previoMeta = 0;               // cuántas facturas se pidieron (para rehacer la fila)
-let previoSaltar = null;          // pedido excluido por el aviso de familia
 let previoCargando = false;       // la lista se está rehaciendo (cambió la ruta)
 let previoDescuentos = null;      // resumen del servidor; null = todavía en vuelo
 let previoDescuentosFallo = "";
 // Familia que la cantidad elegida partía por la mitad y que la fila se estiró
-// para cerrar (2026-07-31). Solo pasa cuando la cantidad se cambia AQUÍ: el
-// arranque desde la barra resuelve eso antes, con el aviso de familia.
+// para cerrar (2026-07-31). La calcula metaSinPartirFamilia en cada armado de
+// la fila, así que vale igual para la que abre la ventana y para las que se
+// rehacen al cambiar algo aquí dentro.
 let previoFamiliaEstirada = null;
 // Pedidos que el operador sacó de la fila con el − de su renglón (2026-07-31).
 // Se guardan por PEDIDO y no por factura: un pedido dividido se llena entero o
@@ -7663,14 +7605,16 @@ let previoTocado = false;
 let previoAbiertoEn = 0;
 const PREVIO_LECTURA_MS = 5000;
 
-function revisarLotePrevio(cola, meta, saltarPedido) {
-  previoCola = cola;
-  previoMeta = meta;
-  previoSaltar = saltarPedido;
-  previoFamiliaEstirada = null;
+// La fila se arma AQUÍ y no la trae quien llama (2026-07-31): así el estado que
+// la decide (lo sacado a mano, la familia estirada) nace limpio y la ventana
+// abre exactamente con lo que rehacerPrevioLote produciría — un solo camino.
+function revisarLotePrevio(meta) {
   previoQuitados = [];
   previoQuitando = null;
   previoCargando = false;
+  previoFamiliaEstirada = null;
+  previoCola = colaDelLote(metaSinPartirFamilia(meta));
+  previoMeta = previoCola.length;
   previoDescuentos = null;
   previoDescuentosFallo = "";
   previoTocado = false;
@@ -7679,7 +7623,7 @@ function revisarLotePrevio(cola, meta, saltarPedido) {
   // Los descuentos se piden EN PARALELO: la ventana abre con lo que el panel
   // ya tiene en la lista y esa columna se completa sola al llegar la
   // respuesta. Nadie espera un viaje al servidor para ver su propio lote.
-  pedirDescuentosDelLote(cola);
+  pedirDescuentosDelLote(previoCola);
   $("previo-overlay").classList.add("visible");
   return new Promise(decidir => { previoResolver = decidir; });
 }
@@ -7799,6 +7743,26 @@ function pintarPrevioLote() {
           ? "Sacaste de la fila todo lo que había. Sube la cantidad o cancela."
           : "Esta ruta no tiene facturas pendientes. Elige otra o cancela."
         }</td></tr>`}</tbody></table>`;
+  pintarPrevioSacados();
+}
+
+// Lo que quedó fuera por decisión del operador, con la vuelta atrás al lado
+// (2026-07-31): sacar un pedido de la fila es un clic, y hasta ahora deshacerlo
+// costaba cancelar la corrida entera y volver a lanzarla. Devolverlo rehace la
+// fila con la cantidad que esté elegida, así que puede volver a entrar estirado
+// —y el aviso del pedido dividido reaparece— igual que la primera vez.
+function pintarPrevioSacados() {
+  const caja = $("previo-sacados");
+  if (!previoQuitados.length) { caja.innerHTML = ""; return; }
+  const hover = "Vuelve a entrar en la fila, con la cantidad que esté elegida.";
+  caja.innerHTML = `<span>Fuera de la fila por decisión tuya:</span>`
+    + previoQuitados.map(id => `<span>${esc(id)} <button title="${esc(hover)}"
+        onclick="previoDevolver('${esc(id)}')">Devolver</button></span>`).join("");
+}
+
+function previoDevolver(pedido_id) {
+  previoQuitados = previoQuitados.filter(p => p !== pedido_id);
+  rehacerPrevioLote();
 }
 
 function filaPrevio(f, i) {
@@ -7810,13 +7774,22 @@ function filaPrevio(f, i) {
   }
   const parte = f.total_partes > 1
     ? ` <span class="mut">(factura ${f.parte} de ${f.total_partes})</span>` : "";
+  // El pedido dividido que estiró la fila va marcado, y sus facturas de más
+  // dicen por qué están (2026-07-31): son las que hacen que el lote no cuadre
+  // con la cantidad elegida. Van siempre al final — el corte cayó dentro de ese
+  // pedido y la fila se extendió hasta cerrarlo.
+  const fam = previoFamiliaEstirada
+    && previoFamiliaEstirada.pedido_id === f.pedido_id;
+  const extra = fam && i >= previoCola.length
+    - (previoFamiliaEstirada.total - previoFamiliaEstirada.dentro)
+    ? ` <span class="previo-extra">entra para no partir el pedido</span>` : "";
   // El − saca esta factura de la fila (2026-07-31, pedido del usuario). No borra
   // nada: el pedido sigue pendiente y lo llena otro lote.
-  return `<tr>
+  return `<tr${fam ? ` class="previo-fam"` : ""}>
     <td class="previo-n"><button class="previo-menos"
         title="Saca esta factura de la fila. El pedido queda pendiente para otro lote."
         onclick="previoQuitarFactura('${esc(f.pedido_id)}')">−</button>${i + 1}</td>
-    <td>${esc(f.pedido_id)}${parte}</td>
+    <td>${esc(f.pedido_id)}${parte}${extra}</td>
     <td>${esc(f.razon_social || f.cliente_id || "")}</td>
     <td class="previo-num">${f.cantidad_lineas ?? ""}</td>
     <td class="previo-desc">${descuentoPrevio(f)}</td></tr>`;
@@ -8015,7 +7988,6 @@ function previoTasaTecleada(campo) {
 // de la ruta anterior.
 async function previoRutaElegida(valor) {
   if (valor === rutaSeleccionada) return;
-  previoSaltar = null;
   previoQuitados = [];
   rutaSeleccionada = valor;
   $("f-ruta").value = valor;
@@ -8054,9 +8026,9 @@ function previoOtroTecleado(valor) {
 const previoSinCantidad = () =>
   otroEnFila && !(parseInt($("enfila-otro").value, 10) >= 1);
 
-// Los pedidos que la fila NO puede tomar: el que saltó el aviso de familia y los
-// que el operador sacó con el −.
-const fueraDeLaFila = () => [previoSaltar, ...previoQuitados].filter(Boolean);
+// Los pedidos que la fila NO puede tomar: los que el operador sacó con el − o
+// con la salida "sacarlo" del aviso del pedido dividido.
+const fueraDeLaFila = () => previoQuitados;
 const pendientesParaLaFila = () =>
   pendientesLlenables().filter(f => !fueraDeLaFila().includes(f.pedido_id));
 
@@ -8160,14 +8132,48 @@ function pintarPrevioAvisos() {
   if (motivoTasa)
     avisos.push(`${motivoTasa} Escríbela aquí arriba, en Tasa: sin ella no se `
       + `llena ${n === 1 ? "la factura" : "ninguna factura del lote"}.`);
-  if (previoFamiliaEstirada) {
-    const f = previoFamiliaEstirada;
-    avisos.push(`El pedido ${f.pedido_id}${f.cliente ? ` (${f.cliente})` : ""} se `
-      + `divide en ${f.total} facturas y la cantidad elegida lo partía por la `
-      + `mitad: la fila se estiró a ${n} para llenarlo entero.`);
-  }
   $("previo-avisos").innerHTML = avisos.map(
-    t => `<div class="previo-ojo">${esc(t)}</div>`).join("");
+    t => `<div class="previo-ojo">${esc(t)}</div>`).join("") + avisoFamiliaEstirada();
+}
+
+// El pedido dividido que el corte partía por la mitad (2026-07-31, pedido del
+// usuario: antes era un modal aparte, ANTES de esta ventana). La fila ya entra
+// estirada —un pedido dividido se llena entero o no se llena— y el aviso dice
+// qué pasó, marca sus facturas en la lista y trae las otras dos salidas: sacarlo
+// y llenar el cupo con los siguientes, o cortar la fila justo antes de él.
+function avisoFamiliaEstirada() {
+  const f = previoFamiliaEstirada;
+  if (!f) return "";
+  const n = previoCola.length;
+  const pedidas = n - (f.total - f.dentro);   // las que cabían antes del estirón
+  const sinEl = n - f.total;                  // lo que queda si el pedido sale
+  const salidas = [];
+  // Sacarlo solo tiene sentido si queda algo con que llenar su lugar; cortar
+  // antes, solo si antes de él hay alguna otra factura que llenar (si la fila
+  // ABRE con este pedido, "llenar 0" no es una salida).
+  if (f.hayConQueRellenar) salidas.push(
+    `<button title="Este pedido queda pendiente, completo, para otro lote."
+       onclick="previoFamiliaFuera(true)">Sacarlo: llenar ${pedidas} con los `
+    + `pedidos siguientes</button>`);
+  if (sinEl >= 1) salidas.push(
+    `<button title="La fila se corta justo antes de este pedido, que queda `
+    + `pendiente completo." onclick="previoFamiliaFuera(false)">Llenar solo `
+    + `${sinEl} y dejarlo fuera</button>`);
+  return `<div class="previo-ojo">El pedido ${esc(f.pedido_id)}${
+      f.cliente ? ` (${esc(f.cliente)})` : ""} se divide en ${f.total} facturas y `
+    + `la cantidad elegida lo partía por la mitad. Un pedido dividido se llena `
+    + `entero o no se llena: la fila entra estirada a ${n} facturas para `
+    + `llenarlo completo.${salidas.length
+        ? `<div class="previo-acciones">${salidas.join("")}</div>` : ""}</div>`;
+}
+
+// Las otras dos salidas del pedido estirado, por el mismo camino que el − de un
+// renglón: con reposición la fila conserva el tamaño pedido; sin ella se corta
+// antes del pedido y esa cuenta pasa a ser la cantidad elegida.
+function previoFamiliaFuera(reponiendo) {
+  if (!previoFamiliaEstirada) return;
+  previoQuitando = previoFamiliaEstirada.pedido_id;
+  if (reponiendo) previoQuitarTrayendo(); else previoQuitarSinReponer();
 }
 
 // La fila que le toca a un lote: las llenables de la lista YA filtrada (ruta,
@@ -8188,7 +8194,7 @@ const colaDelLote = (meta, fueraPedidos) => {
 // NO pasa por aquí a propósito: la reanudación conserva la cuenta y la reserva
 // de la corrida pausada. La meta sale de lo reservado, no de lo pedido, para
 // que "Factura i de N" no prometa más de lo que el lote tiene en mano.
-async function arrancarSecuencia(meta, saltarPedido = null) {
+async function arrancarSecuencia(meta) {
   // Guarda de re-entrada: apartar el lote es un viaje a Supabase y durante ese
   // rato el botón sigue en pantalla — un segundo click no puede lanzar una
   // segunda corrida. Con la revisión previa abierta pasa lo mismo, y encima
@@ -8199,21 +8205,19 @@ async function arrancarSecuencia(meta, saltarPedido = null) {
   // poder llenarlas es lo peor que podría pasar aquí.
   if (configPendiente.length) {
     abrirConfigMaquina(configPendiente).then((ok) => {
-      if (ok) arrancarSecuencia(meta, saltarPedido);
+      if (ok) arrancarSecuencia(meta);
     });
     return;
   }
-  let cola = colaDelLote(meta, saltarPedido);
-  if (!cola.length) { mensaje("No hay pendientes.", "info"); return; }
+  if (!pendientesLlenables().length) { mensaje("No hay pendientes.", "info"); return; }
   // Nada se aparta ni se toca hasta que el operador vea con qué se va a llenar
   // y diga que sí (2026-07-30). Va aquí y no en el botón porque este es el
-  // único punto por el que pasan TODOS los arranques de corrida, y con la fila
-  // ya resuelta: las tres salidas del aviso de familia arman colas distintas.
-  if (!await revisarLotePrevio(cola, meta, saltarPedido)) return;
+  // único punto por el que pasan TODOS los arranques de corrida.
+  if (!await revisarLotePrevio(meta)) return;
   // Desde la revisión se puede cambiar la cantidad o la ruta y sacar facturas a
   // mano, y eso rehace la fila entera: lo que se aparta es lo que quedó A LA
   // VISTA al confirmar, nunca lo que se había calculado al pulsar el botón.
-  cola = previoCola;
+  let cola = previoCola;
   meta = previoMeta;
   const fueraDelLote = fueraDeLaFila();
   if (!cola.length) { mensaje("No hay pendientes.", "info"); return; }
