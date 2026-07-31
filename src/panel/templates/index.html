@@ -5214,17 +5214,27 @@ const detalleDatos = {};              // "pedido|parte" → respuesta del panel
 const detalleFallos = {};             // "pedido|parte" → por qué no se pudo traer
 const detalleReq = {};                // "pedido|parte" → nº de la última consulta
 let detalleReabriendo = null;         // clave con /api/refacturar en vuelo (nota "Reabriendo…")
+const sinDetalleGuardado = new Set(); // claves abiertas cuya factura no guardó sus líneas
+const AVISO_SIN_DETALLE = `De esta factura no quedó guardado el detalle: se marcó
+  a mano, la llenó otra máquina, o se llenó antes de que el panel guardara sus
+  líneas. El pedido completo se ve en AppSheet.`;
 
 const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 
 // La fila entera abre la ventana al pulsarla (2026-07-31, pedido del usuario):
 // antes solo lo hacían tres celdas y un botón, y no se notaba que se podía.
-// `clases` son las que ya lleva esa fila por otro motivo (parte de familia).
+// TODAS las filas abren, también las que no guardaron sus líneas (llenadas
+// antes de que el panel las registrara, cerradas a mano, o de otra máquina):
+// una fila muerta que no responde al clic se lee como que el panel está roto —
+// la ventana dice en su lugar por qué no hay nada que mostrar. Eso se sabe
+// desde la lista (`tiene_detalle`), así que va en el clic y se ahorra el viaje
+// al servidor. `clases` son las que ya lleva la fila por otro motivo (parte de
+// familia).
 function filaDetalle(f, clases = "") {
-  if (f.tiene_detalle === false) return clases ? ` class="${clases}"` : "";
   return ` class="${(clases + " abre-detalle").trim()}"`
     + ` title="Clic para ver el detalle del pedido"`
-    + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"`;
+    + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
+        f.tiene_detalle === false ? ",true" : ""})"`;
 }
 
 // Celda de acciones: sus botones hacen lo suyo y NO abren el detalle de paso.
@@ -5232,13 +5242,18 @@ function filaDetalle(f, clases = "") {
 // los botones.
 const CELDA_ACCIONES = ` style="white-space:nowrap" title="" onclick="event.stopPropagation()"`;
 
-async function abrirDetalle(pedidoId, parte) {
+// `sinDetalle`: la lista ya sabe que esa factura no guardó sus líneas, así que
+// la ventana lo explica de una vez en vez de ir a buscar lo que no existe.
+async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
   detalleTocado = false;
   delete detalleFallos[clave];
+  if (sinDetalle) sinDetalleGuardado.add(clave);
+  else sinDetalleGuardado.delete(clave);
   pintarVentanaDetalle(clave);      // lo que ya se haya traído antes, de una vez
   $("detalle-overlay").classList.add("visible");
+  if (sinDetalle) return;
   await cargarDetalle(pedidoId, parte);
 }
 
@@ -5253,6 +5268,7 @@ function abrirDetalleCargando(pedidoId, parte) {
   detalleTocado = false;
   delete detalleFallos[clave];
   delete detalleDatos[clave];
+  sinDetalleGuardado.delete(clave); // reabrir la vuelve a armar: sí habrá detalle
   pintarVentanaDetalle(clave);      // "Buscando el detalle…"
   $("detalle-overlay").classList.add("visible");
 }
@@ -5349,8 +5365,10 @@ function pintarVentanaDetalle(clave) {
   if (clave !== detalleAbierto) return;
   const d = detalleDatos[clave];
   const partes = d && d.total_partes > 1 ? ` · factura ${d.parte} de ${d.total_partes}` : "";
+  // Sin respuesta del panel (buscando, o sin detalle guardado) el pedido sale
+  // igual de la clave: la ventana siempre dice de cuál factura habla.
   $("detalle-titulo").textContent = d
-    ? `Pedido ${d.pedido_id}${partes}` : "Detalle del pedido";
+    ? `Pedido ${d.pedido_id}${partes}` : `Pedido ${partesDeClave(clave)[0]}`;
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
   const etiqueta = llenadoDirecto(filaDeLista(...partesDeClave(clave)));
   const boton = $("detalle-llenar");
@@ -5361,6 +5379,10 @@ function pintarVentanaDetalle(clave) {
 // El pedido y en cuál de sus facturas se está viendo van en el título de la
 // ventana, así que aquí quedan el cliente, la ruta y el resto del encabezado.
 function contenidoDetalle(clave) {
+  // Sin líneas guardadas no hay detalle que armar, y no es un fallo: se dice
+  // como lo que es (nota gris), no en rojo de error.
+  if (sinDetalleGuardado.has(clave))
+    return `<div class="det-nota">${AVISO_SIN_DETALLE}</div>`;
   if (detalleFallos[clave])
     return `<div class="det-error">${esc(detalleFallos[clave])}</div>`;
   const d = detalleDatos[clave];
