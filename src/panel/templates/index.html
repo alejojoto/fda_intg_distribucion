@@ -1136,6 +1136,11 @@
 <path d='M0 0l5 6 5-6z' fill='%236b7280'/></svg>") right center no-repeat; }
   #previo-cajitas input.cj-edit { width:110px; cursor:text; }
   #previo-cajitas input.cj-edit[type=date] { width:135px; cursor:pointer; }
+  /* "otro…" abre su campo DENTRO de la misma cajita: el número y su sustantivo
+     van en línea con el menú, no debajo (la cajita apila en columna). */
+  #previo-cajitas .cj-linea { display:flex; align-items:center; gap:6px; }
+  #previo-cajitas input#previo-otro { width:62px; }
+  #previo-cajitas .cj-suf { font-size:13px; color:var(--mut); font-weight:400; }
   /* El iconito nativo sobra: el calendario propio ya abre con un clic en
      cualquier parte del campo (mismo criterio que los demás campos de fecha). */
   #previo-cajitas input[type=date]::-webkit-calendar-picker-indicator { display:none; }
@@ -1159,7 +1164,21 @@
                      border-bottom:1px solid #e2e6ec; }
   #previo-lista td { padding:6px 10px; border-bottom:1px solid #f0f2f5; }
   #previo-lista tr:last-child td { border-bottom:none; }
-  #previo-lista .previo-n { color:var(--mut); width:24px; }
+  #previo-lista .previo-n { color:var(--mut); width:50px; white-space:nowrap; }
+  /* El − saca la factura de la fila (2026-07-31): cajita chiquita al inicio del
+     renglón, delante del número. Se pinta en rojo suave solo al pasar por
+     encima: en reposo no tiene que competir con los datos de la factura. */
+  #previo-lista .previo-menos { width:19px; height:19px; padding:0; margin-right:7px;
+                                font-size:14px; line-height:1; vertical-align:-4px;
+                                border-radius:4px; border-color:#dde1e8;
+                                color:var(--mut); }
+  #previo-lista .previo-menos:hover { border-color:#f97066; color:#b42318;
+                                      background:#fef3f2; }
+  /* La pregunta de qué hacer con la fila ocupa el renglón entero, en el sitio de
+     la factura que se está sacando: sin popup y sin mover la tabla. */
+  #previo-lista .previo-pregunta td { background:#f6f7f9; }
+  #previo-lista .previo-pregunta button { margin-left:8px; padding:3px 9px;
+                                          font-size:12.5px; }
   #previo-lista .previo-num { text-align:right; width:52px; }
   #previo-lista .previo-desc { width:130px; }
   #previo-lista .previo-desc .pct { color:#047857; font-weight:600; }
@@ -2544,7 +2563,10 @@ let ultimaLlenadaEnFila = null;
 // para "pedido completo" (ahí se pidió ESE pedido, no un relleno con otros).
 let metaPedidaEnFila = 0;
 let reponerEnFila = false;
-let pedidoSaltadoEnFila = null;   // el que el operador mandó saltar: no vuelve
+// Los pedidos que el operador dejó fuera del lote en la revisión previa (el que
+// saltó el aviso de familia y los que sacó con el − de su renglón): la
+// reposición no los vuelve a traer.
+let pedidosFueraEnFila = [];
 let descartadasEnFila = [];       // claves "id|parte" que resultaron ajenas
 let reposicionesEnFila = [];      // resumen para el final de la corrida
 let rondasReposicion = 0;
@@ -7257,51 +7279,79 @@ function sincronizarCantidades() {
   if (firmaCantidades() !== firmaCantidadesPintada) pintarCantidades();
 }
 
-function pintarCantidades() {
+// "pedido completo" (2026-07-23, renombrado de "factura completa": un pedido
+// puede SER varias facturas, llamarlo "factura" confundía): llena el siguiente
+// pedido disponible ENTERO (venga en 1, 2 o 3 facturas), no una factura suelta.
+// Va primera y existe en los dos modos de impresión. Trae su propio title
+// (hover) porque el nombre no dice por sí solo cuántas facturas puede llegar a
+// llenar.
+const HOVER_PEDIDO_COMPLETO = "Llena el siguiente pedido disponible completo, "
+  + "sin importar en cuántas facturas esté dividido (cada factura son máx. 25 líneas).";
+const NUMEROS_CON_IMPRESION = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const NUMEROS_SIN_IMPRESION = [1, 5, 10];
+
+// Las opciones del menú de cantidad, en un solo lugar (2026-07-31): las pintan
+// el dropdown de la barra y la cajita "Llenar" de la revisión previa, y las dos
+// tienen que ofrecer exactamente lo mismo bajo las mismas condiciones.
+// El sustantivo ("facturas") viaja DENTRO de cada opción numérica para que la
+// etiqueta fija "Llenar:" no cambie y no salga "pedido completo facturas".
+function opcionesDeCantidad() {
   const imp = imprimirEnFila();
-  // "pedido completo" (2026-07-23, renombrado de "factura completa": un
-  // pedido puede SER varias facturas, llamarlo "factura" confundía): llena el
-  // siguiente pedido disponible ENTERO (venga en 1, 2 o 3 facturas), no una
-  // factura suelta. Va primera y existe en los dos modos de impresión. El
-  // sustantivo ("facturas") viaja DENTRO de cada opción numérica para que la
-  // etiqueta fija "Llenar:" no cambie y no salga "pedido completo facturas".
-  // Trae su propio title (hover) porque el nombre no dice por sí solo
-  // cuántas facturas puede llegar a llenar.
-  const HOVER_PEDIDO_COMPLETO = "Llena el siguiente pedido disponible completo, "
-    + "sin importar en cuántas facturas esté dividido (cada factura son máx. 25 líneas).";
-  const numeros = imp ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [1, 5, 10];
-  // La opción puede dejar de existir sin que el operador toque el dropdown (se
-  // cambió de ruta, de canal o de modo): ahí la elección vuelve a la cantidad
-  // numérica vigente en vez de quedar apuntando a algo que ya no está.
-  const conRuta = rutaCompletaDisponible();
-  if (!conRuta) rutaCompletaEnFila = false;
-  // El dropdown nunca puede mostrar una opción distinta de la cantidad que de
-  // verdad se va a llenar, así que al cambiar de modo la cantidad vigente se
-  // acomoda a la lista nueva: con impresión no hay "otro…" (10 es el tope), y
-  // sin impresión un número sin atajo (ej. el 7 elegido con impresión) cae en
-  // "otro…" con su valor a la vista.
-  if (imp) {
-    otroEnFila = false;
-    if (cantidadEnFila > 10) cantidadEnFila = 10;
-  } else if (!completaEnFila && !rutaCompletaEnFila && !otroEnFila && !numeros.includes(cantidadEnFila)) {
-    otroEnFila = true;
-    $("enfila-otro").value = cantidadEnFila;
-  }
-  let html = `<option value="completa" title="${HOVER_PEDIDO_COMPLETO}"`
-    + `${completaEnFila ? " selected" : ""}>pedido completo</option>`;
-  html += numeros.map(n =>
-    `<option value="${n}"${(!completaEnFila && !rutaCompletaEnFila && !otroEnFila && n === cantidadEnFila) ? " selected" : ""}>${n} ${n === 1 ? "factura" : "facturas"}</option>`).join("");
-  if (conRuta) {
+  const ops = [{valor: "completa", texto: "pedido completo", hover: HOVER_PEDIDO_COMPLETO}];
+  for (const n of (imp ? NUMEROS_CON_IMPRESION : NUMEROS_SIN_IMPRESION))
+    ops.push({valor: String(n), texto: `${n} ${n === 1 ? "factura" : "facturas"}`});
+  if (rutaCompletaDisponible()) {
     // "(sin ruta)" es un grupo real de pedidos, no la ausencia de filtro: se
     // nombra distinto para que el hover no diga "la ruta __sin_ruta__".
     const cuales = rutaSeleccionada === "__sin_ruta__"
       ? "los pedidos sin ruta" : `la ruta ${nombreRuta(rutaSeleccionada)}`;
     const n = pendientesLlenables().length;
-    html += `<option value="ruta" title="${esc(`Llena de un tirón todas las facturas pendientes de ${cuales}.`)}"`
-      + `${rutaCompletaEnFila ? " selected" : ""}>ruta completa (${n} ${n === 1 ? "factura" : "facturas"})</option>`;
+    ops.push({
+      valor: "ruta",
+      texto: `ruta completa (${n} ${n === 1 ? "factura" : "facturas"})`,
+      hover: `Llena de un tirón todas las facturas pendientes de ${cuales}.`,
+    });
   }
-  if (!imp) html += `<option value="otro"${otroEnFila ? " selected" : ""}>otro…</option>`;
-  $("enfila-cantidad").innerHTML = html;
+  if (!imp) ops.push({valor: "otro", texto: "otro…"});
+  return ops;
+}
+
+// La opción elegida AHORA, con el mismo valor que llevan los <option>.
+const valorCantidadActual = () =>
+  completaEnFila ? "completa"
+  : rutaCompletaEnFila ? "ruta"
+  : otroEnFila ? "otro" : String(cantidadEnFila);
+
+const opcionesCantidadHtml = () => {
+  const actual = valorCantidadActual();
+  return opcionesDeCantidad().map(o =>
+    `<option value="${o.valor}"${o.hover ? ` title="${esc(o.hover)}"` : ""}`
+    + `${o.valor === actual ? " selected" : ""}>${esc(o.texto)}</option>`).join("");
+};
+
+// El menú nunca puede mostrar una opción distinta de la cantidad que de verdad
+// se va a llenar, así que al cambiar de modo la cantidad vigente se acomoda a
+// la lista nueva: con impresión no hay "otro…" (10 es el tope), y sin impresión
+// un número sin atajo (ej. el 7 elegido con impresión) cae en "otro…" con su
+// valor a la vista. La opción también puede dejar de existir sin que el
+// operador la toque (se cambió de ruta, de canal o de modo): ahí la elección
+// vuelve a la cantidad numérica vigente en vez de apuntar a algo que ya no está.
+function acomodarCantidadAlModo() {
+  if (!rutaCompletaDisponible()) rutaCompletaEnFila = false;
+  if (imprimirEnFila()) {
+    otroEnFila = false;
+    if (cantidadEnFila > 10) cantidadEnFila = 10;
+  } else if (!completaEnFila && !rutaCompletaEnFila && !otroEnFila
+             && !NUMEROS_SIN_IMPRESION.includes(cantidadEnFila)) {
+    otroEnFila = true;
+    $("enfila-otro").value = cantidadEnFila;
+  }
+}
+
+function pintarCantidades() {
+  acomodarCantidadAlModo();
+  const imp = imprimirEnFila();
+  $("enfila-cantidad").innerHTML = opcionesCantidadHtml();
   $("enfila-otro").style.display = otroEnFila ? "" : "none";
   $("enfila-otro-facturas").style.display = otroEnFila ? "" : "none";
   // Cada radio trae su nota, y solo se ve la del elegido (el aviso ámbar con
@@ -7312,18 +7362,26 @@ function pintarCantidades() {
   firmaCantidadesPintada = firmaCantidades();
 }
 
-// Cambio en el dropdown: "pedido completo" fija ese modo; un número fija la
-// cantidad; "otro…" abre el campo editable VACÍO. El sufijo "facturas" del
-// campo libre acompaña a "otro…".
+// El estado que deja una elección del menú, sin tocar el DOM: "pedido completo"
+// fija ese modo; un número fija la cantidad; "otro…" abre el campo editable
+// VACÍO. Lo comparten el dropdown de la barra y la cajita "Llenar" de la
+// revisión previa, para que elegir en cualquiera de los dos deje exactamente el
+// mismo estado.
 // Vacío y no con el valor vigente (2026-07-26): con un número ya escrito, el
 // tecleo del operador se MEZCLA con él en vez de reemplazarlo (campo con "5",
 // se teclea "2" y queda 25) y el lote sale con una cantidad que nadie eligió.
-function cantidadElegida(valor) {
+function fijarCantidad(valor) {
   completaEnFila = valor === "completa";
   rutaCompletaEnFila = valor === "ruta";
   otroEnFila = valor === "otro";
   if (otroEnFila) $("enfila-otro").value = "";
   else if (!completaEnFila && !rutaCompletaEnFila) cantidadEnFila = parseInt(valor, 10);
+}
+
+// Cambio en el dropdown de la barra. El sufijo "facturas" del campo libre
+// acompaña a "otro…".
+function cantidadElegida(valor) {
+  fijarCantidad(valor);
   $("enfila-otro").style.display = otroEnFila ? "" : "none";
   $("enfila-otro-facturas").style.display = otroEnFila ? "" : "none";
   if (otroEnFila) $("enfila-otro").focus();
@@ -7340,8 +7398,9 @@ function cantidadOtroEditada(valor) {
 // borde del corte. Devuelve null si el lote cierra limpio.
 // Ojo: cuenta las partes que siguen PENDIENTES, no total_partes — las que ya
 // se procesaron no están en la lista y no vuelven a llenarse.
-function familiaPartidaPorElCorte(n) {
-  const p = pendientesLlenables();
+// `p` llega desde la revisión previa con los pedidos que quedaron fuera ya
+// descontados: el corte que importa es el de la fila que se está enseñando.
+function familiaPartidaPorElCorte(n, p = pendientesLlenables()) {
   if (n >= p.length) return null;   // el lote se lleva todo lo que hay
   const ultimaDentro = p[n - 1];
   if (!ultimaDentro || ultimaDentro.pedido_id !== p[n].pedido_id) return null;
@@ -7413,8 +7472,7 @@ function familiaLlenarMenos() {
 // CONTIGUAS al frente de la lista (el backend ordena por fecha, pedido y
 // parte). Cuenta las pendientes, no total_partes: las ya procesadas no se
 // vuelven a llenar.
-function familiaDelSiguiente() {
-  const p = pendientesLlenables();
+function familiaDelSiguiente(p = pendientesLlenables()) {
   const pedido_id = p[0].pedido_id;
   let partes = 1;
   while (partes < p.length && p[partes].pedido_id === pedido_id) partes++;
@@ -7556,11 +7614,25 @@ let previoSaltar = null;          // pedido excluido por el aviso de familia
 let previoCargando = false;       // la lista se está rehaciendo (cambió la ruta)
 let previoDescuentos = null;      // resumen del servidor; null = todavía en vuelo
 let previoDescuentosFallo = "";
+// Familia que la cantidad elegida partía por la mitad y que la fila se estiró
+// para cerrar (2026-07-31). Solo pasa cuando la cantidad se cambia AQUÍ: el
+// arranque desde la barra resuelve eso antes, con el aviso de familia.
+let previoFamiliaEstirada = null;
+// Pedidos que el operador sacó de la fila con el − de su renglón (2026-07-31).
+// Se guardan por PEDIDO y no por factura: un pedido dividido se llena entero o
+// no se llena, así que sacar una parte saca a todas. Sobreviven a los cambios de
+// cantidad —fue una decisión sobre esas facturas, no sobre el tamaño del lote— y
+// solo se olvidan al abrir otra revisión.
+let previoQuitados = [];
+let previoQuitando = null;        // pedido con la pregunta abierta en su renglón
 
 function revisarLotePrevio(cola, meta, saltarPedido) {
   previoCola = cola;
   previoMeta = meta;
   previoSaltar = saltarPedido;
+  previoFamiliaEstirada = null;
+  previoQuitados = [];
+  previoQuitando = null;
   previoCargando = false;
   previoDescuentos = null;
   previoDescuentosFallo = "";
@@ -7607,6 +7679,7 @@ function pintarPrevioLote() {
   // no tener pendientes), y con la lista en vuelo el lote todavía no es firme.
   btn.disabled = previoCargando || !n;
   btn.textContent = previoCargando ? "Rehaciendo la fila…"
+    : previoSinCantidad() ? "Escribe cuántas facturas"
     : `Llenar ${n} factura${n === 1 ? "" : "s"}`;
   // Qué va a pasar, en una línea: el mismo dato que las notas de los radios de
   // impresión, dicho sobre ESTE lote — es la última vista antes de arrancar.
@@ -7634,19 +7707,67 @@ function pintarPrevioLote() {
       ? filas.map(filaPrevio).join("")
       : `<tr><td colspan="5" class="mut">${previoCargando
           ? "Rehaciendo la fila con la ruta elegida…"
+          : previoSinCantidad()
+          ? "Escribe cuántas facturas van en la fila, arriba."
+          : previoQuitados.length
+          ? "Sacaste de la fila todo lo que había. Sube la cantidad o cancela."
           : "Esta ruta no tiene facturas pendientes. Elige otra o cancela."
         }</td></tr>`}</tbody></table>`;
 }
 
 function filaPrevio(f, i) {
+  if (previoQuitando === f.pedido_id) {
+    // La pregunta es por el PEDIDO: en uno dividido sale una sola vez, en el
+    // primero de sus renglones, y los demás se esconden mientras se decide.
+    return previoCola.findIndex(c => c.pedido_id === f.pedido_id) === i
+      ? filaPrevioPregunta(f) : "";
+  }
   const parte = f.total_partes > 1
     ? ` <span class="mut">(factura ${f.parte} de ${f.total_partes})</span>` : "";
+  // El − saca esta factura de la fila (2026-07-31, pedido del usuario). No borra
+  // nada: el pedido sigue pendiente y lo llena otro lote.
   return `<tr>
-    <td class="previo-n">${i + 1}</td>
+    <td class="previo-n"><button class="previo-menos"
+        title="Saca esta factura de la fila. El pedido queda pendiente para otro lote."
+        onclick="previoQuitarFactura('${esc(f.pedido_id)}')">−</button>${i + 1}</td>
     <td>${esc(f.pedido_id)}${parte}</td>
     <td>${esc(f.razon_social || f.cliente_id || "")}</td>
     <td class="previo-num">${f.cantidad_lineas ?? ""}</td>
     <td class="previo-desc">${descuentoPrevio(f)}</td></tr>`;
+}
+
+// La pregunta ocupa el renglón de la factura que se está sacando (2026-07-31,
+// pedido del usuario): con qué se queda la fila decide el operador — la
+// siguiente pendiente en su lugar, o una factura menos. Se pregunta en el sitio,
+// sin popup, y cada salida dice en el hover qué le pasa a la fila.
+function filaPrevioPregunta(f) {
+  const cuantas = previoCola.filter(c => c.pedido_id === f.pedido_id).length;
+  const quedan = previoCola.length - cuantas;
+  const conQueRellenar = pendientesParaLaFila().some(
+    p => p.pedido_id !== f.pedido_id
+      && !previoCola.some(c => c.pedido_id === p.pedido_id && c.parte === p.parte));
+  // Un pedido dividido se llena entero o no se llena: sacar una parte las saca
+  // a todas, y el texto lo dice para que nadie cuente mal la fila.
+  const que = cuantas > 1
+    ? `Sacar el pedido ${esc(f.pedido_id)} completo (${cuantas} facturas)`
+    : `Sacar el pedido ${esc(f.pedido_id)}`;
+  const varias = cuantas > 1;
+  const hoverTraer = `La fila conserva su tamaño: ${varias
+    ? "entran en su lugar las siguientes facturas pendientes"
+    : "entra en su lugar la siguiente factura pendiente"}.`;
+  const hoverMenos = `La fila queda con ${quedan === 1
+    ? "una sola factura" : `${quedan} facturas`}: no entra ninguna en su lugar.`;
+  const traer = conQueRellenar
+    ? `<button class="primario" title="${esc(hoverTraer)}"
+        onclick="previoQuitarTrayendo()">Traer la${varias ? "s" : ""} siguiente${
+          varias ? "s" : ""}</button>` : "";
+  const menos = quedan >= 1
+    ? `<button title="${esc(hoverMenos)}"
+        onclick="previoQuitarSinReponer()">Llenar solo ${quedan}</button>` : "";
+  return `<tr class="previo-pregunta"><td colspan="5">
+      <span>${que}:</span>${traer}${menos}
+      <button title="La fila queda como está." onclick="previoQuitarCancelar()">Cancelar</button>
+    </td></tr>`;
 }
 
 // El descuento de la factura RESUMIDO (pedido del usuario): un porcentaje si
@@ -7678,6 +7799,9 @@ function descuentoPrevio(f) {
 // prueba deja fuera de la puesta a punto sí quedan de solo lectura: ahí no hay
 // nada que elegir porque ese dato no se va a tocar.
 function pintarPrevioCajitas() {
+  // Tecleando la cantidad libre no se repinta: se perdería el foco a medio
+  // número (y nada de lo que muestran las cajitas cambia mientras se teclea).
+  if (document.activeElement && document.activeElement.id === "previo-otro") return;
   const opciones = (lista, actual) => lista.map(([valor, texto]) =>
     `<option value="${esc(valor)}"${valor === actual ? " selected" : ""}>${esc(texto)}</option>`).join("");
   const fija = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
@@ -7723,6 +7847,29 @@ function pintarPrevioCajitas() {
       opciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
     imprimirEnFila()));
 
+  // La cantidad también se elige AQUÍ (2026-07-31, pedido del usuario): el mismo
+  // menú de la barra, y cambiarlo rehace la fila a la vista. Va de última porque
+  // sus opciones salen de las dos cajitas anteriores: la ruta ("ruta completa"
+  // solo con una elegida) y la impresión (qué números se ofrecen).
+  // El <select> repite el hover de la opción elegida: cerrado no se ve el title
+  // de los <option>, y "ruta completa" o "pedido completo" no se explican solos.
+  // Se acomoda antes de pintar para que el menú no pueda quedar sin ninguna
+  // opción marcada: ahí el navegador enseñaría la primera y diría una cantidad
+  // distinta de la que se va a llenar.
+  acomodarCantidadAlModo();
+  const elegida = opcionesDeCantidad().find(o => o.valor === valorCantidadActual());
+  cajitas.push(editable("Llenar",
+    `<span class="cj-linea"><select class="cj-edit"${
+        elegida && elegida.hover ? ` title="${esc(elegida.hover)}"` : ""
+      } onchange="previoCantidadElegida(this.value)">${opcionesCantidadHtml()}</select>`
+    + (otroEnFila
+        ? `<input type="number" id="previo-otro" class="cj-edit" min="1"
+                  value="${esc($("enfila-otro").value)}"
+                  oninput="previoOtroTecleado(this.value)"
+           ><span class="cj-suf">facturas</span>`
+        : "")
+    + `</span>`));
+
   // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
   // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
   // De solo lectura: se cambia en ADMIN, no a un clic de arrancar una corrida.
@@ -7763,11 +7910,13 @@ function previoTasaTecleada(campo) {
 }
 
 // Cambiar la ruta rehace la fila: la lista se vuelve a pedir filtrada y el lote
-// se recalcula con el mismo criterio con que se lanzó (cantidad, pedido
-// completo o ruta completa). El pedido saltado no sobrevive: era una decisión
-// sobre una familia de la ruta anterior.
+// se recalcula con el criterio que esté elegido (cantidad, pedido completo o
+// ruta completa). Lo que quedó fuera no sobrevive: eran decisiones sobre pedidos
+// de la ruta anterior.
 async function previoRutaElegida(valor) {
   if (valor === rutaSeleccionada) return;
+  previoSaltar = null;
+  previoQuitados = [];
   rutaSeleccionada = valor;
   $("f-ruta").value = valor;
   previoCargando = true;
@@ -7779,32 +7928,121 @@ async function previoRutaElegida(valor) {
   }
   if (!previoResolver) return;      // se cerró mientras la lista viajaba
   pintarCantidades();               // "ruta completa" puede dejar de existir
-  previoSaltar = null;
-  previoCola = colaDelLote(metaDelModo(previoMeta), null);
-  previoMeta = previoCola.length;
+  rehacerPrevioLote();              // repinta cajitas y lista con la ruta nueva
+}
+
+// Elegir la cantidad desde la revisión (2026-07-31, pedido del usuario): mueve
+// el MISMO estado que el dropdown de la barra —así las dos vistas dicen lo
+// mismo— y rehace la fila a la vista, igual que la ruta.
+function previoCantidadElegida(valor) {
+  fijarCantidad(valor);
+  pintarCantidades();          // la barra de atrás queda igual que esta cajita
+  rehacerPrevioLote();         // repinta las cajitas: "otro…" abre aquí su campo
+  if (otroEnFila) $("previo-otro").focus();
+}
+
+// Tecleo del campo libre: el valor vive en el campo de la barra, que es de donde
+// se lee al lanzar. Mientras no haya un número válido no hay fila que enseñar y
+// el botón lo dice.
+function previoOtroTecleado(valor) {
+  $("enfila-otro").value = valor;
+  const n = parseInt(valor, 10);
+  if (n >= 1) cantidadEnFila = n;
+  rehacerPrevioLote();
+}
+
+const previoSinCantidad = () =>
+  otroEnFila && !(parseInt($("enfila-otro").value, 10) >= 1);
+
+// Los pedidos que la fila NO puede tomar: el que saltó el aviso de familia y los
+// que el operador sacó con el −.
+const fueraDeLaFila = () => [previoSaltar, ...previoQuitados].filter(Boolean);
+const pendientesParaLaFila = () =>
+  pendientesLlenables().filter(f => !fueraDeLaFila().includes(f.pedido_id));
+
+// Rehace la fila con lo que esté elegido AHORA y vuelve a pedir los descuentos.
+function rehacerPrevioLote() {
+  previoQuitando = null;       // cualquier otro cambio despacha la pregunta abierta
+  previoFamiliaEstirada = null;
   previoDescuentos = null;
   previoDescuentosFallo = "";
-  pintarPrevioCajitas();
+  previoCola = previoSinCantidad()
+    ? [] : colaDelLote(metaSinPartirFamilia(metaDelModo()), fueraDeLaFila());
+  previoMeta = previoCola.length;
   pintarPrevioLote();
-  if (previoCola.length) pedirDescuentosDelLote(previoCola);
+  // Tecleando "40" pasan por aquí varias cantidades y solo la última merece un
+  // viaje al servidor: las que quedaron atrás se descartan solas al despertar,
+  // porque la fila ya no es la suya.
+  if (previoCola.length) {
+    const cola = previoCola;
+    setTimeout(() => { if (cola === previoCola) pedirDescuentosDelLote(cola); }, 250);
+  }
 }
 
 // Cuántas facturas pide el modo elegido AHORA (la cantidad de un lote de "ruta
-// completa" o de "pedido completo" cambia con la ruta; la numérica no).
-function metaDelModo(metaPedida) {
-  const hay = pendientesLlenables();
+// completa" o de "pedido completo" cambia con la ruta; la numérica sale siempre
+// del menú, así que un estirón que cerró una familia no se arrastra a la fila
+// siguiente).
+function metaDelModo() {
+  const hay = pendientesParaLaFila();
   if (rutaCompletaEnFila) return hay.length;
-  if (completaEnFila) return hay.length ? familiaDelSiguiente().partes : 0;
-  return metaPedida;
+  if (completaEnFila) return hay.length ? familiaDelSiguiente(hay).partes : 0;
+  return cantidadEnFila;
 }
 
+// Un pedido dividido se llena entero o no se llena (la misma regla del aviso de
+// familia): si la cantidad elegida cortara uno por la mitad, la fila se estira
+// hasta cerrarlo y el aviso lo dice. Aquí no se ofrecen las tres salidas del
+// aviso porque la cantidad se corrige en esta misma ventana.
+function metaSinPartirFamilia(meta) {
+  previoFamiliaEstirada = familiaPartidaPorElCorte(meta, pendientesParaLaFila());
+  return previoFamiliaEstirada
+    ? meta + previoFamiliaEstirada.total - previoFamiliaEstirada.dentro : meta;
+}
+
+// El − de un renglón: abre la pregunta de con qué se queda la fila. Solo eso —
+// nada sale de la fila hasta que el operador elija una de las dos salidas.
+function previoQuitarFactura(pedido_id) {
+  previoQuitando = pedido_id;
+  pintarPrevioLote();
+}
+
+function previoQuitarCancelar() {
+  previoQuitando = null;
+  pintarPrevioLote();
+}
+
+// Sale el pedido y entra la siguiente pendiente en su lugar: la fila conserva el
+// tamaño, así que el modo elegido (cantidad, pedido completo, ruta completa) no
+// se toca.
+function previoQuitarTrayendo() {
+  if (!previoQuitando) return;
+  previoQuitados.push(previoQuitando);
+  rehacerPrevioLote();
+}
+
+// Sale el pedido y no entra nada: la fila queda más corta, y esa cuenta pasa a
+// ser la cantidad elegida — el menú de arriba nunca puede decir una cosa y la
+// fila otra. "Pedido completo" y "ruta completa" dejan de aplicar en cuanto se
+// saca algo a mano, así que la elección cae en el número que quedó.
+function previoQuitarSinReponer() {
+  if (!previoQuitando) return;
+  const quedan = previoCola.filter(c => c.pedido_id !== previoQuitando).length;
+  previoQuitados.push(previoQuitando);
+  fijarCantidad(String(quedan));
+  pintarCantidades();
+  rehacerPrevioLote();
+}
+
+// La impresión decide qué cantidades se ofrecen (con papel no hay "otro…" ni
+// "ruta completa"), así que cambiarla puede mover la cantidad vigente: la fila
+// se rehace para que lo que está a la vista sea lo que se va a llenar.
 function previoImpresionElegida(valor) {
   const radio = document.querySelector(
     `input[name="enfila-imp"][value="${valor}"]`);
   if (radio) radio.checked = true;
   pintarCantidades();          // las cantidades ofrecidas dependen del papel
-  pintarPrevioCajitas();
-  pintarPrevioLote();          // la línea de proceso cambia con la impresión
+  rehacerPrevioLote();         // la línea de proceso también cambia con esto
 }
 
 // Lo que hay que sopesar antes de dar el sí, con su consecuencia sobre el lote
@@ -7822,17 +8060,28 @@ function pintarPrevioAvisos() {
   if (motivoTasa)
     avisos.push(`${motivoTasa} Ninguna factura del lote registra tasa: todas `
       + `salen con el Cambio que el programa tenga. Puedes escribirla aquí mismo.`);
+  if (previoFamiliaEstirada) {
+    const f = previoFamiliaEstirada;
+    avisos.push(`El pedido ${f.pedido_id}${f.cliente ? ` (${f.cliente})` : ""} se `
+      + `divide en ${f.total} facturas y la cantidad elegida lo partía por la `
+      + `mitad: la fila se estiró a ${n} para llenarlo entero.`);
+  }
   $("previo-avisos").innerHTML = avisos.map(
     t => `<div class="previo-ojo">${esc(t)}</div>`).join("");
 }
 
 // La fila que le toca a un lote: las llenables de la lista YA filtrada (ruta,
-// fechas, búsqueda), en su orden, hasta la cantidad pedida. La usan el arranque
-// y la revisión previa, que la rehace cuando ahí se cambia de ruta.
-const colaDelLote = (meta, saltarPedido) => pendientesLlenables()
-  .filter(f => !saltarPedido || f.pedido_id !== saltarPedido)
-  .slice(0, meta)
-  .map(f => ({pedido_id: f.pedido_id, parte: f.parte}));
+// fechas, búsqueda), en su orden, hasta la cantidad pedida y sin los pedidos que
+// quedaron fuera. La usan el arranque (que deja fuera, si acaso, el pedido
+// saltado por el aviso de familia) y la revisión previa, que la rehace cada vez
+// que ahí se cambia algo.
+const colaDelLote = (meta, fueraPedidos) => {
+  const fuera = [].concat(fueraPedidos || []).filter(Boolean);
+  return pendientesLlenables()
+    .filter(f => !fuera.includes(f.pedido_id))
+    .slice(0, meta)
+    .map(f => ({pedido_id: f.pedido_id, parte: f.parte}));
+};
 
 // Arranque de una corrida NUEVA: aparta la fila en el estado compartido y, con
 // lo que quedó apartado, fija el objetivo y reinicia la cuenta. reintentarEnFila
@@ -7861,12 +8110,12 @@ async function arrancarSecuencia(meta, saltarPedido = null) {
   // único punto por el que pasan TODOS los arranques de corrida, y con la fila
   // ya resuelta: las tres salidas del aviso de familia arman colas distintas.
   if (!await revisarLotePrevio(cola, meta, saltarPedido)) return;
-  // Desde la revisión se puede cambiar la ruta, y eso rehace la fila entera:
-  // lo que se aparta es lo que quedó A LA VISTA al confirmar, nunca lo que se
-  // había calculado al pulsar el botón.
+  // Desde la revisión se puede cambiar la cantidad o la ruta y sacar facturas a
+  // mano, y eso rehace la fila entera: lo que se aparta es lo que quedó A LA
+  // VISTA al confirmar, nunca lo que se había calculado al pulsar el botón.
   cola = previoCola;
   meta = previoMeta;
-  saltarPedido = previoSaltar;
+  const fueraDelLote = fueraDeLaFila();
   if (!cola.length) { mensaje("No hay pendientes.", "info"); return; }
   reservandoLote = true;
   try {
@@ -7893,7 +8142,7 @@ async function arrancarSecuencia(meta, saltarPedido = null) {
   // Con "ruta completa" el lote ya se llevó todo lo que había en la ruta: si
   // alguna factura resulta ajena, no queda ninguna con que reponerla.
   reponerEnFila = !completaEnFila && !rutaCompletaEnFila;
-  pedidoSaltadoEnFila = saltarPedido;
+  pedidosFueraEnFila = fueraDelLote;
   descartadasEnFila = [];
   reposicionesEnFila = [];
   rondasReposicion = 0;
@@ -8042,7 +8291,7 @@ async function reponerLote() {
   const libres = pendientesLlenables().filter(f =>
     !colaEnFila.some(c => c.pedido_id === f.pedido_id && c.parte === f.parte)
     && !descartadasEnFila.includes(clave(f))
-    && f.pedido_id !== pedidoSaltadoEnFila
+    && !pedidosFueraEnFila.includes(f.pedido_id)
     && clave(f) !== ultimaLlenadaEnFila);
   const nuevas = libres.slice(0, faltan);
   // Un pedido dividido se llena entero o no se llena: si el corte de la
