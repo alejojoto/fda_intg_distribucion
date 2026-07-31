@@ -4512,6 +4512,9 @@ async function cargar() {
     if (d.firma_compartida) firmaCompartida = d.firma_compartida;
     if (d.nube) {
       nube.carga_ts = d.nube.carga_ts;
+      nube.espejo_activo = d.nube.espejo_activo;
+      nube.cambios_por_enviar = d.nube.cambios_por_enviar;
+      nube.cambios_recientes_30min = d.nube.cambios_recientes_30min;
       pintarNube();
     }
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
@@ -4580,7 +4583,8 @@ setInterval(async () => {
 // visto y se pinta. "ok" = el último sondeo respondió; "caida" = la nube (o
 // el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
 // lleva demasiado sin aterrizar una carga completa.
-let nube = {estado: "ok", ultimoOk: null, carga_ts: null};
+let nube = {estado: "ok", ultimoOk: null, carga_ts: null,
+            espejo_activo: true, cambios_por_enviar: null, cambios_recientes_30min: null};
 let nubeAbierto = false;
 let cargaFallo = false;   // la última /api/facturas no aterrizó (ver cargar())
 
@@ -4611,14 +4615,6 @@ function haceTexto(ts) {
   return "hace " + h + " h" + (m % 60 ? " " + (m % 60) + " min" : "");
 }
 
-function fechaCortaNube(iso) {
-  const hoy = new Date();
-  const hoyIso = hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0")
-               + "-" + String(hoy.getDate()).padStart(2, "0");
-  if (iso === hoyIso) return "de hoy";
-  return "del " + iso.slice(8, 10) + "/" + iso.slice(5, 7);
-}
-
 function armarPopoverNube(clase) {
   const color = clase === "nube-caida" ? "#dc2626"
               : clase === "nube-sync"  ? "#d97706" : "#15803d";
@@ -4636,12 +4632,30 @@ function armarPopoverNube(clase) {
           + (nube.ultimoOk ? haceTexto(nube.ultimoOk) : "sin datos aún")
           + `</span></div>`;
   }
-  const t = (typeof ultimoBCV !== "undefined" && ultimoBCV && ultimoBCV.tasa)
-          ? ultimoBCV : null;
-  html += `<div class="nube-fila"><span>Tasa BCV</span><span>`
-        + (t ? String(t.tasa).replace(".", ",")
-               + (t.fecha_valor ? " · " + fechaCortaNube(t.fecha_valor) : "")
-             : "sin datos aún")
+  const resumen = ultimaLista.resumen || null;
+  html += `<div class="nube-fila"><span>Pendientes</span><span>`
+        + (resumen ? resumen.pedidos_facturables : "sin datos aún")
+        + `</span></div>`;
+  html += `<div class="nube-fila" title="Pedidos con un dato que no se puede `
+        + `facturar solo: cliente sin resolver, producto sin artículo, etc.">`
+        + `<span>Van a revisión</span><span>`
+        + (resumen ? resumen.revision_manual : "sin datos aún")
+        + `</span></div>`;
+  // Envío a la nube (el espejo): un camino aparte de la lectura de arriba —
+  // se puede leer bien y fallar al escribir. "sin conexión" cuando el
+  // espejo está caído, en vez del último número (quedaría desactualizado).
+  const espejoOk = nube.espejo_activo !== false;
+  html += `<div class="nube-fila" title="Facturas de esta máquina que en el `
+        + `último refresco le faltaban llegar a las otras computadoras.">`
+        + `<span>Cambios por enviar</span><span>`
+        + (!espejoOk ? "sin conexión"
+           : (nube.cambios_por_enviar === null ? "sin datos aún" : nube.cambios_por_enviar))
+        + `</span></div>`;
+  html += `<div class="nube-fila" title="Facturas cerradas en cualquier `
+        + `computadora en los últimos 30 min.">`
+        + `<span>Actividad reciente</span><span>`
+        + (!espejoOk ? "sin datos"
+           : (nube.cambios_recientes_30min === null ? "sin datos aún" : nube.cambios_recientes_30min))
         + `</span></div>`;
   if (llenando || secuenciaActiva) {
     html += `<div class="nube-nota">El llenado en curso manda: se actualiza al terminar.</div>`;
@@ -4722,6 +4736,9 @@ async function sondearCompartido() {
     nube.ultimoOk = Date.now();
     if (r.nube) {
       nube.carga_ts = r.nube.carga_ts;
+      nube.espejo_activo = r.nube.espejo_activo;
+      nube.cambios_por_enviar = r.nube.cambios_por_enviar;
+      nube.cambios_recientes_30min = r.nube.cambios_recientes_30min;
     }
     pintarNube();
     const cambio = r.cambio;
