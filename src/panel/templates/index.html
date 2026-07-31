@@ -5709,7 +5709,8 @@ function pintarPendientes(familias) {
     if (partes.length === 1 && !(f0.total_partes > 1)) return filaPendiente(f0, false);
     return `
     <tr class="fam-cabecera">
-      <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(clienteEnLinea(f0))}</td>
+      <td><b>${esc(f0.pedido_id)}</b></td>
+      <td>${celdaCliente(f0)}</td>
       <td>${esc(f0.ruta || "")}</td>
       <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
       <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
@@ -6064,7 +6065,8 @@ function pintarProcesadas(familias) {
     if (partes.length === 1 && !(f0.total_partes > 1)) return filaProcesada(f0, false);
     return `
     <tr class="fam-cabecera">
-      <td colspan="2"><b>${esc(f0.pedido_id)}</b> — ${esc(clienteEnLinea(f0))}</td>
+      <td><b>${esc(f0.pedido_id)}</b></td>
+      <td>${celdaCliente(f0)}</td>
       <td>${esc(f0.ruta || "")}</td>
       <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
       <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
