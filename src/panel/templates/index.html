@@ -152,7 +152,7 @@
      cada vez que se marca (la barra alinea por abajo). */
   #campo-solo-aqui.filtro-on { color:#b54708; font-weight:600; }
   #campo-solo-aqui.filtro-on input { accent-color:#f59e0b; }
-  #sec-pendientes, #sec-procesadas, #sec-revision { border-top-right-radius:0; }
+  #sec-pendientes, #sec-procesadas, #sec-llenados, #sec-revision { border-top-right-radius:0; }
   .campo { display:flex; flex-direction:column; font-size:12px; color:var(--mut); gap:3px; }
   /* Casilla de filtro: los demás campos de la barra llevan su etiqueta encima,
      así que esta va en línea y con un margen abajo para quedar a la altura del
@@ -230,8 +230,8 @@
   .rotulo-dia:empty { display:none; }
   .rotulo-dia.hoy    { background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
   .rotulo-dia.manana { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
-  /* Tabs PENDIENTES / EN REVISIÓN / PROCESADAS / DESCUENTOS / AJUSTES — cada
-     una con su color. Cuál está activa se lee de lejos por cuatro señales que
+  /* Tabs PENDIENTES / POR REVISAR / EN REVISIÓN / PROCESADAS / DESCUENTOS /
+     AJUSTES — cada una con su color. Cuál está activa se lee de lejos por cuatro señales que
      se suman (feedback 2026-07-22: el tinte pálido solo no se distinguía, y
      había que dejar de usar opacity porque encarecía el repintado):
        (a) fondo BIEN distinto — las inactivas son grises, la activa blanca
@@ -259,26 +259,20 @@
   #tab-ajustes.activa { border-top-color:#ec4899; color:#be185d; }
   #tab-admin { border-top-color:#d8c9f5; }
   #tab-admin.activa { border-top-color:#7c3aed; color:#6d28d9; }
-  /* EN REVISIÓN va de última y solo existe cuando hay pedidos en revisión
-     (ver repintar); color propio (rojo) para que resalte cuando aparece —
-     por eso su letra va en rojo también inactiva, es la única excepción. */
-  #tab-revision { border-top-color:#f3b9b9; color:#c9736a; }
-  #tab-revision.activa { border-top-color:#dc2626; color:#b42318; }
+  /* POR REVISAR y EN REVISIÓN solo existen cuando su lista trae algo (ver
+     repintar); color propio para que resalten cuando aparecen — por eso su
+     letra va en color también inactivas, únicas excepciones. Rojo para los
+     llenados que no terminaron perfectos (ahí se actúa ya); verde azulado
+     para los pedidos a los que les faltan datos (esperan, no urgen). */
+  #tab-llenados { border-top-color:#f3b9b9; color:#c9736a; }
+  #tab-llenados.activa { border-top-color:#dc2626; color:#b42318; }
+  #tab-revision { border-top-color:#a7ded8; color:#4e9a92; }
+  #tab-revision.activa { border-top-color:#0d9488; color:#0f766e; }
   /* El panel de la tab activa llena la ventana; solo su tabla hace scroll y
      el paginador queda fijo al pie. */
   .tab-panel { border-top-left-radius:0; flex:1; min-height:0;
                display:flex; flex-direction:column; margin-bottom:0; }
   .tabla-scroll { flex:1; min-height:0; overflow:auto; }
-  /* EN REVISIÓN con dos bloques apilados (2026-07-30): los llenados por
-     revisar arriba a su alto natural (con tope, para que una cola larga no
-     entierre los pedidos sin datos) y abajo el bloque de siempre con el
-     resto del alto. Cada bloque escrolea su propia tabla. */
-  #rev-llenados { flex-shrink:0; display:flex; flex-direction:column;
-                  max-height:45%; border-bottom:2px solid #e2e6ec; }
-  /* Sin pedidos sin datos debajo, la cola toma el alto completo. */
-  #rev-llenados.solo { max-height:none; flex:1; min-height:0; border-bottom:none; }
-  #rev-datos { flex:1; min-height:0; display:flex; flex-direction:column; }
-  .rev-titulo { margin:10px 14px 2px; font-size:13px; }
   .tabla-scroll thead th { position:sticky; top:0; background:#fafbfc; z-index:1;
                            box-shadow:0 1px 0 #e2e6ec; }
   /* DESCUENTOS, AJUSTES y ADMIN no son una tabla única: en esas pestañas la
@@ -1684,9 +1678,13 @@
   <div class="tabs">
     <button class="tab-btn activa" id="tab-pendientes" onclick="irATab('pendientes')">
       PENDIENTES (<span id="n-pendientes">…</span>)</button>
-    <!-- EN REVISIÓN (2026-07-20): entre PENDIENTES y PROCESADAS, y solo
-         visible cuando el pipeline dejó pedidos sin poder facturar (ver
-         repintar). -->
+    <!-- POR REVISAR y EN REVISIÓN (2026-07-31; antes un solo tab con los dos
+         bloques apilados): entre PENDIENTES y PROCESADAS, cada una visible
+         solo cuando su lista trae algo (ver repintar). POR REVISAR lleva los
+         llenados que no terminaron perfectos; EN REVISIÓN, los pedidos que
+         aún no se pueden facturar por datos que faltan. -->
+    <button class="tab-btn" id="tab-llenados" style="display:none" onclick="irATab('llenados')">
+      POR REVISAR (<span id="n-llenados">…</span>)</button>
     <button class="tab-btn" id="tab-revision" style="display:none" onclick="irATab('revision')">
       EN REVISIÓN (<span id="n-revision">…</span>)</button>
     <button class="tab-btn" id="tab-procesadas" onclick="irATab('procesadas')">
@@ -1711,7 +1709,8 @@
     <button type="button" class="peligro" id="borrador-descartar" onclick="borradorDescartarPedir(this)">Descartar</button>
   </div>
 
-  <!-- Buscador compartido entre PENDIENTES, PROCESADAS y EN REVISIÓN (desde
+  <!-- Buscador compartido entre PENDIENTES, PROCESADAS, POR REVISAR y EN
+       REVISIÓN (desde
        2026-07-21 barre las columnas de la fila, no solo el cliente: ver
        CAMPOS_BUSQUEDA en app.py); las fechas Desde/Hasta son SOLO de PROCESADAS
        (PENDIENTES se muestra siempre completa) y por eso solo se ven en esa tab
@@ -2096,42 +2095,38 @@
     </div>
   </section>
 
+  <!-- POR REVISAR y EN REVISIÓN, cada una en su tab (2026-07-31, pedido del
+       usuario; antes eran dos bloques apilados en un solo tab y cada lista
+       quedaba con un mini scroll): los llenados que no terminaron perfectos
+       — el lugar estable donde actuar, para que el error no rebote entre
+       listas — y los pedidos que aún no se pueden facturar por datos que
+       faltan. Cada tab existe solo cuando su lista trae algo. -->
+  <section id="sec-llenados" class="tab-panel" style="display:none">
+    <p class="mut" style="margin:10px 14px 8px">
+      Llenados que no terminaron perfectos: la factura falló a mitad de
+      camino o el documento quedó con líneas de menos. Cada una se queda
+      aquí hasta reintentarla, descartarla o marcarla revisada.</p>
+    <div class="tabla-scroll"><table id="t-llenados">
+      <thead><tr>
+        <th>Pedido</th><th>Cliente</th><th>Ruta</th><th>Qué pasó</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
   <section id="sec-revision" class="tab-panel" style="display:none">
-    <!-- EN REVISIÓN junta dos cosas apiladas (2026-07-30, pedido del usuario):
-         arriba los LLENADOS que no terminaron perfectos — el lugar estable
-         donde actuar, para que el error no rebote entre listas — y abajo los
-         pedidos que aún no se pueden facturar por datos que faltan. Cada
-         bloque se esconde si no tiene nada; el tab existe si hay cualquiera. -->
-    <div id="rev-llenados" style="display:none">
-      <h3 class="rev-titulo">Llenados por revisar</h3>
-      <p class="mut" style="margin:0 14px 8px">
-        Llenados que no terminaron perfectos: la factura falló a mitad de
-        camino o el documento quedó con líneas de menos. Cada una se queda
-        aquí hasta reintentarla, descartarla o marcarla revisada.</p>
-      <div class="tabla-scroll"><table id="t-llenados">
-        <thead><tr>
-          <th>Pedido</th><th>Cliente</th><th>Ruta</th><th>Qué pasó</th><th></th>
-        </tr></thead>
-        <tbody></tbody>
-      </table></div>
-    </div>
-    <div id="rev-datos">
-      <h3 class="rev-titulo" id="rev-datos-titulo" style="display:none">
-        Pedidos que todavía no se pueden facturar</h3>
-      <p class="mut" style="margin:8px 14px">
-        Pedidos que el asistente todavía no puede facturar y qué les falta.
-        Cada caso trae su botón cuando se puede resolver desde aquí (el
-        cliente o el producto que falta); lo que viene dañado de AppSheet se
-        corrige allá. Se reclasifican solos en cada refresco (cada 10
-        minutos): resuelto lo que falta, pasan a PENDIENTES.</p>
-      <div class="tabla-scroll"><table id="t-revision">
-        <thead><tr>
-          <th>Pedido</th><th>Cliente</th><th>Fecha pedido</th><th>Qué falta</th><th>Detalle</th><th></th>
-        </tr></thead>
-        <tbody></tbody>
-      </table></div>
-      <div class="paginador" id="pag-revision"></div>
-    </div>
+    <p class="mut" style="margin:10px 14px 8px">
+      Pedidos que el asistente todavía no puede facturar y qué les falta.
+      Cada caso trae su botón cuando se puede resolver desde aquí (el
+      cliente o el producto que falta); lo que viene dañado de AppSheet se
+      corrige allá. Se reclasifican solos en cada refresco (cada 10
+      minutos): resuelto lo que falta, pasan a PENDIENTES.</p>
+    <div class="tabla-scroll"><table id="t-revision">
+      <thead><tr>
+        <th>Pedido</th><th>Cliente</th><th>Fecha pedido</th><th>Qué falta</th><th>Detalle</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="paginador" id="pag-revision"></div>
   </section>
 </main>
 
@@ -2613,7 +2608,7 @@
     <p>El documento que está en pantalla no tiene esos renglones.</p>
     <div class="editor-acciones">
       <button class="primario" onclick="cerrarLineasOmitidas()"
-              title="La factura queda marcada por revisar en EN REVISIÓN.">Dejar en revisión</button>
+              title="La factura queda marcada en POR REVISAR.">Dejar por revisar</button>
       <button onclick="marcarLineasOmitidasRevisada()"
               title="Quita la marca de revisar: la factura queda como está.">Ya está resuelto</button>
     </div>
@@ -2663,7 +2658,7 @@ window.addEventListener("unhandledrejection", e =>
 let secuenciaActiva = false;
 let llenando = false;
 // Al terminar un llenado que no quedó perfecto (error, líneas de menos), el
-// panel salta solo a EN REVISIÓN, que es donde quedó la factura con sus
+// panel salta solo a POR REVISAR, que es donde quedó la factura con sus
 // botones (pedido del usuario 2026-07-30): así no hay que adivinar a qué
 // lista se fue. No salta en medio de una corrida ni con la pausa por fallo en
 // pantalla — ahí manda la barra —; esos casos consumen el salto cuando la
@@ -2673,8 +2668,8 @@ function saltarARevisionSiTocaba() {
   if (!irARevisionAlTerminar || llenando || secuenciaActiva) return;
   if ($("btn-reintentar-fila").style.display !== "none") return;   // pausa por fallo
   irARevisionAlTerminar = false;
-  if ($("tab-revision").style.display === "none") return;   // ya no hay nada que revisar
-  cambiarTab("revision");
+  if ($("tab-llenados").style.display === "none") return;   // ya no hay nada que revisar
+  cambiarTab("llenados");
 }
 // Cuántas facturas quedaron marcadas "llenada en prueba" (procesadas fantasma
 // del modo prueba, 2026-07-30). Se declara aquí, con el resto del estado, y no
@@ -3740,8 +3735,8 @@ function cerrarLineasOmitidas() {
 // revisar". No se pregunta CÓMO se resolvió (2026-07-30, decisión del usuario:
 // los dos botones se distinguen por el estado en que dejan la factura, no por
 // lo que hizo el operador — completarla a mano dejó de ser la única salida).
-// "Dejar en revisión" NO llama a este endpoint: la factura se queda "por
-// revisar" (EN REVISIÓN y PROCESADAS) hasta que se marque desde ahí
+// "Dejar por revisar" NO llama a este endpoint: la factura se queda "por
+// revisar" (POR REVISAR y PROCESADAS) hasta que se marque desde ahí
 // (marcarFacturaRevisada).
 async function marcarLineasOmitidasRevisada() {
   const pedido = lineasOmitidasPedido;
@@ -4394,7 +4389,8 @@ function filtros() {
 // sitios a la vez: la barra de filtros teñida con el campo culpable marcado, el
 // aviso de arriba con lo que filtra y su ×, y el conteo del pie en ámbar.
 //
-// Qué cuenta como filtro depende de la tab: PENDIENTES y EN REVISIÓN solo
+// Qué cuenta como filtro depende de la tab: PENDIENTES, POR REVISAR y EN
+// REVISIÓN solo
 // filtran por buscador y ruta — las fechas y "Llenadas en esta máquina" son exclusivas
 // de PROCESADAS (ver cambiarTab). Cada entrada trae ya el nombre del filtro que
 // la quita, porque el aviso los ofrece uno por uno.
@@ -4461,10 +4457,10 @@ function pintarEstadoFiltros() {
         : "");
 }
 
-// Qué tab se está viendo. La barra de filtros solo existe en las tres que
-// listan facturas, así que basta con mirar cuál de ellas está activa.
+// Qué tab se está viendo. La barra de filtros solo existe en las que listan
+// facturas, así que basta con mirar cuál de ellas está activa.
 function tabActiva() {
-  return ["pendientes", "procesadas", "revision"]
+  return ["pendientes", "procesadas", "llenados", "revision"]
     .find(t => $("tab-" + t) && $("tab-" + t).classList.contains("activa")) || "pendientes";
 }
 
@@ -4711,19 +4707,20 @@ async function cambioRuta(valor) {
 
 function cambiarTab(tab) {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
-  for (const t of ["pendientes", "procesadas", "descuentos", "ajustes", "admin", "revision"]) {
+  for (const t of ["pendientes", "procesadas", "descuentos", "ajustes", "admin", "llenados", "revision"]) {
     // El botón de ADMIN solo se renderiza en el equipo admin; su sección sí
     // existe siempre, así que la guarda es sobre el botón.
     const btn = $("tab-" + t);
     if (btn) btn.classList.toggle("activa", t === tab);
     $("sec-" + t).style.display = t === tab ? "" : "none";
   }
-  // El buscador aplica (y se ve) en PENDIENTES, PROCESADAS y EN
+  // El buscador aplica (y se ve) en PENDIENTES, PROCESADAS, POR REVISAR y EN
   // REVISIÓN; las fechas Desde/Hasta y el botón de histórico son exclusivos
   // de PROCESADAS — PENDIENTES muestra siempre todas sus facturas, sin
   // recorte por fecha (2026-07-20).
   $("filtros-barra").style.display =
-    (tab === "pendientes" || tab === "procesadas" || tab === "revision") ? "" : "none";
+    (tab === "pendientes" || tab === "procesadas" || tab === "llenados"
+     || tab === "revision") ? "" : "none";
   const fechasVisibles = tab === "procesadas" ? "" : "none";
   $("campo-desde").style.display = fechasVisibles;
   $("campo-hasta").style.display = fechasVisibles;
@@ -5337,18 +5334,24 @@ function repintar() {
   // y esas no son trabajo (2026-07-22).
   $("n-pendientes").textContent = pendientesLlenables().length;
   pintarTituloVentana();   // la barra de la ventana lleva la misma cuenta
-  // El tab EN REVISIÓN junta dos cosas (2026-07-30): arriba los llenados que
-  // no terminaron perfectos (el lugar estable donde actuar) y abajo los
-  // pedidos que aún no se pueden facturar. Existe cuando hay cualquiera de
-  // las dos; si quedó vacío con esa vista abierta, se vuelve a PENDIENTES.
+  // POR REVISAR (llenados que no terminaron perfectos, el lugar estable donde
+  // actuar) y EN REVISIÓN (pedidos que aún no se pueden facturar) son tabs
+  // opcionales (2026-07-31; antes las dos listas compartían un tab, apiladas):
+  // cada una existe solo cuando su lista trae algo. Si la que está a la vista
+  // quedó vacía, se pasa a la hermana si tiene trabajo — como cuando eran un
+  // solo tab, lo que queda por revisar sigue en pantalla — y si no, a
+  // PENDIENTES.
   const porRevisar = ultimaLista.por_revisar || [];
-  const totalRevision = revision.length + porRevisar.length;
-  $("tab-revision").style.display = totalRevision ? "" : "none";
-  $("n-revision").textContent = totalRevision;
-  if (!totalRevision && $("tab-revision").classList.contains("activa"))
-    cambiarTab("pendientes");
+  $("tab-llenados").style.display = porRevisar.length ? "" : "none";
+  $("n-llenados").textContent = porRevisar.length;
+  $("tab-revision").style.display = revision.length ? "" : "none";
+  $("n-revision").textContent = revision.length;
+  if (!porRevisar.length && $("tab-llenados").classList.contains("activa"))
+    cambiarTab(revision.length ? "revision" : "pendientes");
+  if (!revision.length && $("tab-revision").classList.contains("activa"))
+    cambiarTab(porRevisar.length ? "llenados" : "pendientes");
   pintarPendientes(paginarFamilias("pendientes", ultimaLista.pendientes));
-  pintarLlenadosPorRevisar(porRevisar, revision.length);
+  pintarLlenadosPorRevisar(porRevisar);
   pintarRevision(paginar("revision", revision));
   // Deja "Siguiente" activo al final de PROCESADAS mientras quede histórico por
   // fuera de la ventana vigente; pulsarlo la ensancha un escalón. En el último
@@ -6649,20 +6652,13 @@ function detalleDeMotivo(m, p) {
   return typeof caso.detalle === "function" ? caso.detalle(p, m) : caso.detalle;
 }
 
-// --- "Llenados por revisar" (2026-07-30): la sección de arriba del mismo
-// tab. Todo llenado de esta máquina que no terminó perfecto — falló a mitad
-// de camino, quedó marcado para volver a llenar, o cerró con líneas de menos
-// sin despachar la revisión — vive aquí con sus botones, en vez de rebotar
-// entre PENDIENTES y PROCESADAS según el estado. Sin paginación a propósito:
-// lo normal es que sean pocas, y una cola larga escrolea en su bloque.
-function pintarLlenadosPorRevisar(lista, hayPedidosSinDatos) {
-  $("rev-llenados").style.display = lista.length ? "" : "none";
-  // Bajo una cola con filas, el bloque de pedidos vacío no dice nada; y los
-  // títulos solo hacen falta cuando las dos secciones están a la vista.
-  const datosVisibles = !lista.length || hayPedidosSinDatos;
-  $("rev-datos").style.display = datosVisibles ? "" : "none";
-  $("rev-datos-titulo").style.display = (lista.length && datosVisibles) ? "" : "none";
-  $("rev-llenados").classList.toggle("solo", !datosVisibles);
+// --- Tab POR REVISAR (2026-07-30; con tab propio desde 2026-07-31). Todo
+// llenado de esta máquina que no terminó perfecto — falló a mitad de camino,
+// quedó marcado para volver a llenar, o cerró con líneas de menos sin
+// despachar la revisión — vive aquí con sus botones, en vez de rebotar entre
+// PENDIENTES y PROCESADAS según el estado. Sin paginación a propósito: lo
+// normal es que sean pocas, y una cola larga escrolea en su tabla.
+function pintarLlenadosPorRevisar(lista) {
   $("t-llenados").querySelector("tbody").innerHTML = lista.map(f => {
     const detalle = f.detalle_error
       ? esc(f.detalle_error) + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "")
@@ -7292,8 +7288,8 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       const huboOmitidas = r.lineas_omitidas && Object.keys(r.lineas_omitidas).length > 0;
       if (huboOmitidas) {
         abrirLineasOmitidas(pedido_id, parte, r.lineas_omitidas, r.lineas_llenadas, r.lineas_pedidas);
-        // La factura quedó en "Llenados por revisar": al cerrar el llenado el
-        // panel salta allá (detrás del aviso que se acaba de abrir).
+        // La factura quedó en POR REVISAR: al cerrar el llenado el panel
+        // salta allá (detrás del aviso que se acaba de abrir).
         irARevisionAlTerminar = true;
       }
       // Espera de envío a la plataforma (2026-07-28, TEMPORAL): solo en
@@ -7391,16 +7387,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       const advertencia = (r.destranque && r.primer_llenado_sesion)
         ? " Si tenías otro trabajo sin guardar abierto en el programa de facturación, revísalo: el asistente lo cerró de golpe."
         : "";
-      // La factura quedó en "Llenados por revisar" (EN REVISIÓN): el panel
-      // salta allá al cerrar el llenado — o al terminar la corrida, si es que
-      // está corriendo una.
+      // La factura quedó en POR REVISAR: el panel salta allá al cerrar el
+      // llenado — o al terminar la corrida, si es que está corriendo una.
       irARevisionAlTerminar = true;
       // En "Llenar en fila" la barra se queda con Reintentar / Cancelar; en un
       // llenado suelto, el mensaje de siempre y la factura con sus botones.
       if (secuenciaActiva)
         pausarSecuenciaPorFallo(`${fallo}${advertencia} Reintenta o cancela aquí mismo, en la barra.`);
       else
-        mensaje(`${fallo}${advertencia} Quedó EN REVISIÓN para reintentar o descartar.`, "error");
+        mensaje(`${fallo}${advertencia} Quedó POR REVISAR para reintentar o descartar.`, "error");
       return "error";
     }
   } catch (e) {
@@ -7478,7 +7473,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     const seguir = continuarEnFila;
     continuarEnFila = false;
     if (seguir) cargar().then(() => siguienteDeSecuencia());
-    // Con la lista ya recargada, el salto a EN REVISIÓN si este llenado (o
+    // Con la lista ya recargada, el salto a POR REVISAR si este llenado (o
     // uno anterior de la corrida) dejó algo por revisar.
     else cargar().then(() => saltarARevisionSiTocaba());
   }
@@ -9541,7 +9536,7 @@ function reintentarEnFila() {
 
 // Cancelar: abandona la corrida sin mandar una sola tecla a Winledger (regla
 // 2026-07-18e). Sirve para los dos estados en que aparece: pausada por un
-// fallo, y esperando el login. La factura que falló queda EN REVISIÓN con su
+// fallo, y esperando el login. La factura que falló queda POR REVISAR con su
 // Reintentar/Descartar; la barra vuelve a "Llenar en fila". Aquí SÍ se sueltan
 // las reservas del lote: la corrida se abandona, así que lo que no se llenó
 // vuelve a estar disponible para cualquier máquina.
@@ -9551,10 +9546,10 @@ function cancelarEnFila() {
   ocultarBotonesFalloEnFila();
   $("btn-detener").style.display = "none";
   $("btn-secuencia").style.display = "";
-  // Cancelada tras un fallo, la factura quedó EN REVISIÓN (y el panel salta
+  // Cancelada tras un fallo, la factura quedó POR REVISAR (y el panel salta
   // allá); cancelada esperando el login no hay error y sigue en pendientes.
   mensaje((irARevisionAlTerminar
-    ? "Cancelado. La factura quedó EN REVISIÓN."
+    ? "Cancelado. La factura quedó POR REVISAR."
     : "Cancelado. La factura quedó en pendientes.")
     + notaDestranquesEnFila() + notaLoteEnFila(), "info");
   liberarReservas();
