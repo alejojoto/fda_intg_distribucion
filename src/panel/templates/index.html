@@ -1246,11 +1246,9 @@
   #previo-lista .previo-num { text-align:right; width:52px; }
   #previo-lista .previo-desc { width:130px; }
   #previo-lista .previo-desc .pct { color:#047857; font-weight:600; }
-  /* Lo que el operador sacó de la fila queda a la vista y se puede devolver
-     (2026-07-31): sin esto, un − de más obliga a cancelar la corrida entera. */
-  #previo-sacados { font-size:12.5px; color:var(--mut); margin:8px 0 0;
-                    display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-  #previo-sacados button { padding:2px 9px; font-size:12.5px; }
+  /* Lo que el operador sacó de la fila queda a la vista, solo como registro
+     (2026-07-31): la vuelta atrás es cancelar y volver a abrir la fila. */
+  #previo-sacados { font-size:12.5px; color:var(--mut); margin:8px 0 0; }
   /* Configuración obligatoria de la máquina (2026-07-29): los campos se
      resuelven DENTRO del aviso — el que falta arranca vacío y con el foco. */
   #configmaq-caja label { display:block; font-weight:600; font-size:13px;
@@ -8534,23 +8532,17 @@ function previoMensajeFilaVacia() {
     : "Cancela: no hay nada que llenar."}`;
 }
 
-// Lo que quedó fuera por decisión del operador, con la vuelta atrás al lado
-// (2026-07-31): sacar un pedido de la fila es un clic, y hasta ahora deshacerlo
-// costaba cancelar la corrida entera y volver a lanzarla. Devolverlo rehace la
-// fila con la cantidad que esté elegida, así que puede volver a entrar estirado
-// —y el aviso del pedido dividido reaparece— igual que la primera vez.
+// Lo que quedó fuera por decisión del operador, solo como registro (2026-07-31):
+// hubo un botón "Devolver" al lado, pero como la fila conserva la cantidad
+// elegida, devolver un pedido desplazaba a otro que ya estaba dentro — más
+// confuso que útil, y el usuario pidió retirarlo. Sacar no se deshace desde
+// aquí: se cancela y se vuelve a abrir la fila, que nace con todo dentro.
 function pintarPrevioSacados() {
   const caja = $("previo-sacados");
-  if (!previoQuitados.length) { caja.innerHTML = ""; return; }
-  const hover = "Vuelve a entrar en la fila, con la cantidad que esté elegida.";
-  caja.innerHTML = `<span>Fuera de la fila por decisión tuya:</span>`
-    + previoQuitados.map(id => `<span>${esc(id)} <button title="${esc(hover)}"
-        onclick="previoDevolver('${esc(id)}')">Devolver</button></span>`).join("");
-}
-
-function previoDevolver(pedido_id) {
-  previoQuitados = previoQuitados.filter(p => p !== pedido_id);
-  rehacerPrevioLote();
+  if (!previoQuitados.length) { caja.textContent = ""; return; }
+  caja.textContent = `Fuera de la fila por decisión tuya: `
+    + `${previoQuitados.join(" · ")}. Para devolver algo, cancela y vuelve `
+    + `a abrir la fila.`;
 }
 
 function filaPrevio(f, i) {
