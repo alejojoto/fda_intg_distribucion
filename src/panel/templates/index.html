@@ -367,8 +367,10 @@
   /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
-     botón con su propio color ámbar. */
-  #babymix-fila { display:flex; gap:14px; align-items:center;
+     botón con su propio color ámbar. Clase, no id (2026-07-31, pedido del
+     usuario): el mismo control, idéntico y de primero, se repite en las
+     ventanas de revisión/prellenado (previoBabyMix/detalleBabyMix). */
+  .babymix-fila { display:flex; gap:14px; align-items:center;
                   padding:6px 12px; border:1px solid #fcd34d;
                   border-radius:8px; background:#fffbeb; font-size:13.5px; }
   /* Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8): va después de
@@ -386,9 +388,9 @@
   /* El reemplazo de esa barra en producción (2026-07-28): mismo doble espacio
      contra Baby Mix que tenía el bloque al que sustituye. */
   #btn-llenar-siguiente { margin-left:10px; }
-  #babymix-fila b { color:var(--warn); }
-  #babymix-fila label { cursor:pointer; white-space:nowrap; font-weight:600; }
-  #babymix-fila input[type=radio] { padding:0; border:none; background:none;
+  .babymix-fila b { color:var(--warn); }
+  .babymix-fila label { cursor:pointer; white-space:nowrap; font-weight:600; }
+  .babymix-fila input[type=radio] { padding:0; border:none; background:none;
                                     width:16px; height:16px; accent-color:#b54708;
                                     vertical-align:-3px; cursor:pointer; margin-right:4px; }
   .chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap; }
@@ -1601,9 +1603,10 @@
   <div class="barra" id="llenado-barra">
     <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
          y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
-         Arranca en 125 g (el que se está gastando). BORRAR este bloque (y el
-         CSS #babymix-fila) cuando se acaben los paquetes de 125 g. -->
-    <div id="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
+         Arranca en 125 g (el que se está gastando). BORRAR este bloque (y la
+         CSS .babymix-fila, y babyMixControl() más abajo) cuando se acaben los
+         paquetes de 125 g. -->
+    <div class="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
       <b>Baby Mix</b>
       <label><input type="radio" name="f-bm" value="125" checked onchange="guardarGramajeBaby(this.value)"> 125 g</label>
       <label><input type="radio" name="f-bm" value="150" onchange="guardarGramajeBaby(this.value)"> 150 g</label>
@@ -6076,8 +6079,10 @@ function fijoDetalle(clave) {
   const llenable = llenadoDirecto(filaDeLista(...partesDeClave(clave)))
     || detalleReabriendo === clave;
   if (!llenable) return cabecera;
-  const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
-                   cajitaImpresion(), cajitaBaby(), cajitaEmpresa()].join("");
+  // Baby Mix de primero (2026-07-31, pedido del usuario): misma posición que
+  // en la barra del panel.
+  const cajitas = [babyMixControl(), cajitaFecha(), cajitaTasa(), cajitaSerie(),
+                   cajitaImpresion(), cajitaEmpresa()].join("");
   return cabecera
     + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
     + `<div id="detalle-avisos">${htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))}</div>`;
@@ -8594,13 +8599,23 @@ const cajitaImpresion = () => cajitaEditable("Imprimir",
   imprimirEnFila());
 
 // Baby Mix también se revisa antes de llenar (2026-07-31, pedido del usuario):
-// el mismo estado del selector TEMPORAL de la barra, guardado en esta máquina.
-const cajitaBaby = () => cajitaEditable("Baby Mix",
-  `<select class="cj-edit" onchange="cajitaBabyElegida(this.value)">${
-    cajitaOpciones([["125", "125 g"], ["150", "150 g"]], gramajeBaby())}</select>`,
-  false,
-  "Temporal hasta agotar los paquetes de 125 g: las líneas de Baby Mix salen "
-  + "con el gramaje elegido. La elección queda guardada en esta máquina.");
+// IDÉNTICO al de la barra —mismo toggle, color y de primero, a la izquierda—
+// en vez de una cajita más: es el único control temporal que necesita llamar
+// la atención, y las demás cajitas se quedan sin resaltar. El radio comparte
+// name="f-bm" con el de la barra, así que el navegador los mantiene
+// sincronizados solo con que se marque el que corresponde al pintar.
+const babyMixControl = () => {
+  const g = gramajeBaby();
+  return `<div class="babymix-fila" title="Temporal hasta agotar los paquetes `
+    + `de 125 g: las líneas de Baby Mix salen con el gramaje elegido. La `
+    + `elección queda guardada en esta máquina.">
+      <b>Baby Mix</b>
+      <label><input type="radio" name="f-bm" value="125" ${g === "125" ? "checked" : ""}
+        onchange="guardarGramajeBaby(this.value)"> 125 g</label>
+      <label><input type="radio" name="f-bm" value="150" ${g === "150" ? "checked" : ""}
+        onchange="guardarGramajeBaby(this.value)"> 150 g</label>
+    </div>`;
+};
 
 // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
 // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
@@ -8641,6 +8656,9 @@ function pintarPrevioCajitas() {
 
   cajitas.push(`<span class="cj-salto"></span>`);
 
+  // Baby Mix de primero en este renglón (2026-07-31, pedido del usuario): la
+  // misma posición —a la izquierda— que tiene en la barra del panel.
+  cajitas.push(babyMixControl());
   cajitas.push(cajitaSerie());
 
   // La cantidad también se elige AQUÍ (2026-07-31, pedido del usuario): el mismo
@@ -8660,7 +8678,6 @@ function pintarPrevioCajitas() {
       } onchange="previoCantidadElegida(this.value)">${opcionesCantidadHtml()}</select>`));
 
   cajitas.push(cajitaImpresion());
-  cajitas.push(cajitaBaby());
   cajitas.push(cajitaEmpresa());
 
   $("previo-cajitas").innerHTML = cajitas.join("");
@@ -8668,13 +8685,6 @@ function pintarPrevioCajitas() {
 
 function cajitaSerieElegida(valor) {
   cambioSerie(valor);          // fija serieSeleccionada y repinta el selector de la barra
-  repintarPuestaAPunto();
-}
-
-function cajitaBabyElegida(gramaje) {
-  const radio = document.querySelector(`input[name="f-bm"][value="${gramaje}"]`);
-  if (radio) radio.checked = true;
-  guardarGramajeBaby(gramaje);
   repintarPuestaAPunto();
 }
 
