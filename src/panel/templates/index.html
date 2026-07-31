@@ -6671,14 +6671,15 @@ function pintarLlenadosPorRevisar(lista) {
     // solo estaba "Revisada", que despachaba la factura sin decir dónde
     // quedaba; y la otra salida real —rehacer el documento con todas las
     // líneas— obligaba a buscar la factura en PROCESADAS. La primaria es
-    // dejarla como salió: lo que faltó suele resolverse aparte.
+    // volver a llenar (2026-08-01, corrección del usuario): el documento salió
+    // incompleto, así que lo esperable es rehacerlo, no despacharlo así.
     const acciones = f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
-      : `<button class="acento" title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
-           onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Mandar a procesadas</button>
-         <button title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
-           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`;
+      : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
+           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>
+         <button title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
+           onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Mandar a procesadas</button>`;
     return `
     <tr${filaDetalle(f)}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
