@@ -8426,6 +8426,11 @@ for (const evento of ["input", "change", "click"])
 // algo (tasa, cantidad) no hay atajo que ofrecer: se cae al "Seguir aquí" de
 // siempre, que solo cierra la pregunta.
 function intentarCerrarPrevio() {
+  // Fila vacía: no hay lote que armar, así que cerrar no pierde nada — se
+  // cierra directo, sin preguntar (2026-08-01, pedido del usuario). Mientras
+  // la lista viaja (previoCargando) puede volver a llenarse, así que ahí sí
+  // se pregunta como siempre.
+  if (!previoCargando && !previoCola.length) { cerrarPrevioLote(); return; }
   const hubo = previoTocado || Date.now() - previoAbiertoEn >= PREVIO_LECTURA_MS;
   if (!hubo) { cerrarPrevioLote(); return; }
   const acciones = $("previo-caja").querySelector(".editor-acciones");
