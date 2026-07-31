@@ -968,13 +968,16 @@
   .desc-subtab.st-vigentes  { background:#eaf7ef; border-color:#cdeadb; color:#15803d; }
   .desc-subtab.st-proximas  { background:#e8f1fd; border-color:#c3dbf7; color:#1d4ed8; }
   .desc-subtab.st-historico { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
+  .desc-subtab.st-revisar   { background:#fdf3e3; border-color:#f3ddb0; color:#b45309; }
   .desc-subtab.st-vigentes:hover  { background:#dcf0e5; }
   .desc-subtab.st-proximas:hover  { background:#dbe9fb; }
   .desc-subtab.st-historico:hover { background:#e4e8ee; }
+  .desc-subtab.st-revisar:hover   { background:#faeacf; }
   /* Estado activo: el mismo color, ahora sólido */
   .desc-subtab.activa.st-vigentes  { background:#16a34a; border-color:#16a34a; color:#fff; }
   .desc-subtab.activa.st-proximas  { background:#2563eb; border-color:#2563eb; color:#fff; }
   .desc-subtab.activa.st-historico { background:#64748b; border-color:#64748b; color:#fff; }
+  .desc-subtab.activa.st-revisar   { background:#d97706; border-color:#d97706; color:#fff; }
   /* Tarjeta de una campaña en la lista */
   .desc-card { border:1px solid #e2e6ec; border-radius:8px; padding:12px 14px; margin:10px 14px; }
   .desc-card.inactiva { opacity:.6; }
@@ -9483,6 +9486,7 @@ const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
 
 let catalogoActual = null;       // tipo abierto en la vista
 let catalogoFilas = [];          // filas del catálogo abierto
+let catClientesTab = "clientes"; // pestaña del catálogo de clientes: clientes | revisar
 let editorFila = null;           // fila en edición (null = nueva)
 let feriadoAnio = null;          // año elegido en Feriados (null = el en curso)
 let feriadoClase = "todas";      // filtro de tipo en Feriados: todas | normal | bancario
@@ -9677,7 +9681,7 @@ async function abrirCatalogo(tipo, prefill) {
     // No se oculta aquí: tras guardar una fila se restaura la ventana del cliente.
     clienteEnEdicion = null;     // abrir un catálogo siempre vuelve al listado
     // paginar() recorta sola la página si el catálogo encogió y quedó fuera de rango.
-    if (!mismoCatalogo) paginacion.catalogo.pagina = 1;
+    if (!mismoCatalogo) { paginacion.catalogo.pagina = 1; catClientesTab = "clientes"; }
     pintarBotonesCatalogos();
     // Esta vista es la de AJUSTES; Descuentos tiene su propia pestaña y su
     // propio render (renderDescuentos), no pasa por aquí.
@@ -9700,6 +9704,7 @@ async function abrirCatalogo(tipo, prefill) {
         ${def.descripcion ? `<p class="mut" style="margin:0 0 10px">${esc(def.descripcion)}</p>` : ""}
         ${leyenda ? `<div class="orig-leyenda">${leyenda}</div>` : ""}
         ${d.aviso ? `<p class="detalle-error" style="margin:0 0 8px">${esc(d.aviso)}</p>` : ""}
+        ${def.agrupado ? '<div id="cat-pestanas"></div>' : ""}
         <div class="cat-cabecera" style="padding:0 0 10px">
           <span class="buscador"><input type="text" id="cat-filtro" placeholder="filtrar…" value="${esc(filtroPrevio)}" oninput="paginacion.catalogo.pagina=1;pintarFilasCatalogo()">
             <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
@@ -9789,11 +9794,10 @@ function pintarFilasCatalogo() {
 // las entradas por resolver y los clientes de prueba, porque NO son clientes —
 // son entradas sueltas. Con el "Editar" en la cabecera, buscar una de ellas y
 // pulsarlo abría las 25 de golpe como si fueran un solo cliente.
-// Desde 2026-07-31 el bloque de arriba ya no es solo "las nuevas": recoge TODA
-// entrada que todavía no puede facturar, le falte lo que le falte (decir qué
-// es, el código de cliente o el de sucursal). El pedido de esa entrada está
-// esperando en revisión, así que van juntas y de primeras — antes una entrada
-// ya clasificada pero sin código quedaba perdida entre los clientes resueltos.
+// Desde 2026-07-31 el bloque de pendientes recoge TODA entrada que todavía no
+// puede facturar, le falte lo que le falte (decir qué es o el código de
+// cliente), y vive en su propia pestaña "Por revisar" — mezcladas con el
+// catálogo ahogaban a los clientes ya resueltos.
 const GRUPO_PENDIENTES = " pendientes";   // sentinela: no choca con ningún código real
 const GRUPO_PRUEBA = " prueba";
 
@@ -9825,12 +9829,27 @@ function pintarClientesAgrupados(filtro) {
     const auto = g.filas.length >= 2 || g.filas.some(([f]) => f.codigo_sucursal_winledger);
     g.esCadena = primera.es_cadena_manual == null ? auto : !!primera.es_cadena_manual;
   }
-  // Las entradas por resolver de primeras (son el trabajo pendiente), los
-  // clientes de prueba al final y los favoritos arriba del resto; dentro de
-  // cada bloque manda el orden alfabético que ya trae el backend.
-  lista.sort((a, b) => (b.codigo === GRUPO_PENDIENTES) - (a.codigo === GRUPO_PENDIENTES)
-                       || (a.codigo === GRUPO_PRUEBA) - (b.codigo === GRUPO_PRUEBA)
+  // Los clientes de prueba al final y los favoritos arriba del resto; dentro
+  // de cada bloque manda el orden alfabético que ya trae el backend.
+  lista.sort((a, b) => (a.codigo === GRUPO_PRUEBA) - (b.codigo === GRUPO_PRUEBA)
                        || (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0));
+  // Reparto en dos pestañas (pedido del usuario 2026-07-31): las entradas por
+  // resolver son muchas y mezcladas ahogaban el catálogo — van a su propia
+  // pestaña. Sin nada por resolver, la barra de pestañas sobra y se oculta.
+  const porRevisar = lista.filter(g => g.pendientes);
+  const nPorRevisar = porRevisar.reduce((n, g) => n + g.filas.length, 0);
+  if (!nPorRevisar) catClientesTab = "clientes";
+  const enRevisar = catClientesTab === "revisar";
+  const nClientes = lista.filter(g => !g.sueltas).length;
+  const pestana = (id, txt, n, st) => `<button class="desc-subtab ${st}${
+    catClientesTab === id ? " activa" : ""}" onclick="catCambiarPestana('${id}')">${
+    txt}<span class="cuenta">${n}</span></button>`;
+  $("cat-pestanas").innerHTML = nPorRevisar
+    ? `<div class="desc-subtabs" style="margin:0 0 10px">${
+        pestana("clientes", "Clientes", nClientes, "st-vigentes")}${
+        pestana("revisar", "Por revisar", nPorRevisar, "st-revisar")}</div>`
+    : "";
+  lista = enRevisar ? porRevisar : lista.filter(g => !g.pendientes);
   if (filtro) {
     lista = lista.map(g => {
       if (g.etiqueta.toLowerCase().includes(filtro)) return g;
@@ -9849,11 +9868,11 @@ function pintarClientesAgrupados(filtro) {
     else items.push([g, null]);
   }
   const visibles = paginarClientes("catalogo", items);
-  const porResolver = catalogoFilas.filter(f => faltaDeEntrada(f)).length;
   const totalSucursales = lista.reduce((n, g) => n + g.filas.length, 0);
   const catFiltroActivo = hayFiltroActivo("catalogo");
-  const conteoTexto = `${lista.length} cliente(s) · ${totalSucursales} sucursal(es)`
-    + (porResolver ? ` · ${porResolver} por resolver` : "");
+  const conteoTexto = enRevisar
+    ? `${totalSucursales} entrada(s) por resolver`
+    : `${lista.filter(g => !g.prueba).length} cliente(s) · ${totalSucursales} sucursal(es)`;
   $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${conteoTexto}</span> ${chipFiltroActivo(catFiltroActivo)}`;
   let html = "", grupoPintado = null;
   for (const [g, par] of visibles) {
@@ -9862,8 +9881,9 @@ function pintarClientesAgrupados(filtro) {
         grupoPintado = g;
         // Un grupo de entradas sueltas no es un cliente: no lleva el botón "›"
         // de cabecera (abría todas juntas) ni estrella de favorito, y explica
-        // qué hay que hacer con lo que tiene debajo.
-        html += `<tr class="grupo"><td colspan="4">${esc(g.etiqueta)}
+        // qué hay que hacer con lo que tiene debajo. En la pestaña Por revisar
+        // el título sobra (ya lo dice la pestaña): queda solo la explicación.
+        html += `<tr class="grupo"><td colspan="4">${enRevisar ? "" : esc(g.etiqueta)}
              <div class="mut" style="font-weight:400">${g.pendientes
                ? "Sus pedidos esperan en revisión hasta que estén completas. Lo que le falta a cada una está en su fila: el tipo lo trae la app de pedidos, pero el código de cliente se escribe aquí."
                : "No se facturan nunca: sus pedidos se descartan sin pasar por revisión."}</div>
@@ -9887,6 +9907,14 @@ function pintarClientesAgrupados(filtro) {
   // La ficha del cliente vive en su propia ventana: cualquier repintado de la
   // lista la refresca también, para que las dos digan lo mismo.
   if (clienteEnEdicion !== null) pintarVentanaCliente();
+}
+
+// Cambio de pestaña del catálogo de clientes: las filas ya están cargadas,
+// solo cambia cuál bloque se pinta (mismo criterio que las de descuentos).
+function catCambiarPestana(id) {
+  catClientesTab = id;
+  paginacion.catalogo.pagina = 1;
+  pintarFilasCatalogo();
 }
 
 // `opciones.suelta` = la fila NO cuelga de un cliente (entrada por resolver o
@@ -10640,7 +10668,10 @@ function editorMarcarObligatorios() {
     if (!el || el.disabled) continue;
     const req = prueba && !def.clave.includes(c.campo) ? false
       : typeof c.obligatorioSi === "function" ? c.obligatorioSi(get) : !!c.obligatorio;
-    const etiqueta = el.closest("label");
+    // .editor-campo y no "label": el campo con check acompañante (Qué es +
+    // Cliente de prueba) vive en un <div> — buscar el label reventaba aquí y
+    // el editor entero moría antes de abrirse.
+    const etiqueta = el.closest(".editor-campo");
     etiqueta.classList.toggle("campo-obligatorio", req);
     el.classList.toggle("lleno", el.value.trim() !== "");
     // Campo que hace falta y está vacío: la pastilla de origen pasa al frente
