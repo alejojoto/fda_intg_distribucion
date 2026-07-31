@@ -436,14 +436,13 @@
      Se abre en SU ventana (2026-07-30, pedido del usuario), igual que la ficha
      de un cliente: colgado debajo de la fila partía la lista en dos y las
      líneas quedaban apretadas entre las facturas de arriba y las de abajo. */
-  .celda-detalle { cursor:pointer; }
-  .celda-detalle:hover { text-decoration:underline; text-decoration-style:dotted; }
-  /* "Ver detalles" vive en la columna de acciones, junto a Llenar/Descartar
-     (pedido del usuario 2026-07-30), separado por una línea fina para que no
-     se lea como parte del mismo grupo. */
-  .btn-detalle { padding:5px 9px; font-size:12.5px; }
-  .sep-acciones { display:inline-block; width:1px; height:16px; margin:0 8px;
-                  background:#cbd2dc; vertical-align:middle; }
+  /* La fila ENTERA abre el detalle (2026-07-31, pedido del usuario): el botón
+     "Ver detalles" se retiró y con él la columna que ocupaba. Sin manito y sin
+     subrayado al pasar por encima: lo que avisa que la fila se puede pulsar es
+     que se resalta completa (más fuerte que el hover normal de la tabla) y el
+     texto del hover. Las acciones (Llenar/Descartar) cortan el clic aparte. */
+  tr.abre-detalle td { cursor:default; }
+  tr.abre-detalle:hover td { background:#eaf0fb; }
   .detalle-cab { font-size:12.5px; margin-bottom:8px; }
   #detalle-cuerpo table { font-size:12.5px; }
   #detalle-cuerpo th, #detalle-cuerpo td { padding:5px 8px; vertical-align:middle; }
@@ -721,7 +720,7 @@
   .cliente-cabecera { display:flex; align-items:center; gap:12px; margin:0 0 12px; }
   .cliente-cabecera h3 { margin:0; font-size:14px; }
   .cliente-cabecera button { margin-left:auto; }
-  /* Ventana del detalle de UNA factura (botón "Ver detalles"): sus líneas con
+  /* Ventana del detalle de UNA factura (se abre al pulsar su fila): sus líneas con
      la cantidad y el descuento que llevará cada una. Mismo reparto que la del
      cliente — solo el cuerpo hace scroll, "Cerrar" siempre a la vista — y el
      mismo z-index: los avisos del llenado (20) salen por encima. */
@@ -2007,7 +2006,7 @@
   </div>
 </div>
 
-<!-- Ventana del detalle de UNA factura (su botón "Ver detalles"): el pedido
+<!-- Ventana del detalle de UNA factura (se abre al pulsar su fila): el pedido
      línea por línea, en el orden en que se va a llenar. -->
 <div id="detalle-overlay" onclick="if(event.target===this)intentarCerrarDetalle()">
   <div id="detalle-caja">
@@ -5218,26 +5217,20 @@ let detalleReabriendo = null;         // clave con /api/refacturar en vuelo (not
 
 const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 
-// Las celdas Pedido, Cliente y Ruta abren la misma ventana al pulsarlas: son
-// las que identifican el pedido y quedan a mano sin ir a buscar el botón.
-function botonDetalle(f) {
-  if (f.tiene_detalle === false) return "";
-  return `<button class="btn-detalle"
-    title="Qué se llena en cada línea de esta factura"
-    onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"
-    >Ver detalles</button>`;
+// La fila entera abre la ventana al pulsarla (2026-07-31, pedido del usuario):
+// antes solo lo hacían tres celdas y un botón, y no se notaba que se podía.
+// `clases` son las que ya lleva esa fila por otro motivo (parte de familia).
+function filaDetalle(f, clases = "") {
+  if (f.tiene_detalle === false) return clases ? ` class="${clases}"` : "";
+  return ` class="${(clases + " abre-detalle").trim()}"`
+    + ` title="Clic para ver el detalle del pedido"`
+    + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"`;
 }
 
-const abridorDetalle = (f) => f.tiene_detalle === false ? ""
-  : ` class="celda-detalle" onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"`;
-
-// Columna de acciones: "Ver detalles" primero (si aplica), separado por una
-// línea fina de Llenar/Descartar/etc. (accionesDeFila).
-function celdaAcciones(f) {
-  const vd = botonDetalle(f);
-  const resto = accionesDeFila(f);
-  return vd + (vd && resto ? `<span class="sep-acciones"></span>` : "") + resto;
-}
+// Celda de acciones: sus botones hacen lo suyo y NO abren el detalle de paso.
+// El title vacío evita además que el hover de la fila se lea como si explicara
+// los botones.
+const CELDA_ACCIONES = ` style="white-space:nowrap" title="" onclick="event.stopPropagation()"`;
 
 async function abrirDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
@@ -5619,17 +5612,16 @@ function pintarPendientes(familias) {
 // lado de los botones, como en PROCESADAS.
 function filaPendiente(f, enFamilia) {
   const clave = esc(`${f.pedido_id}|${f.parte}`);
-  const abre = abridorDetalle(f);
   return `
-    <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
-      <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}</td>
-      <td${abre}>${enFamilia ? "" : celdaCliente(f)}</td>
-      <td${abre}>${enFamilia ? "" : esc(f.ruta || "")}</td>
+    <tr${filaDetalle(f, enFamilia ? "fam-parte" : "")} data-factura-key="${clave}">
+      <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
+      <td>${enFamilia ? "" : celdaCliente(f)}</td>
+      <td>${enFamilia ? "" : esc(f.ruta || "")}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
       <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
-      <td style="white-space:nowrap">${celdaAcciones(f)}</td>
+      <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
 }
@@ -5826,7 +5818,6 @@ function pintarLlenadosPorRevisar(lista, hayPedidosSinDatos) {
   $("rev-datos-titulo").style.display = (lista.length && datosVisibles) ? "" : "none";
   $("rev-llenados").classList.toggle("solo", !datosVisibles);
   $("t-llenados").querySelector("tbody").innerHTML = lista.map(f => {
-    const abre = abridorDetalle(f);
     const detalle = f.detalle_error
       ? esc(f.detalle_error) + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "")
       : "";
@@ -5843,20 +5834,15 @@ function pintarLlenadosPorRevisar(lista, hayPedidosSinDatos) {
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Ya viste qué faltó y la factura queda como está."
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`;
-    // "Ver detalles" va en la columna de acciones, como en las demás listas
-    // (celdaAcciones); aquí no puede ser celdaAcciones tal cual porque los
-    // botones de la cola no salen del estado sino del tipo de revisión.
-    const vd = botonDetalle(f);
-    const botones = vd + (vd ? `<span class="sep-acciones"></span>` : "") + acciones;
     return `
-    <tr>
-      <td${abre}>${esc(f.pedido_id)}${f.total_partes > 1
+    <tr${filaDetalle(f)}>
+      <td>${esc(f.pedido_id)}${f.total_partes > 1
         ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
-      <td${abre}>${esc(f.razon_social || f.cliente_id || "")}</td>
-      <td${abre}>${esc(f.ruta || "")}</td>
+      <td>${esc(f.razon_social || f.cliente_id || "")}</td>
+      <td>${esc(f.ruta || "")}</td>
       <td>${quePaso}${(f.tipo === "error" && detalle && ultimaReemision)
         ? `<div class="mut">${esc(ultimaReemision)}</div>` : ""}</td>
-      <td style="white-space:nowrap">${botones}</td>
+      <td${CELDA_ACCIONES}>${acciones}</td>
     </tr>`;
   }).join("");
 }
@@ -6016,12 +6002,11 @@ function filaProcesada(f, enFamilia) {
             + `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas).replaceAll("\n", "<br>")}</span>`}
       </td>
     </tr>` : "";
-  const abre = abridorDetalle(f);
   return `
-    <tr class="${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}">
-      <td${abre}>${enFamilia ? "" : esc(f.pedido_id)}</td>
-      <td${abre}>${enFamilia ? "" : celdaCliente(f)}</td>
-      <td${abre}>${enFamilia ? "" : esc(f.ruta || "")}</td>
+    <tr${filaDetalle(f, enFamilia ? "fam-parte" : "")} data-factura-key="${clave}">
+      <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
+      <td>${enFamilia ? "" : celdaCliente(f)}</td>
+      <td>${enFamilia ? "" : esc(f.ruta || "")}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.numero_documento || "")}</td>
@@ -6030,7 +6015,7 @@ function filaProcesada(f, enFamilia) {
       <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
-      <td style="white-space:nowrap">${celdaAcciones(f)}</td>
+      <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>${conflicto}${omitidas}
     <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
 }
@@ -7005,7 +6990,7 @@ async function confirmarMotivo() {
   // A diferencia de "Llenar igual" (accion "tomar"), esto reabre un documento
   // YA CERRADO — el motivo más común para reabrirlo es que algo del pedido
   // tiene que salir distinto, así que en vez de llenar de una se abre el
-  // mismo detalle editable de "Ver detalles" (ya editable: la factura queda
+  // mismo detalle editable que abre la fila (ya editable: la factura queda
   // en error_llenado) para ajustar cantidades y descuentos antes de volver a
   // llenar (pedido del usuario 2026-07-31).
   // La ventana se abre ANTES de tocar el servidor, no después: reabrir puede
