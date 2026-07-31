@@ -1241,6 +1241,10 @@
   /* Cuatro salidas no caben en una fila de 480px: que envuelvan y queden
      alineadas a la derecha, con Parar de último. */
   #tasa-caja .editor-acciones { flex-wrap:wrap; }
+  /* Aviso de familia: los botones APILADOS (2026-07-31). Cada salida dice
+     cuántas facturas salen, y esos rótulos no caben en cuatro columnas de
+     480 px sin partirse en tres renglones cada uno. */
+  #aviso-fam-caja .editor-acciones { flex-direction:column; align-items:stretch; gap:8px; }
   /* Aviso de impresión (2026-07-22, pedido del usuario): antes era un modal
      con "no volver a mostrar" que había que despachar en cada lote. Ahora es
      un aviso en línea, del mismo estilo ámbar que el de la fecha/tasa
@@ -2293,7 +2297,7 @@
     <p id="aviso-fam-texto"></p>
     <div class="editor-acciones">
       <button class="primario" id="aviso-fam-juntas" onclick="familiaLlenarJuntas()"></button>
-      <button id="aviso-fam-saltar" onclick="familiaSaltar()">Saltar este pedido</button>
+      <button id="aviso-fam-saltar" onclick="familiaSaltar()"></button>
       <button id="aviso-fam-menos" onclick="familiaLlenarMenos()"></button>
       <button onclick="cerrarAvisoFamilia()">Cancelar</button>
     </div>
@@ -7433,13 +7437,19 @@ function abrirAvisoFamilia(f) {
     `El pedido ${f.pedido_id}${f.cliente ? " (" + f.cliente + ")" : ""} se divide en ` +
     `${f.total} facturas y con ${cantidadEnFila} solo ` +
     `${f.dentro === 1 ? "entraría 1" : "entrarían " + f.dentro}. ` +
-    `Un pedido dividido se llena entero o no se llena: elige cómo cierra el lote.`;
+    `Un pedido dividido se llena entero o no se llena: elige cómo cierra el lote. ` +
+    `Después ves la lista completa y ahí puedes ajustarla.`;
   $("aviso-fam-juntas").textContent =
     `Llenar las ${f.total} juntas (salen ${totalJuntas} facturas)`;
   $("aviso-fam-saltar").style.display = f.hayConQueRellenar ? "" : "none";
+  // Cuántas salen va en el RÓTULO, no en el hover (2026-07-31, pedido del
+  // usuario): "Saltar este pedido" a secas se leía como llenar menos, cuando en
+  // realidad la cantidad pedida sale completa con los pedidos que siguen.
+  $("aviso-fam-saltar").textContent = cantidadEnFila === 1
+    ? `Saltar este pedido (sale 1 con el pedido siguiente)`
+    : `Saltar este pedido (salen ${cantidadEnFila} con los pedidos siguientes)`;
   $("aviso-fam-saltar").title =
-    `Se llenan las ${cantidadEnFila} que pediste con los pedidos que siguen; ` +
-    `este queda pendiente.`;
+    `Este pedido queda pendiente, completo.`;
   // Quedarse corto solo existe si antes del pedido hay algo que llenar: si la
   // familia abre la fila, "llenar 0" no es una salida.
   $("aviso-fam-menos").style.display = menos >= 1 ? "" : "none";
