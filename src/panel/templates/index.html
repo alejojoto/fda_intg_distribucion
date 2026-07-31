@@ -9603,10 +9603,15 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
     : falta === "Falta decir qué es" ? "Clasificar" : "Completar";
   // Toggle de un clic (solo dentro de la ficha del cliente, 2026-07-30): fuera
   // de ahí se conserva el punto informativo, sin click.
-  const celdaActivo = conToggleActivo
-    ? `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
-         <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`
-    : puntoEstado(f.activo);
+  // Un cliente de prueba nunca factura, así que su interruptor no se puede
+  // prender (regla del usuario 2026-07-31): el backend ya lo rechaza, esto es
+  // que ni se ofrezca el clic.
+  const celdaActivo = !conToggleActivo ? puntoEstado(f.activo)
+    : f.clasificacion === "prueba"
+    ? `<label style="cursor:not-allowed; display:inline-flex" title="Un cliente de prueba no se activa: nunca factura, así que este interruptor no tiene efecto.">
+         <input type="checkbox" class="switch" disabled></label>`
+    : `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
+         <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`;
   return `<tr>
     <td style="padding-left:26px">${nombre}${suelta
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
@@ -10408,6 +10413,23 @@ function editorEsPrueba() {
 function editorAplicarPrueba() {
   const select = $("ed-clasificacion");
   if (select) select.disabled = editorEsPrueba();
+  // Un cliente de prueba nunca factura, así que "Activo" no tendría ningún
+  // efecto: se apaga y no se puede prender de vuelta (regla del usuario
+  // 2026-07-31). El valor que el operador ya tenía puesto se conserva y se
+  // restaura al desmarcar — mismo criterio que cualquier campo que un toggle
+  // oculta en vez de perderlo.
+  const activo = $("ed-activo");
+  if (!activo) return;
+  if (editorEsPrueba()) {
+    if (activo.dataset.activoPrevio === undefined)
+      activo.dataset.activoPrevio = activo.checked ? "1" : "0";
+    activo.checked = false;
+    activo.disabled = true;
+  } else if (activo.dataset.activoPrevio !== undefined) {
+    activo.checked = activo.dataset.activoPrevio === "1";
+    activo.disabled = false;
+    delete activo.dataset.activoPrevio;
+  }
 }
 
 // Revalida el aviso del editor SOLO si ya hay uno a la vista (tras intentar
