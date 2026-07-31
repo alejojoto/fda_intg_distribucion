@@ -4690,9 +4690,8 @@ function armarPopoverNube(clase) {
         + (!espejoOk ? "sin conexión"
            : (nube.cambios_por_enviar === null ? "sin datos aún" : nube.cambios_por_enviar))
         + `</span></div>`;
-  html += `<div class="nube-fila" title="Facturas cerradas en cualquier `
-        + `computadora en los últimos 30 min.">`
-        + `<span>Actividad reciente</span><span>`
+  html += `<div class="nube-fila" title="Facturas cerradas en cualquier computadora.">`
+        + `<span>Cambios en los últimos 30 minutos</span><span>`
         + (!espejoOk ? "sin datos"
            : (nube.cambios_recientes_30min === null ? "sin datos aún" : nube.cambios_recientes_30min))
         + `</span></div>`;
