@@ -8362,10 +8362,16 @@ function pintarBotonPrevio() {
   const btn = $("previo-llenar");
   // Sin facturas no hay nada que llenar (la ruta que se acaba de elegir puede
   // no tener pendientes), y con la lista en vuelo el lote todavía no es firme.
-  btn.disabled = previoCargando || !previoCola.length || sinTasaParaLlenar();
+  // Con la pregunta del − abierta el pedido TODAVÍA está en la fila —no sale
+  // hasta que el operador elija una salida—, así que el botón se apaga: dejarlo
+  // vivo llenaba el pedido que ya se veía como sacado (2026-07-31).
+  btn.disabled = previoCargando || !previoCola.length || sinTasaParaLlenar()
+    || !!previoQuitando;
   // Con una sola unidad el botón dice "Llenar siguiente" (2026-07-31, pedido del
   // usuario): "Llenar 1 factura" contaba algo que no hace falta contar.
   btn.textContent = previoCargando ? "Rehaciendo la fila…"
+    : previoQuitando ? "Decide qué pasa con la fila"
+    : !previoCola.length ? "No hay nada que llenar"
     : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
     : n === 1 ? "Llenar siguiente"
     : `Llenar ${unidadEnFila(n)}`;
@@ -8397,13 +8403,27 @@ function pintarPrevioLote() {
       <th class="previo-num">Líneas</th><th class="previo-desc">Descuento</th>
     </tr></thead><tbody>${filas.length
       ? filas.map(filaPrevio).join("")
-      : `<tr><td colspan="5" class="mut">${previoCargando
-          ? "Rehaciendo la fila con la ruta elegida…"
-          : previoQuitados.length
-          ? "Sacaste de la fila todo lo que había. Sube la cantidad o cancela."
-          : "Esta ruta no tiene facturas pendientes. Elige otra o cancela."
-        }</td></tr>`}</tbody></table>`;
+      : `<tr><td colspan="5" class="mut">${esc(previoMensajeFilaVacia())}</td></tr>`
+    }</tbody></table>`;
   pintarPrevioSacados();
+}
+
+// Qué decir con la fila vacía. Nunca "sube la cantidad" (2026-07-31): si la fila
+// quedó vacía es porque NO queda nada pendiente que traer, así que subirla no
+// trae ninguna — con una ruta puesta la salida real es cambiarla aquí arriba,
+// que rehace la fila con lo de la otra.
+function previoMensajeFilaVacia() {
+  if (previoCargando) return "Rehaciendo la fila con la ruta elegida…";
+  const conRuta = rutaSeleccionada !== "";
+  const cuales = rutaSeleccionada === "__sin_ruta__"
+    ? "Entre los pedidos sin ruta" : `En la ruta ${nombreRuta(rutaSeleccionada)}`;
+  const porque = previoQuitados.length
+    ? "Sacaste de la fila lo último que quedaba pendiente."
+    : conRuta ? `${cuales} no quedan facturas pendientes.`
+              : "No quedan facturas pendientes.";
+  return `${porque} ${conRuta
+    ? "Cambia de ruta aquí arriba para llenar de otra, o cancela."
+    : "Cancela: no hay nada que llenar."}`;
 }
 
 // Lo que quedó fuera por decisión del operador, con la vuelta atrás al lado
@@ -8488,9 +8508,17 @@ function filaPrevioPregunta(f) {
         onclick="previoQuitarTrayendo()">${enFilaEnPedidos()
           ? "Traer el siguiente"
           : `Traer la${varias ? "s" : ""} siguiente${varias ? "s" : ""}`}</button>` : "";
+  // Sacando lo ÚLTIMO que quedaba, la fila no puede quedar más corta ni
+  // reponerse: sin esta salida la única puerta era "Cancelar" —que deja el
+  // pedido dentro— y el saque no llegaba a consumarse nunca (2026-07-31).
+  const hoverNada = "La fila queda vacía y no se llena nada."
+    + (rutaSeleccionada ? " Para llenar de otra ruta, cámbiala aquí arriba." : "");
   const menos = quedan >= 1
     ? `<button title="${esc(hoverMenos)}"
-        onclick="previoQuitarSinReponer()">Llenar solo ${quedan}</button>` : "";
+        onclick="previoQuitarSinReponer()">Llenar solo ${quedan}</button>`
+    : conQueRellenar ? ""
+    : `<button title="${esc(hoverNada)}"
+        onclick="previoQuitarSinReponer()">No llenar nada</button>`;
   return `<tr class="previo-pregunta"><td colspan="5">
       <span>${que}:</span>${traer}${menos}
       <button title="La fila queda como está." onclick="previoQuitarCancelar()">Cancelar</button>
@@ -8807,8 +8835,12 @@ function previoQuitarSinReponer() {
   if (!previoQuitando) return;
   const quedan = unidadesDe(previoCola.filter(c => c.pedido_id !== previoQuitando));
   previoQuitados.push(previoQuitando);
-  fijarCantidad(String(quedan));
-  pintarCantidades();
+  // Sin nada que llenar la cantidad NO se toca: el menú no ofrece un "0" y no
+  // hay pendientes con que rellenar, así que la fila queda vacía sola.
+  if (quedan >= 1) {
+    fijarCantidad(String(quedan));
+    pintarCantidades();
+  }
   rehacerPrevioLote();
 }
 
