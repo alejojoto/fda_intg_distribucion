@@ -273,14 +273,13 @@
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
      botón con su propio color ámbar. */
-  #babymix-fila { display:flex; gap:14px; align-items:center;
+  #babymix-fila { display:flex; gap:14px; align-items:center; margin-left:10px;
                   padding:6px 12px; border:1px solid #fcd34d;
                   border-radius:8px; background:#fffbeb; font-size:13.5px; }
-  /* Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8): va después de
-     Baby Mix con doble espacio de separación (margen 10px + gap 10px de la
-     barra). Por ahora es SOLO la parte visual del flujo por lotes: el botón
-     sigue llenando UNA factura y deteniéndose. */
-  #enfila-bloque { display:flex; gap:10px; align-items:center; margin-left:10px;
+  /* Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8): SOLO la parte
+     visual del flujo por lotes: el botón sigue llenando UNA factura y
+     deteniéndose. */
+  #enfila-bloque { display:flex; gap:10px; align-items:center;
                    padding:6px 12px; border:1px solid #cbd2dc; border-radius:8px;
                    background:#fff; font-size:13.5px; flex-wrap:wrap; }
   #enfila-bloque label { cursor:pointer; white-space:nowrap; font-weight:600; }
@@ -289,9 +288,6 @@
                                      vertical-align:-2px; cursor:pointer; margin-right:3px; }
   #enfila-bloque select { padding:4px 7px; }
   #enfila-otro { width:60px; padding:4px 7px; }
-  /* El reemplazo de esa barra en producción (2026-07-28): mismo doble espacio
-     contra Baby Mix que tenía el bloque al que sustituye. */
-  #btn-llenar-siguiente { margin-left:10px; }
   #babymix-fila b { color:var(--warn); }
   #babymix-fila label { cursor:pointer; white-space:nowrap; font-weight:600; }
   #babymix-fila input[type=radio] { padding:0; border:none; background:none;
@@ -1261,18 +1257,9 @@
   </div>
 
   <!-- Botonera de llenado en su propia fila (2026-07-20): va a crecer con
-       más controles a futuro. Baby Mix va primero y el bloque "Llenar en
-       fila" la sigue con doble espacio de separación. -->
+       más controles a futuro. Baby Mix va de último, a la derecha (2026-07-31,
+       pedido del usuario). -->
   <div class="barra" id="llenado-barra">
-    <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
-         y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
-         Arranca en 125 g (el que se está gastando). BORRAR este bloque (y el
-         CSS #babymix-fila) cuando se acaben los paquetes de 125 g. -->
-    <div id="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
-      <b>Baby Mix</b>
-      <label><input type="radio" name="f-bm" value="125" checked onchange="guardarGramajeBaby(this.value)"> 125 g</label>
-      <label><input type="radio" name="f-bm" value="150" onchange="guardarGramajeBaby(this.value)"> 150 g</label>
-    </div>
     <!-- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) — SOLO la
          parte visual del flujo por lotes, en el orden dictado por el usuario:
          qué llenar, Imprimir sí/no y el botón. Es un DROPDOWN cuya primera
@@ -1333,6 +1320,16 @@
          las guardas de llenar(). -->
     <button class="primario" id="btn-llenar-siguiente" onclick="llenarSiguiente()"
             title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en el programa de facturación.">Llenar siguiente</button>
+    <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
+         y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
+         Arranca en 125 g (el que se está gastando). De último, a la derecha
+         (2026-07-31, pedido del usuario). BORRAR este bloque (y el CSS
+         #babymix-fila) cuando se acaben los paquetes de 125 g. -->
+    <div id="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
+      <b>Baby Mix</b>
+      <label><input type="radio" name="f-bm" value="125" checked onchange="guardarGramajeBaby(this.value)"> 125 g</label>
+      <label><input type="radio" name="f-bm" value="150" onchange="guardarGramajeBaby(this.value)"> 150 g</label>
+    </div>
   </div>
 
   <!-- Doble llenado sin resolver (2026-07-28): franja roja fija hasta que
@@ -1515,6 +1512,29 @@
         que faltó o dio problemas el día anterior).<br>
         La Fecha a facturar arranca en el día elegido y el botón del calendario
         lo repone con un clic; en cualquier factura se puede cambiar a mano.</p>
+    </div>
+    <!-- Modo viejo (2026-07-31): respaldo del operador si una actualización
+         sale lenta o con fallas — el interruptor pone esta máquina en el canal
+         "estable" (la última versión declarada estable, ver
+         scripts/mandar_a_produccion.py --estable) y el lanzador hace el cambio
+         real de versión en el próximo arranque, igual que el canal de Ajustes
+         de admin. Visible en todos los equipos a propósito: es el operador
+         quien lo necesita cuando el modo nuevo no le sirve. -->
+    <div class="ajustes-bloque">
+      <h3>Versión del programa</h3>
+      <div class="ajustes-fila">
+        <label class="desc-todos">
+          <input type="checkbox" id="modo-viejo-chk"
+                 onchange="guardarModoViejo(this.checked)">
+          Usar el modo viejo</label>
+        <span class="prueba-nota"
+              title="El cambio de versión lo hace el lanzador al arrancar, así que esta sesión sigue con la que ya cargó.">Se aplica al reabrir el asistente</span>
+      </div>
+      <p class="mut" style="margin:8px 0 0">
+        Con el modo viejo, este equipo trabaja con la versión estable anterior
+        del programa y deja de recibir actualizaciones hasta que se desmarque.
+        Sirve si una actualización sale lenta o con fallas: márcalo, reabre el
+        asistente y sigue trabajando mientras se corrige.</p>
     </div>
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
@@ -7075,8 +7095,11 @@ function pintarOpcionesPrueba(op) {
     // Canal vacío = automático por equipo, que es como nace toda instalación:
     // en el servidor admin ese automático ES desarrollo, así que se pinta Dev
     // (la opción "Automático" se retiró el 2026-07-29, pedido del usuario).
+    // Con el modo viejo (canal "estable") ninguno de los dos radios queda
+    // marcado: esa elección vive en su propio interruptor de AJUSTES.
     $("prueba-canal-produccion").checked = op.canal === "produccion";
-    $("prueba-canal-desarrollo").checked = op.canal !== "produccion";
+    $("prueba-canal-desarrollo").checked = op.canal !== "produccion" && op.canal !== "estable";
+    $("modo-viejo-chk").checked = op.canal === "estable";
   }
   const es999 = $("prueba-emp-999").checked;
   // En la 999 la puesta a punto es mínima: tasa, fecha y serie NUNCA se ponen,
@@ -7126,7 +7149,13 @@ async function guardarOpcionesPrueba() {
       saltar_serie: es999 ? !!g.saltar_serie : $("prueba-saltar-serie").checked,
       ver_detalle_tecnico: $("prueba-ver-tecnico").checked,
       marcar_procesadas: $("prueba-procesadas-si").checked,
-      canal: $("prueba-canal-produccion").checked ? "produccion" : "desarrollo",
+      // Con el modo viejo puesto ningún radio está marcado: no se manda el
+      // campo, para que un guardado de otra opción no saque a la máquina del
+      // canal estable sin que nadie lo haya pedido. Marcar un radio a
+      // conciencia sí lo manda y apaga el modo viejo — una sola fuente de
+      // verdad: el canal.
+      canal: $("prueba-canal-produccion").checked ? "produccion"
+           : $("prueba-canal-desarrollo").checked ? "desarrollo" : undefined,
     });
     pintarOpcionesPrueba(r.opciones_prueba);
     pintarBanderasPrueba();   // los indicadores de la barra siguen a los switches
@@ -7198,6 +7227,21 @@ async function guardarDiaDespacho(dia) {
   } catch (e) {
     pintarDiaDespacho(anterior);   // el radio no se queda marcando lo que no se guardó
     mensaje("No se pudo guardar el día de despacho: " + e.message, "error");
+  }
+}
+
+// Modo viejo (2026-07-31): el interruptor escribe el canal "estable" (o
+// devuelve la máquina al automático) y el cambio real de versión lo hace el
+// lanzador en el próximo arranque. No se anuncia nada al guardar — el check y
+// la nota del bloque ya lo dicen; solo se avisa si el guardado falló.
+async function guardarModoViejo(activo) {
+  try {
+    const r = await api("/api/ajustes/modo-viejo", {activo});
+    if (opcionesPrueba) opcionesPrueba.canal = r.modo_viejo ? "estable" : "";
+    pintarOpcionesPrueba(opcionesPrueba);   // los radios del canal admin siguen al cambio
+  } catch (e) {
+    $("modo-viejo-chk").checked = !activo;   // el check no se queda marcando lo que no se guardó
+    mensaje("No se pudo guardar el modo viejo: " + e.message, "error");
   }
 }
 
