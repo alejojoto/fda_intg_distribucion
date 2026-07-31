@@ -4680,15 +4680,6 @@ function armarPopoverNube(clase) {
           + (nube.ultimoOk ? haceTexto(nube.ultimoOk) : "sin datos aún")
           + `</span></div>`;
   }
-  const resumen = ultimaLista.resumen || null;
-  html += `<div class="nube-fila"><span>Pendientes</span><span>`
-        + (resumen ? resumen.pedidos_facturables : "sin datos aún")
-        + `</span></div>`;
-  html += `<div class="nube-fila" title="Pedidos con un dato que no se puede `
-        + `facturar solo: cliente sin resolver, producto sin artículo, etc.">`
-        + `<span>Van a revisión</span><span>`
-        + (resumen ? resumen.revision_manual : "sin datos aún")
-        + `</span></div>`;
   // Envío a la nube (el espejo): un camino aparte de la lectura de arriba —
   // se puede leer bien y fallar al escribir. "sin conexión" cuando el
   // espejo está caído, en vez del último número (quedaría desactualizado).
