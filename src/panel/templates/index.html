@@ -2384,8 +2384,8 @@
      ÚNICA ventana del flujo desde el 2026-07-31 (pedido del usuario): antes,
      un pedido dividido que el corte partía por la mitad preguntaba en un modal
      APARTE y previo. Se retiró: esa decisión es sobre facturas concretas, y
-     aquí se ven — la fila entra estirada para no partirlo y el aviso trae las
-     otras dos salidas, sin sacar al operador de la lista.
+     aquí se ven — el pedido queda fuera, la fila conserva la cantidad pedida y
+     el aviso trae las otras dos salidas, sin sacar al operador de la lista.
      El clic afuera PREGUNTA (2026-07-31, pedido del usuario) en cuanto se tocó
      algo o la ventana lleva un rato abierta: revisar y ajustar el lote es
      trabajo, y perderlo de un clic distraído obliga a rehacerlo entero. -->
@@ -8021,9 +8021,9 @@ const enFilaPrefijo = () =>
 // "¿seguro?": abre esta ventana con la puesta a punto que va a usar y las
 // facturas que va a llenar, y de ahí sale a llenar o se cancela.
 // Es la ÚNICA ventana del flujo (2026-07-31): el pedido dividido que el corte
-// partiría entra aquí ya estirado, y las otras salidas se eligen sobre la lista
-// —donde se ven las facturas de las que se está hablando— en vez de en un modal
-// previo que preguntaba a ciegas.
+// partiría queda fuera y las otras salidas se eligen sobre la lista —donde se
+// ven las facturas de las que se está hablando— en vez de en un modal previo
+// que preguntaba a ciegas.
 // `previoResolver` es la promesa que espera la decisión: mientras exista hay
 // una revisión abierta, y arrancarSecuencia no deja entrar a otra.
 let previoResolver = null;
@@ -8032,11 +8032,20 @@ let previoMeta = 0;               // cuántas facturas se pidieron (para rehacer
 let previoCargando = false;       // la lista se está rehaciendo (cambió la ruta)
 let previoDescuentos = null;      // resumen del servidor; null = todavía en vuelo
 let previoDescuentosFallo = "";
-// Familia que la cantidad elegida partía por la mitad y que la fila se estiró
-// para cerrar (2026-07-31). La calcula metaSinPartirFamilia en cada armado de
-// la fila, así que vale igual para la que abre la ventana y para las que se
-// rehacen al cambiar algo aquí dentro.
-let previoFamiliaEstirada = null;
+// Familia que la cantidad elegida partía por la mitad (2026-07-31). La calcula
+// metaSinPartirFamilia en cada armado de la fila, así que vale igual para la que
+// abre la ventana y para las que se rehacen al cambiar algo aquí dentro. Trae
+// `estirada`: false cuando quedó fuera (lo normal) y true cuando el operador
+// pidió llenarla completa y la fila se estiró para cerrarla.
+let previoFamiliaDelCorte = null;
+// Los pedidos divididos que la fila dejó fuera por no caber completos. No son
+// "decisión tuya" como previoQuitados —los explica el aviso, no la lista de
+// sacados— y se recalculan enteros en cada armado.
+let previoFamiliaSaltados = [];
+// El pedido dividido que el operador SÍ quiere completo, aunque la fila tenga
+// que pasarse de la cantidad elegida. Sobrevive a los cambios de cantidad, como
+// previoQuitados: fue una decisión sobre ese pedido.
+let previoFamiliaCompleta = null;
 // Pedidos que el operador sacó de la fila con el − de su renglón (2026-07-31).
 // Se guardan por PEDIDO y no por factura: un pedido dividido se llena entero o
 // no se llena, así que sacar una parte saca a todas. Sobreviven a los cambios de
@@ -8061,8 +8070,9 @@ function revisarLotePrevio(meta) {
   previoQuitados = [];
   previoQuitando = null;
   previoCargando = false;
-  previoFamiliaEstirada = null;
-  previoCola = colaDelLote(metaSinPartirFamilia(meta));
+  previoFamiliaSaltados = [];
+  previoFamiliaCompleta = null;
+  previoCola = colaDelLote(metaSinPartirFamilia(meta), fueraDeLaFila());
   previoMeta = previoCola.length;
   previoDescuentos = null;
   previoDescuentosFallo = "";
@@ -8238,10 +8248,10 @@ function filaPrevio(f, i) {
   // dicen por qué están (2026-07-31): son las que hacen que el lote no cuadre
   // con la cantidad elegida. Van siempre al final — el corte cayó dentro de ese
   // pedido y la fila se extendió hasta cerrarlo.
-  const fam = previoFamiliaEstirada
-    && previoFamiliaEstirada.pedido_id === f.pedido_id;
+  const fam = previoFamiliaDelCorte && previoFamiliaDelCorte.estirada
+    && previoFamiliaDelCorte.pedido_id === f.pedido_id;
   const extra = fam && i >= previoCola.length
-    - (previoFamiliaEstirada.total - previoFamiliaEstirada.dentro)
+    - (previoFamiliaDelCorte.total - previoFamiliaDelCorte.dentro)
     ? ` <span class="previo-extra">entra para no partir el pedido</span>` : "";
   // El − saca esta factura de la fila (2026-07-31, pedido del usuario). No borra
   // nada: el pedido sigue pendiente y lo llena otro lote. Su clic corta aparte
@@ -8517,18 +8527,20 @@ function previoCantidadElegida(valor) {
   rehacerPrevioLote();         // repinta las cajitas y la lista con la cantidad nueva
 }
 
-// Los pedidos que la fila NO puede tomar: los que el operador sacó con el − o
-// con la salida "sacarlo" del aviso del pedido dividido.
-const fueraDeLaFila = () => previoQuitados;
+// Los pedidos que la fila NO puede tomar: los que el operador sacó con el − y
+// los divididos que no cabían completos en la cantidad elegida.
+const fueraDeLaFila = () => previoQuitados.concat(previoFamiliaSaltados);
 const pendientesParaLaFila = () =>
   pendientesLlenables().filter(f => !fueraDeLaFila().includes(f.pedido_id));
 
 // Rehace la fila con lo que esté elegido AHORA y vuelve a pedir los descuentos.
 function rehacerPrevioLote() {
   previoQuitando = null;       // cualquier otro cambio despacha la pregunta abierta
-  previoFamiliaEstirada = null;
+  previoFamiliaSaltados = [];  // el corte se recalcula desde cero
   previoDescuentos = null;
   previoDescuentosFallo = "";
+  // Orden: metaDelModo() se evalúa con los saltados ya limpios y fueraDeLaFila()
+  // después de que metaSinPartirFamilia los haya vuelto a calcular.
   previoCola = colaDelLote(metaSinPartirFamilia(metaDelModo()), fueraDeLaFila());
   previoMeta = previoCola.length;
   pintarPrevioLote();
@@ -8552,14 +8564,28 @@ function metaDelModo() {
   return facturasDeCantidad(cantidadEnFila, hay);
 }
 
-// Un pedido dividido se llena entero o no se llena (la misma regla del aviso de
-// familia): si la cantidad elegida cortara uno por la mitad, la fila se estira
-// hasta cerrarlo y el aviso lo dice. Aquí no se ofrecen las tres salidas del
-// aviso porque la cantidad se corrige en esta misma ventana.
+// Un pedido dividido se llena entero o no se llena. Si la cantidad elegida
+// cortara uno por la mitad, la fila NO se pasa de lo pedido (2026-07-31, pedido
+// del usuario, invierte el default del mismo día): imprimiendo, la cantidad son
+// las fichas que quedan de la serie, así que llenar de más no es una salida —
+// el pedido queda fuera y en su lugar entran los siguientes. Estirar la fila
+// para cerrarlo es la única salida que se pide a mano, en el aviso.
+// El bucle: sacar el pedido corre el corte, que puede caer dentro de otro.
 function metaSinPartirFamilia(meta) {
-  previoFamiliaEstirada = familiaPartidaPorElCorte(meta, pendientesParaLaFila());
-  return previoFamiliaEstirada
-    ? meta + previoFamiliaEstirada.total - previoFamiliaEstirada.dentro : meta;
+  previoFamiliaDelCorte = null;
+  previoFamiliaSaltados = [];
+  for (;;) {
+    const fam = familiaPartidaPorElCorte(meta, pendientesParaLaFila());
+    if (!fam) return meta;
+    if (previoFamiliaCompleta === fam.pedido_id) {
+      previoFamiliaDelCorte = Object.assign({estirada: true}, fam);
+      return meta + fam.total - fam.dentro;
+    }
+    // El aviso habla del primero: es el que la cantidad elegida partía.
+    if (!previoFamiliaDelCorte)
+      previoFamiliaDelCorte = Object.assign({estirada: false}, fam);
+    previoFamiliaSaltados.push(fam.pedido_id);
+  }
 }
 
 // El − de un renglón: abre la pregunta de con qué se queda la fila. Solo eso —
@@ -8653,43 +8679,68 @@ function pintarDetalleAvisos() {
 }
 
 // El pedido dividido que el corte partía por la mitad (2026-07-31, pedido del
-// usuario: antes era un modal aparte, ANTES de esta ventana). La fila ya entra
-// estirada —un pedido dividido se llena entero o no se llena— y el aviso dice
-// qué pasó, marca sus facturas en la lista y trae las otras dos salidas: sacarlo
-// y llenar el cupo con los siguientes, o cortar la fila justo antes de él.
+// usuario: antes era un modal aparte, ANTES de esta ventana). Un pedido dividido
+// se llena entero o no se llena, así que queda fuera y la fila conserva la
+// cantidad pedida trayendo los siguientes. El aviso dice qué pasó y ofrece las
+// dos salidas, cada una nombrada por lo que llena —no por lo que saca, que es lo
+// mismo en las dos (2026-07-31, pedido del usuario)—: llenarlo completo
+// estirando la fila, o parar justo antes de él.
 function avisoFamiliaEstirada() {
-  const f = previoFamiliaEstirada;
+  const f = previoFamiliaDelCorte;
   if (!f) return "";
-  const n = previoCola.length;
-  const pedidas = n - (f.total - f.dentro);   // las que cabían antes del estirón
-  const sinEl = n - f.total;                  // lo que queda si el pedido sale
+  // La cantidad ELEGIDA, no la que quedó: saltando el pedido la fila puede salir
+  // corta (si detrás de él no había con qué rellenar) y el aviso mentiría. Este
+  // aviso solo existe imprimiendo, con cantidad numérica —sin papel la fila se
+  // cuenta en pedidos y el corte nunca parte uno—, así que cantidadEnFila son
+  // exactamente las facturas pedidas.
+  const pedidas = cantidadEnFila;
+  const completa = pedidas + f.total - f.dentro;
+  const antes = pedidas - f.dentro;            // lo que cabe parando antes de él
   const salidas = [];
-  // Sacarlo solo tiene sentido si queda algo con que llenar su lugar; cortar
-  // antes, solo si antes de él hay alguna otra factura que llenar (si la fila
-  // ABRE con este pedido, "llenar 0" no es una salida).
-  if (f.hayConQueRellenar) salidas.push(
-    `<button title="Este pedido queda pendiente, completo, para otro lote."
-       onclick="previoFamiliaFuera(true)">Sacar el pedido: llenar ${pedidas} `
-    + `con los siguientes</button>`);
-  if (sinEl >= 1) salidas.push(
-    `<button title="La fila se corta justo antes de este pedido, que queda `
-    + `pendiente completo." onclick="previoFamiliaFuera(false)">Llenar solo `
-    + `${sinEl} y dejar el pedido fuera</button>`);
+  if (f.estirada) salidas.push(
+    `<button title="El pedido queda pendiente, completo, para otro lote, y en su `
+    + `lugar entran las siguientes facturas." onclick="previoFamiliaCompletaNo()">`
+    + `Llenar ${pedidas} dejando el pedido fuera</button>`);
+  else salidas.push(
+    `<button title="La fila se pasa de lo elegido para no partir el pedido."
+       onclick="previoFamiliaCompletaSi()">Llenar el pedido completo: `
+    + `${completa} facturas</button>`);
+  // Parar antes solo es salida si delante de él hay algo que llenar: si la fila
+  // ABRE con este pedido, "llenar 0" no lo es.
+  if (antes >= 1) salidas.push(
+    `<button title="La fila se corta justo antes de este pedido: no entra nada `
+    + `en su lugar." onclick="previoFamiliaCortarAntes(${antes})">Llenar solo `
+    + `${antes} y parar ahí</button>`);
+  const estado = f.estirada
+    ? `la fila se estira a ${completa} facturas para llenarlo completo.`
+    : `queda pendiente para otro lote y en su lugar entran las siguientes.`;
   return `<div class="pap-ojo">El pedido ${esc(f.pedido_id)}${
       f.cliente ? ` (${esc(f.cliente)})` : ""} se divide en ${f.total} facturas y `
-    + `la cantidad elegida lo partía por la mitad. Un pedido dividido se llena `
-    + `entero o no se llena: la fila entra estirada a ${n} facturas para `
-    + `llenarlo completo.${salidas.length
-        ? `<div class="previo-acciones">${salidas.join("")}</div>` : ""}</div>`;
+    + `no cabía completo en las ${pedidas} elegidas. Un pedido dividido se llena `
+    + `entero o no se llena: ${estado}<div class="previo-acciones">`
+    + `${salidas.join("")}</div></div>`;
 }
 
-// Las otras dos salidas del pedido estirado, por el mismo camino que el − de un
-// renglón: con reposición la fila conserva el tamaño pedido; sin ella se corta
-// antes del pedido y esa cuenta pasa a ser la cantidad elegida.
-function previoFamiliaFuera(reponiendo) {
-  if (!previoFamiliaEstirada) return;
-  previoQuitando = previoFamiliaEstirada.pedido_id;
-  if (reponiendo) previoQuitarTrayendo(); else previoQuitarSinReponer();
+// Las dos salidas del pedido dividido. Llenarlo completo estira la fila hasta
+// cerrarlo; volver atrás lo deja fuera otra vez. Parar antes fija la cantidad
+// elegida en lo que cabe delante de él — el menú de arriba nunca puede decir una
+// cosa y la fila otra— y con esa cantidad el corte ya no parte nada.
+function previoFamiliaCompletaSi() {
+  if (!previoFamiliaDelCorte) return;
+  previoFamiliaCompleta = previoFamiliaDelCorte.pedido_id;
+  rehacerPrevioLote();
+}
+
+function previoFamiliaCompletaNo() {
+  previoFamiliaCompleta = null;
+  rehacerPrevioLote();
+}
+
+function previoFamiliaCortarAntes(cuantas) {
+  previoFamiliaCompleta = null;
+  fijarCantidad(String(cuantas));
+  pintarCantidades();
+  rehacerPrevioLote();
 }
 
 // La fila que le toca a un lote: las llenables de la lista YA filtrada (ruta,
