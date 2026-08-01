@@ -5256,7 +5256,6 @@ function pintarPiePaginacion(tab, p, total, desde, mostrados, totalPaginas, unid
       <button onclick="cambiarPagina('${tab}', -1)" ${p.pagina <= 1 ? "disabled" : ""}>‹ Anterior</button>
       <span>Página <input type="text" inputmode="numeric" class="pag-num" id="${idNum}"
               value="${p.pagina}" aria-label="Número de página"
-              onfocus="this.select()" onclick="this.select()"
               oninput="paginaEscrita('${tab}', this.value)"
               onblur="paginaSalioDelCampo('${tab}', this)"> de ${totalPaginas}</span>
       <button onclick="cambiarPagina('${tab}', 1)" ${sinSiguiente ? "disabled" : ""}>Siguiente ›</button>
@@ -6636,7 +6635,6 @@ function filaLineaDetalle(d, l) {
       <td>${producto}</td>
       <td>
         <input type="number" class="det-cant" min="0" step="any" value="${l.cantidad}"
-               onfocus="this.select()" onclick="this.select()"
                onchange="ajustarCantidad(this,${ref})"
                onkeydown="if(event.key==='Enter')this.blur()">
         ${opciones}
@@ -6645,7 +6643,6 @@ function filaLineaDetalle(d, l) {
       </td>
       <td>
         <input type="number" class="det-pct" min="0" max="100" step="any" value="${l.descuento_pct}"
-               onfocus="this.select()" onclick="this.select()"
                onchange="ajustarDescuento(this,${ref})"
                onkeydown="if(event.key==='Enter')this.blur()"> %
         ${ajuste.descuento_pct !== undefined && ajuste.descuento_pct !== null
@@ -14738,32 +14735,45 @@ document.addEventListener("keydown", (ev) => {
 window.addEventListener("resize", cerrarCalendario);
 window.addEventListener("scroll", cerrarCalendario, true);
 
-// --- Porcentaje de descuento: al entrar, el valor queda seleccionado --------
-// (usuario 2026-07-30) Un % ya escrito obligaba a borrarlo antes de poner otro,
-// y si no se borraba lo tecleado se MEZCLABA con el viejo (campo con "5", se
-// teclea "2", queda 25 o 52). Al entrar al campo se selecciona todo, así el
-// número nuevo reemplaza al anterior de una sola tecleada.
+// --- Campos numéricos editables: al entrar, el valor queda seleccionado ----
+// (usuario 2026-07-30, ampliado 2026-08-01 a todos los campos numéricos del
+// panel) Un valor ya escrito obligaba a borrarlo antes de poner otro, y si no
+// se borraba lo tecleado se MEZCLABA con el viejo (campo con "5", se teclea
+// "2", queda 25 o 52). Al entrar al campo se selecciona todo, así el número
+// nuevo reemplaza al anterior de una sola tecleada.
 // Con Tab el navegador ya selecciona solo; el clic del ratón es el que colapsa
 // la selección en el mouseup, así que ese primer mouseup —solo el que dio el
 // foco— se anula. Un clic posterior dentro del campo ya enfocado sigue
-// colocando el cursor donde se pulsó.
-const SEL_PCT_DESCUENTO = "#desc-pct, .desc-pct-inp, .det-pct";
+// colocando el cursor donde se pulsó (para corregir un dígito puntual), y el
+// doble clic fuerza la selección completa aparte porque el navegador, en
+// algunos casos, la corta en el punto decimal en vez de tomar el valor
+// entero. Un solo bloque delegado para todos los campos — nada por campo.
+const SEL_NUM_EDITABLE =
+  "#rapida-n, #prueba-recortar-n, #desc-pct, #tasa-editable, " +
+  ".pag-num, .det-cant, .det-pct, .desc-pct-inp";
 let pctPorSeleccionar = null;
 
 document.addEventListener("focusin", (ev) => {
-  const el = ev.target.closest?.(SEL_PCT_DESCUENTO);
+  const el = ev.target.closest?.(SEL_NUM_EDITABLE);
   if (el && el.value !== "") el.select();
 });
 
 document.addEventListener("mousedown", (ev) => {
-  const el = ev.target.closest?.(SEL_PCT_DESCUENTO);
+  const el = ev.target.closest?.(SEL_NUM_EDITABLE);
   pctPorSeleccionar = el && el !== document.activeElement ? el : null;
 }, true);
 
 document.addEventListener("mouseup", (ev) => {
   const el = pctPorSeleccionar;
   pctPorSeleccionar = null;
-  if (!el || ev.target.closest?.(SEL_PCT_DESCUENTO) !== el || el.value === "") return;
+  if (!el || ev.target.closest?.(SEL_NUM_EDITABLE) !== el || el.value === "") return;
+  ev.preventDefault();
+  el.select();
+}, true);
+
+document.addEventListener("dblclick", (ev) => {
+  const el = ev.target.closest?.(SEL_NUM_EDITABLE);
+  if (!el || el.value === "") return;
   ev.preventDefault();
   el.select();
 }, true);
