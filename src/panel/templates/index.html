@@ -4449,15 +4449,9 @@ function cambioFechaFacturar() {
   // abierto se queda mostrando los % de la fecha anterior si no se recarga.
   refrescarDetalleAbierto();
   const campo = $("f-tasa");
-  const escrito = campo.value.trim();
-  const eraAMano = escrito && escrito !== tasaAutoBCV;
   campo.value = "";
   tasaAutoBCV = null;
   aplicarTasaBCV();   // repone la que corresponde al nuevo día (o deja vacío + alerta)
-  if (eraAMano)
-    mensaje(`La tasa ${escrito} la habías escrito a mano: se descartó al elegir `
-          + `la fecha y el campo vuelve a la que corresponde a ese día. Si hace `
-          + `falta, escríbela de nuevo.`, "info");
 }
 
 // 20 por defecto en todas las tablas; sin opciones de 50/500 porque el
