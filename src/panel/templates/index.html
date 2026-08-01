@@ -114,6 +114,18 @@
   /* Todo lo que no sea el panel de la tab activa mantiene su altura;
      el panel activo absorbe el resto de la ventana. */
   main > :not(.tab-panel) { flex-shrink:0; }
+  /* Ancho mínimo del panel principal (2026-08-01, pedido del usuario): medido
+     contra PROCESADAS (la lista más ancha, 12 columnas) — por debajo, sus
+     columnas dejan de caber y haría falta scroll horizontal para llegar a los
+     botones. Solo fuera del modo llenado: la barra flotante y el resumen
+     achican esta MISMA ventana a su ancho fijo (ANCHO_FLOTANTE=560, ver más
+     abajo) a propósito. En la ventana propia (Windows) el bloqueo real de la
+     ventana lo hace ventana_app.py por Win32 (ANCHO_MINIMO_PANEL, espejo de
+     este número); esto es la red de seguridad para cuando el panel corre en
+     un navegador normal, que no se puede bloquear desde la página — ahí, si
+     la ventana del navegador es más angosta que esto, aparece scroll
+     horizontal en vez de tapar botones. */
+  body:not(.modo-llenado) { min-width:1200px; overflow-x:auto; }
   .barra { display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:14px; }
   /* Filtros Buscar/Desde/Hasta: viven entre las tabs y la tabla. Solo se
      ven en PENDIENTES y PROCESADAS (ver cambiarTab), pero son un único
