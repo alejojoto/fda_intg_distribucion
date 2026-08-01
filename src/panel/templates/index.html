@@ -544,6 +544,14 @@
                      padding:8px 12px; margin:0 0 12px; font-size:13px; display:none; }
   #borrador-aviso.visible { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   #borrador-aviso-texto { flex:1; }
+  /* Los choques de catálogo requieren una decisión y permanecen visibles
+     hasta que otro sondeo confirme que ya no queda ninguno. */
+  #conflictos-sync-aviso { background:#fef0c7; color:#b54708; border-radius:6px;
+                           padding:8px 12px; margin:0 0 12px; font-size:13px;
+                           display:none; }
+  #conflictos-sync-aviso.visible { display:flex; align-items:center; gap:10px;
+                                   flex-wrap:wrap; }
+  #conflictos-sync-aviso-texto { flex:1; }
   /* Barra de status: UNA sola barra con dos líneas.
      Línea 1 (#mensaje) = estado dinámico (procesando, error, info).
      Línea 2 (#seguridad) = aviso de seguridad + botones — SOLO durante el llenado. */
@@ -784,6 +792,26 @@
             width:min(540px, 92vw); max-height:85vh; overflow:auto;
             box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #editor h3 { margin:0 0 14px; font-size:14px; }
+  #conflictos-sync-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                             display:none; z-index:20; align-items:flex-start;
+                             justify-content:center; }
+  #conflictos-sync-overlay.visible { display:flex; }
+  #conflictos-sync-caja { background:#fff; border-radius:10px; padding:18px;
+                          margin-top:6vh; width:min(820px, 94vw); max-height:85vh;
+                          overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #conflictos-sync-caja h3 { margin:0 0 14px; font-size:14px; }
+  .conflicto-sync-card { border:1px solid #e2e6ec; border-radius:8px; padding:12px;
+                         margin-bottom:12px; }
+  .conflicto-sync-titulo { font-weight:700; margin-bottom:10px; }
+  .conflicto-sync-columnas { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .conflicto-sync-columna { background:#f8fafc; border-radius:6px; padding:10px;
+                            min-width:0; }
+  .conflicto-sync-columna h4 { margin:0 0 8px; font-size:12.5px; }
+  .conflicto-sync-campo { font-size:12.5px; overflow-wrap:anywhere; margin-top:5px; }
+  .conflicto-sync-acciones { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  @media (max-width:600px) {
+    .conflicto-sync-columnas { grid-template-columns:1fr; }
+  }
   .editor-campo { display:flex; flex-direction:column; gap:3px; font-size:12px;
                   color:var(--mut); margin-bottom:10px; }
   .editor-campo input[disabled] { background:#f4f5f7; }
@@ -1776,6 +1804,11 @@
     <button type="button" class="peligro" id="borrador-descartar" onclick="borradorDescartarPedir(this)">Descartar</button>
   </div>
 
+  <div id="conflictos-sync-aviso">
+    <span id="conflictos-sync-aviso-texto"></span>
+    <button type="button" onclick="abrirConflictosSync()">Revisar choques</button>
+  </div>
+
   <!-- Buscador compartido entre PENDIENTES, PROCESADAS y EN REVISIÓN (desde
        2026-07-21 barre las columnas de la fila, no solo el cliente: ver
        CAMPOS_BUSQUEDA en app.py); las fechas Desde/Hasta son SOLO de PROCESADAS
@@ -2201,6 +2234,17 @@
     </div>
   </section>
 </main>
+
+<!-- Choques al editar el mismo dato de catálogo desde equipos distintos. -->
+<div id="conflictos-sync-overlay">
+  <div id="conflictos-sync-caja">
+    <h3>Cambios de catálogo en choque</h3>
+    <div id="conflictos-sync-lista"></div>
+    <div class="editor-acciones">
+      <button type="button" onclick="cerrarConflictosSync()">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Editor de una fila de catálogo (se abre desde AJUSTES) -->
 <div id="editor-overlay" onclick="if(event.target===this)intentarCerrarEditor()">
@@ -3925,6 +3969,151 @@ async function api(ruta, cuerpo) {
   return datos;
 }
 
+const CONFLICTOS_SYNC_NOMBRES = {
+  asistente_productos: "Producto",
+  asistente_clientes: "Cliente",
+  asistente_vendedores: "Vendedor",
+  asistente_feriados: "Feriado",
+  asistente_descuentos: "Campaña de descuento",
+  asistente_maquinas: "Máquina",
+};
+const CONFLICTOS_SYNC_IGNORADOS = new Set([
+  "seq", "seq_remoto", "sync_pendiente", "fecha_actualizado", "fecha_creado",
+  "fecha_cargado",
+]);
+let conflictosSyncCantidad = 0;
+
+function conflictosSyncJson(valor, respaldo) {
+  if (valor === null) return null;
+  if (typeof valor === "object") return valor;
+  try { return JSON.parse(valor); }
+  catch (_) { return respaldo; }
+}
+
+function conflictosSyncValor(valor) {
+  if (valor === null) return "vacío";
+  if (valor === undefined) return "sin valor";
+  if (typeof valor === "object") return JSON.stringify(valor);
+  if (typeof valor === "boolean") return valor ? "Sí" : "No";
+  return String(valor);
+}
+
+function pintarAvisoConflictosSync(cuantos) {
+  conflictosSyncCantidad = Number(cuantos) || 0;
+  const aviso = $("conflictos-sync-aviso");
+  aviso.classList.toggle("visible", conflictosSyncCantidad > 0);
+  if (!conflictosSyncCantidad) {
+    cerrarConflictosSync();
+    return;
+  }
+  $("conflictos-sync-aviso-texto").textContent =
+    `Hay ${conflictosSyncCantidad} cambio(s) de catálogo en choque entre equipos. `
+    + "Un cambio hecho aquí y uno hecho en otro equipo tocaron lo mismo: hay que "
+    + "elegir cuál queda.";
+}
+
+function conflictosSyncCampo(nombre, valor) {
+  const fila = document.createElement("div");
+  fila.className = "conflicto-sync-campo";
+  const etiqueta = document.createElement("strong");
+  etiqueta.textContent = nombre.replaceAll("_", " ") + ": ";
+  fila.append(etiqueta, document.createTextNode(conflictosSyncValor(valor)));
+  return fila;
+}
+
+function conflictosSyncTarjeta(conflicto) {
+  const local = conflictosSyncJson(conflicto.fila_local, {});
+  const remoto = conflictosSyncJson(conflicto.fila_remota, null);
+  const clave = conflictosSyncJson(conflicto.clave, {});
+  const card = document.createElement("div");
+  card.className = "conflicto-sync-card";
+  card.dataset.conflictoId = conflicto.id;
+
+  const titulo = document.createElement("div");
+  titulo.className = "conflicto-sync-titulo";
+  const nombre = CONFLICTOS_SYNC_NOMBRES[conflicto.tabla] || "Dato de catálogo";
+  const claveLegible = clave && typeof clave === "object"
+    ? Object.values(clave).map(conflictosSyncValor).join(" - ")
+    : conflictosSyncValor(clave);
+  titulo.textContent = nombre + (claveLegible ? " — " + claveLegible : "");
+
+  const columnas = document.createElement("div");
+  columnas.className = "conflicto-sync-columnas";
+  const colLocal = document.createElement("div");
+  const colRemota = document.createElement("div");
+  colLocal.className = colRemota.className = "conflicto-sync-columna";
+  colLocal.innerHTML = "<h4>Este equipo</h4>";
+  colRemota.innerHTML = "<h4>Otro equipo</h4>";
+
+  if (remoto === null) {
+    colRemota.append(document.createTextNode("En el otro equipo lo borraron"));
+  }
+  const campos = new Set([...Object.keys(local || {}), ...Object.keys(remoto || {})]);
+  campos.forEach(campo => {
+    if (CONFLICTOS_SYNC_IGNORADOS.has(campo)) return;
+    const aqui = local ? local[campo] : undefined;
+    const otro = remoto ? remoto[campo] : undefined;
+    if (JSON.stringify(aqui) === JSON.stringify(otro)) return;
+    colLocal.append(conflictosSyncCampo(campo, aqui));
+    if (remoto !== null) colRemota.append(conflictosSyncCampo(campo, otro));
+  });
+  columnas.append(colLocal, colRemota);
+
+  const acciones = document.createElement("div");
+  acciones.className = "conflicto-sync-acciones";
+  [["Queda lo de este equipo", "local"], ["Queda lo del otro equipo", "nube"]]
+    .forEach(([texto, decision]) => {
+      const boton = document.createElement("button");
+      boton.type = "button";
+      boton.textContent = texto;
+      boton.onclick = () => confirmarBorrar(
+        boton, () => resolverConflictoSync(conflicto.id, decision, card), "Confirmar");
+      acciones.append(boton);
+    });
+  card.append(titulo, columnas, acciones);
+  return card;
+}
+
+async function abrirConflictosSync() {
+  const overlay = $("conflictos-sync-overlay");
+  if (overlay.classList.contains("visible")) {
+    cerrarConflictosSync();
+    return;
+  }
+  try {
+    const datos = await api("/api/sync/conflictos");
+    const lista = $("conflictos-sync-lista");
+    lista.replaceChildren(...(datos.conflictos || []).map(conflictosSyncTarjeta));
+    if (!lista.children.length) {
+      pintarAvisoConflictosSync(0);
+      if (typeof cargar === "function") cargar();
+      return;
+    }
+    overlay.classList.add("visible");
+  } catch (e) {
+    mensaje("No se pudieron abrir los choques: " + e.message, "error");
+  }
+}
+
+function cerrarConflictosSync() {
+  $("conflictos-sync-overlay").classList.remove("visible");
+}
+
+async function resolverConflictoSync(id, decision, card) {
+  try {
+    await api("/api/sync/conflictos/resolver", {id, decision});
+    card.remove();
+    conflictosSyncCantidad = Math.max(0, conflictosSyncCantidad - 1);
+    pintarAvisoConflictosSync(conflictosSyncCantidad);
+    if (!$("conflictos-sync-lista").children.length) {
+      cerrarConflictosSync();
+      if (typeof cargar === "function") cargar();
+    }
+  } catch (e) {
+    mensaje("No se pudo guardar la decisión: " + e.message, "error");
+  }
+}
+
 // --- Filtros, rutas, tabs y paginación -------------------------------------
 let rutaSeleccionada = "";           // "" = todas; "__sin_ruta__" = sin Ruta Nombre
 let rutaPredeterminada = "";         // por máquina (config_dispositivo)
@@ -5139,6 +5328,7 @@ async function cargar() {
     if (d.nube) {
       nube.carga_ts = d.nube.carga_ts;
       nube.espejo_activo = d.nube.espejo_activo;
+      pintarAvisoConflictosSync(d.nube.sync_conflictos);
       pintarNube();
     }
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
@@ -5324,6 +5514,7 @@ async function sondearCompartido() {
   try {
     const r = await api("/api/estados_compartidos?firma=" +
                         encodeURIComponent(firmaCompartida));
+    if (r.nube) pintarAvisoConflictosSync(r.nube.sync_conflictos);
     if (r.pausado) {
       // "llenado" no cambia el semáforo (es una pausa, no una caída), pero sí
       // dice que en esta computadora hay un llenado en curso que NO salió de
