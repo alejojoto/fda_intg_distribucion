@@ -1497,7 +1497,7 @@
        la ventana. -->
   <img id="logo" src="/assets/icono.svg" alt="" width="42" height="42">
   <h1>Asistente de llenado — Finca Dos Aguas</h1>
-  {% if modo_mock %}<span class="mock">MODO SIMULACIÓN — no toca la app real</span>{% endif %}
+  {% if modo_mock %}<a class="mock" href="/mock" title="Elegir qué simula el próximo llenado (fallos, trancón, omitidas…)" style="text-decoration:none">MODO SIMULACIÓN — no toca la app real · escenarios</a>{% endif %}
   <span class="mock" id="banderas-prueba" title="Apágalas en el .env — o en src/settings.py si es MODO_PRUEBA_IMPLANTACION — y reinicia el panel (PLAN.md 4.6); la entrada MODO ADMIN se apaga en ADMIN → Ajustes de admin"{% if not banderas_prueba %} style="display:none"{% endif %}>MODO PRUEBA — {{ banderas_prueba|join(" · ") }}</span>
   <!-- Estado de la nube (2026-07-30): el mundito dice de un vistazo si esta
        computadora está viendo lo de las demás; el desplegable trae el detalle
