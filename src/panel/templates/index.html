@@ -21,7 +21,12 @@
 <link rel="icon" type="image/svg+xml" href="/assets/icono.svg">
 <link rel="alternate icon" href="/assets/icono.ico">
 <style>
-  :root { --ok:#1a7f37; --err:#b42318; --warn:#b54708; --mut:#667085; }
+  :root { --ok:#1a7f37; --err:#b42318; --warn:#b54708; --mut:#667085;
+    /* Cursor de "esto no responde" (2026-08-01): flecha normal de siempre +
+       una insignia chica de prohibido pegada abajo — como el dictado de
+       ChatGPT mientras transcribe, no el círculo tachado nativo del SO que
+       en Mac se come la flecha entera y hace parecer que el mouse desapareció. */
+    --cursor-prohibido: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj4KICA8cGF0aCBkPSJNNSAzIEw1IDIxIEw5LjUgMTcuNSBMMTIuOCAyNSBMMTYgMjMuNiBMMTIuOCAxNi4yIEwxOSAxNi4yIFoiIGZpbGw9IiMxZDI0MzMiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSIyMyIgY3k9IjIzIiByPSI3IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYzI2MjYiIHN0cm9rZS13aWR0aD0iMi4yIi8+CiAgPGxpbmUgeDE9IjE4LjYiIHkxPSIyNy40IiB4Mj0iMjcuNCIgeTI9IjE4LjYiIHN0cm9rZT0iI2RjMjYyNiIgc3Ryb2tlLXdpZHRoPSIyLjIiLz4KPC9zdmc+Cg==") 5 3, default; }
   * { box-sizing: border-box; }
   /* La app ocupa exactamente la ventana: cabecera, filtros y tabs quedan
      siempre visibles y el scroll vive DENTRO de las tablas (feedback
@@ -196,10 +201,12 @@
   /* Llenar/Reintentar (.acento) y Descartar (.peligro) van siempre en pareja
      en la misma fila (accionesDeFila) — mismo ancho para que no salten al ojo. */
   button.acento, button.peligro { min-width:92px; text-align:center; }
-  /* Nada de símbolo de prohibido (2026-07-29): un botón apagado —el mes al que
-     ya no se puede ir, la opción que ya está elegida— simplemente no responde;
-     el cursor normal no le echa en cara al operador un clic que no iba. */
-  button:disabled { opacity:.45; cursor:default; }
+  /* Botón apagado (2026-08-01): el mes al que el calendario ya no puede ir, la
+     opción que ya está elegida, la página que no existe. La flecha se queda
+     flecha (--cursor-prohibido, ver :root) — el circulito de prohibido nativo
+     del SO reemplazaba la flecha entera en Mac y hacía parecer que el mouse
+     desaparecía (pedido del usuario 2026-07-29, retirado; vuelve reducido). */
+  button:disabled { opacity:.45; cursor:var(--cursor-prohibido); }
   section { background:#fff; border:1px solid #e2e6ec; border-radius:8px; margin-bottom:18px; overflow:hidden; }
   section h2 { font-size:14px; margin:0; padding:10px 14px; border-bottom:1px solid #e2e6ec; background:#fafbfc; }
   /* Fila de ruta + campos de facturación (encima de los filtros) */
@@ -713,7 +720,7 @@
                    transition:transform .18s ease; }
   .switch:checked { background:#16a34a; }
   .switch:checked::after { transform:translateX(14px); }
-  .switch:disabled { cursor:default; opacity:.5; }
+  .switch:disabled { cursor:var(--cursor-prohibido); opacity:.5; }
   .switch:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
   /* Etiqueta que acompaña a un interruptor: el texto largo no debe reflotar
      debajo del interruptor al pasar de un renglón. */
@@ -1006,7 +1013,7 @@
   /* Confirmación de borrado "ahí mismo" (dos botones en vez de popup). */
   .confirmar-borrar { display:inline-flex; gap:6px; align-items:center; }
   .confirmar-borrar .cb-si { background:#dc2626; border-color:#dc2626; color:#fff; }
-  .confirmar-borrar .cb-si:disabled { opacity:.5; }
+  .confirmar-borrar .cb-si:disabled { opacity:.5; cursor:var(--cursor-prohibido); }
   /* Variante no destructiva (confirmarSinQuitar): rojo es para borrar/descartar;
      acciones como "Llenar en fila" usan el mismo verde de DESCUENTOS. */
   .confirmar-borrar .cb-si.ok { background:#16a34a; border-color:#16a34a; }
@@ -1016,7 +1023,7 @@
   .confirm-salida { flex:1 1 auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .confirm-salida .confirm-salida-msg { margin-right:auto; color:#a12a2a; font-size:13px; font-weight:600; }
   .confirm-salida .cb-si { background:#dc2626; border-color:#dc2626; color:#fff; }
-  .confirm-salida .cb-si:disabled { opacity:.5; }
+  .confirm-salida .cb-si:disabled { opacity:.5; cursor:var(--cursor-prohibido); }
   /* Aviso de validación del editor: va DENTRO del modal, pegado a los botones,
      porque la barra de estado queda tapada por el overlay y no se ve. */
   .desc-error { background:#fdecec; border:1px solid #f0b4b4; color:#a12a2a;
@@ -2284,6 +2291,10 @@
           <p class="mut" id="desc-alcance-nota" style="margin:0"></p>
         </div>
       </div>
+      <div class="desc-pendiente" id="desc-falta-productos" style="display:none; margin-bottom:10px">
+        Falta marcar los productos de la campaña.
+        <button type="button" class="desc-ir" onclick="descTab('alcance')">Ir a Productos</button>
+      </div>
       <!-- Acumulable (CONTRATOS.md 4.4, 2026-07-28): la campaña deja de competir
            por la línea y su % se suma al de la que mande. Es una propiedad de la
            campaña entera, no del número, así que no viaja con el bloque del
@@ -2312,10 +2323,6 @@
             <button type="button" class="desc-ir" id="desc-acum-ir" onclick="descTab('choques')">Ver el conflicto</button>
           </div>
         </div>
-      </div>
-      <div class="desc-pendiente" id="desc-falta-productos" style="display:none; margin-bottom:10px">
-        Falta marcar los productos de la campaña.
-        <button type="button" class="desc-ir" onclick="descTab('alcance')">Ir a Productos</button>
       </div>
       <!-- El bloque de clientes viaja igual que el del porcentaje: se ve en
            Detalles y en la pestaña Clientes, para marcar o desmarcar "Todos"
@@ -2688,6 +2695,19 @@ window.onerror = (msg, src, lin, col, err) =>
                    stack: err && err.stack ? String(err.stack).slice(0, 2000) : ""});
 window.addEventListener("unhandledrejection", e =>
   reportarAlPanel({tipo: "promesa", detalle: String(e.reason).slice(0, 2000)}));
+
+// Un <input type="number"> enfocado cambia de valor al rodar el mouse encima
+// (comportamiento nativo del navegador) — pasa en el % de descuentos, en la
+// cantidad/porcentaje del detalle de pre-llenado, y en cualquier campo
+// numérico que se agregue después. Quitarle el foco (blur) durante el propio
+// evento no alcanza: Chrome ya decidió incrementar el valor antes de que
+// nuestro listener corra. Hace falta cancelar el evento con preventDefault
+// (por eso passive:false), y solo mientras el input está enfocado — así el
+// scroll normal de la página/modal sigue intacto en cualquier otro momento.
+document.addEventListener("wheel", (ev) => {
+  const el = document.activeElement;
+  if (el && el.tagName === "INPUT" && el.type === "number") ev.preventDefault();
+}, { passive: false });
 
 // Estado del frontend (el backend además tiene su propio lock de llenado).
 // Desde 2026-07-19 no hay paso de confirmación: el llenado exitoso deja la
@@ -3594,12 +3614,6 @@ function volverALlenarDesdeResumen() {
   const hayOmitidas = Object.keys(omitidas || {}).length > 0;
   terminarEsperaEnvioPlataforma();
   mensaje("", "");   // apaga el modo llenado: el prellenado vive en el panel completo
-  // Llenada en prueba que sigue PENDIENTE (sin registro): no hay documento
-  // cerrado que reabrir — su prellenado se abre directo, y el candado de "ya
-  // se llenó en esta sesión" hace su pregunta al dar Llenar.
-  const pendiente = (ultimaLista.pendientes || [])
-    .find(x => x.pedido_id === pedido_id && x.parte === parte);
-  if (pendiente) { abrirDetalle(pedido_id, parte, pendiente.tiene_detalle === false); return; }
   if (hayOmitidas) reabrirYPrellenar(pedido_id, parte, "Faltaron líneas en el documento");
   else volverAFacturar(pedido_id, parte);
 }
@@ -7438,15 +7452,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // solo ahora.
       const huboOmitidas = r.lineas_omitidas && Object.keys(r.lineas_omitidas).length > 0;
       // Resumen de fin de llenado (2026-08-01, reemplaza a la espera pelada
-      // del 2026-07-28): en TODO llenado individual con éxito — el gate de
-      // solo-producción de la espera vieja dejaba el resumen invisible en la
-      // máquina de pruebas (segunda vuelta del mismo día, reporte del
-      // usuario). La caja queda a la derecha hasta que el operador pulse
-      // Listo o Volver a llenar; en corrida no aparece (la fila encadena).
-      const entraResumen = !secuenciaActiva;
+      // del 2026-07-28): solo en producción, solo en llenado individual y
+      // solo si el documento quedó EN PANTALLA (r.cierre null) — si el paso
+      // de cierre ya lo canceló o lo aceptó no hay nada que revisar ni
+      // enviar. La caja queda a la derecha hasta que el operador pulse Listo
+      // o Volver a llenar.
+      const entraResumen = !secuenciaActiva && !r.cierre && !enFilaDisponible();
       if (huboOmitidas) {
         // En el resumen las omitidas ya se ven ahí mismo, con su salida: el
-        // modal aparte queda solo para la corrida.
+        // modal aparte queda para la corrida y las máquinas con fila.
         if (!entraResumen)
           abrirLineasOmitidas(pedido_id, parte, r.lineas_omitidas, r.lineas_llenadas, r.lineas_pedidas);
         // La factura quedó en "Llenados por revisar" (EN REVISIÓN): al cerrar
@@ -7456,11 +7470,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       if (entraResumen)
         esperarEnvioPlataforma(textoExito, tipoExito,
           {pedido_id, parte, omitidas: r.lineas_omitidas || {},
-           llenadas: r.lineas_llenadas, pedidas: r.lineas_pedidas,
-           // Documento EN PANTALLA (producción: r.cierre null) = falta
-           // enviarlo a la plataforma; aceptado o cancelado por el paso de
-           // cierre, no hay nada que enviar.
-           enPantalla: !r.cierre});
+           llenadas: r.lineas_llenadas, pedidas: r.lineas_pedidas});
       // Encadenado (CONTRATOS.md 3.1 punto 3, act. 2026-07-29): la corrida
       // encadena porque el paso de cierre del backend dejó la Ficha libre
       // (documento Aceptado). Con Imprimir: sí, la pausa «Continuar»
@@ -8438,11 +8448,8 @@ function esperarEnvioPlataforma(texto, tipo, factura) {
   resumenFinal = {...factura,
                   lineas: (ultimoAvanceLlenado && ultimoAvanceLlenado.lineas) || []};
   // Sin spinner (mismo criterio que la espera del login): el programa no está
-  // trabajando, está esperando al operador. La instrucción de envío solo con
-  // el documento en pantalla — cerrado por el paso de prueba, no hay qué enviar.
-  mensaje(factura.enPantalla
-            ? `${texto} Envíala a la plataforma de facturación.` : texto,
-          tipo, false);
+  // trabajando, está esperando al operador.
+  mensaje(`${texto} Envíala a la plataforma de facturación.`, tipo, false);
   document.body.classList.add("modo-fin-llenado");
   pintarResumenFinal();
   plantarVentanaResumen();
@@ -11256,7 +11263,7 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // que ni se ofrezca el clic.
   const celdaActivo = !conToggleActivo ? puntoEstado(f.activo)
     : f.clasificacion === "prueba"
-    ? `<label style="cursor:not-allowed; display:inline-flex" title="Un cliente de prueba no se activa: nunca factura, así que este interruptor no tiene efecto.">
+    ? `<label style="cursor:var(--cursor-prohibido); display:inline-flex" title="Un cliente de prueba no se activa: nunca factura, así que este interruptor no tiene efecto.">
          <input type="checkbox" class="switch" disabled></label>`
     : `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
          <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`;
