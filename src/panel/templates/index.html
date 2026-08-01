@@ -4862,10 +4862,25 @@ function paginaSalioDelCampo(tab, campo) {
   campo.value = paginacion[tab].pagina;
 }
 
+// Lo que de verdad va en la tabla PROCESADAS: sin lo que sigue esperando en
+// "Llenados por revisar" (2026-08-01). Una factura que falló, o que salió con
+// líneas de menos, se queda en ese subtab hasta volver a llenarla, descartarla
+// o mandarla a procesadas — pero aparecía TAMBIÉN aquí, como terminada, en
+// cuanto su pedido salía del lote (p. ej. el cruce rechazado que manda el
+// pedido entero a EN REVISIÓN). Se filtra al pintar y no en la lista misma:
+// `ultimaLista.procesadas` es de donde el detalle y los avisos sacan la fila
+// (filaDeLista), y sin ella la ventana de la factura quedaría sin sus datos.
+function procesadasParaTabla() {
+  const enRevision = new Set((ultimaLista.por_revisar || [])
+    .map(f => `${f.pedido_id}|${f.parte}`));
+  return (ultimaLista.procesadas || [])
+    .filter(f => !enRevision.has(`${f.pedido_id}|${f.parte}`));
+}
+
 // ¿La página vigente de PROCESADAS es la última con lo ya cargado?
 function enUltimaPaginaProcesadas() {
   const p = paginacion.procesadas;
-  const totalFamilias = agruparFamilias(ultimaLista.procesadas || []).length;
+  const totalFamilias = agruparFamilias(procesadasParaTabla()).length;
   const totalPaginas = Math.max(1, Math.ceil(totalFamilias / p.porPagina));
   return p.pagina >= totalPaginas;
 }
@@ -5404,7 +5419,7 @@ function repintar() {
   // fuera de la ventana vigente; pulsarlo la ensancha un escalón. En el último
   // escalón el backend ya no reporta más y el botón se apaga solo.
   const hayMasProc = !!ultimaLista.hay_procesadas_mas_antiguas;
-  pintarProcesadas(paginarFamilias("procesadas", ultimaLista.procesadas, hayMasProc));
+  pintarProcesadas(paginarFamilias("procesadas", procesadasParaTabla(), hayMasProc));
   sincronizarCantidades();   // el dropdown de la corrida sigue a la lista y a la ruta
 }
 
