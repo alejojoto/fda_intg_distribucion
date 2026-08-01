@@ -8067,11 +8067,11 @@ async function confirmarMotivo() {
 // vista. Lo usan el confirmar del motivo y el Volver a llenar del resumen de
 // fin de llenado (ahí el motivo va solo: faltaron líneas).
 // La ventana se abre ANTES de tocar el servidor, no después: reabrir puede
-// tardar segundos —si la factura ya no está en la caché, /api/refacturar
-// relee el pipeline de la nube— y en ese hueco la lista quedaba descubierta,
-// con el modal del motivo ya cerrado. Un segundo clic ahí caía sobre el
-// botón de la fila de abajo y arrancaba un llenado a espaldas de la
-// revisión (visto 2026-07-31).
+// tardar segundos —una factura de otra máquina consulta la nube, y si ya no
+// está en la caché el lote se recarga en fondo mientras la ventana espera el
+// prellenado— y en ese hueco la lista quedaba descubierta, con el modal del
+// motivo ya cerrado. Un segundo clic ahí caía sobre el botón de la fila de
+// abajo y arrancaba un llenado a espaldas de la revisión (visto 2026-07-31).
 async function reabrirYPrellenar(pedido_id, parte, motivo) {
   // La marca de reapertura va puesta ANTES del primer pintado: con ella la
   // ventana sale de una como pantalla de prellenado (cajitas y avisos de la
@@ -8087,20 +8087,46 @@ async function reabrirYPrellenar(pedido_id, parte, motivo) {
   // "Reabriendo…"; sin await a propósito, y si esta respuesta llegara
   // tarde, el nº de consulta de cargarDetalle la descarta.
   cargarDetalle(pedido_id, parte);
+  let r;
   try {
-    const r = await api("/api/refacturar", {pedido_id, parte, motivo});
+    r = await api("/api/refacturar", {pedido_id, parte, motivo});
     if (r.aviso) { cerrarDetalle(); mensaje(r.aviso, "info"); await cargar(); return; }
   } catch (e) {
     cerrarDetalle();
     avisoFactura(pedido_id, parte, e.message);
     return;
   } finally {
-    detalleReabriendo = null;
+    // Si el servidor dejó la recarga del lote corriendo en fondo (en_cache
+    // false), la marca se queda puesta: la ventana sigue en "Reabriendo…"
+    // con la foto del documento hasta que el prellenado editable llegue.
+    if (!r || r.aviso || r.en_cache) detalleReabriendo = null;
   }
   // cargar() antes de traer el detalle: la fila tiene que verse ya como
   // error_llenado propia para que la ventana la pinte editable y con su botón.
   await cargar();
   await cargarDetalle(pedido_id, parte);
+  if (!r.en_cache) await esperarPrellenadoEditable(pedido_id, parte);
+}
+
+// Sondea el detalle de una factura reabierta hasta que entre al lote (la
+// recarga corre en fondo en el servidor) y el prellenado salga editable.
+// Acotado a ~90 s: si no llegó, la marca se suelta y la ventana queda con la
+// foto — la fila ya está reabierta igual, y Llenar espera del lado del
+// servidor a que la recarga aterrice.
+async function esperarPrellenadoEditable(pedido_id, parte) {
+  const clave = claveDetalle(pedido_id, parte);
+  for (let i = 0; i < 30 && detalleReabriendo === clave; i++) {
+    await new Promise(res => setTimeout(res, 3000));
+    if (detalleAbierto !== clave) break;   // se cerró o se abrió otra: no seguir
+    await cargarDetalle(pedido_id, parte);
+    const d = detalleDatos[clave];
+    if (d && d.editable) break;
+  }
+  if (detalleReabriendo !== clave) return;
+  detalleReabriendo = null;
+  // Un repintado más con la marca ya suelta: el botón pasa de "Reabriendo…"
+  // a su acción real.
+  if (detalleAbierto === clave) pintarVentanaDetalle(clave);
 }
 
 // Aviso "en el objeto" para una fila de factura (Descartar / Volver a
