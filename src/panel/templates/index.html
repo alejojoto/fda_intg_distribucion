@@ -693,7 +693,24 @@
   #catalogo-vista { padding:0; }
   #catalogo-vista .cat-cabecera { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
                                   padding:10px 14px; border-bottom:1px solid #eef0f4; }
+  /* Las tablas de los catálogos se ajustan a su contenido en vez de estirarse a
+     todo lo ancho (pedido del usuario 2026-08-01): con el 100% global,
+     Vendedores repartía tres columnas cortas de lado a lado de la pantalla y
+     leer un renglón obligaba a barrer con la vista. Quedan a la izquierda, que
+     es por donde se empieza a leer. */
+  #catalogo-vista table, #cliente-cuerpo table { width:auto; max-width:100%; }
   tr.grupo td { background:#eef2f8; font-weight:600; font-size:12.5px; }
+  /* La fila entera de un catálogo abre su editor (2026-08-01, pedido del
+     usuario): mismo gesto que las de pedidos (ver tr.abre-detalle) y con él se
+     fueron los botones por fila. Sin manito y sin subrayado: lo que avisa que
+     se puede pulsar es el resaltado completo del renglón y el texto del hover.
+     Lo que sigue teniendo control propio (el interruptor de activo, la ★ de
+     favorito, Eliminar/Restaurar/Borrar) corta el clic aparte. */
+  tr.abre-editor td { cursor:default; }
+  tr.abre-editor:hover td { background:#eaf0fb; }
+  /* La cabecera de un cliente ya tiene fondo propio: su resaltado va un tono
+     más marcado o el hover no se notaría. */
+  tr.grupo.abre-editor:hover td { background:#e0e8f5; }
   /* Feriado desactivado: sigue listado (dice "este día NO cuenta") pero se
      lee de un vistazo que no aplica. El botón queda legible a propósito —
      es el que lo vuelve a activar. */
@@ -949,13 +966,8 @@
      (el .nom con flex:1 la empuja): así no se pega al nombre ni al check. */
   .desc-cli-row .fav { margin-left:auto; }
   /* Columna fija al inicio de la fila en el catálogo de CLIENTES: ancho fijo
-     para que la estrella quede alineada entre filas, lejos del botón "›" que
-     va al otro extremo. */
+     para que la estrella quede alineada entre filas. */
   tr.grupo .fav { display:inline-block; width:18px; text-align:center; margin-right:8px; }
-  /* El botón "›" del catálogo de CLIENTES: más grande y notorio que un botón
-     normal, para que se note como acción de la fila. */
-  tr.grupo .btn-abrir-ficha { float:right; font-size:20px; line-height:1;
-                             padding:2px 12px; font-weight:700; }
   .desc-mini { font-size:11.5px; padding:2px 7px; }
   /* Pestañas del editor de campaña + árbol de alcance */
   .desc-tabs { display:flex; gap:4px; border-bottom:1px solid #e2e6ec; margin:0 0 12px; }
@@ -11199,7 +11211,8 @@ async function abrirCatalogo(tipo, prefill) {
           <thead><tr>${columnas.map(c => `<th>${
             c.origenDato
               ? `<span class="orig-punto ${c.origenDato}" title="${esc(ORIGENES[c.origenDato].titulo)}"></span>`
-              : ""}${esc(c.etiqueta)}</th>`).join("")}<th></th></tr></thead>
+              : ""}${esc(c.etiqueta)}</th>`).join("")}${
+            def.agrupado || def.acciones ? "<th></th>" : ""}</tr></thead>
           <tbody></tbody>
         </table></div>
         <div class="paginador" id="pag-catalogo"></div>
@@ -11240,27 +11253,36 @@ function pintarFilasCatalogo() {
   // que la etiqueta cambia respecto a la fila anterior — las filas ya vienen
   // ordenadas del backend, así que basta comparar con la última pintada.
   let grupoPintado = null;
+  // La columna de acciones solo existe donde hay acciones que poner (Feriados,
+  // con Eliminar/Restaurar): el "Editar" por fila se fue cuando la fila entera
+  // pasó a abrir el editor, y una columna vacía separaba el resto sin motivo.
+  const nCols = columnas.length + (def.acciones ? 1 : 0);
   $("t-catalogo").querySelector("tbody").innerHTML = visibles.map(([f, i]) => {
     let cabecera = "";
     if (def.grupoFila) {
       const g = def.grupoFila(f);
       if (g !== grupoPintado) {
         grupoPintado = g;
-        cabecera = `<tr class="grupo"><td colspan="${columnas.length + 1}">${esc(g)}</td></tr>`;
+        cabecera = `<tr class="grupo"><td colspan="${nCols}">${esc(g)}</td></tr>`;
       }
     }
+    // Solo las celdas con un control propio cortan el clic de la fila: sobre un
+    // punto informativo o una celda vacía, pulsar sigue abriendo el editor.
+    const acciones = def.acciones ? def.acciones(f, i) : "";
     return cabecera + `
-    <tr${def.atenuarInactivas && !f.activo ? ' class="fila-inactiva"' : ""}${(def.acciones || def.toggleActivo) ? ` data-fila-idx="${i}"` : ""}>
-      ${columnas.map(c => `<td>${c.tipo === "checkbox"
-          ? (def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i)) : puntoEstado(f[c.campo]))
-          : esc(f[c.campo] ?? "")}</td>`).join("")}
-      <td><button onclick="abrirEditor(${i})">Editar</button>
-          ${def.acciones ? def.acciones(f, i) : ""}</td>
+    <tr class="abre-editor${def.atenuarInactivas && !f.activo ? " fila-inactiva" : ""}"${
+      (def.acciones || def.toggleActivo) ? ` data-fila-idx="${i}"` : ""}
+        title="Clic para editar este ${esc(def.singular)}" onclick="abrirEditor(${i})">
+      ${columnas.map(c => c.tipo === "checkbox"
+          ? `<td${def.toggleActivo ? CELDA_ACCIONES : ""}>${
+              def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i)) : puntoEstado(f[c.campo])}</td>`
+          : `<td>${esc(f[c.campo] ?? "")}</td>`).join("")}
+      ${def.acciones ? `<td${acciones ? CELDA_ACCIONES : ""}>${acciones}</td>` : ""}
     </tr>` + ((def.acciones || def.toggleActivo)
-      ? `<tr class="fila-aviso-error" data-fila-idx="${i}" style="display:none"><td colspan="${columnas.length + 1}"></td></tr>`
+      ? `<tr class="fila-aviso-error" data-fila-idx="${i}" style="display:none"><td colspan="${nCols}"></td></tr>`
       : "");
   }).join("") ||
-    `<tr><td colspan="${columnas.length + 1}" class="mut">Sin filas.</td></tr>`;
+    `<tr><td colspan="${nCols}" class="mut">Sin filas.</td></tr>`;
 }
 
 // Clientes y sucursales: agrupado por cliente Winledger (código + nombre),
@@ -11367,12 +11389,14 @@ function pintarClientesAgrupados(filtro) {
     if (g.sueltas) {
       if (g !== grupoPintado) {
         grupoPintado = g;
-        // Un grupo de entradas sueltas no es un cliente: no lleva el botón "›"
-        // de cabecera (abría todas juntas) ni estrella de favorito, y explica
-        // qué hay que hacer con lo que tiene debajo. En la pestaña Por revisar
-        // el título sobra (ya lo dice la pestaña): queda solo la explicación.
+        // Un grupo de entradas sueltas no es un cliente: no abre ninguna ficha
+        // (las abría todas juntas) ni lleva estrella de favorito, y explica qué
+        // hay que hacer con lo que tiene debajo. En la pestaña Por revisar el
+        // título sobra (ya lo dice la pestaña): queda solo la explicación.
+        // El ancho tope de la explicación es lo que impide que un párrafo largo
+        // estire la tabla entera (2026-08-01).
         html += `<tr class="grupo"><td colspan="4">${enRevisar ? "" : esc(g.etiqueta)}
-             <div class="mut" style="font-weight:400">${g.pendientes
+             <div class="mut" style="font-weight:400; max-width:62ch">${g.pendientes
                ? "Sus pedidos esperan en revisión hasta que estén completas. Lo que le falta a cada una está en su fila: el tipo lo trae la app de pedidos, pero el código de cliente se escribe aquí."
                : "No se facturan nunca: sus pedidos se descartan sin pasar por revisión."}</div>
            </td></tr>`;
@@ -11386,9 +11410,9 @@ function pintarClientesAgrupados(filtro) {
       // solo cuántas hay.
       const badge = g.esCadena
         ? ` <span class="badge">cadena · ${g.filas.length} sucursales</span>` : "";
-      html += `<tr class="grupo"><td colspan="4">${estrellaCliente(g)}${esc(g.etiqueta)}${badge}
-             <button class="btn-abrir-ficha" title="Ver detalle" onclick="editarCliente('${esc(g.codigo)}')">›</button>
-           </td></tr>`;
+      html += `<tr class="grupo abre-editor" title="Clic para ver la ficha del cliente"
+               onclick="editarCliente('${esc(g.codigo)}')"><td colspan="4">${
+             estrellaCliente(g)}${esc(g.etiqueta)}${badge}</td></tr>`;
     }
   }
   $("t-catalogo").querySelector("tbody").innerHTML =
@@ -11427,9 +11451,10 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // clave no hay forma de saber cuál se está abriendo.
   const nombre = esc(f.sucursal_nombre || (suelta ? "(nombre no llegó)" : "(única)"));
   // Una entrada nueva no se "edita": se dice qué es. Las demás incompletas ya
-  // saben qué son y solo les falta un código.
-  const textoBoton = !falta ? "Editar"
-    : falta === "Falta decir qué es" ? "Clasificar" : "Completar";
+  // saben qué son y solo les falta un código. Desde 2026-08-01 eso ya no rotula
+  // un botón —la fila entera abre el editor— sino el texto de su hover.
+  const accion = !falta ? "editar esta sucursal"
+    : falta === "Falta decir qué es" ? "clasificar esta entrada" : "completar esta entrada";
   // Toggle de un clic (solo dentro de la ficha del cliente, 2026-07-30): fuera
   // de ahí se conserva el punto informativo, sin click.
   // Un cliente de prueba nunca factura, así que su interruptor no se puede
@@ -11448,14 +11473,14 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
         esperando === 1 ? "esa factura no sale" : "esas facturas no salen"}.">${
         esperando === 1 ? "1 pedido esperando" : `${esperando} pedidos esperando`}</span>`
     : "";
-  return `<tr>
+  return `<tr${conEditar
+      ? ` class="abre-editor" title="Clic para ${accion}" onclick="abrirEditor(${i})"` : ""}>
     <td style="padding-left:26px">${nombre}${marcaEsperando}${suelta
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
         ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
-    <td>${celdaActivo}</td>
-    <td>${conEditar ? `<button class="${falta ? "acento" : ""}" onclick="abrirEditor(${i})">${
-      textoBoton}</button>${borrarDefinitivo}` : ""}</td>
+    <td${conToggleActivo ? CELDA_ACCIONES : ""}>${celdaActivo}</td>
+    <td${borrarDefinitivo ? CELDA_ACCIONES : ""}>${borrarDefinitivo}</td>
   </tr>`;
 }
 
@@ -11480,7 +11505,7 @@ async function alternarActivoSucursal(indice) {
 function estrellaCliente(g) {
   if (!g.codigo) return "";
   return `<span class="fav" title="favorito: sale de primero en la lista"
-                onclick="alternarFavoritoCliente('${esc(g.codigo)}')">${g.favorito ? "★" : "☆"}</span>
+                onclick="event.stopPropagation(); alternarFavoritoCliente('${esc(g.codigo)}')">${g.favorito ? "★" : "☆"}</span>
           <span class="obj-aviso-inline" data-fav-aviso="${esc(g.codigo)}" style="display:none"></span> `;
 }
 
