@@ -843,7 +843,13 @@
                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #detalle-caja > h3, #detalle-caja > #detalle-fijo,
   #detalle-caja > .editor-acciones { flex:none; }
-  #detalle-caja > h3 { margin:0 0 12px; font-size:14px; }
+  #detalle-caja > h3 { margin:0 0 12px; font-size:14px;
+                       display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  /* Cuadro de "factura X de Y" (2026-08-01): mismo azul que button.acento, para
+     que se note que esta ventana está sobre UNA parte del pedido. */
+  .detalle-parte { display:inline-block; padding:2px 8px; border-radius:6px;
+                   font-size:12px; font-weight:700; color:#1d4ed8; background:#e8efff;
+                   border:1px solid #c7d7fb; }
   #detalle-cuerpo { flex:1 1 auto; min-height:0; overflow:auto; }
   #detalle-caja > .editor-acciones { border-top:1px solid #e2e6ec; padding-top:12px; }
   /* Editor de campaña de descuento (modal propio, más ancho que el de catálogo) */
@@ -6247,11 +6253,14 @@ async function cargarDetalle(pedidoId, parte) {
 function pintarVentanaDetalle(clave) {
   if (clave !== detalleAbierto) return;
   const d = detalleDatos[clave];
-  const partes = d && d.total_partes > 1 ? ` · factura ${d.parte} de ${d.total_partes}` : "";
+  // En línea propia y destacada (2026-08-01, pedido del usuario): al lado del
+  // nombre del pedido "2 de 2" se perdía de vista.
+  const partes = d && d.total_partes > 1
+    ? `<span class="detalle-parte">factura ${d.parte} de ${d.total_partes}</span>` : "";
   // Sin respuesta del panel (buscando, o sin detalle guardado) el pedido sale
   // igual de la clave: la ventana siempre dice de cuál factura habla.
-  $("detalle-titulo").textContent = d
-    ? `Pedido ${d.pedido_id}${partes}` : `Pedido ${partesDeClave(clave)[0]}`;
+  $("detalle-titulo").innerHTML = d
+    ? `Pedido ${esc(d.pedido_id)}${partes}` : `Pedido ${esc(partesDeClave(clave)[0])}`;
   $("detalle-fijo").innerHTML = fijoDetalle(clave);
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
   pintarBotonDetalle();
