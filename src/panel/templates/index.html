@@ -7547,12 +7547,18 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // El rechazo del cliente/sucursal ocurre ANTES de las líneas: hablar de
       // "línea ?" ahí desorienta. Y el cruce ya quedó marcado, así que se dice
       // que reintentar no sirve hasta corregirlo (2026-07-30).
+      // Sin número de línea tampoco se inventa una (2026-08-01): todo lo que
+      // falla antes del detalle —el cliente que no autocompletó, la puesta a
+      // punto— llegaba aquí como "en la línea ?" y mandaba a buscar un renglón
+      // que nunca existió.
       const fallo = r.rechazo_cruce
         ? `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)}: ${r.error}`
           + ` El pedido pasó a EN REVISIÓN: reintentar va a fallar igual hasta que `
           + `ese código exista en el programa de facturación.`
-        : `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)} `
-          + `en la línea ${r.linea_fallida ?? "?"}: ${r.error}.`;
+        : r.linea_fallida
+        ? `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)} `
+          + `en la línea ${r.linea_fallida}: ${r.error}.`
+        : `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)}: ${r.error}`;
       // Destranque en el PRIMER llenado de la sesión (2026-07-26): podría
       // haber pisado trabajo manual ajeno que ya estuviera abierto en
       // Winledger antes de que el asistente tocara nada — se avisa aparte.
