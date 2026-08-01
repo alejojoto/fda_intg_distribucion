@@ -319,7 +319,23 @@
                        border-bottom:none; padding-bottom:4px; }
   tr.fam-cabecera:hover td { background:#f4f6fa; }
   tr.fam-cabecera b { font-size:13px; }
-  tr.fam-parte td:first-child { border-left:3px solid #b9c2d0; }
+  /* La barra va como pseudo-elemento y no como border-left (2026-08-01): con
+     border-collapse el borde de cada renglón se queda con el pixel de la
+     esquina y la línea salía picada. El `bottom:-1px` puentea justo ese
+     pixel, así que se ve UN solo trazo sólido desde la cabecera del pedido
+     hasta su última factura, sin importar qué renglones cuelguen en el medio
+     (avisos, líneas omitidas, doble llenado). */
+  tr.fam-cabecera td:first-child,
+  tr.fam-parte td:first-child { position:relative; }
+  tr.fam-cabecera td:first-child::before,
+  tr.fam-parte td:first-child::before {
+    content:""; position:absolute; left:0; top:0; bottom:-1px; width:3px;
+    background:#b9c2d0; }
+  /* Los renglones que GRITAN (doble llenado abierto, revisión pendiente)
+     traen su propia barra de color en el mismo lugar: esa hace de tramo de
+     la línea, y la gris se retira para no dibujar dos barras pegadas. */
+  tr.fam-parte.fila-conflicto.abierto td:first-child::before,
+  tr.fam-parte.fila-omitidas.pendiente td:first-child::before { display:none; }
   /* Aviso de la factura que dejó a su pedido esperando (2026-07-22): vive
      pegado DEBAJO de la fila que lo causa, ámbar — informa sin frenar, como
      el resto de los avisos del panel. Se va solo cuando la factura se
@@ -6556,7 +6572,7 @@ function filaPendiente(f, enFamilia) {
       <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
-      + `<tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
+      + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
 }
 
 // Una factura con error deja a su pedido ENTERO esperando aquí: no pasa a
@@ -6963,7 +6979,7 @@ function filaProcesada(f, enFamilia) {
   // fiscales por el mismo pedido. Mientras esté abierto va en rojo y con su
   // botón; resuelto queda en gris como rastro de qué se decidió.
   const conflicto = f.conflicto ? `
-    <tr class="fila-conflicto${f.conflicto_abierto ? " abierto" : ""}"
+    <tr class="fila-conflicto${f.conflicto_abierto ? " abierto" : ""}${enFamilia ? " fam-parte" : ""}"
         data-factura-key="${clave}">
       <td colspan="12">
         <span>${esc(f.conflicto).replaceAll("\n", "<br>")}</span>
@@ -6976,7 +6992,7 @@ function filaProcesada(f, enFamilia) {
   // el de doble llenado. Sin revisar grita en ámbar con su botón; revisada
   // baja a gris y se queda como rastro de cuándo se despachó.
   const omitidas = f.lineas_omitidas ? `
-    <tr class="fila-omitidas${f.revision_pendiente ? " pendiente" : ""}"
+    <tr class="fila-omitidas${f.revision_pendiente ? " pendiente" : ""}${enFamilia ? " fam-parte" : ""}"
         data-factura-key="${clave}">
       <td colspan="12">
         ${f.revision_pendiente
@@ -7002,7 +7018,7 @@ function filaProcesada(f, enFamilia) {
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>${conflicto}${omitidas}
-    <tr class="fila-aviso-error" data-factura-key="${clave}" style="display:none"><td colspan="12"></td></tr>`;
+    <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="12"></td></tr>`;
 }
 
 // La misma acción con tres rótulos, uno por lo que se ve en cada lugar:
