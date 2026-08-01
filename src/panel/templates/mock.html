@@ -85,11 +85,11 @@
 
   <fieldset>
     <legend>Encabezado y cierre</legend>
-    <label>Rechazo del código al escribirlo:
-      <select name="rechazo_cruce">
-        <option value="" {% if not escenario.rechazo_cruce %}selected{% endif %}>no simular</option>
-        <option value="cliente" {% if escenario.rechazo_cruce == "cliente" %}selected{% endif %}>de cliente</option>
-        <option value="sucursal" {% if escenario.rechazo_cruce == "sucursal" %}selected{% endif %}>de sucursal</option>
+    <label>El campo no se puede completar:
+      <select name="fallar_campo">
+        <option value="" {% if not escenario.fallar_campo %}selected{% endif %}>no simular</option>
+        <option value="cliente" {% if escenario.fallar_campo == "cliente" %}selected{% endif %}>el cliente</option>
+        <option value="sucursal" {% if escenario.fallar_campo == "sucursal" %}selected{% endif %}>la sucursal</option>
       </select></label>
     <label><input type="checkbox" name="fallar_cierre"
       {% if escenario.fallar_cierre %}checked{% endif %}>
