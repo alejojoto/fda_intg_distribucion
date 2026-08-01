@@ -1570,16 +1570,13 @@
     </div>
     <!-- Resumen de fin de llenado (2026-08-01): terminado un llenado
          individual, el chequeo de qué entró al documento y las líneas del
-         pedido, con Listo (vuelve el panel) y Volver a llenar. -->
+         pedido. Los botones los pinta pintarResumenFinal: con el pedido
+         completo en el documento basta despacharlo (Listo), pero con líneas
+         saltadas hay tres salidas distintas y el operador las decide aquí. -->
     <div id="fin-llenado">
       <div id="fin-llenado-chequeo"></div>
       <div id="fin-llenado-cuerpo"></div>
-      <div id="fin-llenado-acciones">
-        <button class="primario" id="btn-envio-listo" onclick="listoEnvioPlataforma()"
-                title="La factura quedó despachada: vuelve el panel completo.">Listo</button>
-        <button id="btn-volver-llenar" onclick="volverALlenarDesdeResumen()"
-                title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>
-      </div>
+      <div id="fin-llenado-acciones"></div>
     </div>
   </div>
 
@@ -2161,7 +2158,7 @@
       <p class="mut" style="margin:10px 14px 8px">
         Llenados que no terminaron perfectos: la factura falló a mitad de
         camino o el documento quedó con líneas de menos. Cada una se queda
-        aquí hasta volver a llenarla, descartarla o mandarla a procesadas.</p>
+        aquí hasta reintentarla, descartarla o marcarla como procesada.</p>
       <div class="tabla-scroll"><table id="t-llenados">
         <thead><tr>
           <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué pasó</th><th></th>
@@ -2667,7 +2664,7 @@
       <button class="primario" onclick="cerrarLineasOmitidas()"
               title="La factura queda marcada por revisar en EN REVISIÓN.">Dejar en revisión</button>
       <button onclick="marcarLineasOmitidasRevisada()"
-              title="Quita la marca de revisar: la factura queda como está.">Ya está resuelto</button>
+              title="Quita la marca de revisar: la factura queda como está.">Marcar como procesada</button>
     </div>
   </div>
 </div>
@@ -3579,6 +3576,37 @@ function pintarResumenFinal() {
           <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
       }).join("")}</tbody></table>`;
+  pintarAccionesResumen(claves.length > 0);
+}
+
+// Las salidas del resumen (2026-08-01, pedido del usuario). Con líneas
+// saltadas el documento en pantalla está incompleto y "Listo" no alcanzaba:
+// no decía si la factura quedaba resuelta o pendiente de revisar. Son las tres
+// decisiones posibles, en el orden en que se toman — rehacerla, darla por
+// buena, o dejarla para después. Sin líneas saltadas no hay nada que decidir y
+// la botonera se queda como estaba.
+function pintarAccionesResumen(hayOmitidas) {
+  $("fin-llenado-acciones").innerHTML = hayOmitidas
+    ? `<button class="primario" onclick="volverALlenarDesdeResumen()"
+         title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel.">Volver a intentar</button>
+       <button onclick="procesadaDesdeResumen()"
+         title="El documento queda como salió: la factura no pasa por EN REVISIÓN.">Marcar como procesada</button>
+       <button onclick="listoEnvioPlataforma()"
+         title="Vuelve el panel y la factura espera en EN REVISIÓN para decidir después.">Dejar en revisión</button>`
+    : `<button class="primario" onclick="listoEnvioPlataforma()"
+         title="La factura quedó despachada: vuelve el panel completo.">Listo</button>
+       <button onclick="volverALlenarDesdeResumen()"
+         title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>`;
+}
+
+// "Marcar como procesada": lo que faltó se resuelve por fuera y la factura no
+// tiene nada más que revisar. Apaga el salto a EN REVISIÓN que dejó puesto el
+// llenado: allá ya no va a estar.
+async function procesadaDesdeResumen() {
+  const pedido = resumenFinal;
+  irARevisionAlTerminar = false;
+  listoEnvioPlataforma();
+  if (pedido) await marcarFacturaRevisada(pedido.pedido_id, pedido.parte);
 }
 
 // La ventana del resumen: caja FIJA (ALTO_CONTENIDO_RESUMEN), mismo ancho de
@@ -6125,6 +6153,11 @@ function reabrirDesdeDetalle(f) {
       : ["reservada", "llenando", "error_llenado"].includes(f.estado)
         ? {texto: "Llenar igual", abrir: tomarIgual}
         : null;
+  // La que cerró con líneas de menos se reintenta sin preguntar nada
+  // (2026-08-01, pedido del usuario): el porqué ya está registrado, igual que
+  // en su fila de EN REVISIÓN y en el resumen de fin de llenado.
+  if (f.estado === "completada" && f.revision_pendiente)
+    return {texto: "Reintentar", abrir: reintentarOmitidas};
   if (["completada", "descartada", "facturada_a_mano"].includes(f.estado))
     return {texto: "Volver a llenar", abrir: volverAFacturar};
   return null;
@@ -6807,19 +6840,20 @@ function pintarLlenadosPorRevisar(lista) {
           ? "Marcada para volver a llenar."
           : `${falloHace(f.fecha_cargado)}: ${detalle}`)
       : `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas || "").replaceAll("\n", "<br>")}`;
-    // Líneas omitidas: DOS salidas (2026-08-01, pedido del usuario). Antes
-    // solo estaba "Revisada", que despachaba la factura sin decir dónde
-    // quedaba; y la otra salida real —rehacer el documento con todas las
-    // líneas— obligaba a buscar la factura en PROCESADAS. La primaria es
-    // volver a llenar (2026-08-01, corrección del usuario): el documento salió
-    // incompleto, así que lo esperable es rehacerlo, no despacharlo así.
+    // Un llenado con líneas de menos se opera como cualquier otro fallo
+    // (2026-08-01, pedido del usuario): Reintentar y Descartar, los mismos
+    // botones del resto de la lista, más la salida propia de este caso — el
+    // documento SÍ salió, así que darlo por bueno es una decisión real. El
+    // motivo solo lo pregunta Descartar: por qué se reintenta ya lo dice el
+    // renglón (qué línea no entró y por qué).
     const acciones = f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
-           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>
+           onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
          <button title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
-           onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Mandar a procesadas</button>`;
+           onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
+         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`;
     return `
     <tr${filaDetalle(f)}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
@@ -7049,11 +7083,11 @@ function filaProcesada(f, enFamilia) {
     <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="12"></td></tr>`;
 }
 
-// La misma acción con tres rótulos, uno por lo que se ve en cada lugar:
-// "Mandar a procesadas" en EN REVISIÓN (de ahí sale la factura), "Revisada" en
-// el renglón de PROCESADAS (donde ya está: lo que se apaga es el aviso) y "Ya
-// está resuelto" en el aviso de fin de llenado (marcarLineasOmitidasRevisada).
-// En los tres el operador ya vio qué faltó y da el problema por cerrado.
+// La misma acción desde los tres lugares donde se ve el problema: "Marcar como
+// procesada" en EN REVISIÓN y en el resumen de fin de llenado (de ahí sale la
+// factura) y "Revisada" en el renglón de PROCESADAS, donde ya está y lo que se
+// apaga es el aviso. En los tres el operador ya vio qué faltó y da el problema
+// por cerrado.
 async function marcarFacturaRevisada(pedido_id, parte) {
   const listo = avisarTrabajando("Marcando la factura como revisada…");
   try {
@@ -7956,6 +7990,16 @@ function pintarBotonMotivo() {
 function volverAFacturar(pedido_id, parte) {
   if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
   abrirMotivo("refacturar", pedido_id, [parte]);
+}
+
+// Reintentar una factura que cerró con líneas de menos: reabre SIN preguntar
+// el motivo (2026-08-01, pedido del usuario). El porqué ya está registrado —
+// el robot dijo qué línea no entró y por qué—, así que preguntarlo era pedir
+// dos veces el mismo dato; ese mismo hecho queda como traza de la reemisión.
+// Es lo mismo que hace el resumen de fin de llenado (volverALlenarDesdeResumen).
+function reintentarOmitidas(pedido_id, parte) {
+  if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
+  reabrirYPrellenar(pedido_id, parte, "Faltaron líneas en el documento");
 }
 
 function descartar(pedido_id, parte) {
