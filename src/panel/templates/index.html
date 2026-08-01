@@ -1255,8 +1255,10 @@
   /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
      las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
      la lista ni a cancelar la corrida. */
-  #previo-avisos .previo-acciones { display:flex; flex-wrap:wrap; gap:8px; margin-top:7px; }
-  #previo-avisos .previo-acciones button { padding:3px 10px; font-size:12.5px; }
+  #previo-avisos .previo-acciones,
+  #detalle-avisos .previo-acciones { display:flex; flex-wrap:wrap; gap:8px; margin-top:7px; }
+  #previo-avisos .previo-acciones button,
+  #detalle-avisos .previo-acciones button { padding:3px 10px; font-size:12.5px; }
   #previo-resumen { font-size:13px; margin:0 0 6px; }
   /* La lista crece con el lote (una corrida de ruta completa pasa de 40
      facturas): scrollea por dentro para que la botonera nunca quede fuera de
@@ -6305,7 +6307,7 @@ function fijoDetalle(clave) {
                    cajitaImpresion(), cajitaEmpresa(), babyMixControl("detalle")].join("");
   return cabecera
     + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
-    + `<div id="detalle-avisos">${htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))}</div>`;
+    + `<div id="detalle-avisos">${htmlAvisosDetalle(clave)}</div>`;
 }
 
 // El pedido y su factura van en el título, y el cliente con el contexto en la
@@ -9199,10 +9201,89 @@ function avisosPuestaAPunto(n) {
 const htmlAvisosPuestaAPunto = (avisos) =>
   avisos.map(t => `<div class="pap-ojo">${esc(t)}</div>`).join("");
 
+// --- El pedido no es del día anterior (2026-08-01, pedido del usuario) -------
+// Un pedido se factura al día SIGUIENTE de su orden de salida: llenando para
+// hoy, el pedido es de ayer; para mañana, de hoy. Cuando no calza no se bloquea
+// nada —se recupera un pedido de días atrás, se factura con retraso— pero se
+// dice antes de llenar, porque el documento sale con la fecha a facturar y no
+// con la del pedido. La corrección va en el propio aviso, que es lo que este
+// dato tiene de distinto respecto a la serie o la tasa: no hay nada que
+// escribir, solo mover la fecha al día que le toca a ese pedido.
+const diaAntesDe = (iso) => {
+  const d = calDesdeISO(iso);
+  if (!d) return "";
+  d.setDate(d.getDate() - 1);
+  return calISO(d);
+};
+const diaDespuesDe = (iso) => {
+  const d = calDesdeISO(iso);
+  if (!d) return "";
+  d.setDate(d.getDate() + 1);
+  return calISO(d);
+};
+
+// "dd/mm", con el año pegado solo cuando no es el de la fecha a facturar: un
+// pedido de otro año en dd/mm se leería como uno de este.
+const fechaCortaDelAviso = (iso, isoFacturar) =>
+  iso.slice(0, 4) === isoFacturar.slice(0, 4)
+    ? dmaCorto(iso) : iso.split("-").reverse().join("/");
+
+function avisoFechaDelPedido(facturas) {
+  const isoFacturar = $("f-fecha-facturar").value;
+  // Sin fecha puesta no hay contra qué comparar; y saltando la puesta a punto
+  // de la fecha el asistente no la toca, así que el documento no sale con esta.
+  if (!isoFacturar || saltandoPuestaAPunto("fecha")) return "";
+  const esperada = diaAntesDe(isoFacturar);
+  // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
+  const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
+                         .filter(Boolean);
+  const desfasadas = fechas.filter(f => f !== esperada);
+  if (!desfasadas.length) return "";
+  const distintas = [...new Set(desfasadas)].sort();
+  const corta = (iso) => fechaCortaDelAviso(iso, isoFacturar);
+  // Cuatro fechas o más no se enumeran: la lista se vuelve ilegible y lo que
+  // hay que saber es que son de días que no corresponden, no cuáles.
+  const listadas = distintas.map(corta);
+  const dias = listadas.length > 3
+    ? `de ${listadas.length} días distintos`
+    : "del " + listadas.slice(0, -1).join(", ")
+      + (listadas.length > 1 ? " y el " : "") + listadas[listadas.length - 1];
+  const todas = desfasadas.length === fechas.length;
+  const hecho = todas
+    ? (fechas.length === 1
+        ? `El pedido es ${dias}`
+        : `Las ${fechas.length} facturas son de pedidos ${dias}`)
+    : `${desfasadas.length} de las ${fechas.length} facturas son de pedidos ${dias}`;
+  const unaSola = fechas.length === 1;
+  // El botón solo cuando mover la fecha arregla TODAS: con parte del lote en
+  // regla, correrla dejaría fuera de sitio a las que estaban bien.
+  const salida = (todas && distintas.length === 1)
+    ? `<div class="previo-acciones"><button title="Mueve la Fecha a facturar al `
+      + `día siguiente del pedido. La tasa vuelve a la que corresponda a ese día."
+         onclick="cajitaFechaElegida('${esc(diaDespuesDe(distintas[0]))}')">Facturar `
+      + `para el ${esc(corta(diaDespuesDe(distintas[0])))}</button></div>`
+    : "";
+  return `<div class="pap-ojo">${esc(hecho)}, y se factura para el ${
+      esc(corta(isoFacturar))}: lo normal es facturar al día siguiente del `
+    + `pedido, el ${esc(corta(esperada))}. ${
+        unaSola ? "Se llena igual: el documento sale"
+                : "Se llenan igual: los documentos salen"} con la fecha de `
+    + `arriba.${salida}</div>`;
+}
+
 function pintarPrevioAvisos() {
   $("previo-avisos").innerHTML =
     htmlAvisosPuestaAPunto(avisosPuestaAPunto(previoCola.length))
+    + avisoFechaDelPedido(previoCola.map(c => filaDeFactura(c.pedido_id, c.parte)))
     + avisoFamiliaEstirada();
+}
+
+// Avisos de la ventana de una factura: los mismos de la puesta a punto más el
+// de su fecha, que necesita la fila (la cola del lote la trae por su cuenta).
+function htmlAvisosDetalle(clave) {
+  const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
+  return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
+       + avisoFechaDelPedido(fila ? [fila] : []);
 }
 
 // El div de avisos del detalle existe solo con la factura llenable (lo crea
@@ -9210,7 +9291,7 @@ function pintarPrevioAvisos() {
 // cajitas y perder el foco.
 function pintarDetalleAvisos() {
   const div = $("detalle-avisos");
-  if (div) div.innerHTML = htmlAvisosPuestaAPunto(avisosPuestaAPunto(1));
+  if (div) div.innerHTML = htmlAvisosDetalle(detalleAbierto);
 }
 
 // El pedido dividido que el corte partía por la mitad (2026-07-31, pedido del
