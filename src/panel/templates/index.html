@@ -22,11 +22,14 @@
 <link rel="alternate icon" href="/assets/icono.ico">
 <style>
   :root { --ok:#1a7f37; --err:#b42318; --warn:#b54708; --mut:#667085;
-    /* Cursor de "esto no responde" (2026-08-01): flecha normal de siempre +
-       una insignia chica de prohibido pegada abajo — como el dictado de
-       ChatGPT mientras transcribe, no el círculo tachado nativo del SO que
-       en Mac se come la flecha entera y hace parecer que el mouse desapareció. */
-    --cursor-prohibido: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj4KICA8cGF0aCBkPSJNNSAzIEw1IDIxIEw5LjUgMTcuNSBMMTIuOCAyNSBMMTYgMjMuNiBMMTIuOCAxNi4yIEwxOSAxNi4yIFoiIGZpbGw9IiMxZDI0MzMiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSIyMyIgY3k9IjIzIiByPSI3IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYzI2MjYiIHN0cm9rZS13aWR0aD0iMi4yIi8+CiAgPGxpbmUgeDE9IjE4LjYiIHkxPSIyNy40IiB4Mj0iMjcuNCIgeTI9IjE4LjYiIHN0cm9rZT0iI2RjMjYyNiIgc3Ryb2tlLXdpZHRoPSIyLjIiLz4KPC9zdmc+Cg==") 5 3, default; }
+    /* Cursor de "esto no responde" (2026-08-01): la flecha se queda flecha y
+       la insignia de prohibido va pegada abajo, como el dictado de ChatGPT
+       mientras transcribe — el círculo tachado nativo del SO reemplaza la
+       flecha entera y hace parecer que el mouse desapareció.
+       Flecha BLANCA con borde negro y sin la colita: las máquinas de operación
+       son Windows, cuyo puntero es blanco (el de Mac, negro, es solo el del
+       equipo de desarrollo). */
+    --cursor-prohibido: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48cGF0aCBkPSJNNSAzIEw1IDIxIEwxNi41IDE1LjUgWiIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPjxjaXJjbGUgY3g9IjIzIiBjeT0iMjMiIHI9IjciIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RjMjYyNiIgc3Ryb2tlLXdpZHRoPSIyLjIiLz48bGluZSB4MT0iMTguNiIgeTE9IjI3LjQiIHgyPSIyNy40IiB5Mj0iMTguNiIgc3Ryb2tlPSIjZGMyNjI2IiBzdHJva2Utd2lkdGg9IjIuMiIvPjwvc3ZnPgo=") 5 3, default; }
   * { box-sizing: border-box; }
   /* La app ocupa exactamente la ventana: cabecera, filtros y tabs quedan
      siempre visibles y el scroll vive DENTRO de las tablas (feedback
