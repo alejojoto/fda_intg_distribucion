@@ -1359,13 +1359,6 @@
   /* Cuatro salidas no caben en una fila de 480px: que envuelvan y queden
      alineadas a la derecha, con Parar de último. */
   #tasa-caja .editor-acciones { flex-wrap:wrap; }
-  /* Aviso de impresión (2026-07-22, pedido del usuario): antes era un modal
-     con "no volver a mostrar" que había que despachar en cada lote. Ahora es
-     un aviso en línea, del mismo estilo ámbar que el de la fecha/tasa
-     pendiente — informa sin frenar y sin nada que silenciar: aparece solo
-     mientras "Imprimir: sí" esté elegido. */
-  #enfila-imp-aviso { background:#fef0c7; color:#b54708; font-weight:600;
-                      padding:5px 9px; border-radius:6px; font-size:12.5px; }
   /* Calendario propio de los campos de fecha (2026-07-21) ------------------
      El calendario NATIVO del navegador se abre en una ventanita aparte que se
      queda con el teclado: mientras está abierto no se puede teclear la fecha.
@@ -1673,23 +1666,16 @@
     <div id="enfila-bloque" style="display:none" title="Llena la cantidad elegida una tras otra: cada documento se acepta al cerrar y sigue con el siguiente. Con Imprimir: sí se espera tu «Continuar» entre facturas.">
       <b class="rotulo">Llenar:</b>
       <select id="enfila-cantidad" onchange="fijarCantidad(this.value)"></select>
-      <span>Imprimir:
+      <!-- Un solo hover para las dos opciones (2026-08-01, pedido del
+           usuario): antes cada estado traía su propio aviso con su propio
+           hover, un aviso del aviso. Ahora lo que hay que saber de "sí" y de
+           "no" vive en este único title del campo. El día que el envío a
+           facturación se habilite (CONTRATOS.md 3.1 punto 2), este texto
+           cambia. -->
+      <span title="Sí: el programa espera tu confirmación «Continuar» por cada factura; hay que revisar cada impresión y el papel antes de seguir. No: no hay pausas entre pedido y pedido, no se imprime nada ni se espera tu confirmación entre uno y el siguiente; el envío a facturación queda por fuera, pero el pedido sí queda guardado y se puede ver luego con Consultar, en facturación.">Imprimir:
         <label><input type="radio" name="enfila-imp" value="si" onchange="cambioImpresionEnFila()"> sí</label>
         <label><input type="radio" name="enfila-imp" value="no" checked onchange="cambioImpresionEnFila()"> no</label>
       </span>
-      <!-- Aviso ámbar en línea, solo con "Imprimir: sí" (2026-07-22): sale y
-           se quita con el radio, sin confirmar nada. -->
-      <span id="enfila-imp-aviso" style="display:none"
-            title="El programa espera tu confirmación «Continuar» por cada factura; hay que revisar cada impresión y el papel antes de seguir.">Hay que controlar manualmente cada impresión.</span>
-      <!-- Nota gris del lado "no", pareja del aviso ámbar (repuesta 2026-07-26
-           a pedido del usuario; hover reescrito 2026-08-01, mismo pedido).
-           Nombra lo que el operador necesita saber de este lado: sin pausas
-           entre pedido y pedido, el envío a facturación NO lo hace el programa
-           (2026-07-27) y el pedido igual queda guardado, consultable después
-           en facturación. El día que el envío se habilite (CONTRATOS.md 3.1
-           punto 2), este texto cambia. -->
-      <span id="enfila-sinimp-nota" class="mut"
-            title="No hay pausas entre pedido y pedido: no se imprime nada ni se espera tu confirmación entre uno y el siguiente. El envío a facturación queda por fuera, pero el pedido sí queda guardado: se puede ver luego con Consultar, en facturación.">Se guardan pedidos seguidos, sin enviar a facturación</span>
       <button class="primario" id="btn-secuencia" onclick="lanzarEnFila()">Llenar en fila</button>
       <button class="peligro" id="btn-detener" onclick="detenerSecuencia()" style="display:none">Detener secuencia</button>
       <!-- Los botones Reintentar / Cancelar del fallo se mudaron a la barra
@@ -8379,13 +8365,7 @@ function acomodarCantidadAlModo() {
 
 function pintarCantidades() {
   acomodarCantidadAlModo();
-  const imp = imprimirEnFila();
   $("enfila-cantidad").innerHTML = opcionesCantidadHtml();
-  // Cada radio trae su nota, y solo se ve la del elegido (el aviso ámbar con
-  // "sí" desde 2026-07-22, cuando dejó de ser un modal que había que
-  // despachar; la nota gris con "no").
-  $("enfila-imp-aviso").style.display = imp ? "" : "none";
-  $("enfila-sinimp-nota").style.display = imp ? "none" : "";
   firmaCantidadesPintada = firmaCantidades();
 }
 
