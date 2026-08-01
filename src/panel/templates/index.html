@@ -1682,12 +1682,14 @@
       <span id="enfila-imp-aviso" style="display:none"
             title="El programa espera tu confirmación «Continuar» por cada factura; hay que revisar cada impresión y el papel antes de seguir.">Hay que controlar manualmente cada impresión.</span>
       <!-- Nota gris del lado "no", pareja del aviso ámbar (repuesta 2026-07-26
-           a pedido del usuario). Nombra las dos cosas que el operador necesita
-           saber de este lado: los pedidos se encadenan sin pausa y el envío a
-           facturación NO lo hace el programa (2026-07-27). El día que el envío
-           se habilite (CONTRATOS.md 3.1 punto 2), este texto cambia. -->
+           a pedido del usuario; hover reescrito 2026-08-01, mismo pedido).
+           Nombra lo que el operador necesita saber de este lado: sin pausas
+           entre pedido y pedido, el envío a facturación NO lo hace el programa
+           (2026-07-27) y el pedido igual queda guardado, consultable después
+           en facturación. El día que el envío se habilite (CONTRATOS.md 3.1
+           punto 2), este texto cambia. -->
       <span id="enfila-sinimp-nota" class="mut"
-            title="La corrida encadena sola: no se imprime nada ni se espera tu confirmación entre un pedido y el siguiente. El envío a facturación queda por fuera.">Se guardan pedidos seguidos, sin enviar a facturación</span>
+            title="No hay pausas entre pedido y pedido: no se imprime nada ni se espera tu confirmación entre uno y el siguiente. El envío a facturación queda por fuera, pero el pedido sí queda guardado: se puede ver luego con Consultar, en facturación.">Se guardan pedidos seguidos, sin enviar a facturación</span>
       <button class="primario" id="btn-secuencia" onclick="lanzarEnFila()">Llenar en fila</button>
       <button class="peligro" id="btn-detener" onclick="detenerSecuencia()" style="display:none">Detener secuencia</button>
       <!-- Los botones Reintentar / Cancelar del fallo se mudaron a la barra
@@ -8930,8 +8932,13 @@ const cajitaSerie = () => saltandoPuestaAPunto("serie")
                        serieSeleccionada)}</select>`,
       !serieSeleccionada);
 
+// Con "no" el hover explica qué pasa con lo que no se imprime (2026-08-01,
+// pedido del usuario): el documento igual queda guardado en el programa de
+// facturación y se busca después con su modo Consultar.
 const cajitaImpresion = () => cajitaEditable("Imprimir",
-  `<select class="cj-edit" onchange="cajitaImpresionElegida(this.value)">${
+  `<select class="cj-edit"${imprimirEnFila() ? "" :
+      ` title="${esc("Se guardan los pedidos: se pueden ver luego con Consultar, en el programa de facturación.")}"`
+    } onchange="cajitaImpresionElegida(this.value)">${
     cajitaOpciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
   imprimirEnFila());
 
