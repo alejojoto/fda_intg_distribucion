@@ -2147,7 +2147,7 @@
         aquí hasta volver a llenarla, descartarla o mandarla a procesadas.</p>
       <div class="tabla-scroll"><table id="t-llenados">
         <thead><tr>
-          <th>Pedido</th><th>Cliente</th><th>Fecha pedido</th><th>Ruta</th><th>Qué pasó</th><th></th>
+          <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué pasó</th><th></th>
         </tr></thead>
         <tbody></tbody>
       </table></div>
@@ -6807,7 +6807,7 @@ function pintarLlenadosPorRevisar(lista) {
     <tr${filaDetalle(f)}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
         ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
-      <td>${esc(f.razon_social || f.cliente_id || "")}</td>
+      <td>${celdaCliente(f)}</td>
       <td>${esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${esc(f.ruta || "")}</td>
       <td>${quePaso}${(f.tipo === "error" && detalle && ultimaReemision)
