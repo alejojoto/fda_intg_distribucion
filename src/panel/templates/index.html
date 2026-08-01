@@ -572,14 +572,30 @@
   #info-grupos .cajita { position:relative; }
   .cj-tip { display:none; position:absolute; bottom:calc(100% + 4px); left:0;
             z-index:30; background:#1d2433; color:#fff; border-radius:5px;
-            padding:6px 9px; font-size:12px; line-height:1.45;
-            pointer-events:none; overflow:hidden; max-width:420px; }
+            padding:6px 9px; font-size:12px; line-height:1.3;
+            pointer-events:none; overflow:hidden; max-width:536px; }
   .cj-tip.der { left:auto; right:0; }
   #info-grupos .cajita:hover > .cj-tip { display:block; }
+  /* Grupo cuyos productos NO caben en el hueco que hay sobre su cajita
+     (2026-08-01). El hover es HTML: no puede salirse de la caja flotante, y
+     sobre las cajitas solo quedan ~45 px = dos renglones. Se despega entonces
+     de su cajita y se planta arriba del todo (fixed), que es donde está el
+     alto libre; si aún así no alcanza, se parte en columnas de igual ancho
+     (1fr, no max-content: así ninguna columna se pierde por desbordar y el
+     nombre largo se recorta con su elipsis). Nunca baja del aviso de "no
+     muevas el mouse": el alto se recorta contra él. */
+  #info-grupos .cajita:hover > .cj-tip.multi { display:grid; }
+  .cj-tip.panel { position:fixed; top:8px; left:12px; bottom:auto; }
+  .cj-tip.multi { right:12px; grid-auto-flow:column; column-gap:14px;
+                  grid-auto-columns:minmax(0, 1fr); }
   .cj-tip .tp-fila { display:flex; gap:10px; white-space:nowrap; }
+  /* En columnas cada nombre pelea por su ancho: se aprieta lo accesorio. */
+  .cj-tip.multi .tp-fila { gap:6px; }
+  .cj-tip.multi .tp-cant, .cj-tip.multi .tp-pct { min-width:32px; }
   .cj-tip .tp-nom { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
   .cj-tip .tp-cant { min-width:40px; text-align:right; font-weight:600; }
   .cj-tip .tp-pct { min-width:40px; text-align:right; color:#6ee7b7; }
+  .cj-tip .tp-mas { color:var(--mut); font-style:italic; }
   /* RESUMEN DE FIN DE LLENADO (2026-08-01): terminado un llenado individual,
      la caja se convierte en el resumen del pedido — el chequeo de qué entró
      al documento, las líneas y los botones Listo / Volver a llenar. La caja
@@ -3023,6 +3039,25 @@ let avanceLlenado = null;
 // 10 → "10"; 7.5 → "7,5" (coma decimal, como se escribe aquí).
 const pctCorto = (n) => (Math.round(n * 100) / 100).toString().replace(".", ",");
 
+/* Cuántos productos entran en el hover de un grupo y en cuántas columnas
+   (2026-08-01). Se calcula con medidas fijas y no midiendo el hover: está en
+   display:none hasta que el mouse encima, y ahí no mide nada. */
+const ALTO_FILA_TIP = 16;      // 12 px de fuente × line-height 1.3, redondeado
+const ALTO_PADDING_TIP = 12;   // el padding 6px de arriba y el de abajo
+const MARGEN_TIP = 8;          // aire contra los bordes de la caja flotante
+const MAX_COLUMNAS_TIP = 4;    // por debajo de ~120 px de columna no se lee nada
+const renglonesQueCaben = (alto) =>
+  Math.max(1, Math.floor((alto - ALTO_PADDING_TIP) / ALTO_FILA_TIP));
+function repartoTip(productos, altoDisponible) {
+  const caben = renglonesQueCaben(altoDisponible);
+  const columnas = Math.min(MAX_COLUMNAS_TIP, Math.ceil(productos / caben));
+  // Repartidas parejo y no llenando la primera a tope: 9 productos con 4
+  // renglones libres salen 3+3+3, no 4+4+1. Con un grupo enorme (una factura
+  // entera de lo mismo) el cupo se queda corto: el llamador remata con un
+  // "+N más" en vez de recortar en silencio.
+  return {columnas, filas: Math.min(caben, Math.ceil(productos / columnas))};
+}
+
 function pintarInfoLlenado() {
   // ESCONDIDAS EN PRODUCCIÓN hasta que la sección quede lista (2026-07-29,
   // pedido del usuario). El gate vive aquí y no en pintarBarraEnFila porque
@@ -3058,10 +3093,13 @@ function pintarInfoLlenado() {
     const clases = ["cajita"];
     if (desc) clases.push("con-desc");
     if (g.nombre === av.grupo_actual) clases.push("actual");
+    // Sin un solo descuento en el grupo, la columna del % es una hilera de
+    // rayitas que le quita ancho al nombre del producto: no se pinta.
+    const conDescuento = (porGrupo[g.nombre] || []).some(l => l.descuento);
     const filasTip = (porGrupo[g.nombre] || []).map(l => `
       <div class="tp-fila"><span class="tp-nom">${esc(l.producto || l.codigo || "")}</span>
-        <span class="tp-cant">${fmtCantidad(l.cantidad)}</span>
-        <span class="tp-pct">${l.descuento ? `${pctCorto(l.descuento)}%` : "—"}</span></div>`).join("");
+        <span class="tp-cant">${fmtCantidad(l.cantidad)}</span>${!conDescuento ? "" : `
+        <span class="tp-pct">${l.descuento ? `${pctCorto(l.descuento)}%` : "—"}</span>`}</div>`).join("");
     return `<div class="${clases.join(" ")}">
       <span class="cj-rot">${esc(g.nombre)}</span>
       <span class="cj-val">${g.lineas}${
@@ -3069,13 +3107,46 @@ function pintarInfoLlenado() {
       ${filasTip ? `<div class="cj-tip">${filasTip}</div>` : ""}
     </div>`;
   }).join("");
-  // El hover se pinta hacia arriba y no puede salirse de la caja: a las
-  // cajitas de la mitad derecha se les alinea a su borde derecho, y el alto se
-  // recorta a lo que haya entre la fila y el borde superior de la ventana.
+  // Dónde cae el hover de cada grupo: pegado a su cajita mientras sus
+  // productos quepan en el hueco de arriba, y si no, plantado como panel en
+  // todo el ancho de la caja flotante (2026-08-01).
   $("info-grupos").querySelectorAll(".cj-tip").forEach(tip => {
     const r = tip.parentElement.getBoundingClientRect();
-    if (r.left + r.width / 2 > ANCHO_FLOTANTE / 2) tip.classList.add("der");
-    tip.style.maxHeight = Math.max(Math.round(r.top) - 10, 34) + "px";
+    const productos = tip.children.length;
+    const altoSobreLaCajita = Math.max(Math.round(r.top) - 10, 34);
+    if (productos <= renglonesQueCaben(altoSobreLaCajita)) {
+      // Caben todos pegados a su cajita: se deja donde estaba, y a las cajitas
+      // de la mitad derecha se les alinea por el borde derecho.
+      tip.style.maxHeight = altoSobreLaCajita + "px";
+      if (r.left + r.width / 2 > ANCHO_FLOTANTE / 2) tip.classList.add("der");
+      return;
+    }
+    // No caben: el hover se despega de la cajita y toma todo el alto libre de
+    // la caja flotante, sin pisar el aviso de "no muevas el mouse" (si está
+    // oculto, hasta el borde de abajo).
+    const rs = $("seguridad").getBoundingClientRect();
+    const tope = rs.height ? rs.top : window.innerHeight - MARGEN_TIP;
+    // El tope de la caja flotante también manda: si la ventana no llegó a
+    // encogerse (respaldo de Edge) el hueco es media pantalla, y la lista no
+    // tiene por qué estirarse tanto.
+    const alto = Math.max(altoSobreLaCajita,
+                          Math.min(Math.round(tope) - MARGEN_TIP * 2,
+                                   ALTO_CONTENIDO_FLOTANTE - MARGEN_TIP * 2));
+    tip.classList.add("panel");
+    tip.style.maxHeight = alto + "px";
+    const reparto = repartoTip(productos, alto);
+    if (reparto.columnas > 1) {
+      tip.classList.add("multi");
+      tip.style.gridTemplateRows = `repeat(${reparto.filas}, auto)`;
+    }
+    // Grupo tan grande que ni en columnas entra: se dice cuántos quedaron
+    // fuera, que es mejor que recortarlos sin avisar.
+    const cupo = reparto.columnas * reparto.filas;
+    if (productos > cupo) {
+      [...tip.children].slice(cupo - 1).forEach(fila => fila.remove());
+      tip.insertAdjacentHTML("beforeend",
+        `<div class="tp-fila tp-mas">+${productos - cupo + 1} más</div>`);
+    }
   });
 }
 
