@@ -3578,6 +3578,12 @@ function volverALlenarDesdeResumen() {
   const hayOmitidas = Object.keys(omitidas || {}).length > 0;
   terminarEsperaEnvioPlataforma();
   mensaje("", "");   // apaga el modo llenado: el prellenado vive en el panel completo
+  // Llenada en prueba que sigue PENDIENTE (sin registro): no hay documento
+  // cerrado que reabrir — su prellenado se abre directo, y el candado de "ya
+  // se llenó en esta sesión" hace su pregunta al dar Llenar.
+  const pendiente = (ultimaLista.pendientes || [])
+    .find(x => x.pedido_id === pedido_id && x.parte === parte);
+  if (pendiente) { abrirDetalle(pedido_id, parte, pendiente.tiene_detalle === false); return; }
   if (hayOmitidas) reabrirYPrellenar(pedido_id, parte, "Faltaron líneas en el documento");
   else volverAFacturar(pedido_id, parte);
 }
@@ -7416,15 +7422,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // solo ahora.
       const huboOmitidas = r.lineas_omitidas && Object.keys(r.lineas_omitidas).length > 0;
       // Resumen de fin de llenado (2026-08-01, reemplaza a la espera pelada
-      // del 2026-07-28): solo en producción, solo en llenado individual y
-      // solo si el documento quedó EN PANTALLA (r.cierre null) — si el paso
-      // de cierre ya lo canceló o lo aceptó no hay nada que revisar ni
-      // enviar. La caja queda a la derecha hasta que el operador pulse Listo
-      // o Volver a llenar.
-      const entraResumen = !secuenciaActiva && !r.cierre && !enFilaDisponible();
+      // del 2026-07-28): en TODO llenado individual con éxito — el gate de
+      // solo-producción de la espera vieja dejaba el resumen invisible en la
+      // máquina de pruebas (segunda vuelta del mismo día, reporte del
+      // usuario). La caja queda a la derecha hasta que el operador pulse
+      // Listo o Volver a llenar; en corrida no aparece (la fila encadena).
+      const entraResumen = !secuenciaActiva;
       if (huboOmitidas) {
         // En el resumen las omitidas ya se ven ahí mismo, con su salida: el
-        // modal aparte queda para la corrida y las máquinas con fila.
+        // modal aparte queda solo para la corrida.
         if (!entraResumen)
           abrirLineasOmitidas(pedido_id, parte, r.lineas_omitidas, r.lineas_llenadas, r.lineas_pedidas);
         // La factura quedó en "Llenados por revisar" (EN REVISIÓN): al cerrar
@@ -7434,7 +7440,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       if (entraResumen)
         esperarEnvioPlataforma(textoExito, tipoExito,
           {pedido_id, parte, omitidas: r.lineas_omitidas || {},
-           llenadas: r.lineas_llenadas, pedidas: r.lineas_pedidas});
+           llenadas: r.lineas_llenadas, pedidas: r.lineas_pedidas,
+           // Documento EN PANTALLA (producción: r.cierre null) = falta
+           // enviarlo a la plataforma; aceptado o cancelado por el paso de
+           // cierre, no hay nada que enviar.
+           enPantalla: !r.cierre});
       // Encadenado (CONTRATOS.md 3.1 punto 3, act. 2026-07-29): la corrida
       // encadena porque el paso de cierre del backend dejó la Ficha libre
       // (documento Aceptado). Con Imprimir: sí, la pausa «Continuar»
@@ -8412,8 +8422,11 @@ function esperarEnvioPlataforma(texto, tipo, factura) {
   resumenFinal = {...factura,
                   lineas: (ultimoAvanceLlenado && ultimoAvanceLlenado.lineas) || []};
   // Sin spinner (mismo criterio que la espera del login): el programa no está
-  // trabajando, está esperando al operador.
-  mensaje(`${texto} Envíala a la plataforma de facturación.`, tipo, false);
+  // trabajando, está esperando al operador. La instrucción de envío solo con
+  // el documento en pantalla — cerrado por el paso de prueba, no hay qué enviar.
+  mensaje(factura.enPantalla
+            ? `${texto} Envíala a la plataforma de facturación.` : texto,
+          tipo, false);
   document.body.classList.add("modo-fin-llenado");
   pintarResumenFinal();
   plantarVentanaResumen();
