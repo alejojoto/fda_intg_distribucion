@@ -23,13 +23,16 @@
 <style>
   :root { --ok:#1a7f37; --err:#b42318; --warn:#b54708; --mut:#667085;
     /* Cursor de "esto no responde" (2026-08-01): la flecha se queda flecha y
-       la insignia de prohibido va pegada abajo, como el dictado de ChatGPT
-       mientras transcribe — el círculo tachado nativo del SO reemplaza la
-       flecha entera y hace parecer que el mouse desapareció.
-       Flecha BLANCA con borde negro y sin la colita: las máquinas de operación
-       son Windows, cuyo puntero es blanco (el de Mac, negro, es solo el del
-       equipo de desarrollo). */
-    --cursor-prohibido: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48cGF0aCBkPSJNNSAzIEw1IDIxIEwxNi41IDE1LjUgWiIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPjxjaXJjbGUgY3g9IjIzIiBjeT0iMjMiIHI9IjciIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RjMjYyNiIgc3Ryb2tlLXdpZHRoPSIyLjIiLz48bGluZSB4MT0iMTguNiIgeTE9IjI3LjQiIHgyPSIyNy40IiB5Mj0iMTguNiIgc3Ryb2tlPSIjZGMyNjI2IiBzdHJva2Utd2lkdGg9IjIuMiIvPjwvc3ZnPgo=") 5 3, default; }
+       la insignia de prohibido va pegada abajo, como el cursor que muestra
+       ChatGPT mientras transcribe un dictado. El círculo tachado nativo del SO
+       (`not-allowed`, y también `no-drop`, que en Windows se dibuja igual)
+       reemplaza la flecha entera y hace parecer que el mouse desapareció.
+       El dibujo no es propio: es el ícono `mouse-pointer-ban` de Lucide
+       (lucide.dev, licencia ISC) — la silueta del cursor SIN la colita, con su
+       quiebre y todo, más el círculo. Se le agrega relleno blanco con borde
+       negro, que es el puntero de Windows (las máquinas de operación), y se lo
+       rota para dejar el borde izquierdo vertical: el ícono viene inclinado. */
+    --cursor-prohibido: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg1LDMpIHNjYWxlKDEuODMpIHRyYW5zbGF0ZSgtMi4zNiwtMi4zNikgcm90YXRlKDE4LjggMi4zNiAyLjM2KSI+PHBhdGggZD0iTTIuMDM0IDIuNjgxYS40OTguNDk4IDAgMCAxIC42NDctLjY0N2w5IDMuNWEuNS41IDAgMCAxLS4wMzMuOTQ0TDguMjA0IDcuNTQ1YTEgMSAwIDAgMC0uNjYuNjZsLTEuMDY2IDMuNDQzYS41LjUgMCAwIDEtLjk0NC4wMzN6IiBmaWxsPSIjZmZmIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iLjgyIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9nPjxjaXJjbGUgY3g9IjIzIiBjeT0iMjMiIHI9IjciIGZpbGw9IiNmZmYiIHN0cm9rZT0iI2RjMjYyNiIgc3Ryb2tlLXdpZHRoPSIyLjMzIi8+PHBhdGggZD0ibTE4LjEgMTguMSA5LjggOS44IiBzdHJva2U9IiNkYzI2MjYiIHN0cm9rZS13aWR0aD0iMi4zMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+Cg==") 5 3, default; }
   * { box-sizing: border-box; }
   /* La app ocupa exactamente la ventana: cabecera, filtros y tabs quedan
      siempre visibles y el scroll vive DENTRO de las tablas (feedback
