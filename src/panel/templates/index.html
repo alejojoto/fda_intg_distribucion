@@ -6741,9 +6741,15 @@ function falloHace(fechaCargado) {
 // Una entrada NUEVA (llegó sola de la app de pedidos y nadie ha dicho qué es)
 // no se "crea": se clasifica. Es el mismo formulario y el mismo guardado que
 // desde AJUSTES — las dos rutas terminan en el mismo sitio (2026-07-29).
-const botonCrearCliente = (p, i) =>
-  `<button class="acento" onclick="crearClienteDesdeRevision(${i})">${
-    p.entrada_nueva ? "Clasificar cliente" : "Crear cliente"}</button>`;
+// Las acciones que ABREN un formulario se declaran aparte de las que tienen
+// efecto (2026-08-01): la fila entera dispara la de apertura cuando es la única
+// de esa fila, igual que en las demás listas del panel. Una acción con efecto
+// —"Ya está creado" marca el cruce— nunca se dispara por pulsar el renglón.
+const aperturaCliente = (p, i) => ({
+  llamada: `crearClienteDesdeRevision(${i})`,
+  etiqueta: p.entrada_nueva ? "Clasificar cliente" : "Crear cliente",
+  que: p.entrada_nueva ? "clasificar el cliente" : "crear el cliente",
+});
 
 const CASOS_REVISION = [
   // El programa de facturación rechazó el código con el llenado ya empezado
@@ -6756,8 +6762,9 @@ const CASOS_REVISION = [
       + `«Ya está creado»; si el código está mal, corrígelo.`,
     botones: (p, i) => [
       `<button class="acento" onclick="marcarCruceCreado(${i})">Ya está creado</button>`,
-      `<button onclick="crearClienteDesdeRevision(${i})">Corregir el código</button>`,
     ],
+    aperturas: (p, i) => [{llamada: `crearClienteDesdeRevision(${i})`,
+                           etiqueta: "Corregir el código", que: "corregir el código"}],
   },
   {
     prefijo: "Cliente sin conversión",
@@ -6766,7 +6773,7 @@ const CASOS_REVISION = [
       ? "Cliente nuevo de la app de pedidos: falta decir si es un cliente "
         + "independiente o la sucursal de otro"
       : "El cliente no está en el catálogo de facturación — se resuelve con 'Crear cliente'",
-    botones: (p, i) => [botonCrearCliente(p, i)],
+    aperturas: (p, i) => [aperturaCliente(p, i)],
   },
   {
     prefijo: "Cliente_id",
@@ -6775,7 +6782,7 @@ const CASOS_REVISION = [
       ? "Cliente nuevo de la app de pedidos: falta decir si es un cliente "
         + "independiente o la sucursal de otro"
       : "Código de cliente sin forma RIF_sucursal — se resuelve con 'Crear cliente'",
-    botones: (p, i) => [botonCrearCliente(p, i)],
+    aperturas: (p, i) => [aperturaCliente(p, i)],
   },
   {
     prefijo: "Producto(s) sin artículo",
@@ -6785,11 +6792,13 @@ const CASOS_REVISION = [
       || "<b>Producto</b>",
     detalle: "Sin artículo de facturación para ese producto — se crea primero en " +
              "el programa de facturación y después se registra aquí con 'Crear producto'",
-    botones: (p, i) => (p.productos_sin_articulo || []).map((pr, j) =>
-      `<button class="acento" title="${esc(pr.descripcion || pr.pt_id)}"
-        onclick="crearProductoDesdeRevision(${i},${j})">Crear producto${
-        p.productos_sin_articulo.length > 1
-          ? ` ${j + 1} de ${p.productos_sin_articulo.length}` : ""}</button>`),
+    aperturas: (p, i) => (p.productos_sin_articulo || []).map((pr, j) => ({
+      llamada: `crearProductoDesdeRevision(${i},${j})`,
+      etiqueta: `Crear producto${p.productos_sin_articulo.length > 1
+        ? ` ${j + 1} de ${p.productos_sin_articulo.length}` : ""}`,
+      que: "crear el producto",
+      titulo: pr.descripcion || pr.pt_id,
+    })),
   },
   {
     prefijo: "Pedido con campo de error",
@@ -6923,26 +6932,52 @@ let listaRevisionVisible = [];   // página visible, para Crear cliente/producto
 
 function pintarRevision(lista) {
   listaRevisionVisible = lista;
-  $("t-revision").querySelector("tbody").innerHTML = lista.map((p, i) => `
-    <tr>
+  $("t-revision").querySelector("tbody").innerHTML = lista.map((p, i) => {
+    // La fila entera abre el formulario que resuelve el caso, como en las demás
+    // listas del panel (2026-08-01). Solo cuando hay UNA sola apertura: con
+    // varias (un pedido con dos productos por crear) no hay "la" acción de la
+    // fila, y ahí manda el botón de cada una.
+    const abre = aperturasRevision(p, i);
+    const clic = abre.length === 1
+      ? ` class="abre-editor" title="Clic para ${abre[0].que}" onclick="${abre[0].llamada}"`
+      : "";
+    return `
+    <tr${clic}>
       <td>${esc(p.pedido_id)}</td>
       <td>${esc(p.razon_social || p.cliente_id)}${p.razon_social
             ? `<div class="mut">${esc(p.cliente_id)}</div>` : ""}</td>
       <td>${esc((p.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${p.motivos.map(m => casoDeMotivo(m)?.objeto(p) ?? "—").join("<br>")}</td>
       <td>${p.motivos.map(m => esc(detalleDeMotivo(m, p))).join("<br>")}</td>
-      <td style="white-space:nowrap">${botonesRevision(p, i)}</td>
-    </tr>`).join("")
+      <td${CELDA_ACCIONES}>${botonesRevision(p, i, abre)}</td>
+    </tr>`;
+  }).join("")
     || `<tr><td colspan="6" class="mut">Nada en revisión.</td></tr>`;
 }
 
-// Junta los botones de todos los motivos de la fila, sin repetir (los dos
-// motivos de cliente pueden co-ocurrir y ambos resuelven con el mismo botón).
-function botonesRevision(p, i) {
+// Aperturas de todos los motivos de la fila, sin repetir (los dos motivos de
+// cliente pueden co-ocurrir y ambos resuelven con el mismo formulario).
+function aperturasRevision(p, i) {
+  const abre = [];
+  for (const m of p.motivos)
+    for (const a of casoDeMotivo(m)?.aperturas?.(p, i) || [])
+      if (!abre.some(x => x.llamada === a.llamada)) abre.push(a);
+  return abre;
+}
+
+// Los botones de la fila: primero los que tienen efecto, después los que abren
+// un formulario. El botón de apertura se conserva aunque la fila ya abra sola:
+// es lo que nombra la acción (crear un cliente y crear un producto no se
+// adivinan del renglón), y con varias aperturas es la única forma de elegir.
+function botonesRevision(p, i, abre) {
   const botones = [];
   for (const m of p.motivos)
     for (const b of casoDeMotivo(m)?.botones?.(p, i) || [])
       if (!botones.includes(b)) botones.push(b);
+  for (const a of abre || aperturasRevision(p, i))
+    botones.push(`<button${botones.length ? "" : ' class="acento"'}${
+      a.titulo ? ` title="${esc(a.titulo)}"` : ""} onclick="${a.llamada}">${
+      esc(a.etiqueta)}</button>`);
   return botones.join("<br>");
 }
 
