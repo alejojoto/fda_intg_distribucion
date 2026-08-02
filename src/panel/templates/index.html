@@ -1000,7 +1000,6 @@
                          display:flex; align-items:center; justify-content:center; }
   .choque-mover button:hover { background:#eef1f5; color:#1d2433; }
   .desc-fila-pct { display:flex; gap:14px; align-items:center; flex-wrap:wrap; color:var(--mut); }
-  .desc-fila-pct input[type=number] { width:74px; }
   .desc-radios { display:flex; gap:14px; flex-wrap:wrap; color:#1d2433; font-size:13px; margin:2px 0 8px; }
   .desc-radios label { display:flex; gap:5px; align-items:center; cursor:pointer; }
   .desc-chips { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0; }
@@ -1084,8 +1083,18 @@
   /* El porcentaje en verde (descuento = ahorro). Solo color de letra: nada de
      sombras/animaciones (liviano en RAM). Vacío se ve gris por su placeholder;
      lleno, verde. */
-  #desc-pct { color:#15803d; font-weight:700; }
+  /* box-shadow:none anula el ambar/verde genérico de .campo-obligatorio
+     input[type=text] (2026-08-02, efecto colateral de dejar de ser
+     type=number): el campo ya tiene su propia marca "obligatorio" (que se
+     oculta sola sin "Todos los productos") — no hace falta duplicarla, y
+     mostrar ámbar cuando NO es obligatorio confundiría. */
+  #desc-pct { color:#15803d; font-weight:700; width:74px; box-shadow:none; }
   .desc-pct-inp:not(:placeholder-shown) { color:#15803d; font-weight:600; }
+  /* Porcentaje inválido (2026-08-02): no se corrige solo (ni se clampea a
+     0-100 ni se limpia el texto) — se marca en rojo, mismo lenguaje visual
+     que campo-obligatorio (franja a la izquierda), hasta que se corrija. */
+  #desc-pct.pct-invalido, .desc-pct-inp.pct-invalido, .det-pct.pct-invalido {
+    box-shadow: inset 3px 0 0 var(--err); color: var(--err); }
   /* Check "Todos los clientes": la lista específica se OCULTA mientras está
      activo (en vez de mostrarse atenuada), ver descPintarClientes. */
   .desc-todos { display:flex; align-items:center; gap:7px; font-size:13.5px;
@@ -1127,15 +1136,19 @@
   .desc-subtab.st-proximas  { background:#e8f1fd; border-color:#c3dbf7; color:#1d4ed8; }
   .desc-subtab.st-historico { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
   .desc-subtab.st-revisar   { background:#fdf3e3; border-color:#f3ddb0; color:#b45309; }
+  /* Prueba: mismo morado de .card-prueba — pestaña propia, solo visible en modo admin */
+  .desc-subtab.st-prueba    { background:#f3e8ff; border-color:#d8b4fe; color:#6b21a8; }
   .desc-subtab.st-vigentes:hover  { background:#dcf0e5; }
   .desc-subtab.st-proximas:hover  { background:#dbe9fb; }
   .desc-subtab.st-historico:hover { background:#e4e8ee; }
   .desc-subtab.st-revisar:hover   { background:#faeacf; }
+  .desc-subtab.st-prueba:hover    { background:#ead9fd; }
   /* Estado activo: el mismo color, ahora sólido */
   .desc-subtab.activa.st-vigentes  { background:#16a34a; border-color:#16a34a; color:#fff; }
   .desc-subtab.activa.st-proximas  { background:#2563eb; border-color:#2563eb; color:#fff; }
   .desc-subtab.activa.st-historico { background:#64748b; border-color:#64748b; color:#fff; }
   .desc-subtab.activa.st-revisar   { background:#d97706; border-color:#d97706; color:#fff; }
+  .desc-subtab.activa.st-prueba    { background:#7e22ce; border-color:#7e22ce; color:#fff; }
   /* Subtabs de EN REVISIÓN (2026-07-31): rojo para los llenados que no
      terminaron perfectos (se actúa ya), verde azulado para los pedidos sin
      datos (esperan, no urgen). */
@@ -1335,6 +1348,16 @@
                                     margin:0 0 10px; }
   .pap-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
              padding:8px 10px; font-size:13px; line-height:1.45; }
+  /* Aviso con triángulo propio (2026-08-02): el desfase de fecha del pedido es
+     fácil de pasar por alto entre el resto de avisos, así que lleva un ícono
+     que no tienen los demás .pap-ojo. */
+  .pap-ojo-alerta { display:flex; align-items:stretch; gap:10px; }
+  /* El triángulo llena el alto de la caja SIN empujarlo: va absoluto dentro de
+     una columna de ancho fijo, así el alto lo manda el texto y no al revés (un
+     SVG en el flujo no tiene tamaño intrínseco y se estira a 300px). */
+  .pap-ojo-tri-col { flex:0 0 46px; position:relative; }
+  .pap-ojo-triangulo { position:absolute; inset:0; width:100%; height:100%;
+                       color:#d92d20; }
   /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
      las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
      la lista ni a cancelar la corrida. */
@@ -2388,7 +2411,7 @@
           <div class="desc-fila-pct" style="margin-bottom:2px">
             <label class="desc-todos" style="margin:0"><input type="checkbox" id="desc-prod-todos" onclick="descAlcanceCambio()"> Todos los productos (sin kilos)</label>
             <label style="display:flex; align-items:center; gap:5px; margin:0">
-              <input type="number" id="desc-pct" min="0" max="100" step="0.5"> %
+              <input type="text" inputmode="decimal" id="desc-pct" oninput="pctValidar(this)"> %
             </label>
           </div>
           <p class="mut" id="desc-alcance-nota" style="margin:0"></p>
@@ -2800,17 +2823,51 @@ window.addEventListener("unhandledrejection", e =>
   reportarAlPanel({tipo: "promesa", detalle: String(e.reason).slice(0, 2000)}));
 
 // Un <input type="number"> enfocado cambia de valor al rodar el mouse encima
-// (comportamiento nativo del navegador) — pasa en el % de descuentos, en la
-// cantidad/porcentaje del detalle de pre-llenado, y en cualquier campo
-// numérico que se agregue después. Quitarle el foco (blur) durante el propio
-// evento no alcanza: Chrome ya decidió incrementar el valor antes de que
-// nuestro listener corra. Hace falta cancelar el evento con preventDefault
-// (por eso passive:false), y solo mientras el input está enfocado — así el
-// scroll normal de la página/modal sigue intacto en cualquier otro momento.
+// (comportamiento nativo del navegador) — pasa en la cantidad del detalle de
+// pre-llenado y en cualquier campo numérico que se agregue después (los % de
+// descuento ya no son type=number, ver pctEsValido más abajo). Quitarle el
+// foco (blur) durante el propio evento no alcanza: Chrome ya decidió
+// incrementar el valor antes de que nuestro listener corra. Hace falta
+// cancelar el evento con preventDefault (por eso passive:false), y solo
+// mientras el input está enfocado — así el scroll normal de la página/modal
+// sigue intacto en cualquier otro momento.
 document.addEventListener("wheel", (ev) => {
   const el = document.activeElement;
   if (el && el.tagName === "INPUT" && el.type === "number") ev.preventDefault();
 }, { passive: false });
+
+// Porcentaje de descuento (0-100, punto o coma decimal — mismo formato que ya
+// se admitía con el spinner nativo): campos de texto en vez de number para
+// que no salgan flechas ni el scroll/las flechas del teclado cambien el valor
+// solo. Un valor fuera de rango o con texto raro NO se corrige ni se limpia
+// solo — se marca inválido (borde rojo, pct-invalido) y quien llama a
+// pctValidar/pctEsValido decide no aplicarlo hasta que se corrija.
+const PCT_FORMATO_RE = /^\d{1,3}([.,]\d+)?$/;
+function pctEsValido(texto) {
+  const t = (texto ?? "").trim();
+  if (t === "") return true;   // vacío es válido: sin ajuste / sin descuento
+  if (!PCT_FORMATO_RE.test(t)) return false;
+  const n = Number(t.replace(",", "."));
+  return Number.isFinite(n) && n >= 0 && n <= 100;
+}
+// Número real de lo tecleado (acepta coma o punto); null si está vacío. Se
+// asume ya validado con pctEsValido antes de llamarla.
+function pctNumero(texto) {
+  const t = (texto ?? "").trim();
+  return t === "" ? null : Number(t.replace(",", "."));
+}
+// Pinta el estado inválido en el campo mismo (borde rojo + tooltip) sin tocar
+// lo que el operador escribió, conservando el title original del campo (si
+// tenía uno con instrucciones propias). Devuelve si el valor es válido.
+function pctValidar(input) {
+  if (input.dataset.tituloBase === undefined) input.dataset.tituloBase = input.title || "";
+  const ok = pctEsValido(input.value);
+  input.classList.toggle("pct-invalido", !ok);
+  input.title = ok ? input.dataset.tituloBase
+    : (input.dataset.tituloBase ? input.dataset.tituloBase + " — " : "")
+      + "Escribe un porcentaje entre 0 y 100 (punto o coma para los decimales).";
+  return ok;
+}
 
 // Estado del frontend (el backend además tiene su propio lock de llenado).
 // Desde 2026-07-19 no hay paso de confirmación: el llenado exitoso deja la
@@ -6828,7 +6885,8 @@ function filaLineaDetalle(d, l) {
         ${despachoViejo}
       </td>
       <td>
-        <input type="number" class="det-pct" min="0" max="100" step="any" value="${l.descuento_pct}"
+        <input type="text" inputmode="decimal" class="det-pct" value="${l.descuento_pct}"
+               oninput="pctValidar(this)"
                onchange="ajustarDescuento(this,${ref})"
                onkeydown="if(event.key==='Enter')this.blur()"> %
         ${ajuste.descuento_pct !== undefined && ajuste.descuento_pct !== null
@@ -6878,12 +6936,13 @@ function ajustarCantidad(input, pedidoId, parte, codigo) {
 }
 
 function ajustarDescuento(input, pedidoId, parte, codigo) {
+  if (!pctValidar(input)) return;   // inválido: no se manda al servidor hasta corregirlo
   const valor = input.value.trim();
   const linea = lineaDeDetalle(pedidoId, parte, codigo);
-  if (valor !== "" && linea && Number(valor) === linea.descuento_automatico_pct)
+  if (valor !== "" && linea && pctNumero(valor) === linea.descuento_automatico_pct)
     return guardarAjuste(pedidoId, parte, codigo, {descuento_pct: null});
   guardarAjuste(pedidoId, parte, codigo,
-                {descuento_pct: valor === "" ? null : Number(valor)});
+                {descuento_pct: valor === "" ? null : pctNumero(valor)});
 }
 
 function elegirCantidad(pedidoId, parte, codigo, cual, valor) {
@@ -9783,11 +9842,21 @@ const fechaCortaDelAviso = (iso, isoFacturar) =>
   iso.slice(0, 4) === isoFacturar.slice(0, 4)
     ? dmaCorto(iso) : iso.split("-").reverse().join("/");
 
+// SVG y no el carácter "⚠": el glifo se escala con el font-size y no puede
+// crecer hasta el alto de la caja, que es lo que se pidió (2026-08-02).
+const TRIANGULO_ALERTA =
+  `<svg class="pap-ojo-triangulo" viewBox="0 0 24 24" aria-hidden="true">`
+  + `<path fill="currentColor" fill-rule="evenodd" d="M12.87 2.51a1 1 0 0 0-1.74 0`
+  + `L.62 20.99A1 1 0 0 0 1.49 22.5h21.02a1 1 0 0 0 .87-1.51L12.87 2.51ZM11 9h2v6h-2`
+  + `V9Zm0 8h2v2h-2v-2Z"/></svg>`;
+
 function avisoFechaDelPedido(facturas) {
   const isoFacturar = $("f-fecha-facturar").value;
-  // Sin fecha puesta no hay contra qué comparar; y saltando la puesta a punto
-  // de la fecha el asistente no la toca, así que el documento no sale con esta.
-  if (!isoFacturar || saltandoPuestaAPunto("fecha")) return "";
+  // Sin fecha puesta no hay contra qué comparar. Saltando la puesta a punto de
+  // la fecha el aviso SIGUE saliendo (2026-08-02, pedido del usuario: tiene que
+  // verse igual con el modo admin prendido y apagado); lo que cambia es el
+  // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
+  if (!isoFacturar) return "";
   const esperada = diaAntesDe(isoFacturar);
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
@@ -9818,12 +9887,17 @@ function avisoFechaDelPedido(facturas) {
          onclick="cajitaFechaElegida('${esc(diaDespuesDe(distintas[0]))}')">Facturar `
       + `para el ${esc(corta(diaDespuesDe(distintas[0])))}</button></div>`
     : "";
-  return `<div class="pap-ojo">${esc(hecho)}, y se factura para el ${
-      esc(corta(isoFacturar))}: lo normal es facturar al día siguiente del `
-    + `pedido, el ${esc(corta(esperada))}. ${
-        unaSola ? "Se llena igual: el documento sale"
-                : "Se llenan igual: los documentos salen"} con la fecha de `
-    + `arriba.${salida}</div>`;
+  const cierre = saltandoPuestaAPunto("fecha")
+    ? (unaSola ? "La fecha no se pone: el documento sale"
+               : "La fecha no se pone: los documentos salen")
+      + " con la que tenga el programa de facturación."
+    : (unaSola ? "Se llena igual: el documento sale"
+               : "Se llenan igual: los documentos salen") + " con la fecha de arriba.";
+  return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
+      TRIANGULO_ALERTA}</div><div>${
+      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}: lo normal es `
+    + `facturar al día siguiente del pedido, el ${esc(corta(esperada))}. `
+    + `${esc(cierre)}${salida}</div></div>`;
 }
 
 function pintarPrevioAvisos() {
@@ -13012,11 +13086,20 @@ function pintarListaDescuentos() {
     if (ea === 2) return (b.vigencia_hasta || "9999-12-31").localeCompare(a.vigencia_hasta || "9999-12-31");
     return (a.vigencia_hasta || "9999-12-31").localeCompare(b.vigencia_hasta || "9999-12-31");
   });
-  // Reparto en las tres pestañas (la papelera de borradas va aparte, debajo). El
+  // Reparto en las pestañas (la papelera de borradas va aparte, debajo). El
   // Histórico largo solo se pinta al abrir su pestaña, así una lista larga no
   // obliga a bajar entre campañas que hoy no operan.
-  const buckets = {vigentes: 0, proximas: 0, historico: 0};
-  const bucketDe = d => { const e = etapaVigencia(d); return e === 0 ? "vigentes" : e === 1 ? "proximas" : "historico"; };
+  // Prueba tiene su PROPIA pestaña (2026-08-02): una campaña marcada PRUEBA ya
+  // no se mezcla en En curso/Futuras/Archivadas, sin importar su vigencia — y
+  // esa pestaña solo existe con modo admin prendido, así el operador normal ni
+  // se entera de que hay campañas de prueba.
+  if (!modoAdmin && descListaTab === "prueba") descListaTab = "vigentes";
+  const buckets = {vigentes: 0, proximas: 0, historico: 0, prueba: 0};
+  const bucketDe = d => {
+    if (d.es_prueba) return "prueba";
+    const e = etapaVigencia(d);
+    return e === 0 ? "vigentes" : e === 1 ? "proximas" : "historico";
+  };
   for (const d of descCampanas) buckets[bucketDe(d)]++;
   const subtab = (id, txt) => `<button class="desc-subtab st-${id}${descListaTab === id ? " activa" : ""}" onclick="descCambiarSubtab('${id}')">${txt}<span class="cuenta">${buckets[id]}</span></button>`;
   // Bandos separados (2026-07-27): con el modo prueba prendido solo aplican las
@@ -13030,13 +13113,14 @@ function pintarListaDescuentos() {
          ? "Hay 1 campaña real en pausa" : `Hay ${realesEnPausa} campañas reales en pausa`}
        hasta que se apague el modo prueba. Los choques también van aparte: una campaña
        de prueba nunca choca con una real.</p>` : "";
-  const barra = avisoBando + `<div class="desc-subtabs">${subtab("vigentes", "En curso")}${subtab("proximas", "Futuras")}${subtab("historico", "Archivadas")}</div>`;
+  const barra = avisoBando + `<div class="desc-subtabs">${subtab("vigentes", "En curso")}${subtab("proximas", "Futuras")}${subtab("historico", "Archivadas")}${modoAdmin ? subtab("prueba", "Prueba") : ""}</div>`;
   const visibles = descCampanas.filter(d => bucketDe(d) === descListaTab);
   if (!visibles.length) {
     const vacios = {
       vigentes: "No hay campañas vigentes ahora mismo.",
       proximas: "No hay campañas programadas para más adelante.",
       historico: "No hay campañas vencidas.",
+      prueba: "No hay campañas de prueba.",
     };
     cont.innerHTML = barra + `<p class="mut" style="margin:14px">${vacios[descListaTab]}</p>`;
     return;
@@ -13505,10 +13589,11 @@ function descPintarPendientes() {
   }
 }
 
-// % "a aplicar" vigente (el campo de arriba), o null si está vacío.
+// % "a aplicar" vigente (el campo de arriba), o null si está vacío o inválido
+// (marcar un producto no debe estampar un % que no vale).
 function descPctAplicar() {
   const v = $("desc-pct").value.trim();
-  return v === "" ? null : parseFloat(v);
+  return pctEsValido(v) ? pctNumero(v) : null;
 }
 
 // Grupo de un producto (para traducir campañas viejas con herencia y para el
@@ -13609,8 +13694,9 @@ function descPintarArbol() {
       <span class="desc-pct-wrap">
         <button type="button" class="desc-quitar" ${est === "nada" ? 'style="visibility:hidden"' : ""}
                 title="Quitar el grupo entero de la campaña" onclick="descQuitarGrupo('${esc(g.grupo)}')">×</button>
-        <input type="number" class="desc-pct-inp" min="0" max="100" step="0.5"
+        <input type="text" inputmode="decimal" class="desc-pct-inp"
                value="${gi.valor}" placeholder="${gi.ph}" title="Completa las filas que falten con este %; si el grupo ya está entero, iguala a todos"
+               oninput="pctValidar(this)"
                onchange="descPctGrupo('${esc(g.grupo)}', this.value)"><span class="mut">%</span>
       </span>
     </div>`;
@@ -13623,9 +13709,9 @@ function descPintarArbol() {
         <span class="desc-pct-wrap">
           <button type="button" class="desc-quitar" ${sel ? "" : 'style="visibility:hidden"'}
                   title="Quitar este producto de la campaña" onclick="descQuitarProducto('${p.pt_id}')">×</button>
-          <input type="number" class="desc-pct-inp" min="0" max="100" step="0.5"
+          <input type="text" inputmode="decimal" class="desc-pct-inp"
                  value="${descEdit.prodPct[p.pt_id] ?? ""}" placeholder="sin %" title="Vacío = este producto queda sin descuento"
-                 oninput="descSetPct('${p.pt_id}', this.value)"
+                 oninput="descSetPct('${p.pt_id}', this.value); pctValidar(this)"
                  onchange="descAutoCheck('${p.pt_id}', this.value)"><span class="mut">%</span>
         </span>
       </div>`;
@@ -13701,8 +13787,9 @@ function descQuitarGrupo(grupo) {
 }
 
 function descSetPct(pt, valor) {
-  if (valor === "" || valor == null) delete descEdit.prodPct[pt];
-  else descEdit.prodPct[pt] = parseFloat(valor);
+  if (valor === "" || valor == null) { delete descEdit.prodPct[pt]; return; }
+  if (!pctEsValido(valor)) return;   // inválido: no se guarda hasta corregirlo (el borde rojo ya lo dice)
+  descEdit.prodPct[pt] = pctNumero(valor);
 }
 
 // Poner un % en una fila de producto la marca sola (un % sin marcar no
@@ -13710,6 +13797,7 @@ function descSetPct(pt, valor) {
 // el árbol en cada tecla.
 function descAutoCheck(pt, valor) {
   if (valor === "" || valor == null) return;   // vaciarlo no desmarca nada
+  if (!pctEsValido(valor)) return;   // inválido: no marca el producto con un % que no vale
   descEdit.selProd.add(pt);
   descPintarArbol();
   descChequearChoquesDebounced();
@@ -13724,7 +13812,8 @@ function descAutoCheck(pt, valor) {
 // está su propia fila. Vaciarlo no borra nada: al repintar vuelve el valor real.
 function descPctGrupo(grupo, valor) {
   if (valor !== "" && valor != null) {
-    const pct = parseFloat(valor);
+    if (!pctEsValido(valor)) return;   // inválido: no se aplica ni se repinta (el borde rojo ya lo dice)
+    const pct = pctNumero(valor);
     const pts = descProductosDeGrupo(grupo);
     const completo = pts.length > 0 && pts.every(pt => descEdit.selProd.has(pt));
     for (const pt of pts) {
@@ -14011,6 +14100,11 @@ function descValidar() {
     return {msg: "Pon la fecha Hasta, o marca \"Sin fecha de fin\" si la campaña no vence.", tab: "datos"};
   if (dsd && hst && dsd > hst)
     return {msg: "La fecha Hasta no puede ser anterior a la fecha Desde.", tab: "datos"};
+  // Formato/rango del %, con o sin "Todos los productos" (sin "Todos" es el
+  // que se estampa al marcar filas en Productos: con texto inválido ahí
+  // tampoco hay nada que aplicar).
+  if (!pctEsValido($("desc-pct").value))
+    return {msg: "El porcentaje debe ser un número entre 0 y 100.", tab: "datos"};
   // Con "Todos los productos": el % es el único de la campaña, sin él no
   // descuenta nada (el servidor lo exige igual). Se pide en Detalles, donde
   // vive el campo.
