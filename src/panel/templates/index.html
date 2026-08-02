@@ -169,7 +169,7 @@
      solos por su estado (con texto escrito / con valor); la ruta y la casilla
      llevan la clase desde pintarEstadoFiltros. */
   .buscador > input:not(:placeholder-shown),
-  #filtros-barra .campo-fecha.tiene-valor > input,
+  #filtros-barra .campo-fecha.tiene-valor input,
   select.filtro-on { border-color:#f59e0b; background:#fffaf3; }
   /* Solo color: un recuadro alrededor de la casilla movería la barra entera
      cada vez que se marca (la barra alinea por abajo). */
@@ -1487,8 +1487,12 @@
      tiene fecha (las fechas no llevan placeholder, así que :placeholder-shown
      no sirve: lo marca actualizarXFecha con la clase .tiene-valor); su
      espacio queda reservado con el padding de .con-x para que la fecha nunca
-     quede debajo. */
-  .campo-fecha { position:relative; display:inline-flex; align-items:stretch; }
+     quede debajo.
+     La × se posiciona relativa a .campo-fecha-caja (input nada más), no a
+     .campo-fecha entero: si tomara de referencia la fila completa quedaría
+     pegada al borde de las flechas ▲/▼ en vez de al del campo (2026-08-02). */
+  .campo-fecha { display:inline-flex; align-items:stretch; }
+  .campo-fecha-caja { position:relative; display:inline-flex; align-items:stretch; }
   .campo-fecha input[type="date"] { width:150px; }
   .campo-fecha.con-x input[type="date"] { width:166px; padding-right:26px; }
   .campo-fecha .x-fecha {
@@ -1897,18 +1901,22 @@
          de hoy (ver aplicarTopeHoy; se refresca al abrir el calendario, por si
          el panel quedó abierto de un día para otro). -->
     <div class="campo" id="campo-desde" style="display:none">Desde<span class="campo-fecha con-x">
-        <input type="date" id="f-desde" data-tope-hoy onchange="actualizarXFecha('f-desde'); sincronizarRangosFecha(); aplicarFiltros()">
-        <button type="button" class="x-fecha" tabindex="-1" title="Limpiar fecha"
-            onclick="limpiarFecha('f-desde')">&times;</button>
+        <span class="campo-fecha-caja">
+          <input type="date" id="f-desde" data-tope-hoy onchange="actualizarXFecha('f-desde'); sincronizarRangosFecha(); aplicarFiltros()">
+          <button type="button" class="x-fecha" tabindex="-1" title="Limpiar fecha"
+              onclick="limpiarFecha('f-desde')">&times;</button>
+        </span>
         <span class="pasos-fecha">
           <button type="button" tabindex="-1" title="Un día más" onclick="pasoFecha('f-desde', 1)">&#9650;</button>
           <button type="button" tabindex="-1" title="Un día menos" onclick="pasoFecha('f-desde', -1)">&#9660;</button>
         </span>
       </span></div>
     <div class="campo" id="campo-hasta" style="display:none">Hasta<span class="campo-fecha con-x">
-        <input type="date" id="f-hasta" data-tope-hoy onchange="actualizarXFecha('f-hasta'); sincronizarRangosFecha(); aplicarFiltros()">
-        <button type="button" class="x-fecha" tabindex="-1" title="Limpiar fecha"
-            onclick="limpiarFecha('f-hasta')">&times;</button>
+        <span class="campo-fecha-caja">
+          <input type="date" id="f-hasta" data-tope-hoy onchange="actualizarXFecha('f-hasta'); sincronizarRangosFecha(); aplicarFiltros()">
+          <button type="button" class="x-fecha" tabindex="-1" title="Limpiar fecha"
+              onclick="limpiarFecha('f-hasta')">&times;</button>
+        </span>
         <span class="pasos-fecha">
           <button type="button" tabindex="-1" title="Un día más" onclick="pasoFecha('f-hasta', 1)">&#9650;</button>
           <button type="button" tabindex="-1" title="Un día menos" onclick="pasoFecha('f-hasta', -1)">&#9660;</button>
@@ -5084,14 +5092,17 @@ function decorarCamposFecha(raiz) {
     const cont = document.createElement("span");
     cont.className = "campo-fecha";
     inp.parentNode.insertBefore(cont, inp);
-    cont.appendChild(inp);
+    const caja = document.createElement("span");
+    caja.className = "campo-fecha-caja";
+    cont.appendChild(caja);
+    caja.appendChild(inp);
     if (inp.hasAttribute("data-con-x")) {
       cont.classList.add("con-x");   // reserva el espacio de la × a la derecha
       const x = document.createElement("button");
       x.type = "button"; x.className = "x-fecha"; x.tabIndex = -1;
       x.title = "Limpiar fecha"; x.innerHTML = "&times;";
       x.addEventListener("click", () => limpiarFecha(inp.id));
-      cont.appendChild(x);
+      caja.appendChild(x);
     }
     const pasos = document.createElement("span");
     pasos.className = "pasos-fecha";
