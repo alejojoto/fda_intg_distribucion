@@ -726,6 +726,39 @@
      arriba): queda pegada al botón que la produjo, aunque la pestaña cambie. */
   .ajustes-ok { color:#16a34a; font-size:12px; font-weight:600; }
   .cat-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  /* Vista completa de Catálogos/Rutas dentro de AJUSTES (2026-08-02): mismo
+     patrón que PENDIENTES/DESCUENTOS (ocupan solas el área bajo pestañas),
+     solo que anidado un nivel: home ↔ vista se alternan con display, nunca
+     los dos a la vez. */
+  .volver-ajustes { display:inline-flex; align-items:center; gap:6px; margin:14px 0 4px 14px;
+                    background:none; border:none; color:#1d4ed8; font:inherit; font-weight:600;
+                    cursor:pointer; padding:4px 2px; }
+  .volver-ajustes:hover { text-decoration:underline; }
+  /* Regla efectiva de una ruta (lista de AJUSTES → Rutas): automático en
+     verde (mismo verde que .punto-estado.si/.ajustes-ok — "esto ya corre
+     solo"), manual restringido en el texto normal, sin configurar atenuado
+     (nada que resaltar: es el comportamiento de siempre). */
+  .regla-auto { color:#15803d; font-weight:600; }
+  .regla-sin-config { color:var(--mut); }
+  .serie-chip { display:inline-flex; align-items:center; font-size:10.5px; font-weight:600;
+                padding:1px 8px; border-radius:999px; border:1px solid #e2e6ec;
+                background:#f4f5f7; color:var(--mut); margin:0 3px 3px 0; }
+  .serie-chip.predet { background:#dcfce7; border-color:#86efac; color:#15803d; }
+  #ruta-edit-series { display:flex; gap:12px; flex-wrap:wrap; }
+  #ruta-edit-series label { display:flex; align-items:center; gap:5px; cursor:pointer;
+                            font-weight:400; color:#1d2433; }
+  /* Editor de UNA ruta (ventana modal): mismo patrón visual que #editor-overlay. */
+  #ruta-editor-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                         display:none; z-index:20; align-items:flex-start; justify-content:center; }
+  #ruta-editor-overlay.visible { display:flex; }
+  #ruta-editor { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
+                width:min(480px, 92vw); max-height:85vh; overflow:auto;
+                box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #ruta-editor h3 { margin:0 0 14px; font-size:14px; }
+  /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
+     visible SOLO cuando la ruta elegida tiene configuración — dice a las
+     claras por qué el selector cambió de opciones o de valor solo. */
+  #serie-auto-nota { color:#15803d; font-weight:600; font-size:12px; }
   #catalogo-vista { padding:0; }
   #catalogo-vista .cat-cabecera { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
                                   padding:10px 14px; border-bottom:1px solid #eef0f4; }
@@ -1090,10 +1123,12 @@
      mostrar ámbar cuando NO es obligatorio confundiría. */
   #desc-pct { color:#15803d; font-weight:700; width:74px; box-shadow:none; }
   .desc-pct-inp:not(:placeholder-shown) { color:#15803d; font-weight:600; }
-  /* Porcentaje inválido (2026-08-02): no se corrige solo (ni se clampea a
-     0-100 ni se limpia el texto) — se marca en rojo, mismo lenguaje visual
-     que campo-obligatorio (franja a la izquierda), hasta que se corrija. */
-  #desc-pct.pct-invalido, .desc-pct-inp.pct-invalido, .det-pct.pct-invalido {
+  /* Número inválido (2026-08-02, % y luego cantidad): no se corrige solo (ni
+     se clampea ni se limpia el texto) — se marca en rojo, mismo lenguaje
+     visual que campo-obligatorio (franja a la izquierda), hasta que se
+     corrija. */
+  #desc-pct.campo-invalido, .desc-pct-inp.campo-invalido, .det-pct.campo-invalido,
+  .det-cant.campo-invalido {
     box-shadow: inset 3px 0 0 var(--err); color: var(--err); }
   /* Check "Todos los clientes": la lista específica se OCULTA mientras está
      activo (en vez de mostrarse atenuada), ver descPintarClientes. */
@@ -1716,7 +1751,13 @@
       <option value="">Todas</option></select></div>
     <div class="campo"><span class="rotulo">Serie</span><select id="f-serie"
         title="Serie con la que sale cada factura de esta computadora. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
-        onchange="cambioSerie(this.value)"></select></div>
+        onchange="cambioSerie(this.value)"></select>
+      <!-- Automático por ruta (2026-08-02, AJUSTES → Rutas): visible SOLO
+           cuando la ruta elegida tiene serie predeterminada — dice por qué
+           el selector cambió solo, sin mandar al operador a adivinar
+           (ver pintarSeries). -->
+      <span class="mut" id="serie-auto-nota" style="display:none"
+            title="Esta ruta tiene una serie predeterminada configurada en AJUSTES → Rutas: se elige sola al elegir la ruta."></span></div>
     <!-- data-atajo="despacho" (2026-07-21): el botón del medio del calendario
          de ESTE campo pone el día de despacho — se factura para el día de
          entrega (los feriados y fines de semana no lo mueven: afectan la
@@ -1973,6 +2014,15 @@
   </section>
 
   <section id="sec-ajustes" class="tab-panel" style="display:none">
+   <!-- Vista propia por sección (2026-08-02, pedido del usuario): Catálogos y
+        Rutas dejaron de ser un acordeón bajo "Esta máquina"/"Día de despacho"
+        y pasaron a ocupar el área completa de la pestaña, igual que
+        PENDIENTES/DESCUENTOS — el listado de un catálogo entero (Clientes
+        agrupados, el año de Feriados) apretado bajo dos bloques ajenos se
+        leía peor que solo. Un solo estado (ajustesVista) decide cuál de los
+        tres contenedores de abajo se ve; volverAAjustesHome restaura el
+        scroll con el que se entró (ver ajustesScrollGuardado). -->
+   <div id="ajustes-home">
     <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
          computadora, juntas porque son obligatorias juntas — sin las dos no se
          llena nada (ver el aviso #configmaq-overlay). El nombre salió del
@@ -2025,11 +2075,63 @@
         botón del calendario la repone con un clic, y en cualquier factura se
         puede cambiar a mano.</p>
     </div>
+    <!-- Lanzadores: cada uno es TODO lo que se ve en la pantalla principal de
+         AJUSTES (título, ayuda breve y un botón) — la lista/editor de cada
+         catálogo y la lista de rutas viven en su propia vista completa
+         (abajo), no acá debajo. -->
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
+      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
+        códigos usados por programa de facturación.</p>
+      <button class="primario" onclick="abrirCatalogosVista()">Abrir catálogos</button>
+    </div>
+    <div class="ajustes-bloque">
+      <h3>Rutas</h3>
+      <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
+        seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
+      <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
+    </div>
+   </div>
+
+   <!-- Vista completa de Catálogos: abrirCatalogo() sigue pintando adentro de
+        #catalogo-vista, ahora reubicado acá en vez de bajo "Esta máquina". -->
+   <div id="ajustes-catalogos-vista" class="ajustes-vista" style="display:none">
+    <button type="button" class="volver-ajustes" onclick="volverAAjustesHome()">&larr; Volver a Ajustes</button>
+    <div class="ajustes-bloque">
+      <h3>Catálogos</h3>
+      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
+        códigos usados por programa de facturación.</p>
       <div class="cat-btns" id="cat-btns"></div>
     </div>
     <div id="catalogo-vista"></div>
+   </div>
+
+   <!-- Vista completa de Rutas (2026-08-02): una fila por ruta con su regla
+        efectiva; editar abre #ruta-editor-overlay. Sin fila para una ruta =
+        sin configurar = selección manual de siempre (ver pintarFilasRutas). -->
+   <div id="ajustes-rutas-vista" class="ajustes-vista" style="display:none">
+    <button type="button" class="volver-ajustes" onclick="volverAAjustesHome()">&larr; Volver a Ajustes</button>
+    <div class="ajustes-bloque">
+      <h3>Rutas</h3>
+      <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
+        seleccionar automáticamente serie correspondiente al preparar pedidos.
+        Con una serie predeterminada, se elige sola al elegir la ruta; con
+        varias series permitidas y sin predeterminada, se elige a mano entre
+        esas; sin configurar, la selección sigue siendo manual entre todas.</p>
+      <div class="cat-cabecera" style="padding:0 0 10px">
+        <span class="buscador"><input type="text" id="rutas-filtro" placeholder="filtrar…"
+              oninput="pintarFilasRutas()">
+          <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
+              onclick="limpiarBuscador('rutas-filtro', pintarFilasRutas)">&times;</button></span>
+        <span class="mut" id="rutas-conteo"></span>
+        <button class="primario" style="margin-left:auto" onclick="abrirEditorRuta(null)">Configurar ruta</button>
+      </div>
+      <div style="overflow-x:auto"><table id="t-rutas">
+        <thead><tr><th>Ruta</th><th>Regla</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+   </div>
   </section>
 
   <section id="sec-admin" class="tab-panel" style="display:none">
@@ -2320,6 +2422,39 @@
     <div class="editor-acciones">
       <button id="editor-guardar" class="primario" onclick="guardarEditor()">Guardar</button>
       <button onclick="intentarCerrarEditor()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Editor de la config de UNA ruta (se abre desde AJUSTES → Rutas). Al
+     agregar (ruta === null), el nombre sale de un <select> con las rutas que
+     todavía no tienen fila en asistente_rutas_series (evita duplicados sin
+     tener que validar contra el servidor); al editar, la ruta ya no se
+     cambia (es la clave). -->
+<div id="ruta-editor-overlay" onclick="if(event.target===this)cerrarEditorRuta()">
+  <div id="ruta-editor">
+    <h3 id="ruta-editor-titulo"></h3>
+    <div class="editor-campo">
+      <label for="ruta-edit-ruta">Ruta</label>
+      <select id="ruta-edit-ruta" onchange="rutaEditorRecalcular()"></select>
+      <span class="mut" id="ruta-edit-ruta-fija" style="display:none"></span>
+    </div>
+    <div class="editor-campo">
+      <label>Series permitidas</label>
+      <div id="ruta-edit-series"></div>
+    </div>
+    <div class="editor-campo">
+      <label for="ruta-edit-predet">Serie predeterminada</label>
+      <select id="ruta-edit-predet" onchange="rutaEditorRecalcular()"></select>
+      <span class="mut">Se elige sola al elegir esta ruta en la barra. Vacío = queda
+        manual entre las series permitidas.</span>
+    </div>
+    <p class="mut" id="ruta-edit-resumen" style="margin:2px 0 0"></p>
+    <p class="detalle-error" id="ruta-edit-aviso" style="display:none; margin:6px 0 0"></p>
+    <div id="ruta-editor-error" class="desc-error" style="display:none"></div>
+    <div class="editor-acciones">
+      <button id="ruta-editor-guardar" class="primario" onclick="guardarEditorRuta()">Guardar</button>
+      <button onclick="cerrarEditorRuta()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2848,7 +2983,7 @@ document.addEventListener("wheel", (ev) => {
 // se admitía con el spinner nativo): campos de texto en vez de number para
 // que no salgan flechas ni el scroll/las flechas del teclado cambien el valor
 // solo. Un valor fuera de rango o con texto raro NO se corrige ni se limpia
-// solo — se marca inválido (borde rojo, pct-invalido) y quien llama a
+// solo — se marca inválido (borde rojo, campo-invalido) y quien llama a
 // pctValidar/pctEsValido decide no aplicarlo hasta que se corrija.
 const PCT_FORMATO_RE = /^\d{1,3}([.,]\d+)?$/;
 function pctEsValido(texto) {
@@ -2864,16 +2999,53 @@ function pctNumero(texto) {
   const t = (texto ?? "").trim();
   return t === "" ? null : Number(t.replace(",", "."));
 }
+// Lo que VIAJA al servidor: siempre con punto, se haya tecleado con punto o
+// con coma (2026-08-02). El servidor hace float() y "6,5" lo rechaza con
+// "debe ser un número" — el punto es el formato que lleva funcionando desde
+// siempre, así que se normaliza aquí y no se respeta lo tecleado. Se manda
+// texto (no número) para que el vacío y lo inválido lleguen igual que antes y
+// el servidor conserve sus mensajes.
+function pctParaEnviar(texto) {
+  return (texto ?? "").trim().replace(",", ".");
+}
 // Pinta el estado inválido en el campo mismo (borde rojo + tooltip) sin tocar
 // lo que el operador escribió, conservando el title original del campo (si
 // tenía uno con instrucciones propias). Devuelve si el valor es válido.
 function pctValidar(input) {
   if (input.dataset.tituloBase === undefined) input.dataset.tituloBase = input.title || "";
   const ok = pctEsValido(input.value);
-  input.classList.toggle("pct-invalido", !ok);
+  input.classList.toggle("campo-invalido", !ok);
   input.title = ok ? input.dataset.tituloBase
     : (input.dataset.tituloBase ? input.dataset.tituloBase + " — " : "")
       + "Escribe un porcentaje entre 0 y 100 (punto o coma para los decimales).";
+  return ok;
+}
+
+// Cantidad de línea (kg o paquetes): mismo problema de fondo que el % (ver
+// arriba) pero más grave porque det-cant seguía siendo type=number — con
+// locale es-VE, Chrome DESCARTA la coma mientras se teclea en vez de
+// rechazarla: "12,5" queda como "125" en el campo, sin ningún aviso (un
+// pedido de 12,5 kg se guardaría como 125). Pasa a texto para cortarlo de
+// raíz. El rango (>0) ya lo valida el servidor con un mensaje propio; aquí
+// solo se valida el FORMATO, para no mandar NaN si se teclea algo que no es
+// un número — no hay tope superior de dígitos (a diferencia del % no está
+// acotado a 0-100).
+const CANT_FORMATO_RE = /^\d+([.,]\d+)?$/;
+function cantEsValida(texto) {
+  const t = (texto ?? "").trim();
+  return t === "" || CANT_FORMATO_RE.test(t);
+}
+function cantNumero(texto) {
+  const t = (texto ?? "").trim();
+  return t === "" ? null : Number(t.replace(",", "."));
+}
+function cantValidar(input) {
+  if (input.dataset.tituloBase === undefined) input.dataset.tituloBase = input.title || "";
+  const ok = cantEsValida(input.value);
+  input.classList.toggle("campo-invalido", !ok);
+  input.title = ok ? input.dataset.tituloBase
+    : (input.dataset.tituloBase ? input.dataset.tituloBase + " — " : "")
+      + "Escribe un número (punto o coma para los decimales).";
   return ok;
 }
 
@@ -4227,13 +4399,41 @@ let seriePredetAplicada = false;
 let babyPredetAplicado = false;      // el gramaje guardado se aplica solo al abrir
 const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 
+// Config de serie de la ruta elegida (AJUSTES → Rutas, 2026-08-02), o null si
+// esa ruta no tiene fila en asistente_rutas_series — ahí sigue la selección
+// manual de siempre entre las 6 series. Se llena en cargar() (viaja en la
+// misma respuesta de /api/facturas que ya trae `rutas`, ver CLAUDE.md) y se
+// refresca aparte al abrir AJUSTES → Rutas (cargarRutasSeries).
+let rutasSeriesConfig = {};
+const configSerieDeRuta = () => rutasSeriesConfig[rutaSeleccionada] || null;
+
 function pintarSeries() {
+  const cfg = configSerieDeRuta();
+  // Sin config: las 6 series de siempre. Con config: SOLO las permitidas —
+  // colar una serie que la ruta no admite sería facturarla con la serie
+  // equivocada (mismo riesgo que describe reponerLote más abajo).
+  const opciones = (cfg && cfg.series_permitidas.length) ? cfg.series_permitidas : SERIES;
+  const predetDeRuta = cfg ? cfg.serie_predeterminada : "";
+  if (predetDeRuta) {
+    // La ruta manda: se elige sola, sin preguntar (COMPORTAMIENTO, pedido del
+    // usuario — "si tiene serie predeterminada, selecciónala automáticamente").
+    serieSeleccionada = predetDeRuta;
+  } else if (cfg && serieSeleccionada && !opciones.includes(serieSeleccionada)) {
+    // Ruta con series permitidas pero sin predeterminada: lo que hubiera
+    // elegido antes puede haber quedado fuera del nuevo conjunto — se limpia
+    // en vez de adivinar cuál de las permitidas usar.
+    serieSeleccionada = "";
+  }
+  const marcaEstrella = predetDeRuta || seriePredeterminada;
   const vacia = serieSeleccionada
     ? "" : `<option value="" selected>— Elige una serie —</option>`;
   $("f-serie").innerHTML = vacia
-    + SERIES.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
-        ${s}${s === seriePredeterminada ? " ★" : ""}</option>`).join("")
-    + `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`;
+    + opciones.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
+        ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("")
+    + (predetDeRuta ? "" : `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`);
+  const nota = $("serie-auto-nota");
+  nota.style.display = predetDeRuta ? "" : "none";
+  nota.textContent = predetDeRuta ? "automático por ruta" : "";
 }
 
 async function cambioSerie(valor) {
@@ -5221,6 +5421,10 @@ async function cambioRuta(valor) {
     return;
   }
   rutaSeleccionada = valor;
+  // La serie se resuelve según la config de ESTA ruta (AJUSTES → Rutas) antes
+  // de aplicar el filtro: si la ruta nueva tiene predeterminada, se elige
+  // sola; si solo restringe, se limpia lo que quedó fuera (ver pintarSeries).
+  pintarSeries();
   return aplicarFiltros("Cambiando de ruta…");
 }
 
@@ -5584,6 +5788,10 @@ async function cargar() {
       pintarAvisoConflictosSync(d.nube.sync_conflictos);
       pintarNube();
     }
+    // Config de serie por ruta (AJUSTES → Rutas, 2026-08-02): viaja en esta
+    // misma respuesta —ya se pide en cada refresco— antes de pintarSeries()
+    // más abajo, para que la ruta que quede puesta ya resuelva su serie.
+    rutasSeriesConfig = d.rutas_series_config || {};
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
     rutaPredeterminada = d.ruta_predeterminada || "";
     seriePredeterminada = d.serie_predeterminada || "";
@@ -6907,7 +7115,8 @@ function filaLineaDetalle(d, l) {
       <td class="det-num">${l.n}</td>
       <td>${producto}</td>
       <td>
-        <input type="number" class="det-cant" min="0" step="any" value="${l.cantidad}"
+        <input type="text" inputmode="decimal" class="det-cant" value="${l.cantidad}"
+               oninput="cantValidar(this)"
                onchange="ajustarCantidad(this,${ref})"
                onkeydown="if(event.key==='Enter')this.blur()">
         ${opciones}
@@ -6957,11 +7166,12 @@ function repetidaEnDetalle(d, l) {
 // Teclear la cantidad automática otra vez equivale a no tener ajuste: se retira
 // en vez de guardar un ajuste que no cambia nada.
 function ajustarCantidad(input, pedidoId, parte, codigo) {
+  if (!cantValidar(input)) return;   // formato inválido: no se manda hasta corregirlo
   const valor = input.value.trim();
   const linea = lineaDeDetalle(pedidoId, parte, codigo);
-  if (valor !== "" && linea && Number(valor) === linea.cantidad_automatica)
+  if (valor !== "" && linea && cantNumero(valor) === linea.cantidad_automatica)
     return guardarAjuste(pedidoId, parte, codigo, {cantidad: null});
-  guardarAjuste(pedidoId, parte, codigo, {cantidad: valor === "" ? null : Number(valor),
+  guardarAjuste(pedidoId, parte, codigo, {cantidad: valor === "" ? null : cantNumero(valor),
                                           origen: "manual"});
 }
 
@@ -11327,6 +11537,15 @@ const CATALOGOS = {
   clientes: {
     titulo: "Clientes y sucursales",
     singular: "cliente",
+    // Ayuda visible (2026-08-02, pedido del usuario: no solo hover). Obligatorio
+    // real de este catálogo: cliente_id, qué es, código y nombre de cliente en
+    // facturación, y RIF (nombre/código de sucursal solo si es sucursal, ver
+    // `campos` más abajo); "Activo" y "Cliente de prueba" son opcionales.
+    descripcion: "Cruza el cliente y la sucursal del pedido con su código en el "
+      + "programa de facturación. El código de facturación es el dato que hace "
+      + "falta para facturar; el nombre es una referencia visual. Un pedido en "
+      + "EN REVISIÓN por cliente sin código abre este mismo formulario con lo "
+      + "ya conocido — normalmente solo falta completar el código.",
     clave: ["cliente_id"],
     agrupado: true,
     // Obligatorios (usuario 2026-07-25): sin el cliente_id AppSheet no se puede
@@ -11400,6 +11619,14 @@ const CATALOGOS = {
   productos: {
     titulo: "Productos",
     singular: "producto",
+    // Obligatorio real: pt_id y codigo_articulo (ver `campos`). descripcion y
+    // nombre se completan solos y son opcionales de corregir a mano.
+    descripcion: "Cruza el producto del pedido (PT_id) con su código de "
+      + "artículo en el programa de facturación. La descripción y el nombre "
+      + "en facturación se completan solos; si se escriben a mano, dejan de "
+      + "actualizarse automáticamente. Un pedido en EN REVISIÓN por producto "
+      + "sin código abre este mismo formulario con lo ya conocido — "
+      + "normalmente solo falta completar el código de artículo.",
     clave: ["pt_id", "presentacion"],
     // Obligatorios (usuario 2026-07-25): sin PT_id (código de barras) ni código
     // de artículo Winledger el producto no cruza, así que ambos son necesarios.
@@ -11437,6 +11664,11 @@ const CATALOGOS = {
   vendedores: {
     titulo: "Vendedores",
     singular: "vendedor",
+    // Obligatorio real: código y nombre (ver `campos`); Activo es opcional.
+    descripcion: "Vendedores disponibles para elegir como vendedor de esta "
+      + "máquina, en \"Esta máquina\" más arriba. Activo es opcional: "
+      + "desmarcarlo lo saca de ese selector sin borrarlo. Se edita al alta "
+      + "o baja de un vendedor.",
     clave: ["codigo_vendedor_winledger"],
     // Todos obligatorios (usuario 2026-07-25): código y nombre.
     campos: [
@@ -11453,10 +11685,13 @@ const CATALOGOS = {
     titulo: "Feriados",
     singular: "feriado",
     // Al operador se le explica el EFECTO del catálogo, no su mecánica
-    // interna (feedback 2026-07-29).
+    // interna (feedback 2026-07-29). Obligatorio real: fecha y nombre (ver
+    // `campos`); Activo es opcional (desactivar sin borrar).
     descripcion: "Los feriados solo tienen efecto en la tasa: un feriado no "
       + "tiene tasa propia del BCV, así que ese día se aplica la del último "
-      + "día hábil anterior.",
+      + "día hábil anterior. Se edita para agregar un decreto puntual que el "
+      + "calendario del sistema no calculó solo, o para desactivar un feriado "
+      + "calculado que ese año no aplique.",
     clave: ["fecha"],
     // Un feriado es UNA sola cosa (regla del usuario 2026-07-22): un día en
     // que el BCV no publica tasa. Sin tipos — que sea de ley, bancario o
@@ -11536,6 +11771,43 @@ const CATALOGOS = {
 };
 
 // Descuentos vive en su propia pestaña; AJUSTES lista los demás catálogos.
+// --- AJUSTES: navegación entre home / vista de Catálogos / vista de Rutas --
+// (2026-08-02, pedido del usuario): Catálogos y Rutas dejaron de vivir como
+// acordeón bajo "Esta máquina"/"Día de despacho" y pasaron a vista completa,
+// igual que PENDIENTES/DESCUENTOS — un solo estado con tres contenedores que
+// se alternan por display, guardando el scroll de cada uno para no perderlo
+// al ir y volver (AJUSTES deja bajar la página completa, ver .tab-libre en
+// cambiarTab). Cambiar de pestaña arriba (PENDIENTES, DESCUENTOS…) no toca
+// esto: si se vuelve a AJUSTES, queda la misma vista de antes.
+let ajustesVista = "home";   // "home" | "catalogos" | "rutas"
+const ajustesScrollGuardado = {home: 0, catalogos: 0, rutas: 0};
+
+function irAAjustesVista(vista) {
+  ajustesScrollGuardado[ajustesVista] = window.scrollY;
+  ajustesVista = vista;
+  $("ajustes-home").style.display = vista === "home" ? "" : "none";
+  $("ajustes-catalogos-vista").style.display = vista === "catalogos" ? "" : "none";
+  $("ajustes-rutas-vista").style.display = vista === "rutas" ? "" : "none";
+  window.scrollTo(0, ajustesScrollGuardado[vista] || 0);
+}
+
+// Abrir Catálogos no reabre ningún catálogo por su cuenta: si ya había uno
+// elegido (catalogoActual) su lista sigue tal cual —cerrarCatalogo() es la
+// única vía que la vacía—, y si no había ninguno queda solo la fila de
+// botones.
+function abrirCatalogosVista() {
+  irAAjustesVista("catalogos");
+}
+
+function abrirRutasVista() {
+  irAAjustesVista("rutas");
+  cargarRutasSeries();
+}
+
+function volverAAjustesHome() {
+  irAAjustesVista("home");
+}
+
 const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
 
 let catalogoActual = null;       // tipo abierto en la vista
@@ -11569,6 +11841,183 @@ function cerrarCatalogo() {
   clienteEnEdicion = null;
   $("catalogo-vista").innerHTML = "";
   pintarBotonesCatalogos();
+}
+
+// --- AJUSTES: Rutas (serie por ruta, 2026-08-02) ----------------------------
+// Modelo: una fila por ruta (asistente_rutas_series), con qué series admite y
+// cuál es la predeterminada (si tiene una) — ver src/db/rutas_series.py. Sin
+// fila para una ruta = sin configurar = selección manual de siempre.
+let rutasFilasVisibles = [];        // rutas de la última pintada (por índice)
+let rutaEditorEditando = null;      // ruta en edición; null = agregando nueva
+let rutaEditorPredetOriginal = "";  // predet que tenía AL ABRIR (aviso de "se quita")
+
+async function cargarRutasSeries() {
+  try {
+    const d = await api("/api/rutas-series");
+    rutasSeriesConfig = Object.fromEntries((d.filas || []).map(f =>
+      [f.ruta, {series_permitidas: f.series_permitidas, serie_predeterminada: f.serie_predeterminada}]));
+  } catch (e) {
+    mensaje("No se pudo cargar la config de rutas: " + e.message, "error");
+  }
+  pintarFilasRutas();
+}
+
+// Texto + clase de la regla que de verdad aplica hoy para una ruta (se ve en
+// la lista Y arriba del selector de Serie vía #serie-auto-nota — mismo
+// criterio en los dos lugares, ver pintarSeries).
+function reglaEfectivaRuta(cfg) {
+  if (!cfg || !cfg.series_permitidas.length)
+    return {texto: "Sin configurar — selección manual", clase: "regla-sin-config"};
+  if (cfg.serie_predeterminada) {
+    const resto = cfg.series_permitidas.filter(s => s !== cfg.serie_predeterminada);
+    return {
+      texto: `Automático: ${cfg.serie_predeterminada}`
+           + (resto.length ? `, también permite ${resto.join(", ")}` : ""),
+      clase: "regla-auto",
+    };
+  }
+  return {texto: `Manual entre: ${cfg.series_permitidas.join(", ")}`, clase: ""};
+}
+
+function pintarFilasRutas() {
+  const filtro = ($("rutas-filtro").value || "").toLowerCase();
+  const nombres = new Set([...(ultimaLista.rutas || []), ...Object.keys(rutasSeriesConfig)]);
+  rutasFilasVisibles = [...nombres]
+    .sort((a, b) => nombreRuta(a).localeCompare(nombreRuta(b), "es"))
+    .filter(r => !filtro || nombreRuta(r).toLowerCase().includes(filtro));
+  $("rutas-conteo").textContent = `${rutasFilasVisibles.length} de ${nombres.size}`;
+  $("t-rutas").querySelector("tbody").innerHTML = rutasFilasVisibles.length
+    ? rutasFilasVisibles.map((r, i) => {
+        const cfg = rutasSeriesConfig[r] || null;
+        const regla = reglaEfectivaRuta(cfg);
+        const chips = cfg ? cfg.series_permitidas.map(s =>
+          `<span class="serie-chip${s === cfg.serie_predeterminada ? " predet" : ""}">${esc(s)}</span>`
+        ).join("") : "";
+        return `<tr>
+          <td>${esc(nombreRuta(r))}</td>
+          <td><span class="${regla.clase}">${esc(regla.texto)}</span>${
+            chips ? `<div style="margin-top:4px">${chips}</div>` : ""}</td>
+          <td>
+            <button type="button" onclick="abrirEditorRuta(${i})">${cfg ? "Editar" : "Configurar"}</button>${
+            cfg ? ` <button type="button" onclick="confirmarBorrar(this, () => eliminarConfigRuta(${i}))">Eliminar</button>` : ""}
+          </td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="3" class="mut">No hay rutas para mostrar todavía.</td></tr>`;
+}
+
+// null = agregar una ruta nueva (elige entre las que todavía no tienen fila);
+// número = índice en rutasFilasVisibles de una ruta ya configurada o no.
+function abrirEditorRuta(i) {
+  const ruta = (i === null || i === undefined) ? null : rutasFilasVisibles[i];
+  const cfg = ruta ? rutasSeriesConfig[ruta] : null;
+  rutaEditorEditando = ruta;
+  rutaEditorPredetOriginal = (cfg && cfg.serie_predeterminada) || "";
+  $("ruta-editor-error").style.display = "none";
+  $("ruta-editor-titulo").textContent = ruta ? `Configurar ${nombreRuta(ruta)}` : "Configurar ruta";
+  const selectRuta = $("ruta-edit-ruta");
+  const notaRutaFija = $("ruta-edit-ruta-fija");
+  if (ruta) {
+    selectRuta.style.display = "none";
+    notaRutaFija.style.display = "";
+    notaRutaFija.textContent = nombreRuta(ruta);
+  } else {
+    // Solo rutas SIN fila todavía: evita duplicados sin depender de validar
+    // contra el servidor (no adivina cuáles — sale de las rutas que ya se
+    // vieron en pedidos, igual que el filtro de la barra).
+    const disponibles = (ultimaLista.rutas || []).filter(r => !rutasSeriesConfig[r])
+      .sort((a, b) => nombreRuta(a).localeCompare(nombreRuta(b), "es"));
+    selectRuta.style.display = "";
+    notaRutaFija.style.display = "none";
+    selectRuta.innerHTML = disponibles.length
+      ? disponibles.map(r => `<option value="${esc(r)}">${esc(nombreRuta(r))}</option>`).join("")
+      : `<option value="">— no hay rutas sin configurar —</option>`;
+  }
+  // Arranca SIN nada marcado cuando es una ruta nueva (2026-08-02, mismo
+  // criterio que cualquier campo que aparece tras elegir "otro…"): nada
+  // puesto que el operador no haya elegido.
+  $("ruta-edit-series").innerHTML = SERIES.map(s => `
+    <label><input type="checkbox" value="${s}" ${cfg && cfg.series_permitidas.includes(s) ? "checked" : ""}
+      onchange="rutaEditorRecalcular()"> ${s}</label>`).join("");
+  rutaEditorRecalcular(rutaEditorPredetOriginal);
+  $("ruta-editor-overlay").classList.add("visible");
+}
+
+function rutaEditorRecalcular(preseleccionar) {
+  const marcadas = [...$("ruta-edit-series").querySelectorAll("input:checked")].map(c => c.value);
+  const predetSel = $("ruta-edit-predet");
+  const deseada = preseleccionar !== undefined ? preseleccionar : predetSel.value;
+  predetSel.innerHTML = `<option value="">— ninguna —</option>`
+    + marcadas.map(s => `<option value="${s}" ${s === deseada ? "selected" : ""}>${s}</option>`).join("");
+  predetSel.disabled = !marcadas.length;
+  if (!marcadas.includes(deseada)) predetSel.value = "";
+
+  // Aviso "se va a quitar" (2026-08-02, pedido del usuario): se desmarcó la
+  // serie que era la predeterminada al abrir el editor.
+  const aviso = $("ruta-edit-aviso");
+  if (rutaEditorPredetOriginal && !marcadas.includes(rutaEditorPredetOriginal)) {
+    aviso.style.display = "";
+    aviso.textContent = `La serie predeterminada (${rutaEditorPredetOriginal}) se va a quitar: `
+      + "esta ruta se queda sin selección automática.";
+  } else {
+    aviso.style.display = "none";
+  }
+
+  const predetElegida = predetSel.value;
+  $("ruta-edit-resumen").textContent = !marcadas.length
+    ? "Sin series permitidas: esta ruta queda sin configurar (selección manual)."
+    : predetElegida
+      ? `Automático: se elige sola la serie ${predetElegida}`
+        + (marcadas.length > 1 ? `; también se puede cambiar a mano entre ${marcadas.join(", ")}.` : ".")
+      : `Manual entre: ${marcadas.join(", ")}.`;
+}
+
+function cerrarEditorRuta() {
+  $("ruta-editor-overlay").classList.remove("visible");
+}
+
+async function guardarEditorRuta() {
+  const ruta = rutaEditorEditando || $("ruta-edit-ruta").value;
+  const errorDiv = $("ruta-editor-error");
+  errorDiv.style.display = "none";
+  if (!ruta) {
+    errorDiv.textContent = "Elige una ruta.";
+    errorDiv.style.display = "";
+    return;
+  }
+  const permitidas = [...$("ruta-edit-series").querySelectorAll("input:checked")].map(c => c.value);
+  const predeterminada = $("ruta-edit-predet").value;
+  const listo = avisarTrabajando("Guardando la config de la ruta…");
+  try {
+    await api("/api/rutas-series",
+      {ruta, series_permitidas: permitidas, serie_predeterminada: predeterminada});
+  } catch (e) {
+    listo();
+    errorDiv.textContent = e.message;
+    errorDiv.style.display = "";
+    return;
+  }
+  cerrarEditorRuta();
+  listo();
+  mensaje(`Config de ${nombreRuta(ruta)} guardada.`, "info");
+  cargarRutasSeries();
+  pintarSeries();   // por si la ruta guardada es la elegida ahora mismo en la barra
+}
+
+async function eliminarConfigRuta(i) {
+  const ruta = rutasFilasVisibles[i];
+  const listo = avisarTrabajando(`Eliminando la config de ${nombreRuta(ruta)}…`);
+  try {
+    await api("/api/rutas-series/eliminar", {ruta});
+  } catch (e) {
+    listo();
+    mensaje(e.message, "error");
+    return;
+  }
+  listo();
+  mensaje(`${nombreRuta(ruta)} vuelve a selección manual.`, "info");
+  cargarRutasSeries();
+  pintarSeries();
 }
 
 // ¿El cliente de ese código Winledger es una cadena? Misma regla que la vista
@@ -14045,7 +14494,7 @@ function descPayload(activo) {
     // correr con el borrador a medias. El freno de "elige antes de guardar" es
     // descValidar, no el payload.
     acumulable: descAcumActual() === "suma" ? 1 : 0,
-    porcentaje: $("desc-pct").value.trim(),
+    porcentaje: pctParaEnviar($("desc-pct").value),
     vigencia_desde: $("desc-desde").value,
     vigencia_hasta: descEdit.indefinida ? null : $("desc-hasta").value,
     clientes: descEdit.todosClientes ? [] : descObjetivosDesdeSel(),   // Todos = sin objetivos (global)
