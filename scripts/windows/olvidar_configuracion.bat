@@ -1,12 +1,9 @@
 @echo off
 rem ===========================================================================
-rem Olvida el nombre y el vendedor de ESTA computadora, para volver a ver la
-rem pantalla de configuracion obligatoria de una instalacion nueva (2026-07-29).
-rem
-rem Es el atajo de doble clic a:
-rem     python scripts\olvidar_configuracion_maquina.py --si
-rem Cierra el panel el mismo (cooperativo: con un llenado en curso aborta sin
-rem borrar). Los catalogos, las tasas y el registro de facturas NO se tocan.
+rem Configuracion obligatoria de ESTA computadora (nombre, vendedor, serie y
+rem dia de despacho): dos opciones para no confundir "ver la pantalla" con
+rem "borrar de verdad" (2026-07-29; serie y dia se sumaron el 2026-07-30;
+rem opcion de solo ver, 2026-07-31).
 rem ===========================================================================
 cd /d "%~dp0..\.."
 
@@ -20,15 +17,38 @@ if not exist "%PY%" (
     exit /b 1
 )
 
+rem En la instalacion empaquetada el script viaja compilado: solo hay .pyc.
+set "SCRIPT=scripts\olvidar_configuracion_maquina.py"
+if not exist "%SCRIPT%" set "SCRIPT=scripts\olvidar_configuracion_maquina.pyc"
+
 echo ============================================================================
-echo  OLVIDAR LA CONFIGURACION DE ESTA COMPUTADORA
+echo  CONFIGURACION OBLIGATORIA DE ESTA COMPUTADORA
 echo.
-echo  Se borran el nombre con el que aparece en el historial y el vendedor
-echo  con el que factura. Al abrir el panel de nuevo, saldra la pantalla de
-echo  configuracion como en una instalacion nueva.
-echo.
-echo  Si el panel esta abierto, se cierra solo. Al terminar, abrelo de nuevo.
+echo  1) Solo ver la pantalla (no borra nada; sale ya llena con lo que hay
+echo     guardado aqui). El panel tiene que estar abierto.
+echo  2) Borrar de verdad el nombre, el vendedor, la serie y el dia de
+echo     despacho, para ver la pantalla en blanco como en una instalacion
+echo     nueva. Si el panel esta abierto, se cierra solo.
 echo ============================================================================
+echo.
+set "OPCION="
+set /p "OPCION=Elige 1 o 2 y pulsa Enter (cualquier otra cosa cancela): "
+
+if "%OPCION%"=="1" goto :vista_previa
+if "%OPCION%"=="2" goto :borrado_real
+echo.
+echo Cancelado: no se hizo nada.
+pause
+exit /b 0
+
+:vista_previa
+echo.
+"%PY%" "%SCRIPT%" --ver
+echo.
+pause
+exit /b 0
+
+:borrado_real
 echo.
 set "RESPUESTA="
 set /p "RESPUESTA=Escribe SI y pulsa Enter para continuar (cualquier otra cosa cancela): "
@@ -40,10 +60,6 @@ if /i not "%RESPUESTA%"=="SI" (
 )
 
 echo.
-rem En la instalacion empaquetada el script viaja compilado: solo hay .pyc.
-set "SCRIPT=scripts\olvidar_configuracion_maquina.py"
-if not exist "%SCRIPT%" set "SCRIPT=scripts\olvidar_configuracion_maquina.pyc"
-
 "%PY%" "%SCRIPT%" --si
 echo.
 pause
