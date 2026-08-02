@@ -4278,6 +4278,25 @@ function tasaCorrespondiente(fechaFacturar) {
           origen: mejor.fecha_valor === ultimoBCV.fecha_valor ? "portada" : "registro"};
 }
 
+// ¿Hay una tasa BCV registrada y aplicable al día a facturar? (regla única,
+// 2026-08-02, pedido del usuario). Aplica tanto a la del propio día como a la
+// que corresponde por fin de semana o feriado (último día hábil) — en
+// cualquiera de los dos casos la tasa queda OFICIAL y el campo se bloquea:
+// no admite edición ni sustitución manual. Sin ninguna tasa aplicable
+// (histórico anterior al registro, fecha futura que el BCV todavía no
+// publicó, o cualquier otro hueco real del catálogo) devuelve false y el
+// campo sigue editable — ahí la tasa se introduce a mano.
+// Independiente de lo que haya tecleado el operador: solo mira fecha +
+// catálogo, igual que tasaCorrespondiente (que esta función reutiliza).
+function tasaOficialAplica(fechaFacturar) {
+  if (faltaTasaDeDiaPasado(fechaFacturar)) return false;
+  const eleccion = tasaCorrespondiente(fechaFacturar);
+  if (!eleccion) return false;
+  const pendiente = eleccion.fecha_valor !== fechaFacturar
+                 && fechaFacturar && !motivoSinTasa(fechaFacturar);
+  return !pendiente;
+}
+
 // Pre-llena el campo Tasa con la que corresponde al día a facturar y repinta
 // el aviso. Se llama tras cada consulta al BCV y al cambiar el día a
 // facturar. Una tasa escrita a mano nunca se pisa (guarda de tasaAutoBCV).
@@ -4309,6 +4328,9 @@ function aplicarTasaBCV() {
     campo.value = "";
     tasaAutoBCV = null;
   }
+  // Candado del campo (regla única, 2026-08-02): con tasa oficial aplicable
+  // no se edita a mano; sin ninguna, se habilita para escribirla.
+  campo.readOnly = tasaOficialAplica(fechaFacturar);
   pintarAvisoBCV();
 }
 
@@ -9214,9 +9236,13 @@ const cajitaFecha = () => saltandoPuestaAPunto("fecha")
 
 // Sin la tasa del día no se llena nada (2026-07-31, regla del usuario): el
 // campo la pide en vez de anunciar que no se registra, y el botón de llenar
-// queda apagado hasta que esté escrita.
+// queda apagado hasta que esté escrita. Con una tasa oficial aplicable
+// (2026-08-02, regla única) el valor se muestra fijo, igual que el campo de
+// la barra: no se admite edición ni sustitución manual.
 const cajitaTasa = () => saltandoTasa()
   ? cajitaFija("Tasa", "no se registra", true)
+  : tasaOficialAplica($("f-fecha-facturar").value)
+  ? cajitaFija("Tasa", $("f-tasa").value, false)
   : cajitaEditable("Tasa",
       `<input type="text" class="cj-edit" inputmode="decimal" autocomplete="off"
               value="${esc($("f-tasa").value)}" placeholder="escríbela"
