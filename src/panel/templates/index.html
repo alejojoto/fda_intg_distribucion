@@ -993,25 +993,6 @@
   .desc-desglose .productos { font-weight:400; color:var(--mut); font-size:12px;
                               margin-top:2px; }
   .desc-desglose .tope { display:block; font-weight:400; font-size:11px; color:#b45309; }
-  /* Campañas que alcanzan la línea y aun así NO se aplican (perdieron, o una
-     exclusiva las bloqueó): tachadas, porque es justo lo que el operador no
-     puede deducir mirando los porcentajes. */
-  .desc-desglose .fila-bloqueadas { font-size:11.5px; color:var(--mut); margin-top:3px; }
-  .desc-desglose .bloqueada { text-decoration:line-through; white-space:nowrap;
-                              margin-left:4px; }
-  /* Modo de cada campaña en la tabla de combinación. Los tres se ven distintos:
-     el modo es la propiedad que decide cómo se combina, y leerlo mal cambia el
-     porcentaje que se factura. */
-  .chip-modo { display:inline-block; border-radius:999px; padding:0 7px;
-               font-size:10.5px; font-weight:700; letter-spacing:.04em;
-               line-height:17px; vertical-align:middle; margin-left:7px; }
-  .chip-modo.m-prioridad { background:#eef2f8; border:1px solid #cbd5e1; color:#334155; }
-  .chip-modo.m-suma { background:#e8f0fe; border:1px solid #b9d0f7; color:#1e3a8a; }
-  .chip-modo.m-exclusiva { background:#f3e8ff; border:1px solid #d8b4fe; color:#6b21a8; }
-  /* A qué clientes alcanza cada campaña: el alcance compartido es parte de por
-     qué dos campañas se pisan, así que va en su misma fila. */
-  .choque-orden .fila-clientes { font-size:11.5px; color:var(--mut); font-weight:400;
-                                 margin-top:2px; }
   .choque-mover { display:flex; gap:3px; justify-content:flex-end; }
   .choque-mover button { width:20px; height:18px; padding:0; line-height:1; font-size:9px;
                          color:var(--mut); border:1px solid #cbd2dc; background:#fff;
@@ -1066,18 +1047,6 @@
      se vuelve una tarjeta ámbar —la decisión no puede parecer un extra opcional,
      que es justo cómo se leía siendo un check suelto (2026-07-30)— y el mismo
      ámbar marca la pendiente en el resumen. */
-  /* Aviso de que cambiar el modo mueve lo que se factura: ámbar de "esto tiene
-     consecuencia", con la cuenta concreta adentro. */
-  .desc-impacto { background:#fffaeb; border:1px solid #fde68a; color:#92400e;
-                  border-radius:6px; padding:8px 10px; margin-top:8px; font-size:12.5px; }
-  .desc-impacto ul { margin:5px 0 0; padding-left:18px; }
-  /* «Así quedaría», pegado al botón de Guardar: es lectura de confirmación, no
-     una alerta — tono liviano y en una sola línea que envuelve si hace falta. */
-  .desc-ejemplo { display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline;
-                  background:#f6f8fa; border:1px solid #e7ebf0; border-radius:6px;
-                  padding:7px 10px; margin-top:10px; font-size:12.5px; color:#334155; }
-  .desc-ejemplo .titulo { color:var(--mut); font-size:10.5px; text-transform:uppercase;
-                          letter-spacing:.04em; }
   #desc-acum-bloque.falta { background:#fffaeb; border:1px solid #fde68a;
                             border-radius:6px; padding:8px 10px; }
   #desc-acum-bloque.falta #desc-acum-titulo { font-weight:600; color:#92400e; }
@@ -1227,16 +1196,6 @@
                margin-left:7px; }
   .choque-suma { font-size:12.5px; color:#1e3a8a; background:#f0f5ff; border:1px solid #d6e2fb;
                  border-radius:6px; padding:6px 9px; margin:6px 0 0; }
-  /* Campaña EXCLUSIVA (2026-08-02): si manda, reemplaza todo descuento
-     solapado. Morado: no es alerta (es una decisión tomada), pero tampoco el
-     azul de "se suma" — bloquear y sumar son opuestos y no pueden leerse igual. */
-  .card-excl { display:inline-block; background:#f3e8ff; border:1px solid #d8b4fe;
-               color:#6b21a8; border-radius:4px; padding:0 6px; font-size:10.5px;
-               font-weight:700; letter-spacing:.05em; vertical-align:middle;
-               margin-left:7px; }
-  .choque-bloqueo { font-size:12.5px; color:#6b21a8; background:#faf5ff;
-                    border:1px solid #e9d5ff; border-radius:6px; padding:6px 9px;
-                    margin:6px 0 0; }
   .desc-card .card-acciones { display:flex; gap:8px; margin-top:9px; }
   /* Aviso "en el objeto" (feedback del usuario 2026-07-24): cuando una acción de
      la tarjeta (activar/eliminar) la RECHAZA el servidor, el aviso va AQUÍ,
@@ -2392,7 +2351,7 @@
            pelear, la palabra fuerte es la que hace entrar a mirar, y de mirar
            depende decidir si esta se suma o compite. -->
       <button type="button" class="desc-tab" data-t="choques" id="desc-tab-btn-choques"
-              style="display:none" onclick="descTab('choques')">Conflictos y combinación<span class="desc-tab-marca" id="desc-marca-choques" style="display:none"></span></button>
+              style="display:none" onclick="descTab('choques')">Conflictos<span class="desc-tab-marca" id="desc-marca-choques" style="display:none"></span></button>
     </div>
 
     <div id="desc-cuerpo">
@@ -2447,31 +2406,25 @@
            (gana la más específica), y decidirlo desde Detalles obligaba a saltar
            de pestaña para ver en qué quedó. -->
       <div id="desc-acum-slot-datos">
-        <!-- TRES modos, ninguno marcado de entrada (2026-07-30, ampliado el
-             2026-08-02): con otra campaña de por medio, mandar / sumarse /
-             reemplazar facturan porcentajes distintos, así que no hay default
-             seguro que asumir en silencio — se elige antes de dejar guardar.
-             Sin ninguna campaña encima no bloquea nada y la campaña compite,
-             como siempre. -->
-        <div class="editor-campo" id="desc-acum-bloque"><span id="desc-acum-titulo">Cómo se combina con otras campañas</span>
+        <!-- Dos opciones, ninguna marcada de entrada (2026-07-30, pedido del
+             usuario): con otra campaña de por medio, competir y sumarse facturan
+             porcentajes distintos, así que no hay default seguro que asumir en
+             silencio — se elige antes de dejar guardar. Sin ninguna campaña
+             encima no bloquea nada y la campaña compite, como siempre. -->
+        <div class="editor-campo" id="desc-acum-bloque"><span id="desc-acum-titulo">Con otras campañas</span>
           <span class="obligatorio-tag" id="desc-acum-oblig" style="display:none">obligatorio</span>
           <div id="desc-acum-opciones">
-            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="prioridad" onchange="descAcumulableCambio()"> Prioridad: puede mandar; permite acumulables</label>
-            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="suma" onchange="descAcumulableCambio()"> Se suma: se agrega salvo que gane Exclusiva</label>
-            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="exclusiva" onchange="descAcumulableCambio()"> Exclusiva: si manda, reemplaza todo descuento solapado</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="prioridad" onchange="descAcumulableCambio()"> Prioridad: manda una sola y tú eliges cuál</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="suma" onchange="descAcumulableCambio()"> Se suma: su porcentaje se agrega al de la campaña que mande</label>
           </div>
-          <!-- El aviso trae la acción ahí mismo (las opciones de arriba) y
+          <!-- El aviso trae la acción ahí mismo (las dos opciones de arriba) y
                dice las dos consecuencias de no elegir: no guarda, y la tabla de
                quién manda no se deja tocar. Justo eso pasó el 2026-07-30: se
                ordenó la prioridad sin haber visto nunca la opción de sumar. -->
           <div class="desc-pendiente" id="desc-acum-falta" style="display:none">
-            Elige uno: mientras no lo hagas no se puede guardar, ni ordenar quién manda.
+            Elige una: mientras no lo hagas no se puede guardar, ni ordenar quién manda.
             <button type="button" class="desc-ir" id="desc-acum-ir" onclick="descTab('choques')">Ver el conflicto</button>
           </div>
-          <!-- Cambiar el modo de una campaña ya guardada puede mover lo que se
-               factura: el aviso lo dice concreto (qué producto, de cuánto a
-               cuánto), no "esto podría afectar otras campañas". -->
-          <div class="desc-impacto" id="desc-acum-impacto" style="display:none"></div>
         </div>
       </div>
       <!-- El bloque de clientes viaja igual que el del porcentaje: se ve en
@@ -2554,11 +2507,6 @@
          igual desde Productos o Clientes, y al no scrollear no agrega barra. -->
     <div class="desc-overview" id="desc-overview"></div>
 
-    <!-- Ejemplo del resultado con los solapamientos de HOY, pegado al botón de
-         Guardar (pedido del usuario 2026-08-02): antes de guardar hay que poder
-         ver en qué porcentaje termina cada ámbito, sin ir a buscarlo a otra
-         pestaña. Sale del mismo desglose que calcula el motor. -->
-    <div id="desc-ejemplo" class="desc-ejemplo" style="display:none"></div>
     <div id="desc-error" class="desc-error" style="display:none"></div>
     <div class="editor-acciones">
       <button class="primario" onclick="guardarDescuento()">Guardar</button>
@@ -4963,6 +4911,54 @@ for (const evt of ["input", "change"]) {
     if (ev.target && ev.target.matches && ev.target.matches('input[type="date"]')) actualizarXFecha(ev.target.id);
   });
 }
+
+// --- Campos de fecha: el año se queda en cuatro dígitos ---------------------
+// (usuario 2026-08-02) El editor nativo del navegador acumula hasta SEIS
+// dígitos en el año: con 2026 ya puesto, teclear "2026" encima dejaba 202226.
+// Se lleva un buffer propio de los dígitos que van cayendo en el año y se
+// conservan los cuatro últimos, así volver a teclear un año completo lo
+// reemplaza en vez de pegotearse al anterior. El campo solo se corrige cuando
+// el navegador y el buffer difieren (o sea, al pasarse de cuatro dígitos):
+// mientras coincidan no se toca nada. Va en fase de captura para que el valor
+// ya esté corregido cuando corran los oyentes de siempre (aviso de vigencia,
+// filtros, calendario propio).
+function anioDeFecha(valor) { return (valor || "").split("-")[0] || ""; }
+
+let fechaTeclaEnCurso = null;                    // dígito recién pulsado, si lo hubo
+let fechaAnioBuffer = {campo: null, digitos: ""};
+
+document.addEventListener("keydown", (ev) => {
+  const inp = ev.target.closest?.('input[type="date"]');
+  const digito = /^[0-9]$/.test(ev.key) && !ev.ctrlKey && !ev.metaKey && !ev.altKey;
+  fechaTeclaEnCurso = (inp && digito) ? {campo: inp, tecla: ev.key, antes: anioDeFecha(inp.value)} : null;
+  // Flechas, Tab, borrar: se salió del año o se está corrigiendo, se arranca de cero.
+  if (inp && !digito) fechaAnioBuffer = {campo: null, digitos: ""};
+}, true);
+
+document.addEventListener("input", (ev) => {
+  const pend = fechaTeclaEnCurso;
+  fechaTeclaEnCurso = null;
+  if (!pend || ev.target !== pend.campo) return;
+  const ahora = anioDeFecha(pend.campo.value);
+  // El año no cambió: el dígito fue al día o al mes, el buffer del año se suelta.
+  if (ahora === pend.antes) { fechaAnioBuffer = {campo: null, digitos: ""}; return; }
+  if (fechaAnioBuffer.campo !== pend.campo) fechaAnioBuffer = {campo: pend.campo, digitos: ""};
+  fechaAnioBuffer.digitos = (fechaAnioBuffer.digitos + pend.tecla).slice(-4);
+  const esperado = fechaAnioBuffer.digitos.padStart(4, "0");
+  if (esperado !== ahora) pend.campo.value = pend.campo.value.replace(/^\d+/, esperado);
+}, true);
+
+// Red de seguridad para lo que no pasa por ese buffer: un año de más de cuatro
+// dígitos tecleado con el día o el mes todavía vacíos (mientras la fecha está
+// incompleta el campo no expone ningún valor, así que no hay nada que seguir),
+// o un navegador que teclee las fechas de otra manera. Al quedar la fecha
+// completa se conservan igual los cuatro últimos dígitos.
+document.addEventListener("change", (ev) => {
+  const inp = ev.target.closest?.('input[type="date"]');
+  if (!inp) return;
+  const anio = anioDeFecha(inp.value);
+  if (anio.length > 4) inp.value = inp.value.replace(/^\d+/, anio.slice(-4));
+}, true);
 
 // La × de un campo de fecha: lo vacía (cada uno por separado) y esconde su ×.
 // No toca ningún otro campo: anuncia el cambio con un evento change y cada
@@ -12969,15 +12965,6 @@ function descPctTexto(d) {
 // Choques/notas de UNA campaña para su tarjeta en la lista (CONTRATOS.md 4.4):
 // un choque sin decidir es alerta (reusa .conflicto); uno ya decidido es una
 // línea sutil que dice quién manda; las notas son informativas.
-// Chip de modo en la tarjeta de la lista: 'prioridad' es lo normal y no se
-// anuncia; los otros dos cambian lo que se factura y sí se ven de un vistazo.
-function descChipTarjeta(d) {
-  const modo = d.modo || (d.acumulable ? "suma" : "prioridad");
-  if (modo === "suma") return '<span class="card-suma">SE SUMA</span>';
-  if (modo === "exclusiva") return '<span class="card-excl">EXCLUSIVA</span>';
-  return "";
-}
-
 function descChoquesTarjetaHTML(d) {
   const choques = (d.choques || []).map(c => {
     if (c.decision === "esta")
@@ -12992,9 +12979,7 @@ function descChoquesTarjetaHTML(d) {
   // Sumas (campañas acumulables): no son alerta ni decisión pendiente — dicen
   // con quién se apila y en cuánto queda el descuento donde coinciden.
   const sumas = (d.sumas || []).map(s => `<div class="choque-suma">${esc(s)}</div>`).join("");
-  const bloqueos = (d.bloqueos || []).map(b =>
-    `<div class="choque-bloqueo">${esc(b)}</div>`).join("");
-  return choques + sumas + bloqueos + notas;
+  return choques + sumas + notas;
 }
 
 function pintarListaDescuentos() {
@@ -13062,7 +13047,7 @@ function pintarListaDescuentos() {
     // con uno solo sigue en línea detrás de la presentación.
     const alc = descAlcanceHTML(d);
     return `<div class="desc-card ${d.activo ? "" : "inactiva"}" data-desc-id="${esc(d.id)}">
-      <h4>${puntoEstado(d.activo)}${esc(d.nombre || descPctTexto(d) + " — " + (d.alcance === "total" ? "Toda la factura" : `${(d.productos || []).length} producto${(d.productos || []).length === 1 ? "" : "s"}`))}${d.es_prueba ? '<span class="card-prueba">PRUEBA</span>' : ""}${descChipTarjeta(d)}</h4>
+      <h4>${puntoEstado(d.activo)}${esc(d.nombre || descPctTexto(d) + " — " + (d.alcance === "total" ? "Toda la factura" : `${(d.productos || []).length} producto${(d.productos || []).length === 1 ? "" : "s"}`))}${d.es_prueba ? '<span class="card-prueba">PRUEBA</span>' : ""}${d.acumulable ? '<span class="card-suma">SE SUMA</span>' : ""}</h4>
       <div class="meta"><b class="cardpct">${esc(descPctTexto(d))}</b>${d.alcance === "total" ? " general" : ""}${descPresTexto(d) ? " · " + esc(descPresTexto(d)) : ""}${alc.bloque ? "" : " · " + alc.html}</div>
       ${alc.bloque ? alc.html : ""}
       <div class="meta cli">${esc(descQuienes(d.objetivos, d.es_global))}</div>
@@ -13162,9 +13147,9 @@ function nuevoDescuento() {
   descEdit = {
     id: null, nombre: "", alcance: "total", porcentaje: 10,
     // Arranca en paquetes: los kilos solo llevan descuento si se piden.
-    // modo "" = sin decidir: una campaña nueva no llega con la prioridad
+    // acumulable null = sin decidir: una campaña nueva no llega con la prioridad
     // puesta, así que si aparece un conflicto hay que elegir (ver descValidar).
-    presentaciones: "paq", modo: "",
+    presentaciones: "paq", acumulable: null,
     vigencia_desde: "", vigencia_hasta: "", indefinida: false,
     todosClientes: false, selCli: {}, selProd: new Set(),
     prodPct: {},
@@ -13202,7 +13187,7 @@ function editarDescuento(id) {
   }
   descEdit = {
     id: d.id, nombre: d.nombre || "", alcance: d.alcance,
-    presentaciones: d.presentaciones || "ambas", modo: d.modo || (d.acumulable ? "suma" : "prioridad"),
+    presentaciones: d.presentaciones || "ambas", acumulable: !!d.acumulable,
     // Las campañas "especificado" no guardan % general: al reabrir, el campo
     // "descuento a aplicar" vuelve a su default 10 (editable), nunca vacío.
     porcentaje: d.porcentaje ?? 10, vigencia_desde: d.vigencia_desde, vigencia_hasta: d.vigencia_hasta,
@@ -13252,7 +13237,7 @@ function abrirEditorDescuento() {
   descTituloActualizar();
   for (const r of document.getElementsByName("desc-pres")) r.checked = (r.value === descEdit.presentaciones);
   $("desc-pct").value = descEdit.porcentaje;
-  descAcumSet(descEdit.modo || "");
+  descAcumSet(descEdit.acumulable == null ? "" : (descEdit.acumulable ? "suma" : "prioridad"));
   $("desc-desde").value = descEdit.vigencia_desde;
   $("desc-hasta").value = descEdit.vigencia_hasta;
   // Fecha a la que se vuelve si el operador desmarca "Sin fecha de fin": la
@@ -13390,8 +13375,7 @@ function descAcumSet(valor) {
 function descHayCoincidencia() {
   const r = descChoqueUltimo;
   if (!r || !r.listo) return false;
-  return !!((r.choques || []).length || (r.sumas || []).length
-            || (r.notas || []).length || (r.bloqueos || []).length);
+  return !!((r.choques || []).length || (r.sumas || []).length || (r.notas || []).length);
 }
 
 // "Se suma" es el interruptor entre competir y apilarse, y desde Conflictos
@@ -13426,25 +13410,6 @@ function descPintarOverview() {
     ${descConflictoResumen()}
     <div class="meta"><b>Clientes:</b> ${esc(clientesTxt)}</div>`;
   descAcumPintarPendiente();
-  descPintarEjemplo();
-}
-
-// «Así quedaría»: las primeras líneas del desglose, pegadas al botón de Guardar.
-// Es el MISMO cálculo del motor que ya pinta la pestaña de conflictos, resumido
-// para poder confirmar el guardado sin cambiar de pestaña.
-function descPintarEjemplo() {
-  const caja = $("desc-ejemplo");
-  if (!caja) return;
-  const r = descChoqueUltimo;
-  const filas = (r && r.listo) ? (r.desglose || []) : [];
-  if (!filas.length) { caja.style.display = "none"; caja.innerHTML = ""; return; }
-  const num = x => +x.toFixed(6);
-  const nombre = f => f.grupo || (f.productos || []).slice(0, 2).join(", ") || "Toda la factura";
-  const trozos = filas.slice(0, 3).map(f =>
-    `<span><b>${esc(nombre(f))}</b> queda en ${num(f.pct)}%</span>`).join("");
-  const resto = filas.length > 3 ? `<span class="mut">y ${filas.length - 3} ámbito(s) más</span>` : "";
-  caja.innerHTML = `<b class="titulo">Así quedaría:</b>${trozos}${resto}`;
-  caja.style.display = "";
 }
 
 // Renglón de conflictos del resumen fijo (2026-07-30, pedido del usuario): con
@@ -13469,22 +13434,16 @@ function descConflictoResumen() {
     : `${otras} campaña${otras === 1 ? "" : "s"} más`;
   let queda;
   if (decision === "suma") queda = "se suma al % de la que mande";
-  else if (decision === "prioridad" || decision === "exclusiva") {
-    // Quién manda sale de la MISMA tabla que el operador tiene a la vista (su
-    // primera fila), no de una cuenta aparte: así el resumen dice lo mismo que
-    // la pestaña.
-    const filas = descTablaCombinacion(r).conOrden ? (r.combinacion || []) : [];
-    const posicion = new Map((descChoqueOrden || []).map((clave, i) => [clave, i]));
-    const compiten = filas.filter(f => f.modo !== "suma").sort((a, b) =>
-      (posicion.has(descChoqueClave(a)) ? posicion.get(descChoqueClave(a)) : 999)
-      - (posicion.has(descChoqueClave(b)) ? posicion.get(descChoqueClave(b)) : 999));
-    const primera = compiten[0] || null;
+  else if (decision === "prioridad") {
+    // Quién manda sale de la tabla que el operador tiene a la vista (su primera
+    // fila), no de una cuenta aparte: así el resumen dice lo mismo que la pestaña.
+    const tabla = descFilasConvivencia(r);
+    const primera = (tabla.conOrden && tabla.filas.length) ? tabla.filas[0].item : null;
     const manda = primera
       ? (primera.es_esta ? "esta campaña" : `«${esc(primera.etiqueta || "")}»`) : "";
-    const como = decision === "exclusiva" ? "es exclusiva" : "por prioridad";
-    queda = manda ? `${como}: manda ${manda}` : como;
+    queda = manda ? `por prioridad manda ${manda}` : "por prioridad";
   } else {
-    queda = `<span class="falta"><b>falta decidir</b>: cómo se combina</span>`;
+    queda = `<span class="falta"><b>falta decidir</b>: prioridad o se suma</span>`;
   }
   return `<div class="meta"><b>Conflictos:</b> se pisa con ${conQuien} — ${queda}</div>`;
 }
@@ -13498,32 +13457,6 @@ function descAcumPintarPendiente() {
   $("desc-acum-oblig").style.display = falta ? "" : "none";
   $("desc-acum-falta").style.display = falta ? "" : "none";
   $("desc-acum-bloque").classList.toggle("falta", falta);
-  descPintarImpactoModo();
-}
-
-// Cambiar el modo de una campaña YA GUARDADA puede mover lo que se factura: el
-// aviso lo dice CONCRETO (qué ámbito, de cuánto a cuánto), porque lo calcula el
-// servidor corriendo el motor dos veces —con el modo guardado y con el nuevo— y
-// comparando. Sin diferencias no aparece nada: un aviso que no cambia nada es
-// ruido.
-function descPintarImpactoModo() {
-  const caja = $("desc-acum-impacto");
-  if (!caja) return;
-  const imp = (descChoqueUltimo && descChoqueUltimo.listo)
-    ? descChoqueUltimo.impacto_modo : null;
-  if (!imp || !(imp.filas || []).length) {
-    caja.style.display = "none";
-    caja.innerHTML = "";
-    return;
-  }
-  const num = x => +x.toFixed(6);
-  const filas = imp.filas.map(f =>
-    `<li>${esc(f.ambito)}: <b>${num(f.antes)}%</b> pasa a <b>${num(f.despues)}%</b></li>`).join("");
-  caja.innerHTML = `Al pasar de «${esc(DESC_MODO_TXT[imp.modo_anterior] || imp.modo_anterior)}»
-    a «${esc(DESC_MODO_TXT[imp.modo_nuevo] || imp.modo_nuevo)}» cambia lo que se factura:
-    <ul>${filas}</ul>
-    Guardar deja el descuento en los porcentajes de la derecha.`;
-  caja.style.display = "";
 }
 
 // --- Alcance: check "Todos los productos" + % + árbol grupo→producto --------
@@ -13992,7 +13925,7 @@ function descPayload(activo) {
     // Sin decidir viaja como 0 (compite): el chequeo en vivo tiene que poder
     // correr con el borrador a medias. El freno de "elige antes de guardar" es
     // descValidar, no el payload.
-    modo: descAcumActual(),
+    acumulable: descAcumActual() === "suma" ? 1 : 0,
     porcentaje: $("desc-pct").value.trim(),
     vigencia_desde: $("desc-desde").value,
     vigencia_hasta: descEdit.indefinida ? null : $("desc-hasta").value,
@@ -14100,8 +14033,7 @@ function descValidar() {
   // sumarse: con otra campaña de por medio son dos porcentajes distintos y no
   // hay default que se pueda asumir en silencio.
   if (descHayCoincidencia() && !descAcumActual())
-    return {msg: "Hay otra campaña de por medio: elige cómo se combina esta "
-                 + "(prioridad, se suma o exclusiva).",
+    return {msg: "Hay otra campaña de por medio: elige si esta lleva prioridad o si se suma.",
             tab: "choques"};
   return {msg: "", tab: null};
 }
@@ -14171,7 +14103,7 @@ async function desactivarDescuento(id, activo) {
       // Van explícitas porque el guardado toma lo que llega: sin ellas, apagar y
       // volver a encender la campaña la dejaba compitiendo y en "ambas"
       // presentaciones, perdiendo en silencio dos decisiones ya tomadas.
-      modo: d.modo || (d.acumulable ? "suma" : "prioridad"), presentaciones: d.presentaciones,
+      acumulable: d.acumulable ? 1 : 0, presentaciones: d.presentaciones,
       clientes: d.objetivos.map(o => ({codigo_cliente_winledger: o.codigo_cliente_winledger,
                 cliente_id: o.cliente_id, incluir: o.incluir})),
       grupos: d.grupos,
@@ -14222,11 +14154,7 @@ async function descChequearChoques() {
   if (!descEdit) return;
   let r;
   try {
-    // El orden acomodado viaja con el chequeo: el servidor calcula el desglose
-    // con ESAS prioridades, así que lo que se ve es lo que se facturaría al
-    // guardar (y sin que el navegador tenga que rehacer ninguna cuenta).
-    r = await api("/api/descuento/chequear",
-                  {...descPayload(), orden_choque: descChoqueOrden || undefined});
+    r = await api("/api/descuento/chequear", descPayload());
   } catch (e) {
     return;   // un chequeo en vivo fallido no debe tapar el editor; se reintenta solo
   }
@@ -14270,14 +14198,6 @@ function descFusionarOrden(r) {
   if (descChoqueOrdenBase === null) descChoqueOrdenBase = claves.join("|");
 }
 
-// Rótulo corto del modo de una campaña, para las tablas y las tarjetas.
-const DESC_MODO_TXT = {prioridad: "Prioridad", suma: "Se suma", exclusiva: "Exclusiva"};
-
-function descChipModo(modo) {
-  const txt = DESC_MODO_TXT[modo] || DESC_MODO_TXT.prioridad;
-  return `<span class="chip-modo m-${esc(modo || "prioridad")}">${esc(txt)}</span>`;
-}
-
 function descPintarChoques(r) {
   const cont = $("desc-choques");
   // Un chequeo a medias (listo=false: el % vaciado para reteclearlo, los
@@ -14288,21 +14208,15 @@ function descPintarChoques(r) {
   const choques = r.choques || [];
   const notas = r.notas || [];
   const sumas = r.sumas || [];
-  const bloqueos = r.bloqueos || [];
-  const combinacion = r.combinacion || [];
-  // Con una sola campaña en la combinación (la propia) no hay convivencia.
-  if (combinacion.length < 2 && !choques.length && !notas.length
-      && !sumas.length && !bloqueos.length) {
+  if (!choques.length && !notas.length && !sumas.length) {
     descPestanaChoques(false, false);
     cont.innerHTML = "";
     return;
   }
   const filasNotas = notas.map(n => `<div class="choque-nota">${esc(n)}</div>`).join("");
-  const filasBloqueos = bloqueos.map(b =>
-    `<div class="choque-bloqueo">${esc(b.detalle)}</div>`).join("");
   const detalles = choques.map(c =>
     `<p class="mut" style="margin:4px 0 0">Choca con «${esc(c.otra_etiqueta)}»: ${esc(c.detalle)}</p>`).join("");
-  const tabla = descTablaCombinacion(r);
+  const tabla = descTablaConvivencia(r);
   // La tabla trae el grupo entero de campañas que se pisan entre sí, no solo
   // las que chocan con esta: sin decirlo, una fila ajena parecería un choque
   // propio (y moverla, una decisión sobre algo que no es).
@@ -14314,29 +14228,32 @@ function descPintarChoques(r) {
     ? `<p class="mut" style="margin:4px 0 0">${ajenas.join(", ")} no se pisa con esta campaña,
        pero sí con otra de la lista: el orden vale para todo el grupo.</p>`
     : "";
-  // El subtítulo dice en cuál de los casos estás y qué hacer con él. Con la
-  // decisión de modo pendiente manda a elegir, que es lo que abre paso a todo
-  // lo demás; con el orden en juego explica que manda la de arriba; y cuando el
-  // orden NO cambia nada lo DICE en vez de esconder el control sin explicación
-  // (pedido del usuario 2026-08-02).
+  // El subtítulo con la instrucción solo acompaña a la tabla: con puras notas
+  // informativas no se le pide nada al operador. Con sumas no se decide nada
+  // tampoco — se explica qué está viendo.
+  // Con la decisión pendiente el subtítulo no explica la tabla: manda a elegir,
+  // que es lo que abre paso a ordenarla.
   const subtitulo = (descHayCoincidencia() && !descAcumActual())
-    ? `<p class="mut" style="margin:0 0 8px">Elige arriba cómo se combina esta campaña:
-       de eso depende con qué porcentaje se factura.</p>`
+    ? `<p class="mut" style="margin:0 0 8px">${tabla.conOrden
+        ? "Elige arriba antes de seguir: con prioridad ordenas quién manda de las de abajo; sumándose no hay orden que decidir."
+        : "Elige arriba cómo se lleva con la otra campaña: de eso depende con qué porcentaje se factura."}</p>`
     : tabla.conOrden
-    ? `<p class="mut" style="margin:0 0 8px">Manda la de arriba: de ella sale el porcentaje.
-       Reordenarla ES la decisión.</p>`
-    : (r.por_que_no_decide
-       ? `<p class="choque-nota" style="margin:0 0 8px">${esc(r.por_que_no_decide)}</p>`
+    ? `<p class="mut" style="margin:0 0 8px">Manda la de arriba: de ella sale el porcentaje.${
+        sumas.length ? " Lo marcado con + se suma encima, en su misma fila." : ""}</p>`
+    : (tabla.html
+       ? `<p class="mut" style="margin:0 0 8px">Estas campañas no compiten: sus porcentajes se suman.</p>`
        : "");
-  // Sin título propio: la pestaña ya se llama Conflictos y combinación, y
-  // repetirlo aquí era decir dos veces lo mismo (2026-07-29). El desglose
-  // traduce la tabla de arriba a lo que se factura línea por línea: va debajo,
-  // con su título de sección — arriba se decide, abajo se lee.
+  // Sin título propio: la pestaña ya se llama Conflictos y repetirlo aquí
+  // era decir dos veces lo mismo (2026-07-29). Lo que sí queda es el subtítulo,
+  // que dice en cuál de los tres casos estás y qué hacer con él.
+  //
+  // El desglose traduce la tabla de arriba a lo que se factura línea por línea.
+  // Va debajo, con su título de sección: arriba se decide, abajo se lee.
   const desglose = descTablaDesglose(r);
   const bloqueDesglose = desglose
     ? `<h4 class="desglose-titulo">Cómo queda cada producto</h4>${desglose}` : "";
   cont.innerHTML = `${subtitulo}${tabla.html}${detalles}`
-    + `${aclaraAjenas}${filasBloqueos}${filasNotas}${bloqueDesglose}`;
+    + `${aclaraAjenas}${filasNotas}${bloqueDesglose}`;
   descPestanaChoques(true, choques.length > 0);
 }
 
@@ -14382,70 +14299,156 @@ function descChoquePct(it) {
   };
 }
 
-// Tabla de «Conflictos y combinación» (CONTRATOS.md 4.4, rediseño 2026-08-02):
-// UNA fila por campaña que se solapa con la editada —ella incluida—, con su
-// MODO, a qué clientes alcanza y con qué porcentajes. Se muestra SIEMPRE que
-// haya solapamiento, no solo cuando hay dos campañas peleando: el operador
-// tiene que poder ver con quién se pisa su campaña aunque no haya nada que
-// decidir (pedido del usuario 2026-08-02).
-//
-// El control de quién manda (radio + flechas) aparece SOLO cuando reordenar
-// cambiaría lo que se factura — eso lo decide el servidor simulando el motor
-// (`orden_decide`), no una regla adivinada aquí. Cuando no cambia nada, el
-// subtítulo explica por qué en vez de esconder el control sin más.
-//
-// Devuelve {html, conOrden}.
-function descTablaCombinacion(r) {
-  const combinacion = r.combinacion || [];
-  if (combinacion.length < 2) return {html: "", conOrden: false};
-  const conOrden = !!r.orden_decide;
-  // El orden que el operador tiene acomodado manda sobre el del servidor: es lo
-  // que acaba de mover y todavía no guardó. Las campañas que no están en ese
-  // orden (las que se suman, o las de otro componente) van detrás, como vengan.
-  const posicion = new Map((descChoqueOrden || []).map((clave, i) => [clave, i]));
-  const filas = combinacion.slice().sort((a, b) => {
-    const pa = posicion.has(descChoqueClave(a)) ? posicion.get(descChoqueClave(a)) : 999;
-    const pb = posicion.has(descChoqueClave(b)) ? posicion.get(descChoqueClave(b)) : 999;
-    return pa - pb;
-  });
-  // Solo las que COMPITEN se numeran y se ordenan: una que se suma no disputa
-  // ningún puesto, y numerarla sugeriría que sí.
-  const compiten = filas.filter(f => f.modo !== "suma");
-  const conFlechas = conOrden && compiten.length >= 3;
+// [mínimo, máximo] de un desglose de % ({pct, n}), o null si no trae ninguno.
+// Con varios porcentajes por producto el total no es un número sino un rango.
+function descRango(desglose) {
+  const pcts = (desglose || []).map(x => parseFloat(x.pct)).filter(x => !isNaN(x));
+  if (!pcts.length) return null;
+  return [Math.min(...pcts), Math.max(...pcts)];
+}
 
-  const nombreDe = (it) => {
+function descRangoTexto(rango) {
+  // toFixed(6) mata el ruido binario de sumar flotantes (10.1 + 5.2), igual
+  // que el redondeo del cálculo en armado.py.
+  const n = x => +x.toFixed(6);
+  return rango[0] === rango[1] ? `${n(rango[0])}%`
+    : `entre ${n(rango[0])}% y ${n(rango[1])}%`;
+}
+
+// Filas de la tabla de convivencia: {clave, control, item, sumas}. `item` es la
+// campaña que COMPITE por la línea (null cuando no hay ninguna: solo acumulables
+// apiladas entre sí) y `sumas` las ACUMULABLES que se le agregan encima.
+function descFilasConvivencia(r) {
+  const listo = !!(r && r.listo);
+  const orden = listo ? (r.orden || []) : [];
+  const sumas = listo ? (r.sumas || []) : [];
+  const esta = listo ? (r.esta || null) : null;
+  const estaAcum = !!(esta && esta.acumulable);
+  // Alfabéticas, igual que las ordena el servidor en el desglose de abajo: las
+  // dos tablas nombran las mismas sumas y tienen que nombrarlas en el mismo orden.
+  const porNombre = (a, b) => (a.etiqueta || "").localeCompare(b.etiqueta || "");
+  const acumulables = sumas.filter(s => s.acumulable).sort(porNombre);
+  const competidoras = sumas.filter(s => !s.acumulable);
+  const itemEsta = {es_esta: true, etiqueta: "Esta campaña",
+                    pct_desglose: esta ? esta.pct_desglose : []};
+
+  // Con choques manda el orden que el operador tiene acomodado, y cada
+  // competidora trae SUS acumulables: no toda acumulable se apila sobre toda
+  // competidora (pueden no coincidir en clientes, vigencia ni productos).
+  if (orden.length && descChoqueOrden) {
+    const porClave = new Map(orden.map(it => [descChoqueClave(it), it]));
+    const filas = descChoqueOrden.filter(id => porClave.has(id)).map(clave => {
+      const it = porClave.get(clave);
+      return {clave, control: true, item: it, sumas: (it.sumas || []).slice().sort(porNombre)};
+    });
+    return {filas, conOrden: filas.length > 0};
+  }
+  // Sin choques la tabla solo vale la pena si hay algo apilándose.
+  if (!estaAcum) {
+    return acumulables.length
+      ? {filas: [{clave: "__esta__", control: false, item: itemEsta, sumas: acumulables}],
+         conOrden: false}
+      : {filas: [], conOrden: false};
+  }
+  // Esta campaña se SUMA, así que la base es la que mande entre las que compiten
+  // —cuál de ellas gana no se decide desde este editor— y esta va entre las
+  // sumadas, marcada como propia.
+  const conmigo = [itemEsta].concat(acumulables);
+  if (!competidoras.length) {
+    return {filas: [{clave: null, control: false, item: null, sumas: conmigo}],
+            conOrden: false};
+  }
+  const unica = competidoras.length === 1;
+  // Con una sola, la fila la nombra y se puede abrir; con varias no hay a quién
+  // abrir (la fila las resume a todas) y su % viaja como rango, en vez de
+  // inventar una ganadora que este editor no decide.
+  const base = {
+    etiqueta: unica ? competidoras[0].etiqueta : "La campaña que mande",
+    pct_desglose: unica ? competidoras[0].pct_desglose
+      : [].concat(...competidoras.map(c => c.pct_desglose || [])),
+  };
+  return {filas: [{clave: unica ? competidoras[0].id : null, control: false,
+                   item: base, sumas: conmigo}], conOrden: false};
+}
+
+// Celda "%" de una fila: el % de la campaña, "+" el de cada acumulable que se le
+// apila y "=" el total en que termina. Con porcentajes distintos por producto
+// cada parte es un rango y el total también — la cuenta exacta producto por
+// producto vive en la tabla «Cómo queda cada producto», debajo.
+function descPctConSuma(item, sumas) {
+  const conPct = (sumas || []).filter(s => descRango(s.pct_desglose));
+  // Sin nada que sumar la celda queda como siempre: el desglose informativo
+  // ("10% en 3 · 6% en 2"), que dice más que un rango.
+  if (!conPct.length) return descChoquePct(item || {});
+
+  const base = item ? descRango(item.pct_desglose) : null;
+  const trozos = [];
+  let total = [0, 0];
+  if (base) { trozos.push(base); total = base.slice(); }
+  for (const s of conPct) {
+    const g = descRango(s.pct_desglose);
+    trozos.push(g);
+    total = [total[0] + g[0], total[1] + g[1]];
+  }
+  const cuenta = trozos.map(t => `<span>${esc(descRangoTexto(t))}</span>`)
+    .join(' <i class="op">+</i> ');
+  // Un solo sumando no es una suma: el total ES ese número y la cuenta sobra.
+  if (trozos.length < 2) return {html: cuenta, titulo: ""};
+  const tope = total[1] > 100 ? ' <span class="mut">(tope 100%)</span>' : "";
+  return {
+    html: `${cuenta} <i class="op">=</i> <b>${esc(descRangoTexto(total))}</b>${tope}`,
+    titulo: item ? descChoquePct(item).titulo : "",
+  };
+}
+
+// Tabla de convivencia con otras campañas (CONTRATOS.md 4.4): una fila por
+// campaña que COMPITE —manda la de arriba, y reordenarlas ES la decisión— con
+// las ACUMULABLES que se le apilan DENTRO de su misma fila y el total en que
+// termina si manda ella. Se pinta desde descChoqueOrden (lo que el operador
+// tiene acomodado) con los datos del último chequeo; el puesto se recalcula en
+// cada repintado.
+// Devuelve {html, conOrden}: `conOrden` dice si hay algo que decidir (hay
+// choques), para que el subtítulo no pida reordenar donde no hay orden.
+function descTablaConvivencia(r) {
+  const {filas, conOrden} = descFilasConvivencia(r);
+  if (!filas.length) return {html: "", conOrden: false};
+
+  const conFlechas = conOrden && filas.length >= 3;
+  const nombreDe = (it, clave) => {
+    if (!it) return '<span class="mut">La suma de estas campañas</span>';
     if (it.es_esta) return "Esta campaña";
+    if (!clave) return esc(it.etiqueta || "");   // fila sintética: no se abre nada
     // Las demás campañas del grupo se abren desde su propia fila: para ver o
     // corregir con qué porcentaje se está pisando la otra había que cerrar el
     // editor, buscarla en la lista y abrirla a mano.
     return `<button type="button" class="choque-ir" tabindex="-1"
-           title="Abrir «${esc(it.etiqueta || "")}»" data-id="${esc(it.id)}"
+           title="Abrir «${esc(it.etiqueta || "")}»" data-id="${esc(clave)}"
            onclick="descChoqueAbrirOtra(this)">${esc(it.etiqueta || "")}</button>`;
   };
+  const chipsDe = sumas => sumas.length
+    ? `<div class="fila-suman">${sumas.map(s =>
+        `<span class="chip-suma${s.es_esta ? " propia" : ""}">+ ${
+          esc(s.es_esta ? "Esta campaña" : (s.etiqueta || ""))}</span>`).join("")}</div>`
+    : "";
 
-  let puesto = 0;
-  const cuerpo = filas.map((f) => {
-    const clave = descChoqueClave(f);
-    const compite = f.modo !== "suma";
-    if (compite) puesto += 1;
-    const i = compiten.indexOf(f);
-    const arriba = (conFlechas && compite && i > 0)
+  const cuerpo = filas.map((f, i) => {
+    const arriba = (conFlechas && i > 0)
       ? `<button type="button" tabindex="-1" title="Subir un puesto"
-           onclick="descChoqueMover('${esc(clave)}', -1)">&#9650;</button>` : "";
-    const abajo = (conFlechas && compite && i < compiten.length - 1)
+           onclick="descChoqueMover('${esc(f.clave)}', -1)">&#9650;</button>` : "";
+    const abajo = (conFlechas && i < filas.length - 1)
       ? `<button type="button" tabindex="-1" title="Bajar un puesto"
-           onclick="descChoqueMover('${esc(clave)}', 1)">&#9660;</button>` : "";
+           onclick="descChoqueMover('${esc(f.clave)}', 1)">&#9660;</button>` : "";
     const mover = conFlechas ? `<div class="choque-mover">${arriba}${abajo}</div>` : "";
-    const manda = (conOrden && compite)
+    const manda = f.control
       ? `<input type="radio" name="desc-choque-manda" ${i === 0 ? "checked" : ""}
-          title="Manda donde se pisan" onchange="descChoqueSubirAlTope('${esc(clave)}')">` : "";
-    const pct = descChoquePct(f);
-    const propia = !!f.es_esta;
+          title="Manda donde se pisan" onchange="descChoqueSubirAlTope('${esc(f.clave)}')">` : "";
+    const pct = descPctConSuma(f.item, f.sumas);
+    // La fila se resalta cuando esta campaña está en ella, sea compitiendo o
+    // sumándose: es la referencia para saber qué se está moviendo.
+    const propia = (f.item && f.item.es_esta) || f.sumas.some(s => s.es_esta);
     return `<tr${propia ? ' class="esta"' : ""}>
-      ${conOrden ? `<td class="c-manda">${manda}</td>
-        <td class="c-puesto">${compite ? puesto + "º" : ""}</td>` : ""}
-      <td>${nombreDe(f)}${descChipModo(f.modo)}
-        <div class="fila-clientes">${esc(f.clientes || "")}</div></td>
+      ${conOrden ? `<td class="c-manda">${manda}</td><td class="c-puesto">${i + 1}º</td>` : ""}
+      <td>${nombreDe(f.item, f.clave)}${chipsDe(f.sumas)}</td>
       <td class="c-pct"${pct.titulo ? ` title="${esc(pct.titulo)}"` : ""}>${pct.html}</td>
       <td class="c-mover">${mover}</td>
     </tr>`;
@@ -14454,9 +14457,9 @@ function descTablaCombinacion(r) {
   const cabecera = conOrden
     ? `<th class="c-manda">Manda</th><th class="c-puesto">#</th><th>Campaña</th>`
     : `<th>Campaña</th>`;
-  // Sin elegir todavía el modo, la tabla se lee completa pero no se ordena:
-  // ordenarla ES decidir la prioridad, y así se elegía sin ver las otras
-  // opciones (2026-07-30). Los nombres siguen abriendo su campaña.
+  // Sin elegir todavía prioridad o suma, la tabla se lee completa pero no se
+  // ordena: ordenarla ES elegir prioridad, y así se elegía sin ver la otra
+  // opción (2026-07-30). Los nombres siguen abriendo su campaña.
   const bloqueado = conOrden && descHayCoincidencia() && !descAcumActual();
   return {
     html: `<table class="choque-orden${bloqueado ? " bloqueado" : ""}"><thead><tr>
@@ -14466,15 +14469,25 @@ function descTablaCombinacion(r) {
   };
 }
 
+// Cuál de las campañas que compiten por una línea manda: la primera del orden
+// que el operador tiene A LA VISTA, para que subir una fila se vea al instante
+// en el resultado. Si ninguna de esa línea está en el orden (una línea que el
+// choque no alcanza), manda la que decidió el servidor, que ya viene primera.
+function descQuienManda(compiten) {
+  if (!compiten || !compiten.length) return null;
+  if (descChoqueOrden) {
+    const elegida = descChoqueOrden.find(clave => compiten.some(c => c.clave === clave));
+    if (elegida) return compiten.find(c => c.clave === elegida);
+  }
+  return compiten[0];
+}
+
 // «Cómo queda cada producto»: con qué porcentaje termina cada línea donde esta
-// campaña coincide con otras (CONTRATOS.md 4.4).
-//
-// TODA la cuenta viene resuelta del servidor, del MISMO motor que factura
-// (armado.combinar_participantes): quién manda, qué se suma, qué queda
-// bloqueado y el total ya topado. Aquí no se recalcula nada — antes el
-// navegador terminaba la suma por su cuenta y eran dos motores que podían
-// divergir. Por eso mover una flecha vuelve a preguntar al servidor con el
-// orden propuesto (ver descChoqueMover).
+// campaña coincide con otras (CONTRATOS.md 4.4). El servidor ya agrupó los
+// productos que terminan igual —una fila por grupo cuando la campaña le pone un
+// solo % al grupo entero— y resolvió la especificidad; quién manda entre las que
+// empatan sale del orden que el operador tiene arriba, así que la tabla se
+// repinta con cada movimiento de las flechas.
 function descTablaDesglose(r) {
   const filas = (r && r.listo) ? (r.desglose || []) : [];
   if (!filas.length) return "";
@@ -14483,20 +14496,12 @@ function descTablaDesglose(r) {
   const num = x => +x.toFixed(6);
   const nombre = c => c.clave === "__esta__" ? "Esta campaña" : (c.etiqueta || "");
   const cuerpo = filas.map(f => {
-    const manda = (f.compiten || [])[0] || null;
+    const manda = descQuienManda(f.compiten);
     const partes = (manda ? [manda] : []).concat(f.suman || []);
+    const total = partes.reduce((a, c) => a + c.pct, 0);
     const cuenta = partes.map(c =>
         `<span>${esc(nombre(c))} ${num(c.pct)}%</span>`)
-      .join(' <i class="op">+</i> ')
-      || '<span class="mut">sin descuento</span>';
-    // Las bloqueadas se nombran TACHADAS: que una campaña alcance la línea y
-    // aun así no aplique es justo lo que el operador no puede adivinar solo.
-    const bloqueadas = (f.bloqueadas || []).map(c =>
-      `<span class="bloqueada" title="${c.motivo === "exclusiva"
-        ? "La que manda es exclusiva: reemplaza todo descuento solapado"
-        : "No manda en esta línea"}">${esc(nombre(c))} ${num(c.pct)}%</span>`).join(" ");
-    const filaBloqueadas = bloqueadas
-      ? `<div class="fila-bloqueadas">No aplica: ${bloqueadas}</div>` : "";
+      .join(' <i class="op">+</i> ');
     const productos = f.productos || [];
     const n = f.n_productos || 0;
     const resto = n - productos.length;
@@ -14510,14 +14515,14 @@ function descTablaDesglose(r) {
       : (n === 1 ? esc(productos[0]) : (n ? cuentaProd : "Toda la factura"));
     // La lista de productos solo agrega cuando el título no los nombra ya.
     const sub = (n > 1) ? `<div class="productos">${esc(lista)}</div>` : "";
-    // El número grande es lo que de verdad se factura: con la suma pasada del
-    // tope el titular es el tope, y debajo se dice cuánto daba sin topar.
-    const tope = f.topado
-      ? `<span class="tope">topado: la suma da ${num(f.total_sin_tope)}%</span>` : "";
+    // El número grande es lo que de verdad se factura: con la suma pasada de
+    // 100% el titular es el tope, y debajo se dice cuánto daba sin topar.
+    const tope = total > 100
+      ? `<span class="tope">topado: la suma da ${num(total)}%</span>` : "";
     return `<tr>
       <td class="c-ambito">${titulo}${sub}</td>
-      <td class="c-cuenta">${cuenta}${filaBloqueadas}</td>
-      <td class="c-total">${num(f.pct)}%${tope}</td>
+      <td class="c-cuenta">${cuenta}</td>
+      <td class="c-total">${num(Math.min(total, 100))}%${tope}</td>
     </tr>`;
   }).join("");
   return `<table class="desc-desglose"><thead><tr>
@@ -14566,8 +14571,7 @@ async function descChoqueIrA(id, etiqueta) {
 function descChoqueSubirAlTope(clave) {
   if (!descChoqueOrden) return;
   descChoqueOrden = [clave, ...descChoqueOrden.filter(x => x !== clave)];
-  descPintarChoques(descChoqueUltimo);   // la tabla de arriba se reordena al instante
-  descChequearChoques();                 // y el resultado lo recalcula el motor
+  descPintarChoques(descChoqueUltimo);
 }
 
 function descChoqueMover(clave, delta) {
@@ -14578,8 +14582,7 @@ function descChoqueMover(clave, delta) {
   const nuevo = descChoqueOrden.slice();
   nuevo.splice(j, 0, nuevo.splice(i, 1)[0]);
   descChoqueOrden = nuevo;
-  descPintarChoques(descChoqueUltimo);   // la tabla de arriba se reordena al instante
-  descChequearChoques();                 // y el resultado lo recalcula el motor
+  descPintarChoques(descChoqueUltimo);
 }
 
 // Delegado sobre todo el modal: cubre vigencia, % general, "Sin fecha de fin",
@@ -15105,7 +15108,7 @@ function descEstadoBorrador() {
     presentaciones: descPresActual(),
     // null = sin decidir, para que retomar el borrador no dé por elegida una
     // prioridad que el operador nunca marcó.
-    modo: descAcumActual(),
+    acumulable: descAcumActual() === "" ? null : descAcumActual() === "suma",
     todosClientes: descEdit.todosClientes,
     selCli,
     selProd: [...descEdit.selProd],
@@ -15211,8 +15214,7 @@ async function borradorContinuar() {
       descEdit = {
         id, nombre: datos.nombre, alcance: datos.alcance, porcentaje: datos.porcentaje,
         presentaciones: datos.presentaciones,
-        modo: datos.modo || (datos.acumulable == null ? ""
-          : (datos.acumulable ? "suma" : "prioridad")),
+        acumulable: datos.acumulable == null ? null : !!datos.acumulable,
         vigencia_desde: datos.vigencia_desde, vigencia_hasta: datos.vigencia_hasta,
         indefinida: datos.indefinida, todosClientes: datos.todosClientes,
         selCli, selProd: new Set(datos.selProd), prodPct: datos.prodPct,
