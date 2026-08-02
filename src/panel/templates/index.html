@@ -4971,45 +4971,64 @@ for (const evt of ["input", "change"]) {
 
 // --- Campos de fecha: el año se queda en cuatro dígitos ---------------------
 // (usuario 2026-08-02) El editor nativo del navegador acumula hasta SEIS
-// dígitos en el año: con 2026 ya puesto, teclear "2026" encima dejaba 202226.
-// Se lleva un buffer propio de los dígitos que van cayendo en el año y se
-// conservan los cuatro últimos, así volver a teclear un año completo lo
-// reemplaza en vez de pegotearse al anterior. El campo solo se corrige cuando
-// el navegador y el buffer difieren (o sea, al pasarse de cuatro dígitos):
-// mientras coincidan no se toca nada. Va en fase de captura para que el valor
-// ya esté corregido cuando corran los oyentes de siempre (aviso de vigencia,
-// filtros, calendario propio).
+// dígitos en el año: con 2026 ya puesto, seguir tecleando dejaba 202226. El
+// navegador ya arranca el año de cero al entrar al segmento (teclear un año
+// completo encima de otro funciona bien) — lo único que hace falta es que a
+// partir del quinto dígito el año siga corriendo en vez de crecer, así volver
+// a teclear "2026" deja 2026.
+//
+// Mientras se teclea el año se lleva la cuenta de sus dígitos y se conservan
+// los cuatro últimos. Con menos de cinco el navegador y la cuenta coinciden y
+// el campo NO se toca; recién al pasarse se escribe el año corrido. Ojo con el
+// campo a medio llenar: cuando el navegador deja la fecha inválida (el año en
+// 0 mientras se teclea, o el día en 0 al empezar una fecha nueva) el valor del
+// campo queda VACÍO, y escribir ahí encima borraba día y mes — por eso solo se
+// escribe si se venía tecleando el año, y reconstruyendo día y mes desde el
+// valor de antes de la tecla. Va en fase de captura para que el valor ya esté
+// corregido cuando corran los oyentes de siempre (aviso de vigencia, filtros,
+// calendario propio).
 function anioDeFecha(valor) { return (valor || "").split("-")[0] || ""; }
 
-let fechaTeclaEnCurso = null;                    // dígito recién pulsado, si lo hubo
-let fechaAnioBuffer = {campo: null, digitos: ""};
+let fechaTeclaEnCurso = null;   // {campo, tecla, valorAntes} del dígito en curso
+let anioEnTecleo = null;        // {campo, digitos} mientras el tecleo cae en el año
+function soltarAnioEnTecleo() { anioEnTecleo = null; }
 
 document.addEventListener("keydown", (ev) => {
   const inp = ev.target.closest?.('input[type="date"]');
+  if (!inp) { fechaTeclaEnCurso = null; return; }
   const digito = /^[0-9]$/.test(ev.key) && !ev.ctrlKey && !ev.metaKey && !ev.altKey;
-  fechaTeclaEnCurso = (inp && digito) ? {campo: inp, tecla: ev.key, antes: anioDeFecha(inp.value)} : null;
-  // Flechas, Tab, borrar: se salió del año o se está corrigiendo, se arranca de cero.
-  if (inp && !digito) fechaAnioBuffer = {campo: null, digitos: ""};
+  // Flechas, Tab, borrar: se salió del año, la cuenta arranca de cero.
+  if (!digito) { fechaTeclaEnCurso = null; soltarAnioEnTecleo(); return; }
+  fechaTeclaEnCurso = {campo: inp, tecla: ev.key, valorAntes: inp.value};
 }, true);
+// Un clic (a otro segmento o al mismo) y salir del campo también sueltan la cuenta.
+document.addEventListener("mousedown", soltarAnioEnTecleo, true);
+document.addEventListener("focusout", soltarAnioEnTecleo, true);
 
 document.addEventListener("input", (ev) => {
   const pend = fechaTeclaEnCurso;
   fechaTeclaEnCurso = null;
   if (!pend || ev.target !== pend.campo) return;
-  const ahora = anioDeFecha(pend.campo.value);
-  // El año no cambió: el dígito fue al día o al mes, el buffer del año se suelta.
-  if (ahora === pend.antes) { fechaAnioBuffer = {campo: null, digitos: ""}; return; }
-  if (fechaAnioBuffer.campo !== pend.campo) fechaAnioBuffer = {campo: pend.campo, digitos: ""};
-  fechaAnioBuffer.digitos = (fechaAnioBuffer.digitos + pend.tecla).slice(-4);
-  const esperado = fechaAnioBuffer.digitos.padStart(4, "0");
-  if (esperado !== ahora) pend.campo.value = pend.campo.value.replace(/^\d+/, esperado);
+  const antes = anioDeFecha(pend.valorAntes), ahora = anioDeFecha(pend.campo.value);
+  const enTecleo = anioEnTecleo && anioEnTecleo.campo === pend.campo;
+  // Fecha inválida a medio teclear: solo se sigue si el tecleo venía cayendo en
+  // el año; si no, es el día o el mes y no hay nada que corregir.
+  if (!ahora) { if (!enTecleo) return; }
+  // El año no cambió: la tecla fue al día o al mes.
+  else if (ahora === antes) { soltarAnioEnTecleo(); return; }
+  // Primer dígito del año: el navegador ya empezó de cero, se acompaña sin tocar.
+  if (!enTecleo) { anioEnTecleo = {campo: pend.campo, digitos: ahora.replace(/^0+/, "")}; return; }
+  anioEnTecleo.digitos = (anioEnTecleo.digitos + pend.tecla).slice(-4);
+  const esperado = anioEnTecleo.digitos.padStart(4, "0");
+  if (esperado === ahora || esperado === "0000") return;   // el año 0 no existe: no se escribe
+  const [, mes, dia] = (pend.campo.value || pend.valorAntes).split("-");
+  if (mes && dia) pend.campo.value = `${esperado}-${mes}-${dia}`;
 }, true);
 
-// Red de seguridad para lo que no pasa por ese buffer: un año de más de cuatro
-// dígitos tecleado con el día o el mes todavía vacíos (mientras la fecha está
-// incompleta el campo no expone ningún valor, así que no hay nada que seguir),
-// o un navegador que teclee las fechas de otra manera. Al quedar la fecha
-// completa se conservan igual los cuatro últimos dígitos.
+// Red de seguridad para lo que no pasa por esa cuenta: un año largo tecleado
+// con el día o el mes todavía vacíos (ahí el campo no expone ningún valor que
+// seguir), o un navegador que teclee las fechas de otra manera. Al quedar la
+// fecha completa se conservan igual los cuatro últimos dígitos.
 document.addEventListener("change", (ev) => {
   const inp = ev.target.closest?.('input[type="date"]');
   if (!inp) return;
