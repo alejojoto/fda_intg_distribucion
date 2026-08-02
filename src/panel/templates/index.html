@@ -5712,10 +5712,14 @@ function repintar() {
   // Cubre el pintado inicial y los refrescos (la ruta predeterminada de la
   // máquina se aplica al abrir, pero no cuenta como filtro: ver rutaFiltrando).
   pintarEstadoFiltros();
-  // El contador del tab cuenta lo que hay POR LLENAR: la lista trae también
-  // las partes ya listas de un pedido a medias (para que se vea completo),
-  // y esas no son trabajo (2026-07-22).
-  $("n-pendientes").textContent = pendientesLlenables().length;
+  // El contador del tab cuenta lo que hay POR LLENAR en la ruta puesta (o en
+  // todas, sin ruta elegida) — no lo que el buscador deja visible: un texto
+  // puesto ahí no puede hacer que el contador diga menos de lo que la ruta
+  // tiene de verdad (2026-08-02, pedido del usuario). La lista además trae las
+  // partes ya listas de un pedido a medias (para que se vea completo), y esas
+  // tampoco son trabajo (2026-07-22) — de ahí que el conteo no salga de
+  // ultimaLista.pendientes directo.
+  $("n-pendientes").textContent = totalPendientesDeLaRuta();
   pintarTituloVentana();   // la barra de la ventana lleva la misma cuenta
   // EN REVISIÓN existe cuando cualquiera de sus dos listas trae algo: los
   // llenados que no terminaron perfectos, o los pedidos que aún no se pueden
@@ -5770,20 +5774,36 @@ let tituloPuesto = null;    // lo último escrito: cambiarlo es un viaje a la ve
 let listaCargada = false;   // la lista llegó al menos una vez (ver cargar)
 let versionAsistente = "";  // instalador · commit corto; la manda /api/facturas (ver cargar)
 
+// Cuántas facturas por llenar tiene la ruta puesta (o todas juntas, sin ruta
+// elegida): SIEMPRE de pendientes_por_ruta, que el backend arma sin aplicar
+// ningún filtro (ni ruta ni buscador). El contador del tab y el título de la
+// ventana usan esto — no la lista ya recortada por el buscador — para que un
+// texto puesto ahí no los achique por debajo de lo que la ruta tiene de
+// verdad (2026-08-02, pedido del usuario).
+function totalPendientesDeLaRuta() {
+  const porRuta = ultimaLista.pendientes_por_ruta || {};
+  if (!rutaSeleccionada) return Object.values(porRuta).reduce((a, b) => a + b, 0);
+  return porRuta[rutaSeleccionada] || 0;
+}
+
 // "13 Ruta Norte, 9 Ruta Sur, 4 sin ruta" — mismo criterio de agrupar que el
 // filtro de ruta del panel (2026-07-31, pedido del usuario: de un vistazo,
 // en qué ruta está el trabajo pendiente). Con un solo grupo el desglose no
 // suma nada sobre la cuenta ya dicha ("12 pendientes: 12 sin ruta" es ruido).
-function desglosePendientes(pend) {
-  const porRuta = new Map();
+// Solo tiene sentido con "todas" puesto: con una ruta elegida el total ya es
+// de esa ruta sola.
+function desglosePendientes() {
+  if (rutaSeleccionada) return "";
+  const porRuta = ultimaLista.pendientes_por_ruta || {};
+  const conNombre = [];
   let sinRuta = 0;
-  for (const f of pend) {
-    if (!f.ruta) { sinRuta++; continue; }
-    const nombre = nombreRuta(f.ruta);
-    porRuta.set(nombre, (porRuta.get(nombre) || 0) + 1);
+  for (const [r, n] of Object.entries(porRuta)) {
+    if (!n) continue;
+    if (r === "__sin_ruta__") { sinRuta = n; continue; }
+    conNombre.push([nombreRuta(r), n]);
   }
-  if (porRuta.size + (sinRuta ? 1 : 0) <= 1) return "";
-  const partes = [...porRuta.entries()].sort((a, b) => b[1] - a[1])
+  if (conNombre.length + (sinRuta ? 1 : 0) <= 1) return "";
+  const partes = conNombre.sort((a, b) => b[1] - a[1])
     .map(([nombre, c]) => `${c} ${nombre}`);
   if (sinRuta) partes.push(`${sinRuta} sin ruta`);
   return partes.join(", ");
@@ -5801,8 +5821,7 @@ function estadoParaTitulo() {
   // pendientes" mentiría en la barra hasta el próximo intento. Mientras tanto
   // queda el nombre pelado, que es con lo que abre la ventana.
   if (!listaCargada) return null;
-  const pend = pendientesLlenables();
-  const n = pend.length;
+  const n = totalPendientesDeLaRuta();
   let texto;
   if (!n) {
     // La ruta puesta no puede hacer que la barra diga que no queda trabajo: lo
@@ -5813,7 +5832,7 @@ function estadoParaTitulo() {
       : "sin pendientes";
   } else {
     const base = n === 1 ? "1 pendiente" : `${n} pendientes`;
-    const desglose = desglosePendientes(pend);
+    const desglose = desglosePendientes();
     texto = desglose ? `${base}: ${desglose}` : base;
   }
   return versionAsistente ? `${versionAsistente} · ${texto}` : texto;
