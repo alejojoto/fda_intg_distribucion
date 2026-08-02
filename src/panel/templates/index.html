@@ -405,6 +405,22 @@
      (cabecera de cliente): sin caja, pegado al símbolo que lo disparó. */
   .obj-aviso-inline { color:#a12a2a; font-size:12px; font-weight:600; margin-left:4px; }
   .fam-resumen { color:var(--mut); font-size:12px; font-weight:600; }
+  /* Separadores de fecha (2026-08-02): franja compacta, sin barra lateral (no
+     es una fila de datos) para que no se confunda con la barra de familia.
+     Atrasada usa el mismo ámbar que el resto de los avisos que piden
+     atención (pap-ojo, fila-omitidas) — nada nuevo que aprender. */
+  tr.sep-fecha td { background:#eef1f6; color:var(--mut); font-weight:700;
+                    font-size:12px; padding:5px 10px; border-bottom:1px solid #dde2ea; }
+  tr.sep-fecha:hover td { background:#eef1f6; }
+  tr.sep-fecha.sep-fecha-antigua td { background:#fef0c7; color:#b54708; }
+  tr.sep-fecha.sep-fecha-antigua:hover td { background:#fef0c7; }
+  /* Filas de un grupo atrasado: matiz apenas visible, para que se note en
+     cualquier punto del scroll sin competir con los avisos de verdad
+     (fila-aviso, fila-conflicto) que ya usan ámbar/rojo más fuertes. */
+  tr.fila-atrasada td { background:#fffdf6; }
+  tr.fila-atrasada:hover td { background:#fef8e8; }
+  tr.fam-cabecera.fila-atrasada td { background:#fdf6e3; }
+  tr.fam-cabecera.fila-atrasada:hover td { background:#fdf6e3; }
   /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
@@ -5358,6 +5374,72 @@ function pintarPiePaginacion(tab, p, total, desde, mostrados, totalPaginas, unid
   }
 }
 
+// --- Separadores de fecha (2026-08-02) --------------------------------------
+// PENDIENTES, EN REVISIÓN y PROCESADAS agrupan sus filas por día. Un
+// separador es puramente de pintado: nunca lleva data-factura-key ni clase de
+// apertura, así que no cuenta como pedido en ningún conteo (esos se sacan de
+// la lista ANTES de pasar por aquí) y no interfiere con el clic que abre el
+// detalle de la fila real.
+const hoyComoISO = () => calISO(new Date());
+const ayerComoISO = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return calISO(d);
+};
+
+// Atrasado = ni hoy ni ayer, con fecha real (2026-08-02): se resalta —
+// separador y fila— para que un pedido olvidado o un caso de EN REVISIÓN que
+// lleva mucho tiempo esperando no se pierda al fondo de la lista.
+const esFechaAtrasada = (iso, hoy, ayer) => !!iso && iso !== hoy && iso !== ayer;
+
+// "Hoy" / "Ayer" / fecha corta (con año solo si no es el actual, como en
+// avisoFechaDelPedido) / "Sin fecha registrada" para lo que llegó sin dato.
+function etiquetaSeparadorFecha(iso, hoy, ayer) {
+  if (!iso) return "Sin fecha registrada";
+  if (iso === hoy) return "Hoy";
+  if (iso === ayer) return "Ayer";
+  return iso.slice(0, 4) === hoy.slice(0, 4) ? dmaCorto(iso) : iso.split("-").reverse().join("/");
+}
+
+// Pinta `items` —YA en el orden final que se quiere mostrar; esta función
+// nunca reordena— intercalando un separador cada vez que cambia el día de
+// `fechaDe(item)`. `render(item, atrasada)` arma el HTML de la fila (o las
+// filas, para una familia); `atrasada` es el mismo criterio del separador,
+// para que la fila lleve su propio matiz aunque el separador quede fuera de
+// vista al scrollear. Con una página que no arranca en el primer ítem de la
+// lista completa (paginación), el primer grupo siempre lleva su separador —
+// no hay forma de saber, ni falta, qué quedó en la página anterior.
+function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
+  const hoy = hoyComoISO(), ayer = ayerComoISO();
+  let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
+  let html = "";
+  for (const item of items) {
+    const iso = (fechaDe(item) || "").slice(0, 10);
+    if (iso !== diaAnterior) {
+      diaAnterior = iso;
+      const atrasada = esFechaAtrasada(iso, hoy, ayer);
+      html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}">`
+        + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer))}</td></tr>`;
+    }
+    html += render(item, esFechaAtrasada(iso, hoy, ayer));
+  }
+  return html;
+}
+
+// Reordena SOLO para pintar — nunca la lista de origen, de la que depende qué
+// pedido llena "Llenar el siguiente" (pendientesLlenables()[0]) — para que
+// dentro de un mismo día el más reciente quede primero. Dos sorts estables
+// encadenados: el primero ordena por el valor completo descendente: el
+// segundo reagrupa por día (ascendente, el más viejo primero — PENDIENTES no
+// se reordena entre días, solo se le pone separador) sin tocar el orden que
+// dejó el primero adentro de cada grupo.
+function ordenParaPintarPorDia(items, fechaDe) {
+  const copia = [...items];
+  copia.sort((a, b) => (fechaDe(b) || "").localeCompare(fechaDe(a) || ""));
+  copia.sort((a, b) => (fechaDe(a) || "").slice(0, 10).localeCompare((fechaDe(b) || "").slice(0, 10)));
+  return copia;
+}
+
 // Las partes de un mismo pedido llegan CONTIGUAS del backend (agrupadas y
 // ordenadas 1..N); aquí se juntan en bloques para pintarlas como una unidad.
 function agruparFamilias(lista) {
@@ -6888,22 +6970,32 @@ function clienteEnLinea(f) {
   return sucursal ? `${cliente} · ${sucursal}` : cliente;
 }
 
+// Separadores por fecha del PEDIDO (2026-08-02): el orden de fondo no se
+// toca (de él depende qué familia llena "Llenar el siguiente" —
+// pendientesLlenables()[0]) así que los días quedan en el mismo orden en que
+// ya vienen (el más viejo primero). Dentro de un mismo día sí se reordena
+// solo para pintar, más reciente primero (ordenParaPintarPorDia); "antigua"
+// (ni hoy ni ayer) es la misma familia que la lista lleva atrás olvidada.
+const fechaDeFamilia = (partes) => partes[0].fecha_orden_salida;
+
 function pintarPendientes(familias) {
-  $("t-pendientes").querySelector("tbody").innerHTML = familias.map(partes => {
-    const f0 = partes[0];
-    // Un pedido de una sola factura se pinta como siempre: la cabecera de
-    // familia solo aparece cuando de verdad hay varias partes.
-    if (partes.length === 1 && !(f0.total_partes > 1)) return filaPendiente(f0, false);
-    return `
-    <tr class="fam-cabecera">
-      <td><b>${esc(f0.pedido_id)}</b></td>
-      <td>${celdaCliente(f0)}</td>
-      <td>${esc(f0.ruta || "")}</td>
-      <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
-      <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
-    </tr>` + partes.map(f => filaPendiente(f, true)).join("");
-  }).join("")
-    || `<tr><td colspan="8" class="mut">${avisoPendientesVacio()}</td></tr>`;
+  const enOrden = ordenParaPintarPorDia(familias, fechaDeFamilia);
+  $("t-pendientes").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    enOrden, fechaDeFamilia, 8, (partes, atrasada) => {
+      const f0 = partes[0];
+      // Un pedido de una sola factura se pinta como siempre: la cabecera de
+      // familia solo aparece cuando de verdad hay varias partes.
+      if (partes.length === 1 && !(f0.total_partes > 1)) return filaPendiente(f0, false, atrasada);
+      return `
+      <tr class="fam-cabecera${atrasada ? " fila-atrasada" : ""}">
+        <td><b>${esc(f0.pedido_id)}</b></td>
+        <td>${celdaCliente(f0)}</td>
+        <td>${esc(f0.ruta || "")}</td>
+        <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
+        <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
+      </tr>` + partes.map(f => filaPendiente(f, true, atrasada)).join("");
+    }
+  ) || `<tr><td colspan="8" class="mut">${avisoPendientesVacio()}</td></tr>`;
 }
 
 // Lista de pendientes vacía (2026-07-31, pedido del usuario): con una ruta
@@ -6930,10 +7022,12 @@ function avisoPendientesVacio() {
 // Sin número de parte (2026-07-22): la cabecera ya dice cuántas facturas son y
 // cómo van, y cada renglón lleva su chip — el "1/2" sobraba. El estado va al
 // lado de los botones, como en PROCESADAS.
-function filaPendiente(f, enFamilia) {
+function filaPendiente(f, enFamilia, atrasada = false) {
   const clave = esc(`${f.pedido_id}|${f.parte}`);
+  const clases = [enFamilia ? "fam-parte" : "", atrasada ? "fila-atrasada" : ""]
+    .filter(Boolean).join(" ");
   return `
-    <tr${filaDetalle(f, enFamilia ? "fam-parte" : "")} data-factura-key="${clave}">
+    <tr${filaDetalle(f, clases)} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
       <td>${enFamilia ? "" : esc(f.ruta || "")}</td>
@@ -7147,8 +7241,16 @@ function detalleDeMotivo(m, p) {
 // vez de rebotar entre PENDIENTES y PROCESADAS según el estado. Sin
 // paginación a propósito: lo normal es que sean pocas, y una cola larga
 // escrolea en su tabla.
+// Separadores por fecha/hora de ENTRADA en esta lista (2026-08-02): la lista
+// ya viene del backend ordenada por fecha_cierre/fecha_cargado descendente
+// (el llenado más reciente primero), así que agrupar por día es solo detectar
+// cuándo cambia — sin reordenar nada. "Atrasada" (ni hoy ni ayer) destaca el
+// llenado fallido que lleva más tiempo sin resolver.
+const fechaDeLlenadoPorRevisar = (f) => f.fecha_cierre || f.fecha_cargado;
+
 function pintarLlenadosPorRevisar(lista) {
-  $("t-llenados").querySelector("tbody").innerHTML = lista.map(f => {
+  $("t-llenados").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    lista, fechaDeLlenadoPorRevisar, 6, (f, atrasada) => {
     const detalle = f.detalle_error
       ? esc(f.detalle_error) + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "")
       : "";
@@ -7180,7 +7282,7 @@ function pintarLlenadosPorRevisar(lista) {
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`;
     return `
-    <tr${filaDetalle(f)}>
+    <tr${filaDetalle(f, atrasada ? "fila-atrasada" : "")}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
         ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
       <td>${celdaCliente(f)}</td>
@@ -7190,7 +7292,7 @@ function pintarLlenadosPorRevisar(lista) {
         ? `<div class="mut">${esc(ultimaReemision)}</div>` : ""}</td>
       <td${CELDA_ACCIONES}>${acciones}</td>
     </tr>`;
-  }).join("");
+  });
 }
 
 // --- Subtabs de EN REVISIÓN (2026-07-31) ------------------------------------
@@ -7234,17 +7336,26 @@ function irASubtabRevision(id) {
 
 let listaRevisionVisible = [];   // página visible, para Crear cliente/producto
 
+// Separadores por fecha/hora de ENTRADA en revisión (2026-08-02): el backend
+// ya ordena `lista` por `entrada_revision` (día ascendente — el caso más
+// viejo primero — y descendente por hora adentro del mismo día), así que acá
+// solo se detecta cuándo cambia el día. "Atrasada" (ni hoy ni ayer) destaca
+// el caso que lleva más tiempo sin resolver.
 function pintarRevision(lista) {
   listaRevisionVisible = lista;
-  $("t-revision").querySelector("tbody").innerHTML = lista.map((p, i) => {
+  let i = -1;   // el índice tiene que calzar con listaRevisionVisible[i]
+  $("t-revision").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    lista, (p) => p.entrada_revision, 6, (p, atrasada) => {
+    i++;
     // La fila entera abre el formulario que resuelve el caso, como en las demás
     // listas del panel (2026-08-01). Solo cuando hay UNA sola apertura: con
     // varias (un pedido con dos productos por crear) no hay "la" acción de la
     // fila, y ahí manda el botón de cada una.
     const abre = aperturasRevision(p, i);
+    const claseAtrasada = atrasada ? " fila-atrasada" : "";
     const clic = abre.length === 1
-      ? ` class="abre-editor" title="Clic para ${abre[0].que}" onclick="${abre[0].llamada}"`
-      : "";
+      ? ` class="abre-editor${claseAtrasada}" title="Clic para ${abre[0].que}" onclick="${abre[0].llamada}"`
+      : (claseAtrasada ? ` class="${claseAtrasada.trim()}"` : "");
     return `
     <tr${clic}>
       <td>${esc(p.pedido_id)}</td>
@@ -7255,8 +7366,7 @@ function pintarRevision(lista) {
       <td>${p.motivos.map(m => esc(detalleDeMotivo(m, p))).join("<br>")}</td>
       <td${CELDA_ACCIONES}>${botonesRevision(p, i, abre)}</td>
     </tr>`;
-  }).join("")
-    || `<tr><td colspan="6" class="mut">Nada en revisión.</td></tr>`;
+  }) || `<tr><td colspan="6" class="mut">Nada en revisión.</td></tr>`;
 }
 
 // Aperturas de todos los motivos de la fila, sin repetir (los dos motivos de
@@ -7356,19 +7466,32 @@ const ETIQUETAS_ESTADO = {completada: "lista", error_llenado: "error",
                           llenada_prueba: "llenada en prueba"};
 const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 
+// Separadores por fecha/hora de PROCESAMIENTO (2026-08-02): la lista ya viene
+// del backend ordenada por ese mismo instante, descendente — lo más reciente
+// primero (_ordenar_procesadas) — así que agrupar por día es solo detectar
+// cuándo cambia, sin reordenar nada. Sin resaltado de "atrasada": a
+// diferencia de PENDIENTES y EN REVISIÓN, aquí no queda nada pendiente que se
+// esté olvidando. El instante de la familia es el más reciente de sus partes,
+// igual que en el backend (_instante_familia) — una familia sin ninguna parte
+// procesada (facturada a mano, nunca llenada) cae en "Sin fecha registrada".
+const fechaDeFamiliaProcesada = (partes) =>
+  partes.reduce((max, p) => ((p.fecha_cierre || "") > max ? (p.fecha_cierre || "") : max), "");
+
 function pintarProcesadas(familias) {
-  $("t-procesadas").querySelector("tbody").innerHTML = familias.map(partes => {
-    const f0 = partes[0];
-    if (partes.length === 1 && !(f0.total_partes > 1)) return filaProcesada(f0, false);
-    return `
-    <tr class="fam-cabecera">
-      <td><b>${esc(f0.pedido_id)}</b></td>
-      <td>${celdaCliente(f0)}</td>
-      <td>${esc(f0.ruta || "")}</td>
-      <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
-      <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
-    </tr>` + partes.map(f => filaProcesada(f, true)).join("");
-  }).join("") || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
+  $("t-procesadas").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    familias, fechaDeFamiliaProcesada, 12, (partes) => {
+      const f0 = partes[0];
+      if (partes.length === 1 && !(f0.total_partes > 1)) return filaProcesada(f0, false);
+      return `
+      <tr class="fam-cabecera">
+        <td><b>${esc(f0.pedido_id)}</b></td>
+        <td>${celdaCliente(f0)}</td>
+        <td>${esc(f0.ruta || "")}</td>
+        <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
+        <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
+      </tr>` + partes.map(f => filaProcesada(f, true)).join("");
+    }
+  ) || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
 function filaProcesada(f, enFamilia) {
@@ -7426,7 +7549,8 @@ function filaProcesada(f, enFamilia) {
       <td>${esc(f.serie || "")}</td>
       <td class="${f.a_mano ? "mut" : "detalle-error"}">${esc(detalle)}${
         reemisiones ? `<div class="mut">${esc(reemisiones).replaceAll("\n", "<br>")}</div>` : ""}</td>
-      <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}</td>
+      <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}${
+        f.fecha_factura ? `<div>Factura: ${esc(f.fecha_factura)}</div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
@@ -11641,6 +11765,12 @@ function pintarFilasCatalogo() {
 const GRUPO_PENDIENTES = " pendientes";   // sentinela: no choca con ningún código real
 const GRUPO_PRUEBA = " prueba";
 
+// Orden de una lista de clientes: favoritos → cadenas → resto. Lo comparten el
+// catálogo de AJUSTES y el selector de descuentos (2026-08-02, pedido del
+// usuario); vive en un solo sitio para que las dos listas no se separen. El
+// sort que lo usa es estable: dentro de cada bloque manda el orden que ya traía.
+function rangoCliente(favorito, esCadena) { return favorito ? 0 : (esCadena ? 1 : 2); }
+
 function pintarClientesAgrupados(filtro) {
   const grupos = new Map();
   catalogoFilas.forEach((f, i) => {
@@ -11676,10 +11806,12 @@ function pintarClientesAgrupados(filtro) {
     const auto = g.filas.length >= 2 || g.filas.some(([f]) => f.codigo_sucursal_winledger);
     g.esCadena = primera.es_cadena_manual == null ? auto : !!primera.es_cadena_manual;
   }
-  // Los clientes de prueba al final y los favoritos arriba del resto; dentro
-  // de cada bloque manda el orden alfabético que ya trae el backend.
+  // Los clientes de prueba al final y el resto en el orden de siempre del panel
+  // (favoritos → cadenas → resto, ver rangoCliente); dentro de cada bloque manda
+  // el orden alfabético que ya trae el backend.
   lista.sort((a, b) => (a.codigo === GRUPO_PRUEBA) - (b.codigo === GRUPO_PRUEBA)
-                       || (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0));
+                       || rangoCliente(a.favorito, a.esCadena)
+                          - rangoCliente(b.favorito, b.esCadena));
   // Reparto en dos pestañas (pedido del usuario 2026-07-31): las entradas por
   // resolver son muchas y mezcladas ahogaban el catálogo — van a su propia
   // pestaña. Sin nada por resolver, la barra de pestañas sobra y se oculta.
@@ -13712,7 +13844,7 @@ function descPintarClientes() {
   // así que el resumen fijo se actualiza desde aquí.
   descPintarOverview();
   const q = ($("desc-cli-buscar").value || "").toLowerCase();
-  const rank = c => c.favorito ? 0 : (c.es_cadena ? 1 : 2);   // favoritos → cadenas → resto
+  const rank = c => rangoCliente(c.favorito, c.es_cadena);   // favoritos → cadenas → resto
   const lista = descSelector.clientes
     .filter(c => (c.nombre || "").toLowerCase().includes(q) || (c.rif || "").toLowerCase().includes(q)
                  || c.sucursales.some(s => (s.sucursal_nombre || "").toLowerCase().includes(q)))
