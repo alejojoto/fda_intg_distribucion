@@ -7073,7 +7073,12 @@ function pintarLlenadosPorRevisar(lista) {
     // documento SÍ salió, así que darlo por bueno es una decisión real. El
     // motivo solo lo pregunta Descartar: por qué se reintenta ya lo dice el
     // renglón (qué línea no entró y por qué).
-    const acciones = f.tipo === "error"
+    // Una fila AJENA se ve igual en todas las máquinas (2026-08-02) pero se
+    // resuelve en su equipo — el documento a medias quedó en esa pantalla —
+    // así que en vez de botones dice dónde atenderla.
+    const acciones = f.remota
+      ? `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`
+      : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
