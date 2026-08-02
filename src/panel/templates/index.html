@@ -2,15 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<!-- Título corto a propósito: la barra de la ventana de app de Edge lo repetía
-     casi igual que la cabecera de abajo. No puede quedar vacío: sin <title>,
-     Edge muestra la URL (127.0.0.1) en la barra y en el Alt+Tab. Si cambia,
-     hay que cambiar TITULO_VENTANA en src/panel/ventana_encima.py.
+<!-- No puede quedar vacío: sin <title>, Edge muestra la URL (127.0.0.1) en la
+     barra y en el Alt+Tab. Si cambia, hay que cambiar TITULO_VENTANA en
+     src/panel/ventana_encima.py.
      Es la BASE del título: en el camino de Edge, pintarTituloVentana le agrega
-     el estado detrás ("FDA (beta) — llenando 3 de 10") conservando este
-     prefijo. El "(beta)" (2026-07-28) va DESPUÉS de "FDA", así el prefijo que
-     busca ventana_encima sigue matcheando; se quita cuando salga de beta. -->
-<title>FDA (beta)</title>
+     el estado detrás ("Asistente FDA (beta) 1.0.8 — llenando 3 de 10")
+     conservando este prefijo. El "(beta)" (2026-07-28) y la versión van
+     DESPUÉS de "Asistente FDA", así el prefijo que busca ventana_encima sigue
+     matcheando; el "(beta)" se quita cuando salga de beta. -->
+<title>Asistente FDA (beta) 1.0.8</title>
 <!-- Color de la barra de título de la ventana de app de Edge (la pinta con el
      theme-color de la página): claro a propósito, para que no se confunda con
      la cabecera oscura del panel. En un navegador normal no se nota. -->
@@ -1247,6 +1247,9 @@
                                        margin-right:6px; cursor:pointer; }
   #motivo-otro { margin-left:27px; }
   #motivo-otro[readonly] { background:#f4f5f7; cursor:pointer; }
+  /* Tasa oficial ya registrada (2026-08-02): el campo queda fijo, sin
+     admitir edición manual — mismo tratamiento visual que un campo bloqueado. */
+  #f-tasa[readonly] { background:#f4f5f7; cursor:default; }
   /* Modal de la tasa que falta (2026-07-22, pedido del usuario), que sale al
      dar Llenar, y sus hermanos: SÍ son preguntas — hay salidas distintas entre
      las que elegir — y por eso interrumpen. */
@@ -1685,7 +1688,7 @@
     <div class="campo-con-aviso">
       <div class="campo"><span class="rotulo">Tasa</span><input type="text" id="f-tasa" placeholder="—" style="width:90px"
           oninput="pintarAvisoBCV()" onchange="restaurarTasaSiVacia()"
-          title="Se llena sola con la tasa del BCV del día, cuando esté disponible. En fecha pasada, se ajusta sola al cambiarla."></div>
+          title="Se llena sola con la tasa que corresponde al día a facturar (la del BCV, o la del último día hábil por feriado/fin de semana) y queda fija: no se edita a mano. Sin ninguna tasa aplicable se habilita para escribirla."></div>
       <span id="f-tasa-bcv" class="mut" title="Fecha valor declarada por el BCV para la tasa mostrada.">consultando BCV…</span>
     </div>
   </div>
@@ -5730,7 +5733,7 @@ const pendientesLlenables = () => ultimaLista.pendientes.filter(f => f.llenable)
    ventana propia se reconoce por él para no abrir una segunda
    (ventana_app.TITULO_VENTANA) y, en el camino de Edge, ventana_encima busca
    la del panel por el prefijo del <title>. */
-const TITULO_PAGINA = "FDA (beta)";  // el <title> del <head>; ver ventana_encima.py
+const TITULO_PAGINA = "Asistente FDA (beta) 1.0.8";  // el <title> del <head>; ver ventana_encima.py
 const TITULO_FASE = {
   conectando: "buscando el programa",
   entorno: "ajustando fecha y serie",
