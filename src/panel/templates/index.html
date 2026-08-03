@@ -5989,7 +5989,7 @@ setInterval(async () => {
 }, REFRESCO_AUTO_MS);
 
 // --- Botón de estado de la nube (2026-07-30) -------------------------------
-// El sondeo de 5 s ya trae todo lo necesario: aquí solo se guarda lo último
+// El sondeo de 2 s ya trae todo lo necesario: aquí solo se guarda lo último
 // visto y se pinta. "ok" = el último sondeo respondió; "caida" = la nube (o
 // el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
 // lleva demasiado sin aterrizar una carga completa.
@@ -6149,11 +6149,10 @@ pintarNube();   // primer pintado: el ✓ no espera al primer tic del sondeo
 // pesado de arriba es cada 10 minutos, y en ese hueco el panel no se enteraba
 // de que otra laptop tomó o cerró una factura. Esto pregunta SOLO si cambió
 // algo (una consulta de 4 columnas acotada a los últimos días) y recarga la
-// lista únicamente cuando cambió. 5 s: lo que otra máquina llena se ve casi
-// de una, y la consulta es tan chica que ni con 6 laptops sondeando pesa
-// sobre Supabase (que igual atiende al resto del asistente y a las AppSheet).
-const SONDEO_COMPARTIDO_MS = 5 * 1000;
-let sondeoEnVuelo = false;   // a 5 s, una red lenta apilaría peticiones sin esto
+// lista únicamente cuando cambió. 2 s deja margen para bajar y repintar dentro
+// de los 5 s esperados aun con seis laptops; nunca apila una petición lenta.
+const SONDEO_COMPARTIDO_MS = 2 * 1000;
+let sondeoEnVuelo = false;
 
 // El transporte devuelve dominios, no instrucciones visuales. Esta tabla es
 // la única costura entidad -> consultas de la pantalla; las acciones quedan
@@ -6237,9 +6236,11 @@ async function actualizarVistasSincronizadas(entidades, cambioCompartido) {
 }
 
 async function sondearCompartido() {
-  // Durante un llenado no se sondea (el turno de llenado manda), ni con la
-  // pestaña oculta (nadie está mirando la lista; al volver se sondea de una).
-  if (llenando || secuenciaActiva || esperandoLogin || document.hidden) return;
+  // El pull incremental no toca Winledger y debe seguir durante un llenado:
+  // si los seis equipos están ocupados, pausar aquí congela todas las listas
+  // aunque el candado central continúe funcionando. Con la pestaña oculta sí
+  // se difiere; al volver se sondea inmediatamente.
+  if (document.hidden) return;
   if (sondeoEnVuelo) return;
   sondeoEnVuelo = true;
   try {
@@ -6248,9 +6249,6 @@ async function sondearCompartido() {
                         "&revision_sync=" + encodeURIComponent(revisionSync));
     if (r.nube) pintarAvisoConflictosSync(r.nube.sync_conflictos);
     if (r.pausado) {
-      // "llenado" no cambia el semáforo (es una pausa, no una caída), pero sí
-      // dice que en esta computadora hay un llenado en curso que NO salió de
-      // aquí: esta ventana también se encoge y se pone encima de la Ficha.
       if (r.motivo === "sin_conexion") { nube.estado = "caida"; pintarNube(); }
       marcarLlenadoDeOtraVentana(r.motivo === "llenado");
       return;
