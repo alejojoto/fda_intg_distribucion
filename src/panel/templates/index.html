@@ -1712,14 +1712,10 @@
     </button>
     <div id="nube-popover" style="display:none"></div>
   </div>
-  <!-- Barra rápida (2026-07-29, pedido del usuario): atajo a los switches que
-       se mueven todo el tiempo mientras se prueba. No guarda estado propio —
-       mueve los controles de ADMIN → Ajustes de admin y guarda por el mismo
-       camino (guardarOpcionesPrueba), así los dos sitios no pueden discrepar.
-       En equipos con capacidad admin queda siempre visible. Apagado el modo
-       muestra el estado guardado, pero bloquea la edición hasta prenderlo. -->
+  <!-- Barra rápida del equipo admin. PRUEBA exige el toggle ADMIN; Carga es
+       una propiedad de la instalación y sigue editable con ADMIN apagado. -->
   <div id="barra-rapida" style="display:none">
-    <span id="rapida-modo-apagado" style="display:none">ADMIN apagado · prende el interruptor en la pestaña ADMIN para editar</span>
+    <span id="rapida-modo-apagado" style="display:none">ADMIN apagado · la prueba está bloqueada; Carga sigue disponible</span>
     <span class="rapida-grupo">
       <b>Llena</b>
       <button type="button" class="rapida-chip" id="rapida-completa" onclick="rapidaCuanto(false)"
@@ -1739,11 +1735,11 @@
               title="No se elige serie: queda la que esté puesta en el programa.">Serie</button>
     </span>
     <span class="rapida-grupo">
-      <b>Al llenar</b>
-      <button type="button" class="rapida-chip" id="rapida-procesadas-si" onclick="rapidaProcesadas(true)"
-              title="El pedido llenado pasa a PROCESADAS y no se vuelve a ofrecer, igual que en producción.">Pasa a procesadas</button>
-      <button type="button" class="rapida-chip" id="rapida-procesadas-no" onclick="rapidaProcesadas(false)"
-              title="El pedido no se registra: queda marcado «llenada en prueba» mientras el panel siga abierto, para repetirlo cuantas veces haga falta.">Sigue pendiente</button>
+      <b>Estado</b>
+      <button type="button" class="rapida-chip" id="rapida-estado-real" onclick="rapidaModoPrueba(false)"
+              title="Las listas usan la verdad central y cada cambio de este equipo se sincroniza con los demás.">REAL · sincroniza</button>
+      <button type="button" class="rapida-chip" id="rapida-estado-prueba" onclick="rapidaModoPrueba(true)"
+              title="Los llenados quedan solo en la memoria de esta sesión y no cambian SQLite ni la nube.">PRUEBA · solo aquí</button>
       <button type="button" class="rapida-chip" id="rapida-olvidar-prueba" style="display:none"
               onclick="olvidarLlenadasPrueba()"
               title="Las llenadas en esta prueba vuelven a pendientes. No hay registro que borrar: esa marca solo vive mientras el panel esté abierto.">Olvidar llenadas</button>
@@ -2255,10 +2251,9 @@
          este bloque se muestra dentro de ella. -->
     <div class="ajustes-bloque ajustes-admin-destacado" id="ajustes-admin-bloque" style="display:none">
       <h3>Ajustes de admin</h3>
-      <p class="aviso-sensible">Interruptor sensible: cambia cómo factura
-        este equipo, que también es el servidor. Actívalo solo si tienes
-        claro el efecto de cada opción de abajo — activarlo pide confirmar
-        aparte, por si hay gente facturando de verdad en este momento.</p>
+      <p class="aviso-sensible">ADMIN habilita herramientas sensibles de este
+        equipo. La prueba de llenado tiene su propio interruptor y confirmación;
+        prender ADMIN por sí solo no cambia las listas ni la facturación.</p>
       <!-- Qué versión carga este equipo, PRIMERO y fuera del modo admin
            (2026-07-29, pedido del usuario): vivía al final del bloque de
            opciones, que se oculta entero con el modo admin apagado — o sea que
@@ -2269,12 +2264,12 @@
         <label class="desc-todos"
                title="Todo lo que se sube al repositorio, apenas se sube. Es lo que carga el servidor admin por defecto.">
           <input type="radio" name="prueba-canal" id="prueba-canal-desarrollo"
-                 onchange="guardarOpcionesPrueba()">
+                 onchange="guardarCanal()">
           Dev</label>
         <label class="desc-todos"
                title="La misma versión exacta que corren las máquinas de operación: solo lo que se ha liberado. Sirve para ver en qué estado está producción sin ir a otra máquina.">
           <input type="radio" name="prueba-canal" id="prueba-canal-produccion"
-                 onchange="guardarOpcionesPrueba()">
+                 onchange="guardarCanal()">
           Producción</label>
         <span class="prueba-nota"
               title="El cambio de rama lo hace el lanzador antes de levantar el panel, así que esta sesión sigue con el código que ya cargó.">Se aplica al reabrir el asistente</span>
@@ -2285,11 +2280,21 @@
         </label>
       </div>
       <p class="mut" style="margin:8px 0 0">
-        Pone este equipo en modo prueba (las facturas se llenan según las
-        opciones de abajo, sin tocar el estado real) y habilita el borrado
-        definitivo (sin papelera y en todos los equipos) de clientes y
-        campañas de descuento creados a mano. Solo existe en el equipo
-        designado admin.</p>
+        Habilita las herramientas administrativas de este equipo. No cambia
+        por sí solo la forma de llenar ni las listas compartidas.</p>
+      <div class="ajustes-fila">
+        <b class="rotulo">Estado de facturas:</b>
+        <label class="desc-todos admin-modo-label" id="modo-prueba-local-label">
+          <input type="checkbox" id="modo-prueba-local-chk"
+                 onclick="return onClickModoPruebaChk(event)">
+          Prueba aislada en este equipo
+        </label>
+        <span class="prueba-nota" id="modo-prueba-local-nota"></span>
+      </div>
+      <p class="mut" style="margin:8px 0 0">
+        Apagada: este equipo ve la verdad central y sus cambios se sincronizan.
+        Prendida: los llenados no reclaman ni registran facturas reales; quedan
+        solo en esta sesión. En el Mac, WinLedger sigue simulado en ambos casos.</p>
       <!-- Modo viejo (2026-07-31, pedido del usuario): NO es una preferencia
            de este equipo sino del parque entero — se guarda como ajuste global
            (asistente_ajustes) y cada máquina lo baja en su refresco. Va FUERA
@@ -2313,12 +2318,9 @@
         marca, siguen facturando con lo que ya servía, y se corrige con calma.
         Cada computadora lo toma al reabrir el asistente; este equipo no se
         mueve, para poder arreglar mientras tanto.</p>
-      <!-- Opciones del modo prueba (2026-07-25, fusión modo admin + modo
-           prueba, PLAN.md pendiente 31): el contenedor entero se oculta con
-           el switch apagado (pintarOpcionesPrueba) — pedido del usuario
-           2026-07-26: apagar el modo admin no debe dejarlas a la vista ni
-           deshabilitadas, directamente no hay nada que ver. Se guardan en
-           la config del dispositivo. -->
+      <!-- Opciones de PRUEBA AISLADA: ADMIN concede permiso para editarlas y
+           el toggle de prueba decide si se aplican. El contenedor se oculta
+           salvo que ambos estén prendidos. Se guardan por dispositivo. -->
       <div id="ajustes-admin-opciones">
         <div class="prueba-grupo">
           <span class="rotulo-grupo">Dónde factura</span>
@@ -2371,24 +2373,6 @@
               Serie</label>
             <span class="prueba-nota" id="prueba-aviso-saltos-999" style="display:none"
                   title="Con la 999 la puesta a punto es mínima: la tasa, la fecha y la serie no se ponen nunca, así que los tres quedan fijos en «saltar» y no se pueden editar aquí.">Con la 999 van siempre saltados</span>
-          </div>
-        </div>
-        <div class="prueba-grupo">
-          <span class="rotulo-grupo">Al llenar el pedido</span>
-          <div class="ajustes-fila">
-            <label class="desc-todos"
-                   title="El pedido llenado pasa a PROCESADAS y no se vuelve a ofrecer, igual que en producción — pero solo en este equipo: la nube no se toca. Sirve para probar en serie con pedidos distintos. Para devolverlos a pendientes, scripts/limpiar_procesadas.py.">
-              <input type="radio" name="prueba-procesadas" id="prueba-procesadas-si"
-                     onchange="guardarOpcionesPrueba()">
-              Pasa a procesadas</label>
-            <label class="desc-todos"
-                   title="El pedido llenado no se registra en ninguna parte: queda marcado «llenada en prueba» y sale de la cola para que la corrida siga con el siguiente. Al reabrir el panel vuelve a pendiente, listo para repetirlo cuantas veces haga falta.">
-              <input type="radio" name="prueba-procesadas" id="prueba-procesadas-no"
-                     onchange="guardarOpcionesPrueba()">
-              Sigue pendiente</label>
-            <button type="button" id="prueba-olvidar-llenadas" style="display:none"
-                    onclick="olvidarLlenadasPrueba()"
-                    title="Las llenadas en esta prueba vuelven a pendientes sin reabrir el panel, para repetir la misma corrida. No hay registro que borrar: esa marca solo vive mientras el panel esté abierto.">Olvidar llenadas</button>
           </div>
         </div>
         <div class="prueba-grupo">
@@ -3047,9 +3031,9 @@
     <div id="lineas-omitidas-lista"></div>
     <p>El documento que está en pantalla no tiene esos renglones.</p>
     <div class="editor-acciones">
-      <button class="primario" onclick="cerrarLineasOmitidas()"
+      <button class="primario" id="lineas-omitidas-dejar" onclick="cerrarLineasOmitidas()"
               title="La factura queda marcada por revisar en EN REVISIÓN.">Dejar en revisión</button>
-      <button onclick="marcarLineasOmitidasRevisada()"
+      <button id="lineas-omitidas-procesada" onclick="marcarLineasOmitidasRevisada()"
               title="Quita la marca de revisar: la factura queda como está.">Marcar como procesada</button>
     </div>
   </div>
@@ -3265,14 +3249,12 @@ let llenadoTrasLogin = null;      // {pedido_id, parte, autorizarCancelar} a rea
 // llenado (la caja del resumen) aunque ya no haya nada llenándose.
 let esperandoEnvioPlataforma = false;
 let exitoTrasEnvio = null;        // {texto, tipo} del llenado, para cuando pulse Listo
-// Cierre asistido de implantación (ASISTENTE_PRUEBA_IMPLANTACION, ver
-// CLAUDE.md): modoImplantacion se fija leyendo /api/ajustes (cargarAjustes) y
-// se refresca al togglear el modo admin, que es una de sus vías de activación.
+// Estado efectivo de PRUEBA AISLADA. Puede venir del toggle local o de una
+// bandera forzada de entorno/settings; ADMIN es independiente.
 let modoImplantacion = false;
-// Modo admin (2026-07-25, ver ui_bridge.modo_admin): igual que
-// modoImplantacion, se fija leyendo /api/ajustes (cargarAjustes). Ambos
-// habilitan "Borrar de verdad" — ver pintarListaDescuentos/pintarDescuentosBorrados
-// y el botón de cliente manual en AJUSTES.
+let modoPruebaLocal = false;
+let modoPruebaForzado = false;
+// Modo admin: habilita herramientas, nunca activa la prueba aislada.
 let modoAdmin = false;
 // ¿Este equipo es el designado admin (settings.NOMBRE_MAQUINA_ADMIN)? Es la
 // pregunta de la MÁQUINA, no del toggle: modoAdmin puede estar apagado ahí
@@ -3336,13 +3318,13 @@ function verDetalleTecnico() {
 // del día deja de importar. Con la 999 la puesta a punto es mínima y la tasa
 // nunca se pone, y el check se muestra forzado prendido, así que leerlo alcanza.
 // El gate espeja al del backend: app.py solo aplica los saltos con el modo
-// prueba activo (ui_bridge.modo_implantacion, que incluye el toggle admin).
+// prueba activo (ui_bridge.modo_implantacion; ADMIN no lo activa).
 function saltandoTasa() { return saltandoPuestaAPunto("tasa"); }
 
 // Los otros dos saltos (serie y fecha) con el mismo gate: los lee la revisión
 // previa del lote para no anunciar una serie o una fecha que no se van a poner.
 function saltandoPuestaAPunto(cual) {
-  if (!(modoImplantacion || modoAdmin)) return false;
+  if (!modoImplantacion) return false;
   const chk = $(`prueba-saltar-${cual}`);
   return chk ? chk.checked : false;
 }
@@ -4256,6 +4238,11 @@ function abrirLineasOmitidas(pedido_id, parte, omitidas, llenadas, pedidas) {
     `${refFacturaUbicable(pedido_id, parte)}: se escribieron ${llenadas} de ${pedidas} líneas.`;
   $("lineas-omitidas-lista").innerHTML = Object.entries(omitidas || {})
     .map(([codigo, motivo]) => `${esc(codigo)} — ${esc(motivo)}`).join("<br>");
+  // En PRUEBA AISLADA el aviso es informativo: no existe una fila canónica
+  // que mandar a revisión ni que marcar como procesada.
+  $("lineas-omitidas-dejar").textContent = modoImplantacion
+    ? "Cerrar aviso" : "Dejar en revisión";
+  $("lineas-omitidas-procesada").style.display = modoImplantacion ? "none" : "";
   $("lineas-omitidas-overlay").classList.add("visible");
   crecerVentanaPorModal("lineas-omitidas-caja");
 }
@@ -6651,6 +6638,8 @@ function accionesDeFila(f) {
   //     cuando ese equipo no está disponible — "Llenar igual" no sirve si lo
   //     que corresponde es NO facturarla, y antes esa fila solo forzaba a
   //     llenarla igual.
+  if (f.remota && modoImplantacion)
+    return `<span class="mut" title="La prueba aislada no cambia el estado compartido.">Solo en REAL</span>`;
   if (f.remota)
     return f.refacturable
       ? `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`
@@ -6665,7 +6654,9 @@ function accionesDeFila(f) {
   // el operador decide el orden, y la que llene a mano sale sola de la cola
   // (ver sacarDeLaCola).
   if (f.estado === "reservada" && secuenciaActiva)
-    return `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
+    return modoImplantacion
+      ? `<span class="mut">En fila de prueba</span>`
+      : `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
   // Llenada en esta sesión de prueba (sin registro): el único botón que aplica
   // es llenarla otra vez — no hay documento cerrado que reabrir ni registro que
   // descartar. Lleva el sí de repetición puesto: lo dice el propio botón, así
@@ -6676,11 +6667,11 @@ function accionesDeFila(f) {
   if (f.estado === "pendiente" || f.estado === "reservada")
     // La familia ajena también pasa por el prellenado: su pregunta del motivo
     // la despacha el Llenar de la ventana (llenarDesdeDetalle).
-    return botonPrellenado(f, "Llenar", "acento") +
-           `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
+    return botonPrellenado(f, "Llenar", "acento") + (modoImplantacion ? "" :
+           `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`);
   if (f.estado === "error_llenado")
-    return botonPrellenado(f, "Reintentar", "acento") +
-           `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
+    return botonPrellenado(f, "Reintentar", "acento") + (modoImplantacion ? "" :
+           `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`);
   // Estados cerrados por el usuario — completada (reemitir), descartada
   // (recuperar) y las viejas facturada_a_mano: un SOLO botón "Volver a
   // llenar" con la lógica de reabrir-y-llenar, la única que funciona bien (el
@@ -6690,7 +6681,9 @@ function accionesDeFila(f) {
   // llenado normal.
   if (f.estado === "completada" || f.estado === "descartada"
       || f.estado === "facturada_a_mano")
-    return `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`;
+    return modoImplantacion
+      ? `<span class="mut" title="La prueba aislada no reabre facturas reales.">Solo en REAL</span>`
+      : `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`;
   return "";
 }
 
@@ -7641,10 +7634,11 @@ function avisoDeFactura(f, enFamilia) {
     <tr class="fila-aviso ${enFamilia ? "fam-parte" : ""}">
       <td colspan="8">De este pedido ya ${hechas.length === 1
         ? `salió la factura ${hechas[0]}` : `salieron las facturas ${hechas.join(" y ")}`}
-        en esta máquina, así que esta se queda apartada aquí: ninguna otra
-        máquina la toma hasta que la llenes o la liberes.
+        en esta máquina, así que esta se queda apartada aquí.${modoImplantacion
+          ? " Vuelve a REAL para llenarla o liberarla: la prueba no cambia esta reserva."
+          : ` Ninguna otra máquina la toma hasta que la llenes o la liberes.
         <button onclick="liberarAmarre(this,'${esc(f.pedido_id)}')"
-                title="Vuelve a quedar disponible para cualquier máquina.">Liberarla</button></td>
+                title="Vuelve a quedar disponible para cualquier máquina.">Liberarla</button>`}</td>
     </tr>`;
   }
   if (f.estado !== "error_llenado") return "";
@@ -7842,7 +7836,11 @@ function pintarLlenadosPorRevisar(lista) {
     // Una fila AJENA se ve igual en todas las máquinas (2026-08-02) pero se
     // resuelve en su equipo — el documento a medias quedó en esa pantalla —
     // así que en vez de botones dice dónde atenderla.
-    const acciones = f.remota
+    const acciones = modoImplantacion
+      ? (f.tipo === "error"
+          ? botonPrellenado(f, "Probar reintento", "acento")
+          : `<span class="mut" title="Esta decisión cambia una factura real.">Solo en REAL</span>`)
+      : f.remota
       ? `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
@@ -8559,7 +8557,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
           abrirLineasOmitidas(pedido_id, parte, r.lineas_omitidas, r.lineas_llenadas, r.lineas_pedidas);
         // La factura quedó en "Llenados por revisar" (EN REVISIÓN): al cerrar
         // el llenado el panel salta allá.
-        irARevisionAlTerminar = true;
+        if (!modoImplantacion) irARevisionAlTerminar = true;
       }
       if (entraResumen)
         esperarEnvioPlataforma(textoExito, tipoExito,
@@ -9043,6 +9041,10 @@ function reintentarOmitidas(pedido_id, parte) {
 }
 
 function descartar(pedido_id, parte) {
+  if (modoImplantacion) {
+    mensaje("PRUEBA AISLADA no descarta facturas reales. Vuelve a REAL para hacerlo.", "error");
+    return;
+  }
   abrirMotivo("descartar", pedido_id, [parte]);
 }
 
@@ -9528,23 +9530,18 @@ function familiaDelSiguiente(p = pendientesLlenables()) {
 
 // --- "Llenar en fila" desactivado en producción (2026-07-28, TEMPORAL) ------
 // Pedido del usuario: en producción la barra de la corrida no se muestra y en
-// su lugar queda un solo botón azul, "Llenar siguiente". Con el modo admin
-// prendido, o en modo prueba, la barra sigue completa, tal cual estaba.
-// Manda el TOGGLE, no la máquina (corregido 2026-07-28, mismo día): antes esto
-// preguntaba también por esMaquinaAdmin, así que el servidor admin conservaba
-// la barra con el toggle abajo y no había forma de ver desde ahí la vista que
-// ve producción — que es justamente para lo que se apaga el modo admin.
+// su lugar queda un solo botón azul, "Llenar siguiente". La barra completa
+// solo existe en PRUEBA AISLADA; ADMIN por sí solo no cambia el flujo.
 // Tiene DOS consumidores, no uno: pintarBarraEnFila (qué barra se ve) y el gate
 // de la espera de envío a plataforma (ver el bloque de éxito de llenar()). O
-// sea que apagar el toggle en el equipo admin cambia el FLUJO del llenado, no
-// solo la apariencia: aparece la espera con su «Listo», igual que producción.
-// El canal manda SOBRE el toggle (2026-07-28, corrección del mismo día): con
+// sea que apagar PRUEBA AISLADA cambia el FLUJO del llenado, no solo la
+// apariencia: aparece la espera con su «Listo», igual que producción.
+// El canal manda SOBRE la prueba: con
 // el selector "Carga" (ADMIN) en Producción, la corrida siempre queda
 // oculta — es exactamente para lo que existe ese selector, ver esa vista sin
-// depender de un segundo paso. El toggle de modo admin solo decide cuando el
-// canal está en Dev.
+// depender de un segundo paso.
 const enFilaDisponible = () =>
-  !$("prueba-canal-produccion").checked && (modoAdmin || modoImplantacion);
+  !$("prueba-canal-produccion").checked && modoImplantacion;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
@@ -10885,6 +10882,10 @@ function agregarAlMensaje(extra, tipo) {
 // para cualquier máquina. Va con confirmación inline porque es lo delicado del
 // asunto — la parte 1 ya salió impresa aquí y la 2 debería salir detrás.
 function liberarAmarre(btn, pedido_id) {
+  if (modoImplantacion) {
+    mensaje("PRUEBA AISLADA no libera reservas reales. Vuelve a REAL para hacerlo.", "error");
+    return;
+  }
   confirmarBorrar(btn, async () => {
     try {
       const r = await api("/api/liberar_amarre", {pedido_id});
@@ -11095,23 +11096,19 @@ function detenerEsperaLogin() {
 
 // --- AJUSTES: vendedor de esta máquina --------------------------------------
 // Banderas de prueba de entorno/settings fijadas al render (solo cambian
-// reiniciando el panel) — la entrada MODO ADMIN se agrega/quita en vivo,
-// ver pintarBanderasPrueba (fusión modo admin + modo prueba, 2026-07-25).
+// reiniciando el panel). ADMIN y PRUEBA AISLADA se pintan por separado.
 const BANDERAS_PRUEBA_ENV = {{ banderas_prueba|tojson }};
 
-// Barra naranja: las banderas de entorno/settings vienen del render (rótulo
-// MODO PRUEBA); el segmento MODO ADMIN se agrega/quita en vivo al togglear y
-// dice solo "MODO ADMIN" más el estado de sus switches (pedido del usuario
-// 2026-07-25: sin "modo prueba" en ese rótulo — el modo admin ES el modo
-// prueba, no hace falta repetirlo). Los indicadores se leen de los propios
-// controles de AJUSTES (ya pintados por pintarOpcionesPrueba).
+// Barra naranja: ADMIN informa permisos; PRUEBA AISLADA informa que los
+// resultados no cambian SQLite ni la nube. No vuelven a confundirse.
 function pintarBanderasPrueba() {
   const span = $("banderas-prueba");
   if (!span) return;
   const partes = [];
   if (BANDERAS_PRUEBA_ENV.length)
     partes.push("MODO PRUEBA — " + BANDERAS_PRUEBA_ENV.join(" · "));
-  if (modoAdmin) {
+  if (modoAdmin) partes.push("ADMIN");
+  if (modoImplantacion) {
     const ind = [$("prueba-emp-001").checked
                    ? "empresa 001 (Finca)" : "empresa 999 (prueba)"];
     const recorteN = $("prueba-recortar-n").value;
@@ -11123,13 +11120,10 @@ function pintarBanderasPrueba() {
     if ($("prueba-saltar-fecha").checked) saltos.push("fecha");
     if ($("prueba-saltar-serie").checked) saltos.push("serie");
     if (saltos.length) ind.push("sin " + saltos.join("/"));
-    // Solo se nombra la opción que se APARTA de producción: que el pedido pase
-    // a procesadas es lo normal, no hay nada que advertir.
-    if ($("prueba-procesadas-no").checked)
-      ind.push("los pedidos siguen pendientes");
     if ($("prueba-simular-pegado").checked)
       ind.push("probar destranque (cerrar y reabrir)");
-    partes.push("MODO ADMIN — " + ind.join(" · "));
+    ind.push("sin registro real");
+    partes.push("PRUEBA AISLADA — " + ind.join(" · "));
   }
   // El canal va FUERA del modo admin (2026-07-28): en Producción, la vista
   // queda igual a la de una máquina de FDA (ver enFilaDisponible) aunque el
@@ -11145,37 +11139,36 @@ function pintarBanderasPrueba() {
 
 // --- Barra rápida del modo prueba (2026-07-29) ------------------------------
 // Espejo en el encabezado de los switches de ADMIN → Ajustes de admin: se pinta
-// leyendo ESOS controles (nunca un estado propio) y cada chip mueve el control
-// de allá y guarda por guardarOpcionesPrueba, que sigue siendo el único camino
-// de guardado — así los dos sitios no pueden discrepar. Con el modo admin
-// apagado la barra sigue visible en equipos admin para que nunca desaparezca
-// el acceso visual; sus controles quedan bloqueados hasta prenderlo.
+// leyendo ESOS controles (nunca un estado propio). Con ADMIN apagado la barra
+// sigue visible; solo Carga queda editable mediante su endpoint propio.
 function pintarBarraRapida() {
   $("barra-rapida").style.display = esMaquinaAdmin ? "" : "none";
   if (!esMaquinaAdmin) return;
   $("rapida-modo-apagado").style.display = modoAdmin ? "none" : "";
+  pintarModoPrueba();
   const es999 = $("prueba-emp-999").checked;
   const recorta = $("prueba-cuanto-recorte").checked;
   const marcar = (id, on) => $(id).classList.toggle("on", on);
+  marcar("rapida-estado-real", !modoImplantacion);
+  marcar("rapida-estado-prueba", modoImplantacion);
   marcar("rapida-completa", !recorta);
   marcar("rapida-recorte", recorta);
   $("rapida-n").value = $("prueba-recortar-n").value;
-  $("rapida-n").disabled = !modoAdmin || !recorta;
+  $("rapida-n").disabled = !modoAdmin || !modoImplantacion || !recorta;
   for (const cual of ["tasa", "fecha", "serie"]) {
     const chip = $("rapida-salto-" + cual);
     chip.classList.toggle("on", $("prueba-saltar-" + cual).checked);
     // En la 999 los tres saltos van siempre puestos y no se editan (misma
     // regla que abajo, ver pintarOpcionesPrueba).
-    chip.disabled = !modoAdmin || es999;
+    chip.disabled = !modoAdmin || !modoImplantacion || es999;
   }
-  marcar("rapida-procesadas-si", $("prueba-procesadas-si").checked);
-  marcar("rapida-procesadas-no", $("prueba-procesadas-no").checked);
   marcar("rapida-canal-produccion", $("prueba-canal-produccion").checked);
   marcar("rapida-canal-desarrollo", $("prueba-canal-desarrollo").checked);
-  for (const id of ["rapida-completa", "rapida-recorte",
-                    "rapida-procesadas-si", "rapida-procesadas-no",
-                    "rapida-olvidar-prueba", "rapida-canal-produccion",
-                    "rapida-canal-desarrollo"])
+  for (const id of ["rapida-completa", "rapida-recorte"])
+    $(id).disabled = !modoAdmin || !modoImplantacion;
+  for (const id of ["rapida-estado-real", "rapida-estado-prueba"])
+    $(id).disabled = !modoAdmin || modoPruebaForzado;
+  for (const id of ["rapida-olvidar-prueba"])
     $(id).disabled = !modoAdmin;
 }
 
@@ -11196,14 +11189,19 @@ function rapidaSalto(cual) {
   guardarOpcionesPrueba();
 }
 
-function rapidaProcesadas(marcar) {
-  $("prueba-procesadas-si").checked = marcar;
-  $("prueba-procesadas-no").checked = !marcar;
-  guardarOpcionesPrueba();
+function rapidaModoPrueba(encendido) {
+  if (!encendido) {
+    aplicarModoPrueba(false);
+    return;
+  }
+  confirmarSinQuitar(
+    $("rapida-estado-prueba"), () => aplicarModoPrueba(true),
+    "Confirmar: los llenados quedarán solo en esta sesión"
+  );
 }
 
 // --- Procesadas FANTASMA del modo prueba (2026-07-30) -----------------------
-// Con "Sigue pendiente", la factura llenada queda marcada "llenada en prueba" y
+// Toda prueba aislada exitosa queda marcada "llenada en prueba" y
 // sale de la cola para que la corrida siga con la siguiente. Esa marca vive en
 // la memoria del servidor: devolverlas a pendientes es lo que hace repetible la
 // misma corrida sin reabrir el panel. El control aparece solo cuando hay algo
@@ -11212,7 +11210,7 @@ function rapidaProcesadas(marcar) {
 function pintarOlvidarPrueba() {
   const mostrar = llenadasPrueba > 0 && !secuenciaActiva && !llenando;
   const etiqueta = `Olvidar llenadas (${llenadasPrueba})`;
-  for (const id of ["rapida-olvidar-prueba", "prueba-olvidar-llenadas"]) {
+  for (const id of ["rapida-olvidar-prueba"]) {
     const b = $(id);
     if (!b) continue;
     b.style.display = mostrar ? "" : "none";
@@ -11234,14 +11232,15 @@ async function olvidarLlenadasPrueba() {
 function rapidaCanal(canal) {
   $("prueba-canal-desarrollo").checked = canal === "desarrollo";
   $("prueba-canal-produccion").checked = canal === "produccion";
-  guardarOpcionesPrueba();
+  guardarCanal();
 }
 
 // Muestra/oculta y pinta las opciones del modo prueba segun el toggle: con
 // el switch apagado no basta con deshabilitarlas (pedido del usuario
 // 2026-07-26) — se ocultan del todo, solo queda visible el switch.
 function pintarOpcionesPrueba(op) {
-  $("ajustes-admin-opciones").style.display = modoAdmin ? "" : "none";
+  $("ajustes-admin-opciones").style.display =
+    (modoAdmin && modoImplantacion) ? "" : "none";
   if (op) {
     opcionesPrueba = op;
     $("prueba-emp-999").checked = op.empresa !== "001";
@@ -11256,8 +11255,6 @@ function pintarOpcionesPrueba(op) {
     $("prueba-saltar-fecha").checked = !!op.saltar_fecha;
     $("prueba-saltar-serie").checked = !!op.saltar_serie;
     $("prueba-ver-tecnico").checked = !!op.ver_detalle_tecnico;
-    $("prueba-procesadas-si").checked = !!op.marcar_procesadas;
-    $("prueba-procesadas-no").checked = !op.marcar_procesadas;
     // Canal vacío = automático por equipo, que es como nace toda instalación:
     // en el servidor admin ese automático ES desarrollo, así que se pinta Dev
     // (la opción "Automático" se retiró el 2026-07-29, pedido del usuario).
@@ -11272,20 +11269,20 @@ function pintarOpcionesPrueba(op) {
   // siguen el modo admin (pedido del usuario 2026-07-25).
   for (const id of ["prueba-saltar-tasa", "prueba-saltar-fecha", "prueba-saltar-serie"]) {
     if (es999) $(id).checked = true;
-    $(id).disabled = !modoAdmin || es999;
+    $(id).disabled = !modoAdmin || !modoImplantacion || es999;
   }
   // El canal quedó FUERA de esta lista (2026-07-29): con el modo admin apagado
   // hay que poder volver de la vista de producción a Dev sin prenderlo otra vez.
   for (const id of ["prueba-emp-999", "prueba-emp-001", "prueba-cuanto-completa",
                     "prueba-cuanto-recorte", "prueba-simular-pegado",
-                    "prueba-ver-tecnico", "prueba-procesadas-si",
-                    "prueba-procesadas-no"]) {
-    $(id).disabled = !modoAdmin;
+                    "prueba-ver-tecnico"]) {
+    $(id).disabled = !modoAdmin || !modoImplantacion;
   }
   // Cuántas líneas: solo se teclea con el recorte elegido (con la factura
   // completa no hay nada que recortar). El valor NO se borra al cambiar de
   // opción — se recuerda.
-  $("prueba-recortar-n").disabled = !modoAdmin || !$("prueba-cuanto-recorte").checked;
+  $("prueba-recortar-n").disabled = !modoAdmin || !modoImplantacion
+    || !$("prueba-cuanto-recorte").checked;
   // El 0 no se lee solo ("a 0 líneas" no dice qué pasa), así que el sufijo lo
   // explica en el mismo renglón — pero SOLO cuando el recorte es la opción
   // elegida: con la factura completa, ese número queda recordado y apagado, y
@@ -11301,6 +11298,7 @@ function pintarOpcionesPrueba(op) {
 async function guardarOpcionesPrueba() {
   const es999 = $("prueba-emp-999").checked;
   const g = opcionesPrueba || {};
+  const estaba999 = g.empresa !== "001";
   try {
     const r = await api("/api/ajustes/opciones-prueba", {
       empresa: $("prueba-emp-001").checked ? "001" : "999",
@@ -11309,12 +11307,10 @@ async function guardarOpcionesPrueba() {
       simular_cierre_pegado: $("prueba-simular-pegado").checked,
       // En la 999 los saltos se muestran forzados; NO se guarda ese forzado
       // para no pisar lo que el usuario dejó configurado para la 001.
-      saltar_tasa: es999 ? !!g.saltar_tasa : $("prueba-saltar-tasa").checked,
-      saltar_fecha: es999 ? !!g.saltar_fecha : $("prueba-saltar-fecha").checked,
-      saltar_serie: es999 ? !!g.saltar_serie : $("prueba-saltar-serie").checked,
+      saltar_tasa: (es999 || estaba999) ? !!g.saltar_tasa : $("prueba-saltar-tasa").checked,
+      saltar_fecha: (es999 || estaba999) ? !!g.saltar_fecha : $("prueba-saltar-fecha").checked,
+      saltar_serie: (es999 || estaba999) ? !!g.saltar_serie : $("prueba-saltar-serie").checked,
       ver_detalle_tecnico: $("prueba-ver-tecnico").checked,
-      marcar_procesadas: $("prueba-procesadas-si").checked,
-      canal: $("prueba-canal-produccion").checked ? "produccion" : "desarrollo",
     });
     pintarOpcionesPrueba(r.opciones_prueba);
     pintarBanderasPrueba();   // los indicadores de la barra siguen a los switches
@@ -11323,7 +11319,30 @@ async function guardarOpcionesPrueba() {
     // corrección visual que se pidió, no el pull del código.
     pintarBarraEnFila();
   } catch (e) {
+    pintarOpcionesPrueba(opcionesPrueba);
+    pintarBanderasPrueba();
     mensaje("No se pudieron guardar las opciones de prueba: " + e.message, "error");
+  }
+}
+
+async function guardarCanal() {
+  const anterior = (opcionesPrueba && opcionesPrueba.canal) || "";
+  const canal = $("prueba-canal-produccion").checked
+    ? "produccion" : "desarrollo";
+  try {
+    const r = await api("/api/ajustes/canal", {canal});
+    opcionesPrueba = {...(opcionesPrueba || {}), canal: r.canal};
+    $("prueba-canal-produccion").checked = r.canal === "produccion";
+    $("prueba-canal-desarrollo").checked = r.canal !== "produccion";
+    pintarBanderasPrueba();
+    pintarBarraRapida();
+    pintarBarraEnFila();
+  } catch (e) {
+    $("prueba-canal-produccion").checked = anterior === "produccion";
+    $("prueba-canal-desarrollo").checked = anterior !== "produccion";
+    pintarBarraRapida();
+    pintarBarraEnFila();
+    mensaje("No se pudo cambiar el canal: " + e.message, "error");
   }
 }
 
@@ -11352,6 +11371,8 @@ async function cargarAjustes() {
     // máquina): habilita el borrado definitivo de datos de prueba y demás usos
     // de modoImplantacion. Se lee de /api/ajustes.
     modoImplantacion = !!d.modo_implantacion;
+    modoPruebaLocal = !!d.modo_prueba_local;
+    modoPruebaForzado = !!d.modo_prueba_forzado;
     // Ajustes de admin: el bloque entero solo se muestra en el equipo
     // designado admin (ver ui_bridge.es_maquina_admin) — en cualquier otro
     // equipo ni siquiera aparece la opción.
@@ -11361,6 +11382,7 @@ async function cargarAjustes() {
     $("ventana-bloque").style.display = esMaquinaAdmin ? "" : "none";
     $("corte-bloque").style.display = esMaquinaAdmin ? "" : "none";
     $("admin-modo-chk").checked = modoAdmin;
+    pintarModoPrueba();
     pintarModoViejo(d.modo_viejo);
     pintarOpcionesPrueba(d.opciones_prueba);
     pintarBotonCorte();
@@ -11743,12 +11765,11 @@ function pintarSelectVendedores(select, elegido) {
        ${esc(v.codigo)} — ${esc(v.nombre || "")}</option>`).join("");
 }
 
-// Todo lo que el panel muestra POR el modo prueba/admin se repinta aquí: al
-// apagar el switch tiene que desaparecer en el acto, no en el próximo refresh
-// (reporte del usuario 2026-07-26: los "Borrar de verdad" seguían ahí). Solo
+// Todo lo que el panel muestra POR prueba/admin se repinta aquí. Solo
 // se repinta lo que ya tiene datos cargados — pintar una lista vacía dejaría
 // su vista con el texto de "no hay nada" antes de que llegue a cargarse.
 function refrescarVistasModoPrueba() {
+  pintarModoPrueba();
   pintarOpcionesPrueba(null);
   pintarBanderasPrueba();
   pintarBarraEnFila();          // "Llenar en fila" / "Llenar siguiente" (2026-07-28)
@@ -11760,16 +11781,31 @@ function refrescarVistasModoPrueba() {
   }
 }
 
+function pintarModoPrueba() {
+  const chk = $("modo-prueba-local-chk");
+  const nota = $("modo-prueba-local-nota");
+  if (!chk || !nota) return;
+  chk.checked = modoPruebaLocal;
+  chk.disabled = !modoAdmin || modoPruebaForzado;
+  if (modoPruebaForzado) {
+    nota.textContent = "PRUEBA forzada por .env/settings; se apaga allí y al reabrir";
+  } else if (modoImplantacion) {
+    nota.textContent = "PRUEBA · resultados solo en esta sesión";
+  } else {
+    nota.textContent = "REAL · listas y cambios sincronizados";
+  }
+}
+
 async function aplicarModoAdmin(encendido) {
   try {
     const r = await api("/api/ajustes/modo-admin", {encendido});
     modoAdmin = !!r.modo_admin;
-    // El modo prueba lo decide el servidor (el toggle es una de sus tres vías):
-    // sin esto la copia del panel se quedaba en el valor de la carga de la
-    // página y los botones de borrado definitivo sobrevivían al apagado.
     modoImplantacion = !!r.modo_implantacion;
+    modoPruebaLocal = !!r.modo_prueba_local;
+    modoPruebaForzado = !!r.modo_prueba_forzado;
     $("admin-modo-chk").checked = modoAdmin;
     refrescarVistasModoPrueba();
+    cargar();
     mensaje(`Modo admin ${modoAdmin ? "prendido" : "apagado"} en este equipo.`, "info");
   } catch (e) {
     $("admin-modo-chk").checked = !encendido;
@@ -11777,16 +11813,6 @@ async function aplicarModoAdmin(encendido) {
   }
 }
 
-// Apagar (volver a producción real) sigue directo: es la dirección segura, y
-// el servidor la permite desde cualquier equipo sin condiciones. Prender pide
-// confirmar aparte (pedido del usuario 2026-07-26): en el instante de
-// prenderlo puede haber gente facturando de verdad, y una activación
-// accidental le cambiaría el comportamiento del llenado a mitad de una
-// factura real. El checkbox ya cambió su estado visual antes de que este
-// handler corra (así funcionan los checkboxes); con preventDefault() el
-// navegador lo revierte solo — por eso NO hace falta tocar `.checked` a mano
-// aquí. Reusa el patrón verde de confirmarSinQuitar (no el rojo de
-// confirmarBorrar: prender no es un borrado).
 function onClickModoAdminChk(ev) {
   if (!ev.target.checked) {
     aplicarModoAdmin(false);
@@ -11795,6 +11821,36 @@ function onClickModoAdminChk(ev) {
   ev.preventDefault();
   confirmarSinQuitar($("admin-modo-label"), () => aplicarModoAdmin(true),
                       "Confirmar: activar modo admin");
+  return false;
+}
+
+async function aplicarModoPrueba(encendido) {
+  try {
+    const r = await api("/api/ajustes/modo-prueba", {encendido});
+    modoImplantacion = !!r.modo_implantacion;
+    modoPruebaLocal = !!r.modo_prueba_local;
+    modoPruebaForzado = !!r.modo_prueba_forzado;
+    refrescarVistasModoPrueba();
+    cargar();
+    mensaje(modoImplantacion
+      ? "Prueba aislada prendida: los llenados quedan solo en esta sesión."
+      : "Estado real prendido: listas y cambios sincronizados.", "info");
+  } catch (e) {
+    pintarModoPrueba();
+    mensaje(e.message, "error");
+  }
+}
+
+function onClickModoPruebaChk(ev) {
+  if (!ev.target.checked) {
+    aplicarModoPrueba(false);
+    return true;
+  }
+  ev.preventDefault();
+  confirmarSinQuitar(
+    $("modo-prueba-local-label"), () => aplicarModoPrueba(true),
+    "Confirmar: los llenados quedarán solo en esta sesión"
+  );
   return false;
 }
 
