@@ -4941,9 +4941,11 @@ function restaurarTasaSiVacia() {
 }
 
 async function consultarTasaBCV() {
+  let ok = true;
   try {
     ultimoBCV = await api("/api/tasa_bcv");
   } catch (e) {
+    ok = false;
     // Falla de red hacia nuestro propio backend: si ya hubo una respuesta
     // buena se conserva (con aviso, y con su historial), igual que hace la
     // caché del backend.
@@ -4954,6 +4956,7 @@ async function consultarTasaBCV() {
          error: e.message};
   }
   aplicarTasaBCV();   // elige la tasa del día a facturar y repinta el aviso
+  return ok;
 }
 
 // Fecha a facturar y feriados (2026-07-21): el cálculo vive en Python
@@ -4977,8 +4980,11 @@ async function refrescarMapaFeriados() {
   try {
     FERIADOS = (await api("/api/feriados")).feriados;
     pintarAvisoFecha();
+    aplicarTasaBCV();
+    return true;
   } catch (e) {
     console.warn("No se pudo refrescar el mapa de feriados:", e.message);
+    return false;
   }
 }
 
@@ -5866,6 +5872,7 @@ function agruparFamilias(lista) {
 
 let ultimaLista = {pendientes: [], procesadas: []};
 let firmaCompartida = "";
+let revisionSync = "";  // revisión de invalidaciones propia de ESTA pestaña
 
 // Nombra una factura para los avisos: agrega "(parte N)" SOLO cuando el pedido
 // de verdad se divide en varias facturas (pedido del usuario 2026-07-23). En un
@@ -5944,6 +5951,7 @@ async function cargar() {
     cargaFallo = false;
     pintarNube();
     repintar();
+    return true;
   } catch (e) {
     mensaje("No se pudo cargar la lista: " + e.message, "error");
     // Sin lista no se está viendo nada confiable, y el sondeo por su cuenta
@@ -5952,6 +5960,7 @@ async function cargar() {
     // porque carga_ts nunca llega. Solo la limpia una carga que sí aterrice.
     cargaFallo = true;
     pintarNube();
+    return false;
   }
 }
 
@@ -6054,7 +6063,8 @@ async function abrirDiagnosticoSync() {
     const cola = d.outbox || {};
     const filas = [
       `Equipo: ${d.dispositivo}  ·  ${d.version}`,
-      `Camino de sincronización: ${d.camino}`,
+      `Camino de sincronización: ${d.camino}` +
+        (d.rpc_version ? `  ·  RPC v${d.rpc_version}` : ""),
       `Cursor local: ${d.cursor_local ?? "sin snapshot"}  ·  nube: ` +
         (d.cursor_nube ?? `sin respuesta (${d.nube_error || "?"})`),
       `Por subir: ${cola.pendientes ?? "?"}` +
@@ -6064,6 +6074,9 @@ async function abrirDiagnosticoSync() {
       `Choques sin resolver: ${d.conflictos_abiertos}`,
       `Réplica local: ${d.espejo.facturas} facturas, ${d.espejo.pedidos} pedidos`,
       `Instalación sincronizada: ${d.snapshot || "nunca"}`,
+      `Rutas/series: ${d.rutas?.visibles ?? "?"} visibles, ` +
+        `${d.rutas?.pendientes ?? "?"} pendientes  ·  foto v2: ` +
+        `${d.snapshot_rutas_v2 || "todavía no"}`,
       "", "--- Últimas líneas del registro ---", ...(d.log || []),
     ];
     caja.textContent = filas.join("\n");
@@ -6139,6 +6152,88 @@ pintarNube();   // primer pintado: el ✓ no espera al primer tic del sondeo
 // sobre Supabase (que igual atiende al resto del asistente y a las AppSheet).
 const SONDEO_COMPARTIDO_MS = 5 * 1000;
 let sondeoEnVuelo = false;   // a 5 s, una red lenta apilaría peticiones sin esto
+
+// El transporte devuelve dominios, no instrucciones visuales. Esta tabla es
+// la única costura entidad -> consultas de la pantalla; las acciones quedan
+// pendientes si hay un editor abierto y se reintentan en el próximo sondeo.
+const ACCIONES_POR_ENTIDAD = Object.freeze({
+  clientes:   ["principal", "detalle", "catalogo:clientes", "descuentos"],
+  productos:  ["principal", "detalle", "catalogo:productos", "descuentos"],
+  vendedores: ["catalogo:vendedores", "ajustes"],
+  feriados:   ["catalogo:feriados", "feriados"],
+  tasas:      ["tasas"],
+  maquinas:   ["principal", "ajustes"],
+  descuentos: ["principal", "detalle", "descuentos"],
+  pedidos:    ["principal"],
+  facturas:   ["principal"],
+  rutas:      ["rutas"],
+});
+const accionesSyncPendientes = new Set();
+
+function editorVisible(id) {
+  const el = $(id);
+  return !!el && el.classList.contains("visible");
+}
+
+function registrarEntidadesCambiadas(entidades) {
+  for (const entidad of entidades || []) {
+    let acciones = ACCIONES_POR_ENTIDAD[entidad] || [];
+    if (entidad === "ajustes:fecha_corte_produccion")
+      acciones = ["principal", "ajustes"];
+    else if (entidad.startsWith("ajustes:"))
+      acciones = ["ajustes"];
+    for (const accion of acciones) accionesSyncPendientes.add(accion);
+  }
+}
+
+async function actualizarVistasSincronizadas(entidades, cambioCompartido) {
+  registrarEntidadesCambiadas(entidades);
+  if (cambioCompartido) accionesSyncPendientes.add("principal");
+
+  if (accionesSyncPendientes.has("principal")) {
+    if (await cargar() !== false) accionesSyncPendientes.delete("principal");
+  }
+  if (accionesSyncPendientes.has("detalle")
+      && !detalleTocado && !detalleAjustesEnVuelo.length) {
+    if (await refrescarDetalleAbierto() !== false)
+      accionesSyncPendientes.delete("detalle");
+  }
+
+  for (const tipo of ["clientes", "productos", "vendedores", "feriados"]) {
+    const accion = "catalogo:" + tipo;
+    if (!accionesSyncPendientes.has(accion) || catalogoActual !== tipo) continue;
+    if (editorVisible("editor-overlay") || editorVisible("cliente-overlay")) continue;
+    if (await abrirCatalogo(tipo) !== false)
+      accionesSyncPendientes.delete(accion);
+  }
+
+  if (accionesSyncPendientes.has("descuentos") && !editorVisible("desc-overlay")) {
+    // Clientes/productos alimentan este selector; releerlo es barato y evita
+    // conservar opciones viejas durante toda la sesión.
+    descSelector = null;
+    if (await renderDescuentos() !== false)
+      accionesSyncPendientes.delete("descuentos");
+  }
+  if (accionesSyncPendientes.has("feriados")) {
+    if (await refrescarMapaFeriados() !== false)
+      accionesSyncPendientes.delete("feriados");
+  }
+  if (accionesSyncPendientes.has("tasas")) {
+    if (await consultarTasaBCV() !== false)
+      accionesSyncPendientes.delete("tasas");
+  }
+  if (accionesSyncPendientes.has("ajustes")
+      && !(typeof ajustesCompartidosSinGuardar === "function"
+           && ajustesCompartidosSinGuardar())) {
+    if (await cargarAjustes() !== false)
+      accionesSyncPendientes.delete("ajustes");
+  }
+  if (accionesSyncPendientes.has("rutas") && !editorVisible("ruta-editor-overlay")) {
+    if (await cargarRutasSeries() !== false)
+      accionesSyncPendientes.delete("rutas");
+  }
+}
+
 async function sondearCompartido() {
   // Durante un llenado no se sondea (el turno de llenado manda), ni con la
   // pestaña oculta (nadie está mirando la lista; al volver se sondea de una).
@@ -6147,7 +6242,8 @@ async function sondearCompartido() {
   sondeoEnVuelo = true;
   try {
     const r = await api("/api/estados_compartidos?firma=" +
-                        encodeURIComponent(firmaCompartida));
+                        encodeURIComponent(firmaCompartida) +
+                        "&revision_sync=" + encodeURIComponent(revisionSync));
     if (r.nube) pintarAvisoConflictosSync(r.nube.sync_conflictos);
     if (r.pausado) {
       // "llenado" no cambia el semáforo (es una pausa, no una caída), pero sí
@@ -6167,14 +6263,10 @@ async function sondearCompartido() {
     pintarNube();
     const cambio = r.cambio;
     firmaCompartida = r.firma;
-    if (cambio) cargar();
-    // Un catálogo llegó de otra máquina y YA está en la base local: si la
-    // pestaña DESCUENTOS está a la vista, se repinta al tiro — sin esto la
-    // lista esperaba el refresco pesado del pipeline (minutos) o un F5
-    // (2026-08-02). El editor vive en su propio modal (#desc-overlay), así
-    // que repintar la lista no toca una edición en curso.
-    if (r.catalogos && $("sec-descuentos").style.display !== "none")
-      renderDescuentos();
+    const entidades = r.entidades_cambiadas
+      || (r.catalogos ? ["descuentos"] : []);  // servidor anterior, compatibilidad
+    await actualizarVistasSincronizadas(entidades, cambio);
+    if (r.revision_sync) revisionSync = r.revision_sync;
   } catch (_) { /* sondeo informativo: un fallo puntual no interrumpe nada */
     nube.estado = "caida";   // el propio asistente no contestó: mismo aviso
     pintarNube();
@@ -6858,6 +6950,7 @@ function cerrarDetalle() {
 // misma marca cambia el pie: haber tocado algo es lo que parte "Volver" en
 // "Guardar cambios" y "Descartar cambios".
 let detalleTocado = false;
+$("detalle-cuerpo").addEventListener("input", marcarDetalleTocado);
 $("detalle-cuerpo").addEventListener("change", marcarDetalleTocado);
 $("detalle-cuerpo").addEventListener("click", (ev) => {
   if (ev.target.closest("button")) marcarDetalleTocado();
@@ -7070,6 +7163,7 @@ async function cargarDetalle(pedidoId, parte) {
   // descarta en vez de pisar a la más nueva — la foto provisional de una
   // reapertura no puede tapar al detalle editable que la sigue.
   const req = detalleReq[clave] = (detalleReq[clave] || 0) + 1;
+  let ok = true;
   try {
     const params = new URLSearchParams({
       pedido_id: pedidoId, parte,
@@ -7078,7 +7172,7 @@ async function cargarDetalle(pedidoId, parte) {
       fecha_facturar: ($("f-fecha-facturar") || {}).value || "",
     });
     const datos = await api("/api/factura/detalle?" + params);
-    if (detalleReq[clave] !== req) return;
+    if (detalleReq[clave] !== req) return true;
     detalleDatos[clave] = datos;
     // Primer detalle desde que se abrió la ventana: es a esto a lo que vuelve
     // "Descartar cambios".
@@ -7086,11 +7180,13 @@ async function cargarDetalle(pedidoId, parte) {
       detalleOriginal = fotoDeAjustes(clave, datos);
     delete detalleFallos[clave];
   } catch (e) {
-    if (detalleReq[clave] !== req) return;
+    if (detalleReq[clave] !== req) return true;
+    ok = false;
     detalleFallos[clave] = e.message;
     delete detalleDatos[clave];
   }
   pintarVentanaDetalle(clave);
+  return ok;
 }
 
 // La ventana muestra UNA factura: una respuesta que llega tarde (se cerró, o se
@@ -7377,8 +7473,8 @@ const quitarAjuste = (pedidoId, parte, codigo, campo) =>
 // El detalle que el operador tenga abierto, al día otra vez (cambió la fecha a
 // facturar, se editó una campaña de descuento…).
 function refrescarDetalleAbierto() {
-  if (!detalleAbierto) return;
-  cargarDetalle(...partesDeClave(detalleAbierto));
+  if (!detalleAbierto) return true;
+  return cargarDetalle(...partesDeClave(detalleAbierto));
 }
 
 function lineaDeDetalle(pedidoId, parte, codigo) {
@@ -11262,8 +11358,10 @@ async function cargarAjustes() {
     pintarOpcionesPrueba(d.opciones_prueba);
     pintarBotonCorte();
     refrescarVistasModoPrueba();
+    return true;
   } catch (e) {
     mensaje("No se pudieron cargar los ajustes: " + e.message, "error");
+    return false;
   }
 }
 
@@ -11463,6 +11561,12 @@ function maquinaSinGuardar() {
   const vendedor = $("vendedor-select").value;
   return inp.value.trim() !== (nombreMaquina || "")
       || (!!vendedor && vendedor !== (vendedorMaquina || ""));
+}
+
+function ajustesCompartidosSinGuardar() {
+  const corte = $("corte-fecha");
+  const cortePendiente = !!corte && corte.value !== (corteProduccion || "");
+  return maquinaSinGuardar() || cortePendiente;
 }
 
 // Las pestañas de arriba pasan por aquí y no por cambiarTab directo: salir de
@@ -12038,8 +12142,11 @@ async function cargarRutasSeries() {
       [f.ruta, {series_permitidas: f.series_permitidas, serie_predeterminada: f.serie_predeterminada}]));
   } catch (e) {
     mensaje("No se pudo cargar la config de rutas: " + e.message, "error");
+    return false;
   }
   pintarFilasRutas();
+  pintarSeries();
+  return true;
 }
 
 // Texto + clase de la regla que de verdad aplica hoy para una ruta (se ve en
@@ -12409,8 +12516,10 @@ async function abrirCatalogo(tipo, prefill) {
       </div>`;
     pintarFilasCatalogo();
     if (prefill) abrirEditor(null, prefill);
+    return true;
   } catch (e) {
     mensaje("No se pudo cargar el catálogo: " + e.message, "error");
+    return false;
   }
 }
 
@@ -13567,8 +13676,10 @@ async function renderDescuentos() {
     descConflictos = conf;
     pintarListaDescuentos();
     pintarDescuentosBorrados();
+    return true;
   } catch (e) {
     cont.innerHTML = `<p class="detalle-error" style="margin:14px">No se pudieron cargar los descuentos: ${esc(e.message)}</p>`;
+    return false;
   }
 }
 
