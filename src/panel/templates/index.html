@@ -1039,6 +1039,25 @@
   .desc-desglose .productos { font-weight:400; color:var(--mut); font-size:12px;
                               margin-top:2px; }
   .desc-desglose .tope { display:block; font-weight:400; font-size:11px; color:#b45309; }
+  /* Campañas que alcanzan la línea y aun así NO se aplican (perdieron, o una
+     exclusiva las bloqueó): tachadas, porque es justo lo que el operador no
+     puede deducir mirando los porcentajes. */
+  .desc-desglose .fila-bloqueadas { font-size:11.5px; color:var(--mut); margin-top:3px; }
+  .desc-desglose .bloqueada { text-decoration:line-through; white-space:nowrap;
+                              margin-left:4px; }
+  /* Modo de cada campaña en la tabla de combinación. Los tres se ven distintos:
+     el modo es la propiedad que decide cómo se combina, y leerlo mal cambia el
+     porcentaje que se factura. */
+  .chip-modo { display:inline-block; border-radius:999px; padding:0 7px;
+               font-size:10.5px; font-weight:700; letter-spacing:.04em;
+               line-height:17px; vertical-align:middle; margin-left:7px; }
+  .chip-modo.m-prioridad { background:#eef2f8; border:1px solid #cbd5e1; color:#334155; }
+  .chip-modo.m-suma { background:#e8f0fe; border:1px solid #b9d0f7; color:#1e3a8a; }
+  .chip-modo.m-exclusiva { background:#f3e8ff; border:1px solid #d8b4fe; color:#6b21a8; }
+  /* A qué clientes alcanza cada campaña: el alcance compartido es parte de por
+     qué dos campañas se pisan, así que va en su misma fila. */
+  .choque-orden .fila-clientes { font-size:11.5px; color:var(--mut); font-weight:400;
+                                 margin-top:2px; }
   .choque-mover { display:flex; gap:3px; justify-content:flex-end; }
   .choque-mover button { width:20px; height:18px; padding:0; line-height:1; font-size:9px;
                          color:var(--mut); border:1px solid #cbd2dc; background:#fff;
@@ -1092,6 +1111,18 @@
      se vuelve una tarjeta ámbar —la decisión no puede parecer un extra opcional,
      que es justo cómo se leía siendo un check suelto (2026-07-30)— y el mismo
      ámbar marca la pendiente en el resumen. */
+  /* Aviso de que cambiar el modo mueve lo que se factura: ámbar de "esto tiene
+     consecuencia", con la cuenta concreta adentro. */
+  .desc-impacto { background:#fffaeb; border:1px solid #fde68a; color:#92400e;
+                  border-radius:6px; padding:8px 10px; margin-top:8px; font-size:12.5px; }
+  .desc-impacto ul { margin:5px 0 0; padding-left:18px; }
+  /* «Así quedaría», pegado al botón de Guardar: es lectura de confirmación, no
+     una alerta — tono liviano y en una sola línea que envuelve si hace falta. */
+  .desc-ejemplo { display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline;
+                  background:#f6f8fa; border:1px solid #e7ebf0; border-radius:6px;
+                  padding:7px 10px; margin-top:10px; font-size:12.5px; color:#334155; }
+  .desc-ejemplo .titulo { color:var(--mut); font-size:10.5px; text-transform:uppercase;
+                          letter-spacing:.04em; }
   #desc-acum-bloque.falta { background:#fffaeb; border:1px solid #fde68a;
                             border-radius:6px; padding:8px 10px; }
   #desc-acum-bloque.falta #desc-acum-titulo { font-weight:600; color:#92400e; }
@@ -1257,6 +1288,64 @@
                margin-left:7px; }
   .choque-suma { font-size:12.5px; color:#1e3a8a; background:#f0f5ff; border:1px solid #d6e2fb;
                  border-radius:6px; padding:6px 9px; margin:6px 0 0; }
+  /* Campaña EXCLUSIVA (2026-08-02): si manda, reemplaza todo descuento
+     solapado. Morado: no es alerta (es una decisión tomada), pero tampoco el
+     azul de "se suma" — bloquear y sumar son opuestos y no pueden leerse igual. */
+  .card-excl { display:inline-block; background:#f3e8ff; border:1px solid #d8b4fe;
+               color:#6b21a8; border-radius:4px; padding:0 6px; font-size:10.5px;
+               font-weight:700; letter-spacing:.05em; vertical-align:middle;
+               margin-left:7px; }
+  .choque-bloqueo { font-size:12.5px; color:#6b21a8; background:#faf5ff;
+                    border:1px solid #e9d5ff; border-radius:6px; padding:6px 9px;
+                    margin:6px 0 0; }
+
+  /* --- Pestaña CONFLICTOS (2026-08-02) ------------------------------------
+     Una tarjeta por CONJUNTO de campañas que se pisan. La que todavía espera
+     una decisión se separa con el mismo ámbar del choque pendiente; el resto
+     se lee como ficha informativa y no grita. */
+  .conf-intro { margin:12px 14px 0; }
+  .conf-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end;
+                  margin:10px 14px; padding:10px 12px; background:#f7f9fb;
+                  border:1px solid #e4e8ee; border-radius:8px; }
+  .conf-filtro { display:flex; flex-direction:column; gap:3px; font-size:11px;
+                 font-weight:700; color:var(--mut); text-transform:uppercase;
+                 letter-spacing:.04em; }
+  .conf-filtro select, .conf-filtro input { font:inherit; font-size:13px;
+                 font-weight:400; text-transform:none; letter-spacing:normal;
+                 color:var(--fg); padding:4px 6px; border:1px solid #d7dce3;
+                 border-radius:6px; background:#fff; min-width:150px; }
+  .conf-card { margin:12px 14px; padding:12px 14px; border:1px solid #e2e6ec;
+               border-radius:10px; background:#fff; }
+  .conf-card.pendiente { border-color:#f0dca0; background:#fffdf7; }
+  .conf-card > h4 { margin:0 0 6px; font-size:14px; }
+  .conf-chip { display:inline-block; margin-left:8px; border-radius:4px;
+               padding:0 6px; font-size:10.5px; font-weight:700;
+               letter-spacing:.05em; vertical-align:middle; }
+  .conf-chip.pendiente { background:#fdf6e3; border:1px solid #f0dca0; color:#92600a; }
+  .conf-chip.listo { background:#eaf7ef; border:1px solid #cdeadb; color:#15803d; }
+  .conf-compartido { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12.5px;
+                     color:var(--mut); margin-bottom:8px; }
+  .conf-motivo { margin:6px 0 4px; }
+  .conf-subtitulo { margin:14px 0 4px; font-size:13px; }
+  .conf-manda { font-size:10px; font-weight:700; letter-spacing:.05em;
+                color:#15803d; text-transform:uppercase; }
+  .choque-orden .c-modo { width:130px; }
+  .choque-orden .c-modo select { font:inherit; font-size:12.5px; padding:2px 4px;
+                border:1px solid #d7dce3; border-radius:5px; background:#fff; }
+  .conf-fuera { font-size:11.5px; color:#6b21a8; margin-top:2px; }
+  /* Campañas sin ningún solape hoy: plegadas, porque no piden nada — pero su
+     modo guardado se dice, que es el que valdrá el día que aparezca una. */
+  .conf-sueltas summary { cursor:pointer; font-weight:600; }
+  .conf-suelta { padding:8px 0; border-top:1px solid #eef0f4; }
+  .conf-suelta-acciones { display:flex; gap:8px; align-items:center; margin-top:6px; }
+  .conf-suelta-acciones select { font:inherit; font-size:12.5px; padding:3px 6px;
+                border:1px solid #d7dce3; border-radius:5px; background:#fff; }
+  /* Aviso de decisión pendiente tras guardar: ámbar como el choque sin decidir,
+     y con sus dos salidas resueltas dentro del propio aviso. */
+  .desc-aviso-decidir { margin:12px 14px 0; padding:10px 12px; border-radius:8px;
+                background:#fdf6e3; border:1px solid #f0dca0; color:#92600a;
+                font-size:13px; }
+  .desc-aviso-decidir .acciones { display:flex; gap:8px; margin-top:8px; }
   .desc-card .card-acciones { display:flex; gap:8px; margin-top:9px; }
   /* Aviso "en el objeto" (feedback del usuario 2026-07-24): cuando una acción de
      la tarjeta (activar/eliminar) la RECHAZA el servidor, el aviso va AQUÍ,
@@ -2025,6 +2114,12 @@
         vigente y activa, ese porcentaje se descuenta en cada factura que se
         llene.</p>
     </div>
+    <!-- Aviso de decisión pendiente (2026-08-02): al guardar una campaña que
+         choca sin que nadie haya dicho cuál manda, se avisa aquí en vez de
+         bloquear el guardado. Trae las dos salidas resueltas: ir a decidirlo, o
+         dejar lo que hoy pasa fijado como decisión ("dejar como está" también
+         es decidir). -->
+    <div id="desc-aviso-decidir" class="desc-aviso-decidir" style="display:none"></div>
     <div id="desc-lista"></div>
     <div id="desc-borradas"></div>
   </section>
@@ -2539,13 +2634,12 @@
       <button type="button" class="desc-tab activa" data-t="datos" onclick="descTab('datos')">Detalles</button>
       <button type="button" class="desc-tab" data-t="alcance" onclick="descTab('alcance')">Productos<span class="desc-tab-marca" id="desc-marca-alcance" style="display:none"></span></button>
       <button type="button" class="desc-tab" data-t="clientes" onclick="descTab('clientes')">Clientes<span class="desc-tab-marca" id="desc-marca-clientes" style="display:none"></span></button>
-      <!-- Conflictos con otras campañas: la pestaña SOLO aparece cuando hay algo
-           que mostrar (2026-07-29). Se llamó "Coincidencias" hasta el 2026-07-30,
-           cuando el usuario la renombró: aunque dos campañas se sumen en vez de
-           pelear, la palabra fuerte es la que hace entrar a mirar, y de mirar
-           depende decidir si esta se suma o compite. -->
-      <button type="button" class="desc-tab" data-t="choques" id="desc-tab-btn-choques"
-              style="display:none" onclick="descTab('choques')">Conflictos<span class="desc-tab-marca" id="desc-marca-choques" style="display:none"></span></button>
+      <!-- La pestaña "Conflictos y combinación" se retiró de aquí el 2026-08-02:
+           las reglas de convivencia se consultan y se editan en UN solo sitio,
+           DESCUENTOS → Conflictos. Tenerlas también dentro de cada campaña hacía
+           que el mismo solape se contara distinto según desde cuál se abriera.
+           Lo que queda en el editor es el resumen del renglón "Conflictos" (ver
+           descConflictoResumen) y su enlace a esa pestaña. -->
     </div>
 
     <div id="desc-cuerpo">
@@ -2600,25 +2694,32 @@
            (gana la más específica), y decidirlo desde Detalles obligaba a saltar
            de pestaña para ver en qué quedó. -->
       <div id="desc-acum-slot-datos">
-        <!-- Dos opciones, ninguna marcada de entrada (2026-07-30, pedido del
-             usuario): con otra campaña de por medio, competir y sumarse facturan
-             porcentajes distintos, así que no hay default seguro que asumir en
-             silencio — se elige antes de dejar guardar. Sin ninguna campaña
-             encima no bloquea nada y la campaña compite, como siempre. -->
-        <div class="editor-campo" id="desc-acum-bloque"><span id="desc-acum-titulo">Con otras campañas</span>
+        <!-- TRES modos, ninguno marcado de entrada (2026-07-30, ampliado el
+             2026-08-02): con otra campaña de por medio, mandar / sumarse /
+             reemplazar facturan porcentajes distintos, así que no hay default
+             seguro que asumir en silencio — se elige antes de dejar guardar.
+             Sin ninguna campaña encima no bloquea nada y la campaña compite,
+             como siempre. -->
+        <div class="editor-campo" id="desc-acum-bloque"><span id="desc-acum-titulo">Cómo se combina con otras campañas</span>
           <span class="obligatorio-tag" id="desc-acum-oblig" style="display:none">obligatorio</span>
           <div id="desc-acum-opciones">
-            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="prioridad" onchange="descAcumulableCambio()"> Prioridad: manda una sola y tú eliges cuál</label>
-            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="suma" onchange="descAcumulableCambio()"> Se suma: su porcentaje se agrega al de la campaña que mande</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="prioridad" onchange="descAcumulableCambio()"> Prioridad: puede mandar; permite acumulables</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="suma" onchange="descAcumulableCambio()"> Se suma: se agrega salvo que gane Exclusiva</label>
+            <label class="desc-todos" style="margin-top:2px"><input type="radio" name="desc-acum" value="exclusiva" onchange="descAcumulableCambio()"> Exclusiva: si manda, reemplaza todo descuento solapado</label>
           </div>
-          <!-- El aviso trae la acción ahí mismo (las dos opciones de arriba) y
+          <!-- El aviso trae la acción ahí mismo (las opciones de arriba) y
                dice las dos consecuencias de no elegir: no guarda, y la tabla de
                quién manda no se deja tocar. Justo eso pasó el 2026-07-30: se
                ordenó la prioridad sin haber visto nunca la opción de sumar. -->
           <div class="desc-pendiente" id="desc-acum-falta" style="display:none">
-            Elige una: mientras no lo hagas no se puede guardar, ni ordenar quién manda.
-            <button type="button" class="desc-ir" id="desc-acum-ir" onclick="descTab('choques')">Ver el conflicto</button>
+            Elige uno: mientras no lo hagas no se puede guardar.
+            <button type="button" class="desc-ir" id="desc-acum-ir"
+                    onclick="descIrAConflictosDesdeEditor()">Ver en Conflictos</button>
           </div>
+          <!-- Cambiar el modo de una campaña ya guardada puede mover lo que se
+               factura: el aviso lo dice concreto (qué producto, de cuánto a
+               cuánto), no "esto podría afectar otras campañas". -->
+          <div class="desc-impacto" id="desc-acum-impacto" style="display:none"></div>
         </div>
       </div>
       <!-- El bloque de clientes viaja igual que el del porcentaje: se ve en
@@ -2686,21 +2787,17 @@
       </div>
     </div>
 
-    <!-- COINCIDENCIAS (CONTRATOS.md 4.4): una pestaña más, dentro del cuerpo que
-         scrollea. Antes vivía fija debajo, con su propio scroll: dos barras en
-         el mismo formulario cortaban las tablas por la mitad (2026-07-29).
-         Arriba el check "Se suma" (viaja desde Detalles) y debajo el resultado
-         que se repinta al tocarlo: se decide viendo en qué queda. -->
-    <div id="desc-tab-choques" class="desc-tab-panel" style="display:none">
-      <div id="desc-acum-slot-choques"></div>
-      <div id="desc-choques"></div>
-    </div>
     </div><!-- /desc-cuerpo -->
 
     <!-- El resumen de la campaña es lo ÚNICO fijo bajo las pestañas: se ve
          igual desde Productos o Clientes, y al no scrollear no agrega barra. -->
     <div class="desc-overview" id="desc-overview"></div>
 
+    <!-- Ejemplo del resultado con los solapamientos de HOY, pegado al botón de
+         Guardar (pedido del usuario 2026-08-02): antes de guardar hay que poder
+         ver en qué porcentaje termina cada ámbito, sin ir a buscarlo a otra
+         pestaña. Sale del mismo desglose que calcula el motor. -->
+    <div id="desc-ejemplo" class="desc-ejemplo" style="display:none"></div>
     <div id="desc-error" class="desc-error" style="display:none"></div>
     <div class="editor-acciones">
       <button class="primario" onclick="guardarDescuento()">Guardar</button>
@@ -13415,7 +13512,15 @@ let descSelector = null;   // {clientes:[...], grupos:[{grupo,productos:[{pt_id,
 let descCampanas = [];     // campañas ya cargadas (para editar/desactivar sin re-fetch)
 let descBorradas = [];     // campañas archivadas en la papelera (para restaurar)
 let descBorradasAbierto = false;   // la papelera arranca plegada y recuerda si se abrió
-let descListaTab = "vigentes";  // pestaña activa de la lista: vigentes | proximas | historico
+let descListaTab = "vigentes";  // pestaña de la lista: vigentes | proximas | historico | conflictos
+// CONFLICTOS (2026-08-02): la convivencia entre campañas se consulta y se
+// decide AQUÍ, no dentro de cada campaña. `descConflictos` es la última foto del
+// servidor; `descConfFiltro`, lo que el operador tiene filtrado; `descConfVuelta`,
+// a dónde volver tras abrir una campaña desde un conflicto (grupo + filtros +
+// scroll), para que editar no cueste perder el sitio.
+let descConflictos = {grupos: [], sin_conflicto: []};
+let descConfFiltro = {cliente: "", producto: "", campana: "", estado: "", fecha: ""};
+let descConfVuelta = null;
 let descEdit = null;       // campaña en edición (ver nuevoDescuento para su forma)
 let descCliAbierto = null; // rif con sus sucursales desplegadas en Clientes
 // Choques con otras campañas (CONTRATOS.md 4.4), chequeo en vivo del editor:
@@ -13430,7 +13535,6 @@ let descChoqueOrden = null;
 // El orden tal como llegó del servidor la PRIMERA vez en este editor: es la
 // referencia para saber si el operador movió algo (mover una fila es un cambio
 // sin guardar como cualquier otro, y de los más consecuentes).
-let descChoqueOrdenBase = null;
 
 // Los buscadores reconstruyen todo el árbol/lista en cada tecla; en una PC lenta
 // (Windows del operador) eso se siente. El debounce agrupa la ráfaga de tecleo y
@@ -13451,9 +13555,16 @@ async function renderDescuentos() {
   cont.innerHTML = '<p class="mut" style="margin:14px"><span class="spinner"></span> Cargando…</p>';
   try {
     if (!descSelector) descSelector = await api("/api/descuentos/selector");
-    const r = await api("/api/catalogo/descuentos");
+    // Las dos consultas van juntas: la pestaña CONFLICTOS se pinta con la misma
+    // foto que las tarjetas, y así el contador de su píldora nunca contradice lo
+    // que se ve al entrar.
+    const [r, conf] = await Promise.all([
+      api("/api/catalogo/descuentos"),
+      api("/api/descuentos/conflictos"),
+    ]);
     descCampanas = r.filas;
     descBorradas = r.borradas || [];
+    descConflictos = conf;
     pintarListaDescuentos();
     pintarDescuentosBorrados();
   } catch (e) {
@@ -13601,6 +13712,15 @@ function descPctTexto(d) {
 // Choques/notas de UNA campaña para su tarjeta en la lista (CONTRATOS.md 4.4):
 // un choque sin decidir es alerta (reusa .conflicto); uno ya decidido es una
 // línea sutil que dice quién manda; las notas son informativas.
+// Chip de modo en la tarjeta de la lista: 'prioridad' es lo normal y no se
+// anuncia; los otros dos cambian lo que se factura y sí se ven de un vistazo.
+function descChipTarjeta(d) {
+  const modo = d.modo || (d.acumulable ? "suma" : "prioridad");
+  if (modo === "suma") return '<span class="card-suma">SE SUMA</span>';
+  if (modo === "exclusiva") return '<span class="card-excl">EXCLUSIVA</span>';
+  return "";
+}
+
 function descChoquesTarjetaHTML(d) {
   const choques = (d.choques || []).map(c => {
     if (c.decision === "esta")
@@ -13615,7 +13735,9 @@ function descChoquesTarjetaHTML(d) {
   // Sumas (campañas acumulables): no son alerta ni decisión pendiente — dicen
   // con quién se apila y en cuánto queda el descuento donde coinciden.
   const sumas = (d.sumas || []).map(s => `<div class="choque-suma">${esc(s)}</div>`).join("");
-  return choques + sumas + notas;
+  const bloqueos = (d.bloqueos || []).map(b =>
+    `<div class="choque-bloqueo">${esc(b)}</div>`).join("");
+  return choques + sumas + bloqueos + notas;
 }
 
 function pintarListaDescuentos() {
@@ -13663,6 +13785,9 @@ function pintarListaDescuentos() {
     return e === 0 ? "vigentes" : e === 1 ? "proximas" : "historico";
   };
   for (const d of descCampanas) buckets[bucketDe(d)]++;
+  // CONFLICTOS no reparte campañas: cuenta CONJUNTOS de campañas que se pisan
+  // (2026-08-02). Cada uno sale una sola vez, mire desde donde se mire.
+  buckets.conflictos = (descConflictos.grupos || []).length;
   const subtab = (id, txt) => `<button class="desc-subtab st-${id}${descListaTab === id ? " activa" : ""}" onclick="descCambiarSubtab('${id}')">${txt}<span class="cuenta">${buckets[id]}</span></button>`;
   // Bandos separados (2026-07-27): con el modo prueba prendido solo aplican las
   // campañas marcadas PRUEBA. Las reales quedan en pausa mientras tanto, y eso
@@ -13675,7 +13800,18 @@ function pintarListaDescuentos() {
          ? "Hay 1 campaña real en pausa" : `Hay ${realesEnPausa} campañas reales en pausa`}
        hasta que se apague el modo prueba. Los choques también van aparte: una campaña
        de prueba nunca choca con una real.</p>` : "";
-  const barra = avisoBando + `<div class="desc-subtabs">${subtab("vigentes", "En curso")}${subtab("proximas", "Futuras")}${subtab("historico", "Archivadas")}${modoAdmin ? subtab("prueba", "Prueba") : ""}</div>`;
+  // La píldora de CONFLICTOS lleva el punto ámbar cuando queda algo por
+  // decidir: es lo único de esta pantalla que le pide una acción al operador.
+  const hayPendiente = (descConflictos.grupos || []).some(g => g.pendiente);
+  const barra = avisoBando + `<div class="desc-subtabs">${subtab("vigentes", "En curso")}${
+    subtab("proximas", "Futuras")}${subtab("historico", "Archivadas")}${
+    subtab("conflictos", "Conflictos" + (hayPendiente ? " ●" : ""))}${
+    modoAdmin ? subtab("prueba", "Prueba") : ""}</div>`;
+  if (descListaTab === "conflictos") {
+    cont.innerHTML = barra + '<div id="desc-conf-cuerpo"></div>';
+    pintarConflictos();
+    return;
+  }
   const visibles = descCampanas.filter(d => bucketDe(d) === descListaTab);
   if (!visibles.length) {
     const vacios = {
@@ -13693,7 +13829,7 @@ function pintarListaDescuentos() {
     // con uno solo sigue en línea detrás de la presentación.
     const alc = descAlcanceHTML(d);
     return `<div class="desc-card ${d.activo ? "" : "inactiva"}" data-desc-id="${esc(d.id)}">
-      <h4>${puntoEstado(d.activo)}${esc(d.nombre || descPctTexto(d) + " — " + (d.alcance === "total" ? "Toda la factura" : `${(d.productos || []).length} producto${(d.productos || []).length === 1 ? "" : "s"}`))}${d.es_prueba ? '<span class="card-prueba">PRUEBA</span>' : ""}${d.acumulable ? '<span class="card-suma">SE SUMA</span>' : ""}</h4>
+      <h4>${puntoEstado(d.activo)}${esc(d.nombre || descPctTexto(d) + " — " + (d.alcance === "total" ? "Toda la factura" : `${(d.productos || []).length} producto${(d.productos || []).length === 1 ? "" : "s"}`))}${d.es_prueba ? '<span class="card-prueba">PRUEBA</span>' : ""}${descChipTarjeta(d)}</h4>
       <div class="meta"><b class="cardpct">${esc(descPctTexto(d))}</b>${d.alcance === "total" ? " general" : ""}${descPresTexto(d) ? " · " + esc(descPresTexto(d)) : ""}${alc.bloque ? "" : " · " + alc.html}</div>
       ${alc.bloque ? alc.html : ""}
       <div class="meta cli">${esc(descQuienes(d.objetivos, d.es_global))}</div>
@@ -13719,6 +13855,461 @@ function descCambiarSubtab(id) {
   descListaTab = id;
   pintarListaDescuentos();
   pintarDescuentosBorrados();   // la papelera solo se muestra en Histórico: sigue el cambio de pestaña
+}
+
+// ===========================================================================
+// Pestaña CONFLICTOS (2026-08-02). UN solo lugar donde se consulta y se decide
+// cómo conviven las campañas. Antes cada campaña traía su propia sección y el
+// mismo solape se contaba distinto según desde cuál de las dos se abriera.
+// Aquí cada conjunto que se pisa sale UNA vez, con el mismo contenido siempre:
+// el servidor los arma sin privilegiar a ninguna (catalogos.listar_conflictos)
+// y los porcentajes salen del MOTOR que factura, no de una cuenta del panel.
+// ===========================================================================
+const DESC_PRES_TXT = {paq: "paquetes", kg: "kilos", ambas: "paquetes y kilos"};
+
+// Qué hace cada modo cuando aparece otra campaña encima. Se usa igual en el
+// conflicto y en la lista de campañas sin conflicto (ahí, en futuro: "si mañana
+// coincide con otra…").
+const DESC_MODO_EXPLICA = {
+  prioridad: "compite por mandar; si gana, se le suman encima las que se suman",
+  suma: "no compite: su porcentaje se agrega al de la que mande",
+  exclusiva: "compite por mandar; si gana es el único descuento de la línea",
+};
+
+function descConfTexto(g) {
+  return g.campanas.map(c => c.etiqueta || c.nombre || "").join(" ");
+}
+
+// Opciones de los filtros, sacadas de lo que de verdad hay en pantalla: un
+// filtro que ofrece cosas inexistentes solo hace perder clics.
+function descConfOpciones() {
+  const todas = (descConflictos.grupos || []).flatMap(g => g.campanas)
+    .concat(descConflictos.sin_conflicto || []);
+  const clientes = new Map(), productos = new Map(), campanas = new Map();
+  let hayGlobal = false;
+  for (const c of todas) {
+    campanas.set(c.id, c.etiqueta || c.nombre || c.id);
+    if (c.es_global) hayGlobal = true;
+    for (const o of c.objetivos || []) clientes.set(o.rif, o.etiqueta || o.rif);
+    for (const p of c.productos || []) {
+      productos.set("pt:" + p.pt_id, p.descripcion || p.pt_id);
+      if (p.grupo) productos.set("gr:" + p.grupo, p.grupo + " (grupo entero)");
+    }
+  }
+  const orden = m => [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  return {clientes: orden(clientes), productos: orden(productos),
+          campanas: orden(campanas), hayGlobal};
+}
+
+// ¿Esta campaña pasa los filtros de cliente / producto / campaña / fecha? Una
+// campaña GLOBAL pasa cualquier filtro de cliente y una de alcance 'total',
+// cualquiera de producto: de verdad los cubre a todos.
+function descConfCampanaPasa(c, f) {
+  if (f.campana && c.id !== f.campana) return false;
+  if (f.cliente && !c.es_global
+      && !(c.objetivos || []).some(o => o.rif === f.cliente)) return false;
+  if (f.producto && c.alcance !== "total") {
+    const [tipo, valor] = [f.producto.slice(0, 2), f.producto.slice(3)];
+    const cubre = (c.productos || []).some(p =>
+      tipo === "pt" ? p.pt_id === valor : p.grupo === valor);
+    if (!cubre) return false;
+  }
+  if (f.fecha) {
+    if ((c.vigencia_desde || "") > f.fecha) return false;
+    if ((c.vigencia_hasta || "9999-12-31") < f.fecha) return false;
+  }
+  return true;
+}
+
+// Un GRUPO pasa si alguna de sus campañas pasa: filtrar por un cliente no debe
+// esconder el conflicto entero donde ese cliente está metido.
+function descConfGrupoPasa(g, f) {
+  if (f.estado === "inactivas") return false;   // en un conflicto solo hay activas
+  return g.campanas.some(c => descConfCampanaPasa(c, f));
+}
+
+function descConfSueltaPasa(c, f) {
+  if (f.estado === "activas" && !c.activo) return false;
+  if (f.estado === "inactivas" && c.activo) return false;
+  return descConfCampanaPasa(c, f);
+}
+
+function descConfFiltroCambio(campo, valor) {
+  descConfFiltro[campo] = valor;
+  pintarConflictos();
+}
+
+function descConfLimpiarFiltros() {
+  descConfFiltro = {cliente: "", producto: "", campana: "", estado: "", fecha: ""};
+  pintarConflictos();
+}
+
+function descConfBarraFiltros() {
+  const o = descConfOpciones();
+  const f = descConfFiltro;
+  const sel = (campo, etiqueta, pares, extra) => `<label class="conf-filtro">${esc(etiqueta)}
+    <select onchange="descConfFiltroCambio('${campo}', this.value)">
+      <option value="">Todas</option>${extra || ""}
+      ${pares.map(([v, t]) =>
+        `<option value="${esc(v)}"${f[campo] === v ? " selected" : ""}>${esc(t)}</option>`).join("")}
+    </select></label>`;
+  const activos = Object.values(f).filter(Boolean).length;
+  return `<div class="conf-filtros">
+    ${sel("cliente", "Cliente", o.clientes)}
+    ${sel("producto", "Producto o grupo", o.productos)}
+    ${sel("campana", "Campaña", o.campanas)}
+    <label class="conf-filtro">Estado
+      <select onchange="descConfFiltroCambio('estado', this.value)">
+        <option value="">Todas</option>
+        <option value="activas"${f.estado === "activas" ? " selected" : ""}>Solo activas</option>
+        <option value="inactivas"${f.estado === "inactivas" ? " selected" : ""}>Solo desactivadas</option>
+      </select></label>
+    <label class="conf-filtro">Vigentes el
+      <input type="date" value="${esc(f.fecha)}"
+             onchange="descConfFiltroCambio('fecha', this.value)"></label>
+    ${activos ? `<button type="button" class="btn-azul"
+        onclick="descConfLimpiarFiltros()">Quitar filtros (${activos})</button>` : ""}
+  </div>`;
+}
+
+// «Dónde coinciden»: clientes, presentación y ventana de vigencia comunes.
+function descConfCompartido(g) {
+  const cp = g.compartido;
+  const clientes = cp.clientes.alcance === "todos" ? "TODOS los clientes"
+    : cp.clientes.alcance === "algunos"
+      ? cp.clientes.etiquetas.join(", ")
+      : "clientes distintos (se encadenan a través de otra campaña del grupo)";
+  const pres = cp.presentaciones.map(p => DESC_PRES_TXT[p] || p).join(" / ");
+  const vig = !cp.vigencia_comun
+    ? "no hay una sola ventana común: se encadenan"
+    : cp.hasta ? `del ${cp.desde} al ${cp.hasta}` : `desde ${cp.desde}`;
+  return `<div class="conf-compartido">
+    <span><b>Clientes:</b> ${esc(clientes)}</span>
+    <span><b>Aplica a:</b> ${esc(pres)}</span>
+    <span><b>Coinciden:</b> ${esc(vig)}</span></div>`;
+}
+
+// Tabla de quién manda. Una por bloque de campañas que CHOCAN: reordenarla es
+// la decisión, y se guarda en el acto contra el servidor (no hay borrador que
+// perder ni botón que recordar pulsar).
+function descConfTablaOrden(g, bloque, i) {
+  const porId = new Map(g.campanas.map(c => [c.id, c]));
+  const filas = bloque.ids.map((id, n) => {
+    const c = porId.get(id);
+    if (!c) return "";
+    const arriba = n > 0 ? `<button type="button" title="Subir un puesto"
+        onclick="descConfMover('${esc(g.id)}', ${i}, '${esc(id)}', -1)">&#9650;</button>` : "";
+    const abajo = n < bloque.ids.length - 1 ? `<button type="button" title="Bajar un puesto"
+        onclick="descConfMover('${esc(g.id)}', ${i}, '${esc(id)}', 1)">&#9660;</button>` : "";
+    return `<tr>
+      <td class="c-manda">${n === 0 ? '<span class="conf-manda">manda</span>' : ""}</td>
+      <td class="c-puesto">${n + 1}º</td>
+      <td>${descConfNombre(c)}</td>
+      <td class="c-modo">${descConfSelectorModo(c)}</td>
+      <td class="c-pct">${esc(descConfPct(c))}</td>
+      <td class="c-mover"><div class="choque-mover">${arriba}${abajo}</div></td>
+    </tr>`;
+  }).join("");
+  const motivo = bloque.pendiente
+    ? `Nadie ha decidido este orden todavía: mientras tanto manda la campaña
+       más reciente. Súbela con las flechas para dejarlo dicho — aunque sea
+       para dejarlo como está.`
+    : "Manda la de arriba porque así lo decidiste. Muévelas para cambiarlo.";
+  return `<p class="mut conf-motivo">${motivo}</p>
+    <table class="choque-orden"><thead><tr>
+      <th class="c-manda"></th><th class="c-puesto">#</th><th>Campaña</th>
+      <th class="c-modo">Modo</th><th class="c-pct">%</th><th class="c-mover"></th>
+    </tr></thead><tbody>${filas}</tbody></table>`;
+}
+
+// El nombre abre la campaña en su editor y vuelve aquí al cerrarlo. El id sale
+// de data-id y no del onclick: un nombre con apóstrofo —"Plaza's"— rompería la
+// cadena JS del atributo.
+function descConfNombre(c) {
+  return `<button type="button" class="choque-ir" data-id="${esc(c.id)}"
+      title="Abrir «${esc(c.etiqueta || "")}»" onclick="descConfAbrirCampana(this)"
+      >${esc(c.etiqueta || c.nombre || c.id)}</button>${
+    c.es_prueba ? '<span class="card-prueba">PRUEBA</span>' : ""}`;
+}
+
+function descConfSelectorModo(c) {
+  return `<select class="conf-modo" data-id="${esc(c.id)}"
+      title="${esc(DESC_MODO_EXPLICA[c.modo] || "")}"
+      onchange="descConfCambiarModo(this)">
+    ${Object.keys(DESC_MODO_TXT).map(m =>
+      `<option value="${m}"${c.modo === m ? " selected" : ""}>${esc(DESC_MODO_TXT[m])}</option>`
+    ).join("")}</select>`;
+}
+
+// El % con que la campaña cubre sus productos. Con uno solo, ese número; con
+// varios, cuántos productos lleva cada uno (mismo criterio que el editor).
+function descConfPct(c) {
+  const d = c.pct_desglose || [];
+  if (!d.length) return "sin %";
+  if (d.length === 1) return `${+parseFloat(d[0].pct).toFixed(6)}%`;
+  return d.slice(0, 3).map(x => `${+parseFloat(x.pct).toFixed(6)}% en ${x.n}`).join(" · ")
+    + (d.length > 3 ? ` +${d.length - 3} más` : "");
+}
+
+// Las que NO compiten: se suman encima de la que mande, o son exclusivas que
+// bloquean. Van fuera de la tabla de orden porque ahí no hay nada que ordenar.
+function descConfFueraDeOrden(g) {
+  const enOrden = new Set(g.ordenes.flatMap(o => o.ids));
+  const sueltas = g.campanas.filter(c => !enOrden.has(c.id));
+  if (!sueltas.length) return "";
+  return `<table class="choque-orden"><thead><tr>
+      <th>Campaña</th><th class="c-modo">Modo</th><th class="c-pct">%</th>
+    </tr></thead><tbody>${sueltas.map(c => `<tr>
+      <td>${descConfNombre(c)}</td>
+      <td class="c-modo">${descConfSelectorModo(c)}</td>
+      <td class="c-pct">${esc(descConfPct(c))}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+// Por qué el resultado es el que es, pareja por pareja y sin repetir: el
+// servidor ya manda cada par UNA vez (nunca A→B y B→A).
+function descConfRelaciones(g) {
+  const nombre = id => {
+    const c = g.campanas.find(x => x.id === id);
+    return `«${esc((c && (c.etiqueta || c.nombre)) || id)}»`;
+  };
+  const clase = {choque: "conflicto", nota: "choque-nota",
+                 suma: "choque-suma", bloqueo: "choque-bloqueo"};
+  return g.relaciones.map(r =>
+    `<div class="${clase[r.clase] || "choque-nota"}">${nombre(r.a)} y ${nombre(r.b)}: ${
+      esc(r.detalle)}</div>`).join("");
+}
+
+// «Cómo queda cada producto»: el resultado que se factura, línea por línea. Sale
+// del mismo motor que arma la factura — el panel no vuelve a sacar la cuenta.
+function descConfDesglose(g) {
+  if (!g.desglose.length) return "";
+  const num = x => +x.toFixed(6);
+  const nombre = c => esc(c.etiqueta || "");
+  const cuerpo = g.desglose.map(f => {
+    const partes = [].concat(f.compiten.slice(0, 1), f.suman)
+      .map(c => `<span>${nombre(c)} ${num(c.pct)}%</span>`).join(' <i class="op">+</i> ');
+    const fuera = (f.bloqueadas || []).map(c =>
+      `<div class="conf-fuera">${nombre(c)} queda fuera: ${esc(c.motivo || "")}</div>`).join("");
+    const productos = f.productos || [];
+    const resto = (f.n_productos || 0) - productos.length;
+    const lista = productos.join(" · ") + (resto > 0 ? ` y ${resto} más` : "");
+    const cuenta = `<span class="mut">${f.n_productos} producto${f.n_productos === 1 ? "" : "s"}</span>`;
+    const titulo = f.grupo ? `${esc(f.grupo)} · ${cuenta}`
+      : (f.n_productos === 1 ? esc(productos[0]) : (f.n_productos ? cuenta : "Toda la factura"));
+    const sub = f.n_productos > 1 ? `<div class="productos">${esc(lista)}</div>` : "";
+    const tope = f.topado
+      ? `<span class="tope">topado: la suma da ${num(f.total_sin_tope)}%</span>` : "";
+    return `<tr>
+      <td class="c-ambito">${titulo}${sub}</td>
+      <td class="c-cuenta">${partes}${fuera}</td>
+      <td class="c-total">${num(f.pct)}%${tope}</td>
+    </tr>`;
+  }).join("");
+  return `<h4 class="conf-subtitulo">Cómo queda cada producto</h4>
+    <table class="desc-desglose"><thead><tr>
+      <th>Dónde coinciden</th><th class="c-cuenta">Cuenta</th>
+      <th class="c-total">Queda en</th>
+    </tr></thead><tbody>${cuerpo}</tbody></table>`;
+}
+
+function descConfTarjeta(g) {
+  const titulo = g.campanas.map(c => `«${esc(c.etiqueta || c.nombre || c.id)}»`).join(" · ");
+  const chip = g.pendiente
+    ? '<span class="conf-chip pendiente">falta decidir</span>'
+    : '<span class="conf-chip listo">decidido</span>';
+  const ordenes = g.ordenes.map((b, i) => descConfTablaOrden(g, b, i)).join("");
+  const sinOrden = !g.ordenes.length
+    ? `<p class="mut conf-motivo">Estas campañas no compiten entre sí: no hay
+       orden que decidir, solo lo que dice cada renglón de abajo.</p>` : "";
+  return `<div class="conf-card${g.pendiente ? " pendiente" : ""}"
+       data-conf-id="${esc(g.id)}">
+    <h4>${titulo}${chip}</h4>
+    ${descConfCompartido(g)}
+    ${sinOrden}${ordenes}${descConfFueraDeOrden(g)}
+    ${descConfRelaciones(g)}
+    ${descConfDesglose(g)}
+  </div>`;
+}
+
+// Campañas que hoy no se cruzan con ninguna: no hay conflicto que decidir, pero
+// su modo guardado sí importa el día que aparezca una coincidencia — por eso se
+// dice cuál es y qué hará, en vez de esconderlas.
+function descConfSinConflicto(sueltas) {
+  if (!sueltas.length) return "";
+  const filas = sueltas.map(c => `<div class="conf-suelta">
+    <div><b>${esc(c.etiqueta || c.nombre || c.id)}</b>${descChipModo(c.modo)}${
+      c.activo ? "" : ' <b class="card-off">DESACTIVADO</b>'}${
+      c.es_prueba ? '<span class="card-prueba">PRUEBA</span>' : ""}</div>
+    <div class="meta">Sin conflictos actuales. Si mañana coincide con otra campaña,
+      ${esc(DESC_MODO_EXPLICA[c.modo] || "")}.</div>
+    <div class="conf-suelta-acciones">${descConfSelectorModo(c)}
+      <button type="button" class="btn-verde" data-id="${esc(c.id)}"
+              onclick="descConfAbrirCampana(this)">Abrir campaña</button></div>
+  </div>`).join("");
+  return `<div class="ajustes-bloque conf-sueltas">
+    <details${descConfSueltasAbierto ? " open" : ""} ontoggle="descConfSueltasToggle(this)">
+      <summary>Sin conflictos actuales (${sueltas.length})</summary>
+      ${filas}
+    </details></div>`;
+}
+
+let descConfSueltasAbierto = false;
+function descConfSueltasToggle(det) { descConfSueltasAbierto = det.open; }
+
+function pintarConflictos() {
+  const cont = $("desc-conf-cuerpo");
+  if (!cont) return;
+  const f = descConfFiltro;
+  const grupos = (descConflictos.grupos || []).filter(g => descConfGrupoPasa(g, f));
+  const sueltas = (descConflictos.sin_conflicto || []).filter(c => descConfSueltaPasa(c, f));
+  const total = (descConflictos.grupos || []).length;
+  const encabezado = `<p class="mut conf-intro">${total
+    ? `${total} conjunto${total === 1 ? "" : "s"} de campañas se pisan entre sí.
+       Cada uno sale una sola vez: lo que se ve aquí es lo que se factura.`
+    : "Ninguna campaña se pisa con otra ahora mismo."}</p>`
+    + descConfBarraFiltros();
+  const cuerpo = grupos.length ? grupos.map(descConfTarjeta).join("")
+    : (total ? '<p class="mut" style="margin:14px">Ningún conflicto pasa esos filtros.</p>' : "");
+  cont.innerHTML = encabezado + cuerpo + descConfSinConflicto(sueltas);
+}
+
+// --- Decisión pendiente al guardar -----------------------------------------
+// Guardar ya no se bloquea por un choque sin decidir (la decisión vive en
+// CONFLICTOS, no en el editor), pero tampoco pasa en silencio: mientras nadie
+// diga cuál manda, el cálculo aplica la campaña más reciente, y eso es una
+// decisión tomada por defecto sobre un monto fiscal. El aviso lo dice y trae
+// las dos salidas resueltas.
+function descDecisionPendiente() {
+  const r = descChoqueUltimo;
+  if (!r || !r.listo) return null;
+  const sin = (r.choques || []).filter(c => !c.decision);
+  return sin.length ? sin.map(c => c.otra_etiqueta).filter(Boolean) : null;
+}
+
+function descAvisarDecisionPendiente(nombres, id) {
+  const caja = $("desc-aviso-decidir");
+  if (!caja) return;
+  const conQuien = nombres.map(n => `«${esc(n)}»`).join(", ");
+  caja.innerHTML = `<div><b>Falta decidir cuál campaña manda</b> donde esta se pisa
+      con ${conQuien}. Mientras nadie lo diga, se factura la más reciente.</div>
+    <div class="acciones">
+      <button type="button" class="primario" onclick="descIrAConflictos()">Decidirlo en Conflictos</button>
+      <button type="button" class="btn-azul" data-id="${esc(id || "")}"
+              onclick="descDejarComoEsta(this)">Dejar como está</button>
+      <button type="button" onclick="descCerrarAvisoDecidir()">Cerrar</button>
+    </div>`;
+  caja.style.display = "";
+}
+
+function descCerrarAvisoDecidir() {
+  const caja = $("desc-aviso-decidir");
+  if (caja) { caja.style.display = "none"; caja.innerHTML = ""; }
+}
+
+// Se refresca contra el servidor antes de pintar: se llega aquí desde el editor
+// o desde el aviso, y la explicación tiene que ser la de AHORA, no la de la
+// última vez que se abrió la pestaña.
+async function descIrAConflictos() {
+  descCerrarAvisoDecidir();
+  descListaTab = "conflictos";
+  await renderDescuentos();
+  pintarDescuentosBorrados();
+  $("desc-lista").scrollIntoView({block: "start"});
+}
+
+// "Dejar como está" NO es no hacer nada: fija como decisión el orden que hoy
+// aplica (la más reciente arriba), y así el choque deja de estar pendiente sin
+// que cambie ni un porcentaje.
+async function descDejarComoEsta(btn) {
+  const id = btn.dataset.id;
+  btn.disabled = true;
+  try {
+    const conf = await api("/api/descuentos/conflictos");
+    const bloques = (conf.grupos || [])
+      .filter(g => g.campanas.some(c => c.id === id))
+      .flatMap(g => g.ordenes)
+      .filter(b => b.pendiente && b.ids.includes(id));
+    if (!bloques.length) {
+      mensaje("Ya no queda nada por decidir en ese conflicto.", "info");
+    } else {
+      for (const b of bloques) await api("/api/descuentos/conflicto/orden", {orden: b.ids});
+      mensaje("Queda decidido tal como estaba: manda la misma campaña de antes.", "info");
+    }
+    descCerrarAvisoDecidir();
+    await descConfRefrescar();
+  } catch (e) {
+    btn.disabled = false;
+    mensaje("No se pudo dejar fijada la decisión: " + e.message, "error");
+  }
+}
+
+// Refresca la foto del servidor SIN mover al operador de donde está: el
+// repintado vacía el contenedor un instante y el scroll se iría al tope.
+async function descConfRefrescar() {
+  const y = window.scrollY;
+  await renderDescuentos();
+  window.scrollTo(0, y);
+}
+
+// Subir o bajar un puesto. Se guarda EN EL ACTO contra el servidor: aquí no hay
+// borrador que perder ni botón de confirmar que recordar, y el resultado que se
+// lee después del movimiento es exactamente el que se facturaría.
+async function descConfMover(grupoId, bloqueIdx, id, delta) {
+  const g = (descConflictos.grupos || []).find(x => x.id === grupoId);
+  const bloque = g && g.ordenes[bloqueIdx];
+  if (!bloque) return;
+  const orden = bloque.ids.slice();
+  const i = orden.indexOf(id), j = i + delta;
+  if (i < 0 || j < 0 || j >= orden.length) return;
+  orden.splice(j, 0, orden.splice(i, 1)[0]);
+  try {
+    await api("/api/descuentos/conflicto/orden", {orden});
+    await descConfRefrescar();
+  } catch (e) {
+    mensaje("No se pudo cambiar el orden: " + e.message, "error");
+    await descConfRefrescar();   // la pantalla vuelve a lo que de verdad hay guardado
+  }
+}
+
+// Cambiar el modo de una campaña sin abrir su formulario entero: es un solo
+// interruptor y decide cuánto se factura, así que se guarda al elegirlo.
+async function descConfCambiarModo(sel) {
+  const id = sel.dataset.id, modo = sel.value;
+  sel.disabled = true;
+  try {
+    await api("/api/descuentos/conflicto/modo", {id, modo});
+    await descConfRefrescar();
+  } catch (e) {
+    mensaje("No se pudo cambiar el modo: " + e.message, "error");
+    await descConfRefrescar();
+  }
+}
+
+// Abrir una campaña del conflicto en su editor de siempre, dejando anotado a
+// dónde volver: mismo conflicto, mismos filtros, mismo scroll.
+function descConfAbrirCampana(btn) {
+  const tarjeta = btn.closest("[data-conf-id]");
+  descConfVuelta = {grupo: tarjeta ? tarjeta.dataset.confId : null,
+                    filtro: {...descConfFiltro}, scroll: window.scrollY};
+  editarDescuento(btn.dataset.id);
+}
+
+// Al cerrar el editor (guardando o descartando) se vuelve al conflicto de donde
+// se salió, con la explicación ya recalculada.
+async function descConfVolver() {
+  if (!descConfVuelta) return;
+  const destino = descConfVuelta;
+  descConfVuelta = null;
+  descConfFiltro = destino.filtro;
+  descListaTab = "conflictos";
+  await renderDescuentos();
+  // El grupo pudo cambiar de composición mientras se editaba (o desaparecer):
+  // si sigue ahí se vuelve a él, y si no, al tope de la lista.
+  const tarjeta = destino.grupo
+    ? document.querySelector(`[data-conf-id="${CSS.escape(destino.grupo)}"]`) : null;
+  if (tarjeta) tarjeta.scrollIntoView({block: "center"});
+  else window.scrollTo(0, destino.scroll);
 }
 
 // Campañas eliminadas (papelera local, 2026-07-24): si el operador borró una
@@ -13793,9 +14384,9 @@ function nuevoDescuento() {
   descEdit = {
     id: null, nombre: "", alcance: "total", porcentaje: 10,
     // Arranca en paquetes: los kilos solo llevan descuento si se piden.
-    // acumulable null = sin decidir: una campaña nueva no llega con la prioridad
+    // modo "" = sin decidir: una campaña nueva no llega con la prioridad
     // puesta, así que si aparece un conflicto hay que elegir (ver descValidar).
-    presentaciones: "paq", acumulable: null,
+    presentaciones: "paq", modo: "",
     vigencia_desde: "", vigencia_hasta: "", indefinida: false,
     todosClientes: false, selCli: {}, selProd: new Set(),
     prodPct: {},
@@ -13833,7 +14424,7 @@ function editarDescuento(id) {
   }
   descEdit = {
     id: d.id, nombre: d.nombre || "", alcance: d.alcance,
-    presentaciones: d.presentaciones || "ambas", acumulable: !!d.acumulable,
+    presentaciones: d.presentaciones || "ambas", modo: d.modo || (d.acumulable ? "suma" : "prioridad"),
     // Las campañas "especificado" no guardan % general: al reabrir, el campo
     // "descuento a aplicar" vuelve a su default 10 (editable), nunca vacío.
     porcentaje: d.porcentaje ?? 10, vigencia_desde: d.vigencia_desde, vigencia_hasta: d.vigencia_hasta,
@@ -13883,7 +14474,7 @@ function abrirEditorDescuento() {
   descTituloActualizar();
   for (const r of document.getElementsByName("desc-pres")) r.checked = (r.value === descEdit.presentaciones);
   $("desc-pct").value = descEdit.porcentaje;
-  descAcumSet(descEdit.acumulable == null ? "" : (descEdit.acumulable ? "suma" : "prioridad"));
+  descAcumSet(descEdit.modo || "");
   $("desc-desde").value = descEdit.vigencia_desde;
   $("desc-hasta").value = descEdit.vigencia_hasta;
   // Fecha a la que se vuelve si el operador desmarca "Sin fecha de fin": la
@@ -13900,14 +14491,12 @@ function abrirEditorDescuento() {
   if ($("desc-prod-buscar")) $("desc-prod-buscar").value = "";
   descCliAbierto = null;
   descError("");
-  // Choques (CONTRATOS.md 4.4): orden y bloque, limpios en cada apertura —
-  // nunca queda el orden de la campaña anterior pegado; el primer chequeo trae
-  // el orden guardado.
+  // Choques (CONTRATOS.md 4.4): el orden queda limpio en cada apertura — nunca
+  // se arrastra el de la campaña anterior; el primer chequeo trae el guardado,
+  // que es el que se vuelve a mandar al guardar (decidirlo es cosa de la
+  // pestaña CONFLICTOS, no de aquí).
   descChoqueOrden = null;
-  descChoqueOrdenBase = null;
   descChoqueUltimo = null;
-  $("desc-choques").innerHTML = "";
-  descPestanaChoques(false, false);
   descTab("datos");
   descAlcanceCambio();
   descPintarClientes();
@@ -13926,23 +14515,17 @@ function abrirEditorDescuento() {
 
 // Firma del estado editable de la campaña (mismo payload que se guardaría). Se
 // compara contra la del momento de abrir para saber si hay cambios sin guardar.
-// El orden de los choques va aparte de la firma: llega con el chequeo del
-// servidor y marcaría "sucio" sin que el operador toque nada. Se compara
-// contra el orden que trajo ese primer chequeo (descChoqueOrdenBase), así que
-// solo cuenta como cambio lo que el operador movió de verdad.
+// El orden de los choques NO entra: llega con el chequeo del servidor y desde
+// que se decide en la pestaña CONFLICTOS (2026-08-02) el editor no lo mueve —
+// contarlo marcaría "sucio" sin que el operador haya tocado nada.
 function descFirma() {
   try { return JSON.stringify(descPayload()); }
   catch (_) { return null; }
 }
 
-function descOrdenMovido() {
-  return descChoqueOrdenBase !== null && descChoqueOrden !== null
-      && descChoqueOrden.join("|") !== descChoqueOrdenBase;
-}
-
 function descHayCambios() {
   if (!descEdit || descEdit.firma === undefined) return false;
-  return descFirma() !== descEdit.firma || descOrdenMovido();
+  return descFirma() !== descEdit.firma;
 }
 
 // Intento de cierre del editor de campaña (clic afuera o Cancelar): con cambios
@@ -13962,16 +14545,16 @@ function intentarCerrarDescuento() {
 function cerrarDescuento() {
   $("desc-overlay").classList.remove("visible");
   descChoqueOrden = null;
-  descChoqueOrdenBase = null;
   descChoqueUltimo = null;
   descEdit = null;
   borradorOlvidar("campana");   // salida por las buenas (guardado o descarte deliberado): no es trabajo interrumpido
+  descConfVolver();   // si se entró desde un conflicto, se vuelve a él
 }
 
 function descTab(nombre) {
   for (const b of document.querySelectorAll("#desc-caja .desc-tab"))
     b.classList.toggle("activa", b.dataset.t === nombre);
-  for (const t of ["datos", "alcance", "clientes", "choques"])
+  for (const t of ["datos", "alcance", "clientes"])
     $("desc-tab-" + t).style.display = t === nombre ? "block" : "none";
   // Los bloques de Porcentaje y de Clientes no son exclusivos de Detalles: cada
   // uno VIAJA (es el mismo bloque, no una copia) a la pestaña que se abre —el
@@ -13982,12 +14565,6 @@ function descTab(nombre) {
     .appendChild($("desc-pct-bloque"));
   $(nombre === "clientes" ? "desc-cli-slot-clientes" : "desc-cli-slot-datos")
     .appendChild($("desc-cli-bloque"));
-  // El par prioridad/se suma viaja igual, entre Detalles y Conflictos: ahí es el
-  // único control que mueve el resultado cuando no hay orden que reordenar.
-  $(nombre === "choques" ? "desc-acum-slot-choques" : "desc-acum-slot-datos")
-    .appendChild($("desc-acum-bloque"));
-  // Parado en Conflictos, "Ver el conflicto" llevaría a donde ya estás.
-  $("desc-acum-ir").style.display = nombre === "choques" ? "none" : "";
   descPintarOverview();
   if (nombre === "clientes") descPintarClientes();
   if (nombre === "alcance") descAlcanceCambio();
@@ -14021,7 +14598,8 @@ function descAcumSet(valor) {
 function descHayCoincidencia() {
   const r = descChoqueUltimo;
   if (!r || !r.listo) return false;
-  return !!((r.choques || []).length || (r.sumas || []).length || (r.notas || []).length);
+  return !!((r.choques || []).length || (r.sumas || []).length
+            || (r.notas || []).length || (r.bloqueos || []).length);
 }
 
 // "Se suma" es el interruptor entre competir y apilarse, y desde Conflictos
@@ -14056,6 +14634,25 @@ function descPintarOverview() {
     ${descConflictoResumen()}
     <div class="meta"><b>Clientes:</b> ${esc(clientesTxt)}</div>`;
   descAcumPintarPendiente();
+  descPintarEjemplo();
+}
+
+// «Así quedaría»: las primeras líneas del desglose, pegadas al botón de Guardar.
+// Es el MISMO cálculo del motor que ya pinta la pestaña de conflictos, resumido
+// para poder confirmar el guardado sin cambiar de pestaña.
+function descPintarEjemplo() {
+  const caja = $("desc-ejemplo");
+  if (!caja) return;
+  const r = descChoqueUltimo;
+  const filas = (r && r.listo) ? (r.desglose || []) : [];
+  if (!filas.length) { caja.style.display = "none"; caja.innerHTML = ""; return; }
+  const num = x => +x.toFixed(6);
+  const nombre = f => f.grupo || (f.productos || []).slice(0, 2).join(", ") || "Toda la factura";
+  const trozos = filas.slice(0, 3).map(f =>
+    `<span><b>${esc(nombre(f))}</b> queda en ${num(f.pct)}%</span>`).join("");
+  const resto = filas.length > 3 ? `<span class="mut">y ${filas.length - 3} ámbito(s) más</span>` : "";
+  caja.innerHTML = `<b class="titulo">Así quedaría:</b>${trozos}${resto}`;
+  caja.style.display = "";
 }
 
 // Renglón de conflictos del resumen fijo (2026-07-30, pedido del usuario): con
@@ -14080,18 +14677,56 @@ function descConflictoResumen() {
     : `${otras} campaña${otras === 1 ? "" : "s"} más`;
   let queda;
   if (decision === "suma") queda = "se suma al % de la que mande";
-  else if (decision === "prioridad") {
-    // Quién manda sale de la tabla que el operador tiene a la vista (su primera
-    // fila), no de una cuenta aparte: así el resumen dice lo mismo que la pestaña.
-    const tabla = descFilasConvivencia(r);
-    const primera = (tabla.conOrden && tabla.filas.length) ? tabla.filas[0].item : null;
+  else if (decision === "prioridad" || decision === "exclusiva") {
+    // Quién manda sale del mismo orden que el servidor calculó con el motor
+    // (`orden_decide` dice si reordenar cambiaría algo), no de una cuenta
+    // aparte: así el resumen dice lo mismo que la pestaña CONFLICTOS.
+    const filas = r.orden_decide ? (r.combinacion || []) : [];
+    const posicion = new Map((descChoqueOrden || []).map((clave, i) => [clave, i]));
+    const compiten = filas.filter(f => f.modo !== "suma").sort((a, b) =>
+      (posicion.has(descChoqueClave(a)) ? posicion.get(descChoqueClave(a)) : 999)
+      - (posicion.has(descChoqueClave(b)) ? posicion.get(descChoqueClave(b)) : 999));
+    const primera = compiten[0] || null;
     const manda = primera
       ? (primera.es_esta ? "esta campaña" : `«${esc(primera.etiqueta || "")}»`) : "";
-    queda = manda ? `por prioridad manda ${manda}` : "por prioridad";
+    const como = decision === "exclusiva" ? "es exclusiva" : "por prioridad";
+    queda = manda ? `${como}: manda ${manda}` : como;
   } else {
-    queda = `<span class="falta"><b>falta decidir</b>: prioridad o se suma</span>`;
+    queda = `<span class="falta"><b>falta decidir</b>: cómo se combina</span>`;
   }
-  return `<div class="meta"><b>Conflictos:</b> se pisa con ${conQuien} — ${queda}</div>`;
+  // El detalle completo (quién manda, qué se suma, qué queda bloqueado y en qué
+  // termina cada producto) vive en DESCUENTOS → Conflictos desde el 2026-08-02:
+  // aquí va el resumen y el camino, no una segunda copia de las reglas.
+  return `<div class="meta"><b>Conflictos:</b> se pisa con ${conQuien} — ${queda}
+    <button type="button" class="desc-ir"
+            onclick="descIrAConflictosDesdeEditor()">Ver en Conflictos</button></div>`;
+}
+
+// Salir del editor hacia la pestaña CONFLICTOS. Con cambios sin guardar no se
+// salta en seco: la misma pregunta de salida de siempre, con las tres salidas
+// escritas para este caso.
+function descIrAConflictosDesdeEditor() {
+  // Si el editor se abrió DESDE un conflicto, cerrarlo ya devuelve solo a esa
+  // pestaña (descConfVolver): llamar además a descIrAConflictos repintaría dos
+  // veces y desharía el salto al conflicto de origen.
+  const ir = () => {
+    const volviendo = !!descConfVuelta;
+    if (descEdit) cerrarDescuento();
+    if (!volviendo) descIrAConflictos();
+  };
+  if (!descHayCambios()) return ir();
+  if (confirmSalidaCerrar) confirmSalidaCerrar();
+  pedirConfirmSalida({
+    acciones: $("desc-overlay").querySelector(".editor-acciones"),
+    mensaje: "Hay cambios sin guardar. Antes de ir a Conflictos:",
+    guardarTxt: "Guardar e ir",
+    salirTxt: "Descartar e ir",
+    guardar: async () => {
+      const volviendo = !!descConfVuelta;
+      if (await guardarDescuento() && !volviendo) descIrAConflictos();
+    },
+    cerrar: ir,
+  });
 }
 
 // Marca de obligatorio del par prioridad/se suma: solo con otra campaña de por
@@ -14103,6 +14738,32 @@ function descAcumPintarPendiente() {
   $("desc-acum-oblig").style.display = falta ? "" : "none";
   $("desc-acum-falta").style.display = falta ? "" : "none";
   $("desc-acum-bloque").classList.toggle("falta", falta);
+  descPintarImpactoModo();
+}
+
+// Cambiar el modo de una campaña YA GUARDADA puede mover lo que se factura: el
+// aviso lo dice CONCRETO (qué ámbito, de cuánto a cuánto), porque lo calcula el
+// servidor corriendo el motor dos veces —con el modo guardado y con el nuevo— y
+// comparando. Sin diferencias no aparece nada: un aviso que no cambia nada es
+// ruido.
+function descPintarImpactoModo() {
+  const caja = $("desc-acum-impacto");
+  if (!caja) return;
+  const imp = (descChoqueUltimo && descChoqueUltimo.listo)
+    ? descChoqueUltimo.impacto_modo : null;
+  if (!imp || !(imp.filas || []).length) {
+    caja.style.display = "none";
+    caja.innerHTML = "";
+    return;
+  }
+  const num = x => +x.toFixed(6);
+  const filas = imp.filas.map(f =>
+    `<li>${esc(f.ambito)}: <b>${num(f.antes)}%</b> pasa a <b>${num(f.despues)}%</b></li>`).join("");
+  caja.innerHTML = `Al pasar de «${esc(DESC_MODO_TXT[imp.modo_anterior] || imp.modo_anterior)}»
+    a «${esc(DESC_MODO_TXT[imp.modo_nuevo] || imp.modo_nuevo)}» cambia lo que se factura:
+    <ul>${filas}</ul>
+    Guardar deja el descuento en los porcentajes de la derecha.`;
+  caja.style.display = "";
 }
 
 // --- Alcance: check "Todos los productos" + % + árbol grupo→producto --------
@@ -14576,7 +15237,7 @@ function descPayload(activo) {
     // Sin decidir viaja como 0 (compite): el chequeo en vivo tiene que poder
     // correr con el borrador a medias. El freno de "elige antes de guardar" es
     // descValidar, no el payload.
-    acumulable: descAcumActual() === "suma" ? 1 : 0,
+    modo: descAcumActual(),
     porcentaje: pctParaEnviar($("desc-pct").value),
     vigencia_desde: $("desc-desde").value,
     vigencia_hasta: descEdit.indefinida ? null : $("desc-hasta").value,
@@ -14689,7 +15350,8 @@ function descValidar() {
   // sumarse: con otra campaña de por medio son dos porcentajes distintos y no
   // hay default que se pueda asumir en silencio.
   if (descHayCoincidencia() && !descAcumActual())
-    return {msg: "Hay otra campaña de por medio: elige si esta lleva prioridad o si se suma.",
+    return {msg: "Hay otra campaña de por medio: elige cómo se combina esta "
+                 + "(prioridad, se suma o exclusiva).",
             tab: "choques"};
   return {msg: "", tab: null};
 }
@@ -14731,9 +15393,14 @@ async function guardarDescuento() {
   if (descChoqueOrden && descChoqueOrden.length) payload.orden_choque = descChoqueOrden;
   try {
     const r = await api("/api/descuento", payload);
+    // Con la vuelta a CONFLICTOS pendiente, el repintado lo hace ella: dos
+    // renders a la vez se pisarían el contenedor de la lista.
+    const volviendo = !!descConfVuelta;
+    const pendiente = descDecisionPendiente();
     cerrarDescuento();
     mensaje(r.aviso || "Descuento guardado.", r.aviso ? "error" : "info");
-    renderDescuentos();
+    if (!volviendo) renderDescuentos();
+    if (pendiente) descAvisarDecisionPendiente(pendiente, r.id);
     return true;
   } catch (e) {
     // Choque aparecido entre el último chequeo y el guardado (otra laptop
@@ -14759,7 +15426,7 @@ async function desactivarDescuento(id, activo) {
       // Van explícitas porque el guardado toma lo que llega: sin ellas, apagar y
       // volver a encender la campaña la dejaba compitiendo y en "ambas"
       // presentaciones, perdiendo en silencio dos decisiones ya tomadas.
-      acumulable: d.acumulable ? 1 : 0, presentaciones: d.presentaciones,
+      modo: d.modo || (d.acumulable ? "suma" : "prioridad"), presentaciones: d.presentaciones,
       clientes: d.objetivos.map(o => ({codigo_cliente_winledger: o.codigo_cliente_winledger,
                 cliente_id: o.cliente_id, incluir: o.incluir})),
       grupos: d.grupos,
@@ -14810,7 +15477,11 @@ async function descChequearChoques() {
   if (!descEdit) return;
   let r;
   try {
-    r = await api("/api/descuento/chequear", descPayload());
+    // El orden acomodado viaja con el chequeo: el servidor calcula el desglose
+    // con ESAS prioridades, así que lo que se ve es lo que se facturaría al
+    // guardar (y sin que el navegador tenga que rehacer ninguna cuenta).
+    r = await api("/api/descuento/chequear",
+                  {...descPayload(), orden_choque: descChoqueOrden || undefined});
   } catch (e) {
     return;   // un chequeo en vivo fallido no debe tapar el editor; se reintenta solo
   }
@@ -14818,10 +15489,9 @@ async function descChequearChoques() {
   // reteclearlo, los productos desmarcados un momento) vuelve con listo=false, y
   // si se quedara, el renglón de conflictos del resumen y el freno de compite/se
   // suma perderían el conflicto que ya se sabía. Mismo criterio que
-  // descFusionarOrden y descPintarChoques, que también dejan el a medias de lado.
+  // descFusionarOrden, que también deja el a medias de lado.
   if (r.listo) descChoqueUltimo = r;
   descFusionarOrden(r);
-  descPintarChoques(r);
   descPintarOverview();   // el renglón de conflictos del resumen sale de este chequeo
   descRevalidarAviso();   // conflicto estrenado (o resuelto): el aviso a la vista se pone al día
 }
@@ -14851,394 +15521,14 @@ function descFusionarOrden(r) {
   if (descChoqueOrden && descChoqueOrden.length === claves.length
       && descChoqueOrden.every(id => claves.includes(id))) return;
   descChoqueOrden = claves;
-  if (descChoqueOrdenBase === null) descChoqueOrdenBase = claves.join("|");
 }
 
-function descPintarChoques(r) {
-  const cont = $("desc-choques");
-  // Un chequeo a medias (listo=false: el % vaciado para reteclearlo, los
-  // productos desmarcados un momento) deja la pestaña como está. Desde que la
-  // convivencia vive en una pestaña propia (2026-07-29), quitarla sacaría al
-  // operador de donde está escribiendo — mismo criterio que descFusionarOrden.
-  if (!r || !r.listo) return;
-  const choques = r.choques || [];
-  const notas = r.notas || [];
-  const sumas = r.sumas || [];
-  if (!choques.length && !notas.length && !sumas.length) {
-    descPestanaChoques(false, false);
-    cont.innerHTML = "";
-    return;
-  }
-  const filasNotas = notas.map(n => `<div class="choque-nota">${esc(n)}</div>`).join("");
-  const detalles = choques.map(c =>
-    `<p class="mut" style="margin:4px 0 0">Choca con «${esc(c.otra_etiqueta)}»: ${esc(c.detalle)}</p>`).join("");
-  const tabla = descTablaConvivencia(r);
-  // La tabla trae el grupo entero de campañas que se pisan entre sí, no solo
-  // las que chocan con esta: sin decirlo, una fila ajena parecería un choque
-  // propio (y moverla, una decisión sobre algo que no es).
-  const directos = new Set(choques.map(c => c.otra_id));
-  const ajenas = (tabla.conOrden ? (r.orden || []) : [])
-    .filter(it => !it.es_esta && !directos.has(it.id))
-    .map(it => `«${esc(it.etiqueta || "")}»`);
-  const aclaraAjenas = ajenas.length
-    ? `<p class="mut" style="margin:4px 0 0">${ajenas.join(", ")} no se pisa con esta campaña,
-       pero sí con otra de la lista: el orden vale para todo el grupo.</p>`
-    : "";
-  // El subtítulo con la instrucción solo acompaña a la tabla: con puras notas
-  // informativas no se le pide nada al operador. Con sumas no se decide nada
-  // tampoco — se explica qué está viendo.
-  // Con la decisión pendiente el subtítulo no explica la tabla: manda a elegir,
-  // que es lo que abre paso a ordenarla.
-  const subtitulo = (descHayCoincidencia() && !descAcumActual())
-    ? `<p class="mut" style="margin:0 0 8px">${tabla.conOrden
-        ? "Elige arriba antes de seguir: con prioridad ordenas quién manda de las de abajo; sumándose no hay orden que decidir."
-        : "Elige arriba cómo se lleva con la otra campaña: de eso depende con qué porcentaje se factura."}</p>`
-    : tabla.conOrden
-    ? `<p class="mut" style="margin:0 0 8px">Manda la de arriba: de ella sale el porcentaje.${
-        sumas.length ? " Lo marcado con + se suma encima, en su misma fila." : ""}</p>`
-    : (tabla.html
-       ? `<p class="mut" style="margin:0 0 8px">Estas campañas no compiten: sus porcentajes se suman.</p>`
-       : "");
-  // Sin título propio: la pestaña ya se llama Conflictos y repetirlo aquí
-  // era decir dos veces lo mismo (2026-07-29). Lo que sí queda es el subtítulo,
-  // que dice en cuál de los tres casos estás y qué hacer con él.
-  //
-  // El desglose traduce la tabla de arriba a lo que se factura línea por línea.
-  // Va debajo, con su título de sección: arriba se decide, abajo se lee.
-  const desglose = descTablaDesglose(r);
-  const bloqueDesglose = desglose
-    ? `<h4 class="desglose-titulo">Cómo queda cada producto</h4>${desglose}` : "";
-  cont.innerHTML = `${subtitulo}${tabla.html}${detalles}`
-    + `${aclaraAjenas}${filasNotas}${bloqueDesglose}`;
-  descPestanaChoques(true, choques.length > 0);
-}
+// Rótulo corto del modo de una campaña, para las tablas y las tarjetas.
+const DESC_MODO_TXT = {prioridad: "Prioridad", suma: "Se suma", exclusiva: "Exclusiva"};
 
-// Muestra u oculta la pestaña «Conflictos» según haya algo que mostrar, con el
-// chip naranja cuando queda algo por decidir: un CHOQUE de verdad, o el par
-// compite/se suma todavía sin elegir (2026-07-30) — una suma ya decidida no se
-// decide, se lee. Si la pestaña se va estando abierta —se quitó el último
-// conflicto desde el propio editor— el foco vuelve a Detalles en vez de dejar el
-// cuerpo en blanco.
-function descPestanaChoques(hay, conChoque) {
-  $("desc-tab-btn-choques").style.display = hay ? "" : "none";
-  const marca = $("desc-marca-choques");
-  marca.style.display = (hay && (conChoque || !descAcumActual())) ? "" : "none";
-  marca.textContent = "decidir";
-  if (!hay && $("desc-tab-choques").style.display !== "none") descTab("datos");
-}
-
-// Cuántos porcentajes distintos entran en la celda "%" antes de resumir el resto
-// en "+N más" (el desglose completo queda en el title de la celda).
-const DESC_CHOQUE_PCT_TOPE = 3;
-
-// Celda "%" de la tabla de choques: {html, titulo}. Un porcentaje solo sale solo
-// (campaña pareja, o 'toda la factura'); si difieren, se desglosan por cuántos
-// productos cubre cada uno, de mayor a menor cobertura — el orden lo arma el
-// servidor con la misma resolución producto > grupo > general del cálculo (ver
-// _desglose_pct). Antes toda campaña 'especificado' sin % general decía "varios",
-// incluso con un único porcentaje parejo en todos sus productos.
-function descChoquePct(it) {
-  const desglose = it.pct_desglose || [];
-  if (!desglose.length) return {html: '<span class="mut">sin %</span>', titulo: ""};
-  const pctDe = x => parseFloat(x.pct);
-  if (desglose.length === 1) return {html: `<span>${pctDe(desglose[0])}%</span>`, titulo: ""};
-  const partes = desglose.slice(0, DESC_CHOQUE_PCT_TOPE)
-    .map(x => `<span>${pctDe(x)}% en ${x.n}</span>`);
-  const resto = desglose.length - DESC_CHOQUE_PCT_TOPE;
-  if (resto > 0) partes.push(`<span class="mut">+${resto} más</span>`);
-  return {
-    html: partes.join(" · "),
-    // El title dice "productos" completo y no recorta: sirve de leyenda del "en
-    // N" y es donde se ven los porcentajes que no cupieron.
-    titulo: desglose.map(x => `${pctDe(x)}% en ${x.n} producto${x.n === 1 ? "" : "s"}`)
-      .join(" · "),
-  };
-}
-
-// [mínimo, máximo] de un desglose de % ({pct, n}), o null si no trae ninguno.
-// Con varios porcentajes por producto el total no es un número sino un rango.
-function descRango(desglose) {
-  const pcts = (desglose || []).map(x => parseFloat(x.pct)).filter(x => !isNaN(x));
-  if (!pcts.length) return null;
-  return [Math.min(...pcts), Math.max(...pcts)];
-}
-
-function descRangoTexto(rango) {
-  // toFixed(6) mata el ruido binario de sumar flotantes (10.1 + 5.2), igual
-  // que el redondeo del cálculo en armado.py.
-  const n = x => +x.toFixed(6);
-  return rango[0] === rango[1] ? `${n(rango[0])}%`
-    : `entre ${n(rango[0])}% y ${n(rango[1])}%`;
-}
-
-// Filas de la tabla de convivencia: {clave, control, item, sumas}. `item` es la
-// campaña que COMPITE por la línea (null cuando no hay ninguna: solo acumulables
-// apiladas entre sí) y `sumas` las ACUMULABLES que se le agregan encima.
-function descFilasConvivencia(r) {
-  const listo = !!(r && r.listo);
-  const orden = listo ? (r.orden || []) : [];
-  const sumas = listo ? (r.sumas || []) : [];
-  const esta = listo ? (r.esta || null) : null;
-  const estaAcum = !!(esta && esta.acumulable);
-  // Alfabéticas, igual que las ordena el servidor en el desglose de abajo: las
-  // dos tablas nombran las mismas sumas y tienen que nombrarlas en el mismo orden.
-  const porNombre = (a, b) => (a.etiqueta || "").localeCompare(b.etiqueta || "");
-  const acumulables = sumas.filter(s => s.acumulable).sort(porNombre);
-  const competidoras = sumas.filter(s => !s.acumulable);
-  const itemEsta = {es_esta: true, etiqueta: "Esta campaña",
-                    pct_desglose: esta ? esta.pct_desglose : []};
-
-  // Con choques manda el orden que el operador tiene acomodado, y cada
-  // competidora trae SUS acumulables: no toda acumulable se apila sobre toda
-  // competidora (pueden no coincidir en clientes, vigencia ni productos).
-  if (orden.length && descChoqueOrden) {
-    const porClave = new Map(orden.map(it => [descChoqueClave(it), it]));
-    const filas = descChoqueOrden.filter(id => porClave.has(id)).map(clave => {
-      const it = porClave.get(clave);
-      return {clave, control: true, item: it, sumas: (it.sumas || []).slice().sort(porNombre)};
-    });
-    return {filas, conOrden: filas.length > 0};
-  }
-  // Sin choques la tabla solo vale la pena si hay algo apilándose.
-  if (!estaAcum) {
-    return acumulables.length
-      ? {filas: [{clave: "__esta__", control: false, item: itemEsta, sumas: acumulables}],
-         conOrden: false}
-      : {filas: [], conOrden: false};
-  }
-  // Esta campaña se SUMA, así que la base es la que mande entre las que compiten
-  // —cuál de ellas gana no se decide desde este editor— y esta va entre las
-  // sumadas, marcada como propia.
-  const conmigo = [itemEsta].concat(acumulables);
-  if (!competidoras.length) {
-    return {filas: [{clave: null, control: false, item: null, sumas: conmigo}],
-            conOrden: false};
-  }
-  const unica = competidoras.length === 1;
-  // Con una sola, la fila la nombra y se puede abrir; con varias no hay a quién
-  // abrir (la fila las resume a todas) y su % viaja como rango, en vez de
-  // inventar una ganadora que este editor no decide.
-  const base = {
-    etiqueta: unica ? competidoras[0].etiqueta : "La campaña que mande",
-    pct_desglose: unica ? competidoras[0].pct_desglose
-      : [].concat(...competidoras.map(c => c.pct_desglose || [])),
-  };
-  return {filas: [{clave: unica ? competidoras[0].id : null, control: false,
-                   item: base, sumas: conmigo}], conOrden: false};
-}
-
-// Celda "%" de una fila: el % de la campaña, "+" el de cada acumulable que se le
-// apila y "=" el total en que termina. Con porcentajes distintos por producto
-// cada parte es un rango y el total también — la cuenta exacta producto por
-// producto vive en la tabla «Cómo queda cada producto», debajo.
-function descPctConSuma(item, sumas) {
-  const conPct = (sumas || []).filter(s => descRango(s.pct_desglose));
-  // Sin nada que sumar la celda queda como siempre: el desglose informativo
-  // ("10% en 3 · 6% en 2"), que dice más que un rango.
-  if (!conPct.length) return descChoquePct(item || {});
-
-  const base = item ? descRango(item.pct_desglose) : null;
-  const trozos = [];
-  let total = [0, 0];
-  if (base) { trozos.push(base); total = base.slice(); }
-  for (const s of conPct) {
-    const g = descRango(s.pct_desglose);
-    trozos.push(g);
-    total = [total[0] + g[0], total[1] + g[1]];
-  }
-  const cuenta = trozos.map(t => `<span>${esc(descRangoTexto(t))}</span>`)
-    .join(' <i class="op">+</i> ');
-  // Un solo sumando no es una suma: el total ES ese número y la cuenta sobra.
-  if (trozos.length < 2) return {html: cuenta, titulo: ""};
-  const tope = total[1] > 100 ? ' <span class="mut">(tope 100%)</span>' : "";
-  return {
-    html: `${cuenta} <i class="op">=</i> <b>${esc(descRangoTexto(total))}</b>${tope}`,
-    titulo: item ? descChoquePct(item).titulo : "",
-  };
-}
-
-// Tabla de convivencia con otras campañas (CONTRATOS.md 4.4): una fila por
-// campaña que COMPITE —manda la de arriba, y reordenarlas ES la decisión— con
-// las ACUMULABLES que se le apilan DENTRO de su misma fila y el total en que
-// termina si manda ella. Se pinta desde descChoqueOrden (lo que el operador
-// tiene acomodado) con los datos del último chequeo; el puesto se recalcula en
-// cada repintado.
-// Devuelve {html, conOrden}: `conOrden` dice si hay algo que decidir (hay
-// choques), para que el subtítulo no pida reordenar donde no hay orden.
-function descTablaConvivencia(r) {
-  const {filas, conOrden} = descFilasConvivencia(r);
-  if (!filas.length) return {html: "", conOrden: false};
-
-  const conFlechas = conOrden && filas.length >= 3;
-  const nombreDe = (it, clave) => {
-    if (!it) return '<span class="mut">La suma de estas campañas</span>';
-    if (it.es_esta) return "Esta campaña";
-    if (!clave) return esc(it.etiqueta || "");   // fila sintética: no se abre nada
-    // Las demás campañas del grupo se abren desde su propia fila: para ver o
-    // corregir con qué porcentaje se está pisando la otra había que cerrar el
-    // editor, buscarla en la lista y abrirla a mano.
-    return `<button type="button" class="choque-ir" tabindex="-1"
-           title="Abrir «${esc(it.etiqueta || "")}»" data-id="${esc(clave)}"
-           onclick="descChoqueAbrirOtra(this)">${esc(it.etiqueta || "")}</button>`;
-  };
-  const chipsDe = sumas => sumas.length
-    ? `<div class="fila-suman">${sumas.map(s =>
-        `<span class="chip-suma${s.es_esta ? " propia" : ""}">+ ${
-          esc(s.es_esta ? "Esta campaña" : (s.etiqueta || ""))}</span>`).join("")}</div>`
-    : "";
-
-  const cuerpo = filas.map((f, i) => {
-    const arriba = (conFlechas && i > 0)
-      ? `<button type="button" tabindex="-1" title="Subir un puesto"
-           onclick="descChoqueMover('${esc(f.clave)}', -1)">&#9650;</button>` : "";
-    const abajo = (conFlechas && i < filas.length - 1)
-      ? `<button type="button" tabindex="-1" title="Bajar un puesto"
-           onclick="descChoqueMover('${esc(f.clave)}', 1)">&#9660;</button>` : "";
-    const mover = conFlechas ? `<div class="choque-mover">${arriba}${abajo}</div>` : "";
-    const manda = f.control
-      ? `<input type="radio" name="desc-choque-manda" ${i === 0 ? "checked" : ""}
-          title="Manda donde se pisan" onchange="descChoqueSubirAlTope('${esc(f.clave)}')">` : "";
-    const pct = descPctConSuma(f.item, f.sumas);
-    // La fila se resalta cuando esta campaña está en ella, sea compitiendo o
-    // sumándose: es la referencia para saber qué se está moviendo.
-    const propia = (f.item && f.item.es_esta) || f.sumas.some(s => s.es_esta);
-    return `<tr${propia ? ' class="esta"' : ""}>
-      ${conOrden ? `<td class="c-manda">${manda}</td><td class="c-puesto">${i + 1}º</td>` : ""}
-      <td>${nombreDe(f.item, f.clave)}${chipsDe(f.sumas)}</td>
-      <td class="c-pct"${pct.titulo ? ` title="${esc(pct.titulo)}"` : ""}>${pct.html}</td>
-      <td class="c-mover">${mover}</td>
-    </tr>`;
-  }).join("");
-
-  const cabecera = conOrden
-    ? `<th class="c-manda">Manda</th><th class="c-puesto">#</th><th>Campaña</th>`
-    : `<th>Campaña</th>`;
-  // Sin elegir todavía prioridad o suma, la tabla se lee completa pero no se
-  // ordena: ordenarla ES elegir prioridad, y así se elegía sin ver la otra
-  // opción (2026-07-30). Los nombres siguen abriendo su campaña.
-  const bloqueado = conOrden && descHayCoincidencia() && !descAcumActual();
-  return {
-    html: `<table class="choque-orden${bloqueado ? " bloqueado" : ""}"><thead><tr>
-      ${cabecera}<th class="c-pct">%</th><th class="c-mover"></th>
-    </tr></thead><tbody>${cuerpo}</tbody></table>`,
-    conOrden,
-  };
-}
-
-// Cuál de las campañas que compiten por una línea manda: la primera del orden
-// que el operador tiene A LA VISTA, para que subir una fila se vea al instante
-// en el resultado. Si ninguna de esa línea está en el orden (una línea que el
-// choque no alcanza), manda la que decidió el servidor, que ya viene primera.
-function descQuienManda(compiten) {
-  if (!compiten || !compiten.length) return null;
-  if (descChoqueOrden) {
-    const elegida = descChoqueOrden.find(clave => compiten.some(c => c.clave === clave));
-    if (elegida) return compiten.find(c => c.clave === elegida);
-  }
-  return compiten[0];
-}
-
-// «Cómo queda cada producto»: con qué porcentaje termina cada línea donde esta
-// campaña coincide con otras (CONTRATOS.md 4.4). El servidor ya agrupó los
-// productos que terminan igual —una fila por grupo cuando la campaña le pone un
-// solo % al grupo entero— y resolvió la especificidad; quién manda entre las que
-// empatan sale del orden que el operador tiene arriba, así que la tabla se
-// repinta con cada movimiento de las flechas.
-function descTablaDesglose(r) {
-  const filas = (r && r.listo) ? (r.desglose || []) : [];
-  if (!filas.length) return "";
-  // toFixed(6) mata el ruido binario de sumar flotantes (10.1 + 5.2), igual que
-  // el redondeo del cálculo en armado.py.
-  const num = x => +x.toFixed(6);
-  const nombre = c => c.clave === "__esta__" ? "Esta campaña" : (c.etiqueta || "");
-  const cuerpo = filas.map(f => {
-    const manda = descQuienManda(f.compiten);
-    const partes = (manda ? [manda] : []).concat(f.suman || []);
-    const total = partes.reduce((a, c) => a + c.pct, 0);
-    const cuenta = partes.map(c =>
-        `<span>${esc(nombre(c))} ${num(c.pct)}%</span>`)
-      .join(' <i class="op">+</i> ');
-    const productos = f.productos || [];
-    const n = f.n_productos || 0;
-    const resto = n - productos.length;
-    const lista = productos.join(" · ") + (resto > 0 ? ` y ${resto} más` : "");
-    const cuentaProd = `<span class="mut">${n} producto${n === 1 ? "" : "s"}</span>`;
-    // El ámbito se titula con su grupo. Un producto sin grupo (sin código de
-    // artículo) no tiene con qué titularse: si es uno solo lo nombra él, y si
-    // son varios los nombra la lista de abajo — nunca el primero haciendo de
-    // título, que después se repetía en la lista.
-    const titulo = f.grupo ? `${esc(f.grupo)} · ${cuentaProd}`
-      : (n === 1 ? esc(productos[0]) : (n ? cuentaProd : "Toda la factura"));
-    // La lista de productos solo agrega cuando el título no los nombra ya.
-    const sub = (n > 1) ? `<div class="productos">${esc(lista)}</div>` : "";
-    // El número grande es lo que de verdad se factura: con la suma pasada de
-    // 100% el titular es el tope, y debajo se dice cuánto daba sin topar.
-    const tope = total > 100
-      ? `<span class="tope">topado: la suma da ${num(total)}%</span>` : "";
-    return `<tr>
-      <td class="c-ambito">${titulo}${sub}</td>
-      <td class="c-cuenta">${cuenta}</td>
-      <td class="c-total">${num(Math.min(total, 100))}%${tope}</td>
-    </tr>`;
-  }).join("");
-  return `<table class="desc-desglose"><thead><tr>
-      <th>Dónde coinciden</th><th class="c-cuenta">Cuenta</th>
-      <th class="c-total">Queda en</th>
-    </tr></thead><tbody>${cuerpo}</tbody></table>`;
-}
-
-// Abrir OTRA campaña del grupo desde su fila de la tabla. Con cambios sin
-// guardar no se salta en seco: la misma pregunta de salida del editor, con las
-// tres salidas escritas para este caso (guardar y abrir / descartar y abrir /
-// seguir editando); si ya había una pregunta a la vista se reemplaza, manda el
-// último clic. El id y el nombre salen del propio botón (data-id y su texto), no
-// de argumentos en el onclick: un nombre con apóstrofo —"Plaza's"— rompería la
-// cadena JS del atributo.
-async function descChoqueAbrirOtra(btn) {
-  const id = btn.dataset.id, etiqueta = btn.textContent;
-  if (!descHayCambios()) return descChoqueIrA(id, etiqueta);
-  if (confirmSalidaCerrar) confirmSalidaCerrar();
-  pedirConfirmSalida({
-    acciones: $("desc-overlay").querySelector(".editor-acciones"),
-    mensaje: `Hay cambios sin guardar. Antes de abrir «${etiqueta}»:`,
-    guardarTxt: "Guardar y abrir",
-    salirTxt: "Descartar y abrir",
-    guardar: async () => { if (await guardarDescuento()) await descChoqueIrA(id, etiqueta); },
-    cerrar: () => descChoqueIrA(id, etiqueta),
-  });
-}
-
-async function descChoqueIrA(id, etiqueta) {
-  // La lista puede estar vieja (otra máquina borró esa campaña, o el guardado
-  // de esta acaba de repintarla): se refresca antes de rendirse, y si de verdad
-  // ya no está se dice dónde quedó el operador en vez de no hacer nada.
-  if (!descCampanas.some(d => d.id === id)) await renderDescuentos();
-  if (!descCampanas.some(d => d.id === id)) {
-    const txt = `«${etiqueta}» ya no está entre las campañas: otra máquina pudo borrarla.`;
-    if (descEdit) descError(txt); else mensaje(txt, "error");
-    return;
-  }
-  if (descEdit) cerrarDescuento();
-  editarDescuento(id);
-}
-
-// Los dos movimientos son del operador y solo tocan el orden local: el servidor
-// no tiene nada que decir hasta que se guarde.
-function descChoqueSubirAlTope(clave) {
-  if (!descChoqueOrden) return;
-  descChoqueOrden = [clave, ...descChoqueOrden.filter(x => x !== clave)];
-  descPintarChoques(descChoqueUltimo);
-}
-
-function descChoqueMover(clave, delta) {
-  if (!descChoqueOrden) return;
-  const i = descChoqueOrden.indexOf(clave);
-  const j = i + delta;
-  if (i < 0 || j < 0 || j >= descChoqueOrden.length) return;
-  const nuevo = descChoqueOrden.slice();
-  nuevo.splice(j, 0, nuevo.splice(i, 1)[0]);
-  descChoqueOrden = nuevo;
-  descPintarChoques(descChoqueUltimo);
+function descChipModo(modo) {
+  const txt = DESC_MODO_TXT[modo] || DESC_MODO_TXT.prioridad;
+  return `<span class="chip-modo m-${esc(modo || "prioridad")}">${esc(txt)}</span>`;
 }
 
 // Delegado sobre todo el modal: cubre vigencia, % general, "Sin fecha de fin",
@@ -15764,7 +16054,7 @@ function descEstadoBorrador() {
     presentaciones: descPresActual(),
     // null = sin decidir, para que retomar el borrador no dé por elegida una
     // prioridad que el operador nunca marcó.
-    acumulable: descAcumActual() === "" ? null : descAcumActual() === "suma",
+    modo: descAcumActual(),
     todosClientes: descEdit.todosClientes,
     selCli,
     selProd: [...descEdit.selProd],
@@ -15775,7 +16065,6 @@ function descEstadoBorrador() {
     // campo del formulario: sin guardarlo aquí, retomar el trabajo interrumpido
     // lo devolvería al orden guardado sin avisar.
     ordenChoque: descChoqueOrden,
-    ordenChoqueBase: descChoqueOrdenBase,
   };
 }
 
@@ -15870,7 +16159,8 @@ async function borradorContinuar() {
       descEdit = {
         id, nombre: datos.nombre, alcance: datos.alcance, porcentaje: datos.porcentaje,
         presentaciones: datos.presentaciones,
-        acumulable: datos.acumulable == null ? null : !!datos.acumulable,
+        modo: datos.modo || (datos.acumulable == null ? ""
+          : (datos.acumulable ? "suma" : "prioridad")),
         vigencia_desde: datos.vigencia_desde, vigencia_hasta: datos.vigencia_hasta,
         indefinida: datos.indefinida, todosClientes: datos.todosClientes,
         selCli, selProd: new Set(datos.selProd), prodPct: datos.prodPct,
@@ -15885,7 +16175,6 @@ async function borradorContinuar() {
       // lo dejó en null y el chequeo en vivo que viene detrás lo respeta.
       if (datos.ordenChoque) {
         descChoqueOrden = datos.ordenChoque;
-        descChoqueOrdenBase = datos.ordenChoqueBase || null;
       }
       if (datos.pestana) descTab(datos.pestana);
       if (campanaDesaparecida)
