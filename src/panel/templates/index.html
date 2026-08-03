@@ -95,6 +95,7 @@
   .rapida-chip:hover:not(:disabled) { background:rgba(255,255,255,.14); }
   .rapida-chip.on { background:#f2f4f8; border-color:#f2f4f8; color:#1d2433; font-weight:600; }
   .rapida-chip:disabled { opacity:.4; }
+  #rapida-modo-apagado { color:#ffdca8; font-size:12px; font-weight:600; }
   #rapida-n { width:44px; padding:2px 4px; text-align:center; font-size:12px; }
   /* Aviso de conexión perdida (2026-07-27). Primera fila del body (que es un
      flex column): empuja al resto en vez de taparlo, sin posicionamiento fijo
@@ -1692,7 +1693,7 @@
        la ventana. -->
   <img id="logo" src="/assets/icono.svg" alt="" width="42" height="42">
   <h1>Asistente de llenado — Finca Dos Aguas</h1>
-  {% if modo_mock %}<a class="mock" href="/mock" title="Elegir qué simula el próximo llenado (fallos, trancón, omitidas…)" style="text-decoration:none">MODO SIMULACIÓN — no toca la app real · escenarios</a>{% endif %}
+  {% if modo_mock %}<a class="mock" href="/mock" title="Solo el llenado de WinLedger es simulado. Los cambios compartidos de catálogos, rutas y ajustes sí son reales y se sincronizan." style="text-decoration:none">SIMULACIÓN WINLEDGER — cambios compartidos sí sincronizan · escenarios</a>{% endif %}
   <span class="mock" id="banderas-prueba" title="Apágalas en el .env — o en src/settings.py si es MODO_PRUEBA_IMPLANTACION — y reinicia el panel (PLAN.md 4.6); la entrada MODO ADMIN se apaga en ADMIN → Ajustes de admin"{% if not banderas_prueba %} style="display:none"{% endif %}>MODO PRUEBA — {{ banderas_prueba|join(" · ") }}</span>
   <!-- Estado de la nube (2026-07-30): el mundito dice de un vistazo si esta
        computadora está viendo lo de las demás; el desplegable trae el detalle
@@ -1715,8 +1716,10 @@
        se mueven todo el tiempo mientras se prueba. No guarda estado propio —
        mueve los controles de ADMIN → Ajustes de admin y guarda por el mismo
        camino (guardarOpcionesPrueba), así los dos sitios no pueden discrepar.
-       Solo aparece con el modo admin prendido, igual que esas opciones. -->
+       En equipos con capacidad admin queda siempre visible. Apagado el modo
+       muestra el estado guardado, pero bloquea la edición hasta prenderlo. -->
   <div id="barra-rapida" style="display:none">
+    <span id="rapida-modo-apagado" style="display:none">ADMIN apagado · prende el interruptor en la pestaña ADMIN para editar</span>
     <span class="rapida-grupo">
       <b>Llena</b>
       <button type="button" class="rapida-chip" id="rapida-completa" onclick="rapidaCuanto(false)"
@@ -1990,10 +1993,9 @@
       PROCESADAS</button>
     <button class="tab-btn" id="tab-descuentos" onclick="irATab('descuentos')">DESCUENTOS</button>
     <button class="tab-btn" id="tab-ajustes" onclick="irATab('ajustes')">AJUSTES</button>
-    <!-- ADMIN (2026-07-29): los ajustes de admin salieron de AJUSTES a su propia
-         página. El botón solo se RENDERIZA en el equipo designado admin
-         (es_maquina_admin, ver ui_bridge.es_maquina_admin): en una máquina de
-         operación la pestaña no existe. -->
+    <!-- ADMIN: siempre se renderiza en equipos con capacidad administrativa
+         (servidor y Mac de desarrollo), aunque el toggle esté apagado. En una
+         máquina de operación la pestaña no existe. -->
     {% if es_maquina_admin %}
     <button class="tab-btn" id="tab-admin" onclick="irATab('admin')">ADMIN</button>
     {% endif %}
@@ -2246,8 +2248,8 @@
   </section>
 
   <section id="sec-admin" class="tab-panel" style="display:none">
-    <!-- Ajustes de admin (2026-07-29): tiene su propia pestaña, visible solo
-         en el equipo designado admin (ver ui_bridge.es_maquina_admin) — el
+    <!-- Ajustes de admin: tiene su propia pestaña, visible solo en equipos con
+         capacidad admin (ver ui_bridge.es_maquina_admin) — el
          botón de la pestaña ya no se renderiza en ningún otro equipo, y
          además d.es_maquina_admin desde /api/ajustes sigue decidiendo si
          este bloque se muestra dentro de ella. -->
@@ -11148,28 +11150,35 @@ function pintarBanderasPrueba() {
 // leyendo ESOS controles (nunca un estado propio) y cada chip mueve el control
 // de allá y guarda por guardarOpcionesPrueba, que sigue siendo el único camino
 // de guardado — así los dos sitios no pueden discrepar. Con el modo admin
-// apagado la barra no aparece, igual que las opciones que refleja.
+// apagado la barra sigue visible en equipos admin para que nunca desaparezca
+// el acceso visual; sus controles quedan bloqueados hasta prenderlo.
 function pintarBarraRapida() {
-  $("barra-rapida").style.display = modoAdmin ? "" : "none";
-  if (!modoAdmin) return;
+  $("barra-rapida").style.display = esMaquinaAdmin ? "" : "none";
+  if (!esMaquinaAdmin) return;
+  $("rapida-modo-apagado").style.display = modoAdmin ? "none" : "";
   const es999 = $("prueba-emp-999").checked;
   const recorta = $("prueba-cuanto-recorte").checked;
   const marcar = (id, on) => $(id).classList.toggle("on", on);
   marcar("rapida-completa", !recorta);
   marcar("rapida-recorte", recorta);
   $("rapida-n").value = $("prueba-recortar-n").value;
-  $("rapida-n").disabled = !recorta;
+  $("rapida-n").disabled = !modoAdmin || !recorta;
   for (const cual of ["tasa", "fecha", "serie"]) {
     const chip = $("rapida-salto-" + cual);
     chip.classList.toggle("on", $("prueba-saltar-" + cual).checked);
     // En la 999 los tres saltos van siempre puestos y no se editan (misma
     // regla que abajo, ver pintarOpcionesPrueba).
-    chip.disabled = es999;
+    chip.disabled = !modoAdmin || es999;
   }
   marcar("rapida-procesadas-si", $("prueba-procesadas-si").checked);
   marcar("rapida-procesadas-no", $("prueba-procesadas-no").checked);
   marcar("rapida-canal-produccion", $("prueba-canal-produccion").checked);
   marcar("rapida-canal-desarrollo", $("prueba-canal-desarrollo").checked);
+  for (const id of ["rapida-completa", "rapida-recorte",
+                    "rapida-procesadas-si", "rapida-procesadas-no",
+                    "rapida-olvidar-prueba", "rapida-canal-produccion",
+                    "rapida-canal-desarrollo"])
+    $(id).disabled = !modoAdmin;
 }
 
 function rapidaCuanto(recortar) {
