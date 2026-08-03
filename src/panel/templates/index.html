@@ -1762,15 +1762,18 @@
   <div class="rutas-barra" id="rutas-barra">
     <div class="campo"><span class="rotulo">Ruta</span><select id="f-ruta" onchange="cambioRuta(this.value)">
       <option value="">Todas</option></select></div>
-    <div class="campo"><span class="rotulo">Serie</span><select id="f-serie"
-        title="Serie con la que sale cada factura de esta computadora. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
-        onchange="cambioSerie(this.value)"></select>
+    <div class="campo"><span class="rotulo">Serie</span>
       <!-- Automático por ruta (2026-08-02, AJUSTES → Rutas): visible SOLO
            cuando la ruta elegida tiene serie predeterminada — dice por qué
            el selector cambió solo, sin mandar al operador a adivinar
-           (ver pintarSeries). -->
+           (ver pintarSeries). Va ANTES del select (2026-08-03) para que el
+           select quede siempre al fondo de la columna: con .rutas-barra en
+           align-items:end, si el aviso queda después el select sube y
+           descuadra contra el de Ruta, que no tiene aviso debajo. -->
       <span class="mut" id="serie-auto-nota" style="display:none"
-            title="Esta ruta tiene una serie predeterminada configurada en AJUSTES → Rutas: se elige sola al elegir la ruta."></span></div>
+            title="Esta ruta tiene una serie predeterminada configurada en AJUSTES → Rutas: se elige sola al elegir la ruta."></span><select id="f-serie"
+        title="Serie con la que sale cada factura de esta computadora. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
+        onchange="cambioSerie(this.value)"></select></div>
     <!-- data-atajo="despacho" (2026-07-21): el botón del medio del calendario
          de ESTE campo pone el día de despacho — se factura para el día de
          entrega (los feriados y fines de semana no lo mueven: afectan la
