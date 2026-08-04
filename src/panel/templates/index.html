@@ -1210,6 +1210,9 @@
   /* Rango de vigencia al revés (desde posterior a hasta): aviso inline pegado a
      las fechas y borde rojo en los dos inputs, encendidos en vivo. */
   .desc-vig-aviso { color:#a12a2a; font-size:12px; margin-top:6px; }
+  /* Pista del prefijo de prueba: solo con el modo prueba puesto, que es cuando
+     alguien puede querer una campaña que no salga de esta computadora. */
+  .desc-nota-prueba { color:#5b6472; font-size:12px; margin:-4px 0 10px; }
   .desc-fecha-mal { outline:2px solid #dc2626; outline-offset:1px; border-radius:3px; }
   /* Pestañas de la lista (En curso / Futuras / Archivadas): píldoras livianas,
      más discretas que las folder-tabs de arriba para no competir con ellas. Cada
@@ -2674,6 +2677,9 @@
       <label class="editor-campo campo-obligatorio">Nombre <span class="obligatorio-tag">obligatorio</span>
         <input type="text" id="desc-nombre" placeholder="ej. Ensaladas verano" oninput="descTituloActualizar()">
       </label>
+      <div id="desc-nota-prueba" class="desc-nota-prueba" style="display:none">
+        Empieza el nombre con «test» y la campaña se queda solo en esta computadora: no viaja a la nube ni la ven las demás máquinas.
+      </div>
       <div class="editor-campo campo-obligatorio">Vigencia <span class="obligatorio-tag">obligatorio</span>
         <div class="desc-fila-pct">
           <span>desde <input type="date" id="desc-desde"></span>
@@ -14725,6 +14731,7 @@ function abrirEditorDescuento() {
   borradorAvisoOcultar();   // lo que se teclee aquí pisa el borrador de este editor: el aviso ya no aplicaría
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   $("desc-nombre").value = descEdit.nombre;
+  $("desc-nota-prueba").style.display = modoPruebaLocal ? "block" : "none";
   descTituloActualizar();
   for (const r of document.getElementsByName("desc-pres")) r.checked = (r.value === descEdit.presentaciones);
   $("desc-pct").value = descEdit.porcentaje;
