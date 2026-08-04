@@ -9008,8 +9008,8 @@ function avisoDeFactura(f, enFamilia) {
     return `
     <tr class="fila-aviso ${enFamilia ? "fam-parte" : ""}">
       <td colspan="8">De este pedido ya ${hechas.length === 1
-        ? `salió la factura ${hechas[0]}` : `salieron las facturas ${hechas.join(" y ")}`}
-        en esta máquina, así que esta se queda apartada aquí.${modoImplantacion
+        ? `se resolvió la factura ${hechas[0]}` : `se resolvieron las facturas ${hechas.join(" y ")}`}
+        en esta máquina (llenada o descartada), así que esta se queda apartada aquí.${modoImplantacion
           ? " Vuelve a REAL para llenarla o liberarla: la prueba no cambia esta reserva."
           : ` Ninguna otra máquina la toma hasta que la llenes o la liberes.
         <button onclick="liberarAmarre(this,'${esc(f.pedido_id)}')"
@@ -9491,7 +9491,10 @@ function filaProcesada(f, enFamilia) {
       <td colspan="12">
         <span>${esc(f.conflicto).replaceAll("\n", "<br>")}</span>
         ${f.conflicto_abierto && !f.remota
-          ? `<button class="peligro" onclick="abrirResolverConflicto('${esc(f.pedido_id)}',${f.parte})">Resolver</button>`
+          ? (f.conflicto_ganadora
+              ? `<button class="peligro" onclick="confirmarBorrar(this, () => resolverConAnulacion('${esc(f.pedido_id)}',${f.parte}), 'Confirmar: ya se anuló')">Ya la anulé</button> `
+              : "")
+            + `<button class="peligro" onclick="abrirResolverConflicto('${esc(f.pedido_id)}',${f.parte})">Resolver</button>`
           : ""}
       </td>
     </tr>` : "";
@@ -10109,10 +10112,19 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       return "confirmacion";
     } else if (e.datos && e.datos.codigo === "ocupada") {
       // Otra máquina tenía la factura: el backend ya detuvo el llenado y
-      // canceló el documento a medias si lo había. Solo queda avisar; la
-      // factura sale sola de PENDIENTES con el cargar() del finally.
+      // canceló el documento a medias si lo había. En una CORRIDA no se
+      // detiene todo (2026-08-04): esa factura es trabajo de otro equipo, no
+      // un fallo de esta — se salta y se sigue con la siguiente; el aviso se
+      // acumula para el resumen del final. A mano, solo el aviso; la factura
+      // sale sola de PENDIENTES con el cargar() del finally.
+      if (secuenciaActiva) {
+        sacarDeLaCola(pedido_id, parte);
+        reposicionesEnFila.push(
+          `${refFacturaUbicable(pedido_id, parte)} la tiene otra computadora: la corrida la saltó.`);
+        continuarEnFila = true;
+        return "ocupada";
+      }
       mensaje(e.message, "alerta");
-      if (secuenciaActiva) detenerSecuencia();
       return "error";
     } else if (secuenciaActiva) {
       pausarSecuenciaPorFallo(`Error: ${e.message}. Reintenta o cancela aquí mismo, en la barra.`);
@@ -10249,12 +10261,26 @@ const ACCIONES_MOTIVO = {
     titulo: (id, partes) => {
       const familia = (filaDeFactura(id, partes[0]) || {}).familia_ajena;
       const maquina = familia ? familia.maquina : "otra máquina";
-      return `'${maquina}' ya está facturando este pedido — ¿llenar esta parte aquí igual?`;
+      // Un descarte también reserva el pedido completo (2026-08-04): el
+      // título dice lo que de verdad pasó allá.
+      return familia && familia.estado === "descartada"
+        ? `'${maquina}' descartó una parte de este pedido y lo tiene reservado — ¿llenar esta parte aquí igual?`
+        : `'${maquina}' ya está facturando este pedido — ¿llenar esta parte aquí igual?`;
     },
-    nota: "Un pedido dividido se factura completo en la misma máquina: la parte que ya salió lleva la serie y el papel de ese equipo. Si la llenas aquí, el pedido queda repartido entre dos equipos y dos series.",
+    nota: (id, partes) => {
+      const familia = (filaDeFactura(id, partes[0]) || {}).familia_ajena;
+      return familia && familia.estado === "descartada"
+        ? "Quien descarta una parte se queda con el pedido completo: decidir "
+          + "si el resto se factura o se descarta es de ese equipo. Si la "
+          + "llenas aquí, esa decisión queda repartida entre dos equipos."
+        : "Un pedido dividido se factura completo en la misma máquina: la "
+          + "parte que ya salió lleva la serie y el papel de ese equipo. Si "
+          + "la llenas aquí, el pedido queda repartido entre dos equipos y "
+          + "dos series.";
+    },
     opciones: ["Ese equipo no está disponible (apagado, dañado o sin red)",
                "Ya se acordó que esta parte sale de esta máquina",
-               "Allá no van a facturar el resto del pedido"],
+               "Allá no van a resolver el resto del pedido"],
     boton: "Llenar aquí igual",
     clase: "primario",
   },
@@ -10316,9 +10342,12 @@ function abrirResolverConflicto(pedido_id, parte) {
   // última que escribió.
   const equipos = [...(f.conflicto || "").matchAll(/'([^']+)'/g)].map(m => m[1]);
   const opciones = [...new Set(equipos)];
+  // Si la detección dejó anotado quién llegó primero al servidor, ese
+  // documento es el que se propone conservar — el operador puede cambiarlo.
+  const ganadora = f.conflicto_ganadora;
   $("conflicto-opciones").innerHTML = opciones.map((m, i) =>
     `<label><input type="radio" name="conflicto-queda" value="${esc(m)}"${
-      i === 0 ? " checked" : ""}>El documento que salió en '${esc(m)}'</label>`).join("");
+      (ganadora ? m === ganadora : i === 0) ? " checked" : ""}>El documento que salió en '${esc(m)}'</label>`).join("");
   // Arrancan vacíos a propósito: el nº lo tiene el operador en el papel, y
   // proponer uno inventado es peor que no proponer nada.
   $("conflicto-doc").value = "";
@@ -10363,6 +10392,30 @@ async function confirmarResolverConflicto() {
   const listo = avisarTrabajando("Resolviendo el conflicto…");
   try {
     await api("/api/resolver_conflicto", cuerpo);
+  } catch (e) {
+    listo();
+    avisoFactura(pedido_id, parte, e.message);
+    return;
+  }
+  await cargar();
+  listo();
+}
+
+// «Ya la anulé» (2026-08-04): cierre en un paso del conflicto cuya carrera ya
+// dejó anotado quién llegó primero al servidor — el operador confirma que el
+// documento que llegó de segundo ya se anuló en papel. El registro queda con
+// el mismo rastro que el diálogo completo (queda vivo el del ganador).
+async function resolverConAnulacion(pedido_id, parte) {
+  const f = filaDeFactura(pedido_id, parte);
+  if (!f || !f.conflicto_ganadora) return;
+  const listo = avisarTrabajando("Registrando la anulación…");
+  try {
+    await api("/api/resolver_conflicto", {
+      pedido_id, parte,
+      queda_viva: f.conflicto_ganadora,
+      numero_documento: "",
+      nota: "el documento que llegó de segundo ya se anuló (confirmado con «Ya la anulé»)",
+    });
   } catch (e) {
     listo();
     avisoFactura(pedido_id, parte, e.message);
