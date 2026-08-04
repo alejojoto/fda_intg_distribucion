@@ -13386,6 +13386,11 @@ function reglaEfectivaRuta(cfg) {
   return {texto: `Manual entre: ${cfg.series_permitidas.join(", ")}`, clase: ""};
 }
 
+// Una ruta cuenta como configurada solo si tiene series permitidas: desde el
+// catálogo aditivo (2026-08-04) TODA ruta vista en un pedido ya tiene fila en
+// rutas_series, así que la existencia de la fila dejó de distinguir nada.
+const tieneSeries = cfg => !!(cfg && cfg.series_permitidas.length);
+
 function pintarFilasRutas() {
   const filtro = ($("rutas-filtro").value || "").toLowerCase();
   const nombres = new Set([...(ultimaLista.rutas || []), ...Object.keys(rutasSeriesConfig)]);
@@ -13405,8 +13410,9 @@ function pintarFilasRutas() {
           <td><span class="${regla.clase}">${esc(regla.texto)}</span>${
             chips ? `<div style="margin-top:4px">${chips}</div>` : ""}</td>
           <td>
-            <button type="button" onclick="abrirEditorRuta(${i})">${cfg ? "Editar" : "Configurar"}</button>${
-            cfg ? ` <button type="button" onclick="confirmarBorrar(this, () => eliminarConfigRuta(${i}))">Eliminar</button>` : ""}
+            <button type="button" onclick="abrirEditorRuta(${i})">${
+              tieneSeries(cfg) ? "Editar" : "Configurar"}</button>${
+            tieneSeries(cfg) ? ` <button type="button" onclick="confirmarBorrar(this, () => eliminarConfigRuta(${i}))">Eliminar</button>` : ""}
           </td>
         </tr>`;
       }).join("")
@@ -13429,10 +13435,11 @@ function abrirEditorRuta(i) {
     notaRutaFija.style.display = "";
     notaRutaFija.textContent = nombreRuta(ruta);
   } else {
-    // Solo rutas SIN fila todavía: evita duplicados sin depender de validar
-    // contra el servidor (no adivina cuáles — sale de las rutas que ya se
-    // vieron en pedidos, igual que el filtro de la barra).
-    const disponibles = (ultimaLista.rutas || []).filter(r => !rutasSeriesConfig[r])
+    // Solo rutas sin series todavía (las que la lista muestra como "Sin
+    // configurar"): con el catálogo aditivo toda ruta vista ya tiene fila, así
+    // que filtrar por "sin fila" dejaba el selector siempre vacío.
+    const disponibles = [...new Set([...(ultimaLista.rutas || []), ...Object.keys(rutasSeriesConfig)])]
+      .filter(r => !tieneSeries(rutasSeriesConfig[r]))
       .sort((a, b) => nombreRuta(a).localeCompare(nombreRuta(b), "es"));
     selectRuta.style.display = "";
     notaRutaFija.style.display = "none";
