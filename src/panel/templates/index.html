@@ -1364,6 +1364,8 @@
   .sup-tabla th { color:var(--mut); font-size:11.5px; background:#fafbfc;
                   font-weight:600; white-space:nowrap; }
   .sup-tabla tbody tr:last-child td { border-bottom:0; }
+  .sup-usuario-admin { text-align:center; }
+  .sup-usuario-admin input { width:16px; height:16px; cursor:pointer; }
   .sup-equipo-nombre { font-weight:600; overflow-wrap:anywhere; }
   .sup-chip { display:inline-flex; align-items:center; border:1px solid;
               border-radius:999px; padding:2px 8px; font-size:11px;
@@ -2266,8 +2268,8 @@
     </div>
     <div class="campo">Buscar<span class="buscador">
         <input type="text" id="f-buscar" style="width:260px"
-            placeholder="pedido, cliente, sucursal, ruta, tipo, Nº doc, máquina…"
-            title="Busca en pedido, cliente (nombre y código), sucursal, ruta, tipo (Paq./kg), Nº de documento y máquina."
+            placeholder="pedido, cliente, sucursal, ruta, tipo, Nº doc…"
+            title="Busca en pedido, cliente (nombre y código), sucursal, ruta, tipo (Paq./kg) y Nº de documento."
             oninput="filtroBusquedaDinamico()">
         <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar búsqueda"
             onclick="limpiarBuscador('f-buscar', aplicarFiltros)">&times;</button>
@@ -2306,8 +2308,16 @@
          Máquina); esta casilla recorta la lista a lo llenado aquí. -->
     <label class="campo-check" id="campo-solo-aqui" style="display:none"
            title="Oculta lo que llenaron las otras máquinas y lo que se facturó a mano.">
-      <input type="checkbox" id="f-solo-aqui" onchange="aplicarFiltros()">
+      <input type="checkbox" id="f-solo-aqui" onchange="marcarSoloAqui()">
       Llenadas en esta máquina</label>
+    <!-- Filtro por UN equipo (2026-08-04). Solo aparece en las PC marcadas
+         como usuario admin (ADMIN → Supervisión → Equipos) y en el equipo
+         admin: a quien solo factura no le sirve elegir de qué otra máquina
+         mirar el historial. La visibilidad la decide cada refresco, no el
+         render de la página, para que marcar una PC se le note sin reabrir. -->
+    <div class="campo" id="campo-maquina" style="display:none">Máquina
+      <select id="f-maquina" onchange="elegirMaquinaFiltro()"
+              title="Muestra solo lo llenado desde ese equipo."></select></div>
   </div>
 
   <section id="sec-pendientes" class="tab-panel">
@@ -2663,6 +2673,7 @@
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
+              <th title="Su operador administra el sistema: solo esas PC ven el filtro por máquina en PROCESADAS.">Usuario admin</th>
               <th>Atención</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -5489,8 +5500,14 @@ function filtros() {
        + "&buscar=" + encodeURIComponent($("f-buscar").value)
        + "&ruta=" + encodeURIComponent(rutaSeleccionada)
        + "&dias=" + ventanaProcesadasDias()
-       + "&solo_aqui=" + ($("f-solo-aqui").checked ? "1" : "");
+       + "&solo_aqui=" + ($("f-solo-aqui").checked ? "1" : "")
+       + "&maquina=" + encodeURIComponent(maquinaSeleccionada);
 }
+
+// Hostname del equipo elegido en el dropdown ("" = todas). Vive aparte del
+// <select> porque el dropdown se repinta en cada refresco (la lista de equipos
+// puede crecer) y el valor tiene que sobrevivir a ese repintado.
+let maquinaSeleccionada = "";
 
 // --- Filtro activo (2026-07-31, pedido del usuario) --------------------------
 // Mientras haya un filtro puesto la lista NO está completa, y eso se ve en tres
@@ -5516,8 +5533,17 @@ function filtrosActivos(tab) {
     if ($("f-desde").value) activos.push({cual: "desde", texto: `Desde: ${dma($("f-desde").value)}`});
     if ($("f-hasta").value) activos.push({cual: "hasta", texto: `Hasta: ${dma($("f-hasta").value)}`});
     if ($("f-solo-aqui").checked) activos.push({cual: "solo_aqui", texto: "Llenadas en esta máquina"});
+    if (maquinaSeleccionada)
+      activos.push({cual: "maquina", texto: `Máquina: ${nombreMaquinaFiltro(maquinaSeleccionada)}`});
   }
   return activos;
+}
+
+// El nombre visible del equipo elegido; su hostname si el catálogo todavía no
+// trajo uno (el dropdown ya muestra ese mismo texto).
+function nombreMaquinaFiltro(dispositivo) {
+  const equipo = maquinasFiltro.find(m => m.dispositivo === dispositivo);
+  return (equipo && equipo.nombre) || dispositivo;
 }
 
 // La ruta puesta recorta la lista, sí, pero solo se denuncia como filtro cuando
@@ -5583,6 +5609,28 @@ function soltarFiltro(cual) {
     actualizarXFecha("f-" + cual);
     sincronizarRangosFecha();   // el otro extremo suelta su tope cruzado
   } else if (cual === "solo_aqui") $("f-solo-aqui").checked = false;
+  else if (cual === "maquina") {
+    maquinaSeleccionada = "";
+    if ($("f-maquina")) $("f-maquina").value = "";
+  }
+}
+
+// Elegir un equipo suelta "Llenadas en esta máquina": las dos recortan por el
+// mismo criterio y juntas dan lista vacía en cuanto el equipo elegido no es
+// este. La casilla hace lo simétrico (ver aplicarFiltros).
+function elegirMaquinaFiltro() {
+  maquinaSeleccionada = $("f-maquina").value;
+  if (maquinaSeleccionada) $("f-solo-aqui").checked = false;
+  aplicarFiltros();
+}
+
+// El lado simétrico: marcar la casilla suelta el equipo elegido en el dropdown.
+function marcarSoloAqui() {
+  if ($("f-solo-aqui").checked) {
+    maquinaSeleccionada = "";
+    if ($("f-maquina")) $("f-maquina").value = "";
+  }
+  aplicarFiltros();
 }
 
 // Quita UN filtro desde su chip del aviso y recarga la lista.
@@ -5896,6 +5944,46 @@ function pintarRutas(rutas, haySinRuta) {
     + opcionRutaPredet();
 }
 
+// Equipos que ofrece el dropdown de máquina (hostname + nombre visible) y si
+// esta PC puede usarlo, tal como los mandó el último refresco.
+let maquinasFiltro = [];
+let puedeFiltrarPorMaquina = false;
+
+// El dropdown vive en PROCESADAS (la única lista con facturas de otras
+// laptops) y solo en las PC habilitadas. Las dos condiciones se miran juntas
+// porque cambian por vías distintas: la tab al clickear, el permiso en el
+// refresco.
+function mostrarCampoMaquina() {
+  const campo = $("campo-maquina");
+  if (campo)
+    campo.style.display =
+      (puedeFiltrarPorMaquina && tabActiva() === "procesadas") ? "" : "none";
+}
+
+// Si esta PC deja de estar habilitada (se le quitó la marca desde ADMIN), el
+// dropdown se esconde y suelta lo que tuviera puesto: un filtro que ya no se
+// puede ver ni quitar dejaría la lista recortada sin explicación.
+function pintarMaquinasFiltro(puede, equipos) {
+  if (!$("campo-maquina")) return;
+  puedeFiltrarPorMaquina = !!puede;
+  if (!puede) {
+    mostrarCampoMaquina();
+    if (maquinaSeleccionada) { maquinaSeleccionada = ""; aplicarFiltros(); }
+    return;
+  }
+  maquinasFiltro = equipos || [];
+  mostrarCampoMaquina();
+  const opciones = [["", "Todas"], ...maquinasFiltro.map(m => [m.dispositivo, m.nombre])];
+  // El equipo elegido conserva su opción aunque ya no aparezca en la lista
+  // (mismo motivo que en pintarRutas: si no, el <select> cae en "Todas" y
+  // aparenta que no hay filtro puesto cuando sí lo hay).
+  if (maquinaSeleccionada && !opciones.some(([valor]) => valor === maquinaSeleccionada))
+    opciones.push([maquinaSeleccionada, maquinaSeleccionada]);
+  $("f-maquina").innerHTML = opciones.map(([valor, texto]) => `
+    <option value="${esc(valor)}" ${valor === maquinaSeleccionada ? "selected" : ""}>
+      ${esc(texto)}</option>`).join("");
+}
+
 async function cambioRuta(valor) {
   if (valor === QUITAR_PREDET) {
     avisarTrabajando("Quitando la ruta predeterminada…");
@@ -6111,14 +6199,39 @@ function supProblemasEquipo(equipo) {
 function supFilaEquipo(equipo, sinDatos) {
   const accion = sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
     esc(equipo.dispositivo || "")}')">Ver detalle</button>`;
+  const host = esc(equipo.dispositivo || "");
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
+    <td class="sup-usuario-admin"><input type="checkbox"
+        ${equipo.usuario_admin ? "checked" : ""}
+        title="Su operador administra el sistema: verá el filtro por máquina en PROCESADAS."
+        onchange="marcarUsuarioAdmin('${host}', this)"></td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
+}
+
+// La marca viaja por el catálogo de máquinas: se pone aquí y la PC marcada la
+// aplica en su refresco. Si el guardado falla, la casilla vuelve donde estaba
+// —quedarse marcada mentiría sobre lo que de verdad quedó guardado.
+async function marcarUsuarioAdmin(dispositivo, caja) {
+  const querido = caja.checked;
+  caja.disabled = true;
+  try {
+    await api("/api/supervision/usuario-admin",
+              {dispositivo, usuario_admin: querido});
+    const equipo = [...supEquipos, ...supSinDatos]
+      .find(e => e.dispositivo === dispositivo);
+    if (equipo) equipo.usuario_admin = querido;
+  } catch (e) {
+    caja.checked = !querido;
+    mensaje("No se pudo cambiar la marca de usuario admin: " + e.message, "error");
+  } finally {
+    caja.disabled = false;
+  }
 }
 
 function pintarResumenSupervision(tickets) {
@@ -6150,7 +6263,7 @@ function pintarEquiposSupervision() {
     .concat(supSinDatos.map(e => supFilaEquipo(e, true)));
   $("sup-equipos-tabla").querySelector("tbody").innerHTML = filas.length
     ? filas.join("")
-    : `<tr><td colspan="6" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
+    : `<tr><td colspan="7" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
   const quedan = Number(supResumen.equipos || 0) > supEquipos.length;
   $("sup-equipos-mas").style.display = quedan ? "" : "none";
 }
@@ -6497,6 +6610,7 @@ function cambiarTab(tab) {
   // "Llenadas en esta máquina" es de PROCESADAS: es la única lista que trae facturas
   // de otras laptops (ver campo-solo-aqui).
   $("campo-solo-aqui").style.display = tab === "procesadas" ? "" : "none";
+  mostrarCampoMaquina();   // mismo criterio, más el permiso de esta PC
   // Cambiar de tab cambia QUÉ filtra (las fechas y la casilla solo cuentan en
   // PROCESADAS): el aviso se repinta con los de la tab que queda a la vista.
   pintarEstadoFiltros();
@@ -6864,6 +6978,7 @@ async function cargar(conservarScroll = false) {
       }
     }
     pintarRutas(d.rutas, d.hay_sin_ruta);
+    pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
     cargaFallo = false;
     pintarNube();
