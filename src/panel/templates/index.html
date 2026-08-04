@@ -13973,7 +13973,7 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
     ? `<label style="cursor:var(--cursor-prohibido); display:inline-flex" title="Un cliente de prueba no se activa: nunca factura, así que este interruptor no tiene efecto.">
          <input type="checkbox" class="switch" disabled></label>`
     : `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
-         <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="alternarActivoSucursal(${i})"></label>`;
+         <input type="checkbox" class="switch" ${f.activo ? "checked" : ""} onclick="return onClickActivoSucursal(event, ${i})"></label>`;
   // La marca va pegada al nombre para verse de un vistazo; el detalle de qué
   // le falta sigue en su renglón de abajo.
   const marcaEsperando = falta && esperando
@@ -13990,6 +13990,18 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
     <td${conToggleActivo ? CELDA_ACCIONES : ""}>${celdaActivo}</td>
     <td${borrarDefinitivo ? CELDA_ACCIONES : ""}>${borrarDefinitivo}</td>
   </tr>`;
+}
+
+// Confirmación antes de activar O desactivar una sucursal (pedido del usuario
+// 2026-08-04: el toggle de un solo clic es fácil de pasar por alto por error).
+// Mismo patrón que onClickEsPruebaChk: el clic se revierte con preventDefault
+// y confirmarSinQuitar dispara alternarActivoSucursal recién al confirmar.
+function onClickActivoSucursal(ev, indice) {
+  ev.preventDefault();
+  const f = catalogoFilas[indice];
+  confirmarSinQuitar(ev.target.closest("label"), () => alternarActivoSucursal(indice),
+    f.activo ? "Confirmar: sale de facturación" : "Confirmar: entra a facturación");
+  return false;
 }
 
 // Activa/desactiva UNA sucursal desde su toggle en la ficha del cliente
@@ -14093,6 +14105,19 @@ function avisoActivoCliente(codigo, msg) {
   el.scrollIntoView({block: "nearest"});
 }
 
+// Confirmación antes de activar O desactivar el cliente completo (pedido del
+// usuario 2026-08-04: apaga TODAS sus sucursales de un golpe y es el primer
+// control debajo del título — fácil de tocar sin querer). Mismo patrón que
+// onClickEsPruebaChk/onClickActivoSucursal.
+function onClickActivoCliente(ev, codigo) {
+  ev.preventDefault();
+  const filas = catalogoFilas.filter(f => (f.codigo_cliente_winledger || "") === codigo);
+  const activo = !!(filas.length && filas[0].activo_cliente);
+  confirmarSinQuitar(ev.target.closest("label"), () => alternarActivoCliente(codigo),
+    activo ? "Confirmar: desactiva el cliente" : "Confirmar: activa el cliente");
+  return false;
+}
+
 // Activa/desactiva el cliente COMPLETO (filtro maestro sobre todas sus
 // sucursales, 2026-07-30): toma el estado efectivo actual y guarda el
 // contrario, igual que alternarCadenaCliente.
@@ -14141,7 +14166,7 @@ function pintarVentanaCliente() {
   const cabecera = clienteEnEdicion ? `
     <label class="switch-linea" style="font-size:12.5px; margin-bottom:12px">
       <input type="checkbox" class="switch" ${activoCliente ? "checked" : ""}
-             onclick="alternarActivoCliente('${esc(clienteEnEdicion)}')">
+             onclick="return onClickActivoCliente(event, '${esc(clienteEnEdicion)}')">
       <span>Cliente activo — apágalo para sacarlo por completo (todas sus
       sucursales a la vez) del proceso automático de facturación, sin tocar el
       estado propio de cada una.</span>
