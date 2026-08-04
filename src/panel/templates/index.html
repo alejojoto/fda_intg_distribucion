@@ -1299,6 +1299,122 @@
   .desc-subtab.st-faltantes:hover { background:#d7f0ec; }
   .desc-subtab.activa.st-fallidos  { background:#dc2626; border-color:#dc2626; color:#fff; }
   .desc-subtab.activa.st-faltantes { background:#0d9488; border-color:#0d9488; color:#fff; }
+  /* ADMIN conserva una sola pestaña principal y separa sus dos vistas con las
+     mismas subtabs livianas del resto del panel. Supervisión usa el morado de
+     ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
+  #sup-subtabs { margin-bottom:12px; }
+  #admin-subtab-ajustes { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
+  #admin-subtab-ajustes:hover { background:#e4e8ee; }
+  #admin-subtab-ajustes.activa { background:#64748b; border-color:#64748b; color:#fff; }
+  #admin-subtab-supervision { background:#f3e8ff; border-color:#d8b4fe; color:#6b21a8; }
+  #admin-subtab-supervision:hover { background:#ead9fd; }
+  #admin-subtab-supervision.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  #admin-panel-supervision { padding:0 14px 18px; }
+  #sup-cargando { padding:26px 4px; color:var(--mut); }
+  #sup-error, #sup-tickets-error, #sup-ticket-modal-error {
+    background:#fdecec; border:1px solid #f0b4b4; color:#a12a2a;
+    border-radius:7px; padding:10px 12px; font-size:13px; margin:10px 0;
+  }
+  .sup-resumen { display:flex; gap:10px; flex-wrap:wrap; margin:2px 0 14px; }
+  .sup-resumen-card { flex:1 1 112px; max-width:170px; min-width:105px;
+                      border:1px solid #e2e6ec; border-radius:8px;
+                      background:#fafbfc; padding:10px 12px; }
+  .sup-resumen-num { display:block; font-size:24px; line-height:1.1;
+                     font-weight:700; color:#1d2433; }
+  .sup-resumen-label { display:block; margin-top:3px; color:var(--mut);
+                       font-size:11.5px; }
+  .sup-bloque { border:1px solid #e2e6ec; border-radius:8px; margin:0 0 14px;
+                overflow:hidden; background:#fff; }
+  .sup-bloque > h3 { font-size:13.5px; margin:0; padding:9px 12px;
+                     border-bottom:1px solid #e2e6ec; background:#fafbfc; }
+  #sup-alertas { border-color:#f2d7a4; background:#fffcf5; }
+  #sup-alertas-lista { list-style:none; padding:8px 12px; margin:0; }
+  .sup-alerta { display:flex; gap:8px; align-items:flex-start; padding:4px 0;
+                font-size:12.5px; }
+  .sup-alerta-punto { flex:none; width:8px; height:8px; margin-top:5px;
+                      border-radius:50%; background:#d97706; }
+  .sup-alerta.alerta .sup-alerta-punto { background:#dc2626; }
+  .sup-tabla-scroll { width:100%; overflow-x:auto; }
+  .sup-tabla { width:100%; min-width:820px; border-collapse:collapse; }
+  .sup-tabla th, .sup-tabla td { padding:8px 10px; border-bottom:1px solid #eef0f4;
+                                 text-align:left; vertical-align:top; font-size:12.5px; }
+  .sup-tabla th { color:var(--mut); font-size:11.5px; background:#fafbfc;
+                  font-weight:600; white-space:nowrap; }
+  .sup-tabla tbody tr:last-child td { border-bottom:0; }
+  .sup-equipo-nombre { font-weight:600; overflow-wrap:anywhere; }
+  .sup-chip { display:inline-flex; align-items:center; border:1px solid;
+              border-radius:999px; padding:2px 8px; font-size:11px;
+              font-weight:600; line-height:1.35; white-space:nowrap; }
+  .sup-chip.activa { background:#eaf7ef; border-color:#b7dfc0; color:#15803d; }
+  .sup-chip.apagada { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
+  .sup-chip.sin-reportar { background:#fdecec; border-color:#f0b4b4; color:#b42318; }
+  .sup-chip.sin-datos { background:#f8fafc; border:1px dashed #98a2b3; color:#667085; }
+  .sup-estado-nota { margin-top:3px; color:var(--mut); font-size:11px; }
+  .sup-nube-lineas { display:flex; gap:4px 8px; flex-wrap:wrap; max-width:210px; }
+  .sup-nube-lineas .sup-nube-ok { color:#15803d; font-weight:600; }
+  .sup-nube-lineas .sup-nube-mal { color:#b42318; font-weight:600; }
+  .sup-problemas { display:flex; gap:4px; flex-wrap:wrap; max-width:260px; }
+  .sup-problema { display:inline-block; background:#fff7ed; border:1px solid #fed7aa;
+                  color:#9a3412; border-radius:999px; padding:2px 7px;
+                  font-size:10.5px; font-weight:600; }
+  .sup-mas { padding:9px 12px; border-top:1px solid #e2e6ec; background:#fafbfc; }
+  .sup-lista-vacia { padding:12px; color:var(--mut); font-size:12.5px; }
+  #sup-actividad-lista { list-style:none; margin:0; padding:5px 12px; }
+  .sup-actividad-fila { display:grid; grid-template-columns:58px minmax(100px, .7fr)
+                        minmax(180px, 1.2fr) minmax(130px, .8fr); gap:8px;
+                        align-items:baseline; padding:6px 0;
+                        border-bottom:1px solid #eef0f4; font-size:12.5px; }
+  .sup-actividad-fila:last-child { border-bottom:0; }
+  .sup-doble { display:inline-block; margin-left:5px; background:#fdecec;
+               border:1px solid #f0b4b4; color:#b42318; border-radius:999px;
+               padding:1px 6px; font-size:10.5px; font-weight:600; }
+  #sup-ticket-filtros { margin:0; padding:10px 12px 4px; }
+  .sup-ticket-filtro { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
+  .sup-ticket-filtro:hover { background:#e4e8ee; }
+  .sup-ticket-filtro.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  #sup-tickets-cargando { padding:12px; color:var(--mut); font-size:12.5px; }
+  #sup-tickets-aviso { background:#fffaeb; border:1px solid #fde68a;
+                       color:#92400e; border-radius:7px; padding:10px 12px;
+                       margin:10px 12px 12px; font-size:12.5px; }
+  .sup-ticket-mensaje { max-width:420px; overflow-wrap:anywhere; }
+  .sup-ticket-estado.nuevo { background:#fdecec; border-color:#f0b4b4; color:#b42318; }
+  .sup-ticket-estado.en-proceso { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
+  .sup-ticket-estado.resuelto { background:#eaf7ef; border-color:#b7dfc0; color:#15803d; }
+  .sup-ticket-estado.descartado { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
+  #sup-equipo-overlay, #sup-ticket-overlay {
+    position:fixed; inset:0; background:rgba(29,36,51,.45); display:none;
+    z-index:20; align-items:flex-start; justify-content:center;
+  }
+  #sup-equipo-overlay.visible, #sup-ticket-overlay.visible { display:flex; }
+  #sup-equipo-caja, #sup-ticket-caja {
+    background:#fff; border-radius:10px; padding:18px; margin-top:5vh;
+    width:min(760px, 94vw); max-height:88vh; overflow:auto;
+    box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+  #sup-equipo-caja h3, #sup-ticket-caja h3 { margin:0 0 14px; font-size:14px; }
+  .sup-detalle-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 18px;
+                      margin-bottom:12px; }
+  .sup-detalle-seccion { border-top:1px solid #e2e6ec; padding-top:10px;
+                         margin-top:10px; }
+  .sup-detalle-seccion h4 { margin:0 0 7px; font-size:12.5px; }
+  .sup-dato { font-size:12.5px; margin:4px 0; overflow-wrap:anywhere; }
+  .sup-dato > span:first-child { color:var(--mut); margin-right:6px; }
+  .sup-pre { margin:7px 0 0; padding:10px; max-height:260px; overflow:auto;
+             border:1px solid #e2e6ec; border-radius:7px; background:#f6f8fb;
+             font:11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+             white-space:pre-wrap; overflow-wrap:anywhere; }
+  .sup-ticket-mensaje-completo { white-space:pre-wrap; overflow-wrap:anywhere;
+                                 background:#f8fafc; border:1px solid #e2e6ec;
+                                 border-radius:7px; padding:10px; font-size:12.5px; }
+  #sup-ticket-nota { font:inherit; font-size:12.5px; width:100%; resize:vertical;
+                     padding:8px; border:1px solid #cbd2dc; border-radius:6px;
+                     box-sizing:border-box; }
+  #sup-ticket-estado { font:inherit; padding:5px 8px; border:1px solid #cbd2dc;
+                       border-radius:6px; }
+  @media (max-width:700px) {
+    .sup-actividad-fila { grid-template-columns:52px 1fr; }
+    .sup-detalle-grid { grid-template-columns:1fr; }
+  }
   /* Tarjeta de una campaña en la lista */
   .desc-card { border:1px solid #e2e6ec; border-radius:8px; padding:12px 14px; margin:10px 14px; }
   .desc-card.inactiva { opacity:.6; }
@@ -2335,6 +2451,13 @@
   </section>
 
   <section id="sec-admin" class="tab-panel" style="display:none">
+    <div id="sup-subtabs" class="desc-subtabs">
+      <button type="button" id="admin-subtab-ajustes" class="desc-subtab activa"
+              onclick="irASubtabAdmin('ajustes')">Ajustes</button>
+      <button type="button" id="admin-subtab-supervision" class="desc-subtab"
+              onclick="irASubtabAdmin('supervision')">Supervisión</button>
+    </div>
+    <div id="admin-panel-ajustes">
     <!-- Ajustes de admin: tiene su propia pestaña, visible solo en equipos con
          capacidad admin (ver ui_bridge.es_maquina_admin) — el
          botón de la pestaña ya no se renderiza en ningún otro equipo, y
@@ -2544,6 +2667,71 @@
       </div>
       <div id="corte-confirma" style="display:none"></div>
     </div>
+    </div>
+    <div id="admin-panel-supervision" style="display:none">
+      <div id="sup-cargando" style="display:none">
+        <span class="spinner"></span> Cargando supervisión…
+      </div>
+      <div id="sup-error" style="display:none"></div>
+      <div id="sup-overview-contenido" style="display:none">
+        <div id="sup-resumen" class="sup-resumen"></div>
+        <div id="sup-alertas" class="sup-bloque" style="display:none">
+          <h3>Alertas</h3>
+          <ul id="sup-alertas-lista"></ul>
+        </div>
+        <div class="sup-bloque">
+          <h3>Equipos</h3>
+          <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
+            <thead><tr>
+              <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
+              <th>Atención</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div id="sup-equipos-mas" class="sup-mas" style="display:none">
+            <button type="button" onclick="cargarMasEquipos()">Mostrar más</button>
+          </div>
+        </div>
+        <div class="sup-bloque">
+          <h3>Actividad reciente</h3>
+          <ul id="sup-actividad-lista"></ul>
+        </div>
+      </div>
+      <div class="sup-bloque" id="sup-tickets-bloque">
+        <h3>Bandeja de tickets</h3>
+        <div id="sup-tickets-aviso" style="display:none"></div>
+        <div id="sup-ticket-filtros" class="desc-subtabs" style="display:none">
+          <button type="button" class="desc-subtab sup-ticket-filtro activa"
+                  data-estado="abiertos" onclick="cambiarFiltroTickets('abiertos')">Abiertos</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="nuevo" onclick="cambiarFiltroTickets('nuevo')">Nuevos</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="en_proceso" onclick="cambiarFiltroTickets('en_proceso')">En proceso</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="resuelto" onclick="cambiarFiltroTickets('resuelto')">Resueltos</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="descartado" onclick="cambiarFiltroTickets('descartado')">Descartados</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="todos" onclick="cambiarFiltroTickets('todos')">Todos</button>
+        </div>
+        <div id="sup-tickets-cargando" style="display:none">
+          <span class="spinner"></span> Cargando tickets…
+        </div>
+        <div id="sup-tickets-error" style="display:none"></div>
+        <div id="sup-tickets-lista" style="display:none">
+          <div class="sup-tabla-scroll"><table id="sup-tickets-tabla" class="sup-tabla">
+            <thead><tr>
+              <th>Ticket</th><th>Fecha</th><th>Equipo</th><th>Mensaje</th>
+              <th>Estado</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div id="sup-tickets-mas" class="sup-mas" style="display:none">
+            <button type="button" onclick="cargarMasTickets()">Mostrar más</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- EN REVISIÓN junta dos listas como subtabs (2026-07-31, pedido del
@@ -2632,6 +2820,44 @@
               onclick="copiarIdTicket(this)">Copiar número</button>
       <button type="button" id="ticket-copiar" onclick="copiarTicket(this)">Copiar informe</button>
       <button type="button" id="ticket-cancelar" onclick="cerrarTicket()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detalle de un equipo desde ADMIN → Supervisión. -->
+<div id="sup-equipo-overlay" onclick="if(event.target===this)cerrarDetalleEquipoSupervision()">
+  <div id="sup-equipo-caja">
+    <h3 id="sup-equipo-titulo">Detalle del equipo</h3>
+    <div id="sup-equipo-cuerpo"></div>
+    <div class="editor-acciones">
+      <button type="button" onclick="cerrarDetalleEquipoSupervision()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lectura y gestión de un ticket desde ADMIN → Supervisión. -->
+<div id="sup-ticket-overlay" onclick="if(event.target===this)intentarCerrarTicketSupervision()">
+  <div id="sup-ticket-caja">
+    <h3 id="sup-ticket-titulo">Ticket</h3>
+    <div id="sup-ticket-cuerpo"></div>
+    <div class="editor-campo">
+      <label for="sup-ticket-estado">Estado</label>
+      <select id="sup-ticket-estado">
+        <option value="nuevo">Nuevo</option>
+        <option value="en_proceso">En proceso</option>
+        <option value="resuelto">Resuelto</option>
+        <option value="descartado">Descartado</option>
+      </select>
+    </div>
+    <div class="editor-campo">
+      <label for="sup-ticket-nota">Nota del administrador</label>
+      <textarea id="sup-ticket-nota" rows="4" maxlength="4000"></textarea>
+    </div>
+    <div id="sup-ticket-modal-error" style="display:none"></div>
+    <div class="editor-acciones">
+      <button type="button" id="sup-ticket-guardar" class="primario"
+              onclick="guardarTicketSupervision()">Guardar</button>
+      <button type="button" onclick="intentarCerrarTicketSupervision()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -5679,6 +5905,533 @@ async function cambioRuta(valor) {
   return aplicarFiltros("Cambiando de ruta…");
 }
 
+// --- ADMIN → Supervisión ----------------------------------------------------
+// El overview y la bandeja viajan por endpoints separados: la falta de la
+// clave de servicio de tickets nunca deja sin datos al resto del parque.
+let subtabAdminActiva = "ajustes";
+let supRefrescoInterval = null;
+let supOverviewCargado = false;
+let supOverviewEnVuelo = false;
+let supTicketsCargados = false;
+let supTicketsSolicitud = 0;
+let supEquipos = [];
+let supSinDatos = [];
+let supActividad = [];
+let supResumen = {};
+let supCursorNube = null;
+let supDispositivoPropio = "";
+let supPagina = {desde:0, limite:0};
+let supTickets = [];
+let supTicketsTotal = 0;
+let supTicketFiltro = "abiertos";
+let supTicketAbierto = null;
+
+const SUP_PROBLEMAS = {
+  sin_reportar: "sin reportar",
+  cola_trancada: "cola trancada",
+  outbox_acumulado: "cambios sin subir",
+  choques: "choques",
+  nube: "error de nube",
+  sync_degradada: "sync degradada",
+  atraso_cursor: "atrasada",
+  modo_prueba: "modo prueba",
+};
+
+const SUP_RESULTADOS = {
+  completada: "Llenada",
+  error_llenado: "Error de llenado",
+  pendiente: "Devuelta a pendientes",
+  reservada: "Reservada",
+  llenando: "En llenado",
+  descartada: "Descartada",
+  facturada_a_mano: "Facturada a mano",
+};
+
+const SUP_TICKET_ESTADOS = {
+  nuevo: "Nuevo",
+  en_proceso: "En proceso",
+  resuelto: "Resuelto",
+  descartado: "Descartado",
+};
+
+function supVisible() {
+  return $("sec-admin").style.display !== "none"
+      && $("admin-panel-supervision").style.display !== "none"
+      && document.visibilityState === "visible";
+}
+
+function irASubtabAdmin(id) {
+  if (id !== "ajustes" && id !== "supervision") return;
+  subtabAdminActiva = id;
+  $("admin-subtab-ajustes").classList.toggle("activa", id === "ajustes");
+  $("admin-subtab-supervision").classList.toggle("activa", id === "supervision");
+  $("admin-panel-ajustes").style.display = id === "ajustes" ? "" : "none";
+  $("admin-panel-supervision").style.display = id === "supervision" ? "" : "none";
+  if (id === "supervision" && $("sec-admin").style.display !== "none")
+    refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
+  actualizarRefrescoSupervision();
+}
+
+function actualizarRefrescoSupervision() {
+  if (supRefrescoInterval) {
+    clearInterval(supRefrescoInterval);
+    supRefrescoInterval = null;
+  }
+  if (!supVisible()) return;
+  supRefrescoInterval = setInterval(() => {
+    if (supVisible()) refrescarSupervision(false, false);
+  }, 60000);
+}
+
+function sincronizarSupervisionConTab(tab) {
+  if (tab === "admin" && subtabAdminActiva === "supervision")
+    refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
+  actualizarRefrescoSupervision();
+}
+
+document.addEventListener("visibilitychange", actualizarRefrescoSupervision);
+
+function refrescarSupervision(cargarOverview, cargarTickets) {
+  return Promise.allSettled([
+    cargarSupervision({mostrarCarga:!!cargarOverview}),
+    cargarTicketsSupervision({mostrarCarga:!!cargarTickets}),
+  ]);
+}
+
+function supFechaCorta(valor) {
+  if (!valor) return "—";
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return String(valor);
+  const ahora = new Date();
+  const hora = fecha.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const esHoy = fecha.getFullYear() === ahora.getFullYear()
+      && fecha.getMonth() === ahora.getMonth() && fecha.getDate() === ahora.getDate();
+  if (esHoy) return hora;
+  return fecha.toLocaleDateString([], {day:"2-digit", month:"2-digit"}) + " " + hora;
+}
+
+function supNumero(valor) {
+  return valor === null || valor === undefined ? "—" : String(valor);
+}
+
+function supNombreEquipo(equipo, marcarPropio) {
+  const dispositivo = equipo.dispositivo || "—";
+  const maquina = equipo.maquina || "";
+  let nombre = maquina && maquina !== dispositivo
+    ? dispositivo + " — " + maquina : dispositivo;
+  if (marcarPropio && dispositivo === supDispositivoPropio) nombre += " (este equipo)";
+  return nombre;
+}
+
+function supNombreEquipoModal(equipo) {
+  const dispositivo = equipo.dispositivo || "—";
+  return equipo.maquina ? dispositivo + " — " + equipo.maquina : dispositivo;
+}
+
+function supEstadoEquipo(equipo, sinDatos) {
+  if (sinDatos) return `<span class="sup-chip sin-datos">Sin datos</span>`;
+  if (equipo.estado === "activa")
+    return `<span class="sup-chip activa">Activa</span>`;
+  if (equipo.estado === "apagada")
+    return `<span class="sup-chip apagada">Apagada</span>`
+      + `<div class="sup-estado-nota">${esc(supFechaCorta(equipo.apagado_en))}</div>`;
+  const segundos = Number(equipo.segundos_sin_ver);
+  const hace = Number.isFinite(segundos)
+    ? `hace ${Math.max(1, Math.floor(segundos / 60))} min` : "sin hora reciente";
+  return `<span class="sup-chip sin-reportar">Sin reportar</span>`
+    + `<div class="sup-estado-nota">${hace}</div>`;
+}
+
+function supEstadoTicket(estado) {
+  const clase = (estado || "").replace("_", "-");
+  return `<span class="sup-chip sup-ticket-estado ${esc(clase)}">${
+    esc(SUP_TICKET_ESTADOS[estado] || estado || "—")}</span>`;
+}
+
+function supNubeEquipo(equipo) {
+  const partes = [];
+  const cursorLocal = Number(equipo.cursor_local);
+  const cursorNube = Number(supCursorNube);
+  const hayCursores = equipo.cursor_local !== null && equipo.cursor_local !== undefined
+      && supCursorNube !== null && supCursorNube !== undefined
+      && Number.isFinite(cursorLocal) && Number.isFinite(cursorNube);
+  if (!hayCursores) partes.push(`<span class="sup-nube-mal">Sin datos</span>`);
+  if (hayCursores && cursorNube > cursorLocal)
+    partes.push(`<span>${cursorNube - cursorLocal} atrás</span>`);
+  if (hayCursores && cursorLocal > cursorNube)
+    partes.push(`<span>${cursorLocal - cursorNube} por delante</span>`);
+  const pendientes = Number(equipo.outbox_pendientes) || 0;
+  const conflictos = Number(equipo.conflictos) || 0;
+  if (pendientes > 0) partes.push(`<span>${pendientes} por subir</span>`);
+  if (conflictos > 0) partes.push(`<span>${conflictos} choques</span>`);
+  if (equipo.nube_error) partes.push(`<span class="sup-nube-mal">Error</span>`);
+  if (!partes.length) partes.push(`<span class="sup-nube-ok">Al día</span>`);
+  return `<div class="sup-nube-lineas">${partes.join("")}</div>`;
+}
+
+function supProblemasEquipo(equipo) {
+  return `<div class="sup-problemas">${(equipo.problemas || []).map(p =>
+    `<span class="sup-problema" title="${esc(p.texto || "")}">${
+      esc(SUP_PROBLEMAS[p.tipo] || p.tipo || "atención")}</span>`).join("")}</div>`;
+}
+
+function supFilaEquipo(equipo, sinDatos) {
+  const accion = sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
+    esc(equipo.dispositivo || "")}')">Ver detalle</button>`;
+  return `<tr>
+    <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
+    <td>${supEstadoEquipo(equipo, sinDatos)}</td>
+    <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}</td>
+    <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
+    <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
+    <td>${accion}</td>
+  </tr>`;
+}
+
+function pintarResumenSupervision(tickets) {
+  const tarjetas = [
+    [Number(supResumen.equipos || 0) + supSinDatos.length, "Equipos"],
+    [supNumero(supResumen.activos), "Activos"],
+    [supEquipos.filter(e => (e.problemas || []).length > 0).length, "Con problemas"],
+    [supNumero(supResumen.sin_reportar), "Sin reportar"],
+    [supNumero(supResumen.apagados), "Apagados"],
+  ];
+  if (tickets && tickets.disponible)
+    tarjetas.push([tickets.error ? "—" : supNumero(tickets.nuevos), "Tickets sin atender"]);
+  $("sup-resumen").innerHTML = tarjetas.map(([numero, rotulo]) =>
+    `<div class="sup-resumen-card"><span class="sup-resumen-num">${esc(numero)}</span>`
+    + `<span class="sup-resumen-label">${rotulo}</span></div>`).join("");
+}
+
+function pintarAlertasSupervision(alertas) {
+  const lista = alertas || [];
+  $("sup-alertas").style.display = lista.length ? "" : "none";
+  $("sup-alertas-lista").innerHTML = lista.map(a =>
+    `<li class="sup-alerta ${a.nivel === "alerta" ? "alerta" : "aviso"}">`
+    + `<span class="sup-alerta-punto"></span><span>${esc(a.texto || "")}</span></li>`
+  ).join("");
+}
+
+function pintarEquiposSupervision() {
+  const filas = supEquipos.map(e => supFilaEquipo(e, false))
+    .concat(supSinDatos.map(e => supFilaEquipo(e, true)));
+  $("sup-equipos-tabla").querySelector("tbody").innerHTML = filas.length
+    ? filas.join("")
+    : `<tr><td colspan="6" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
+  const quedan = Number(supResumen.equipos || 0) > supEquipos.length;
+  $("sup-equipos-mas").style.display = quedan ? "" : "none";
+}
+
+function pintarActividadSupervision() {
+  const nombres = new Map();
+  for (const equipo of [...supEquipos, ...supSinDatos])
+    nombres.set(equipo.dispositivo, equipo.maquina || equipo.dispositivo || "—");
+  $("sup-actividad-lista").innerHTML = supActividad.length
+    ? supActividad.map(a => `<li class="sup-actividad-fila">
+        <span class="mut">${esc(supFechaCorta(a.fecha))}</span>
+        <span>${esc(nombres.get(a.dispositivo) || a.dispositivo || "—")}</span>
+        <span>pedido ${esc(a.pedido_id || "—")} · parte ${esc(a.parte ?? "—")}</span>
+        <span>${esc(SUP_RESULTADOS[a.resultado] || a.resultado || "—")}${
+          a.conflicto ? `<span class="sup-doble">doble llenado</span>` : ""}</span>
+      </li>`).join("")
+    : `<li class="sup-lista-vacia">No hay actividad reciente.</li>`;
+}
+
+async function cargarSupervision({mostrarCarga=false, anadir=false, desde=0} = {}) {
+  if (supOverviewEnVuelo) return;
+  supOverviewEnVuelo = true;
+  if (mostrarCarga) {
+    $("sup-cargando").style.display = "";
+    $("sup-overview-contenido").style.display = "none";
+  }
+  $("sup-error").style.display = "none";
+  const btnMas = $("sup-equipos-mas").querySelector("button");
+  if (anadir) { btnMas.disabled = true; btnMas.textContent = "Cargando…"; }
+  try {
+    const d = await api("/api/supervision" + (desde ? "?desde=" + desde : ""));
+    const nuevos = d.equipos || [];
+    if (anadir) {
+      const vistos = new Set(supEquipos.map(e => e.dispositivo));
+      supEquipos.push(...nuevos.filter(e => !vistos.has(e.dispositivo)));
+    } else {
+      supEquipos = nuevos;
+    }
+    supSinDatos = d.sin_datos || [];
+    supActividad = d.actividad || [];
+    supResumen = d.resumen || {};
+    supCursorNube = d.cursor_nube;
+    supDispositivoPropio = d.dispositivo_propio || "";
+    supPagina = d.pagina || {desde, limite:nuevos.length};
+    pintarResumenSupervision(d.tickets || {});
+    pintarAlertasSupervision(d.alertas || []);
+    pintarEquiposSupervision();
+    pintarActividadSupervision();
+    $("sup-overview-contenido").style.display = "";
+    supOverviewCargado = true;
+  } catch (e) {
+    $("sup-error").textContent = e.message;
+    $("sup-error").style.display = "";
+    $("sup-overview-contenido").style.display = "none";
+  } finally {
+    supOverviewEnVuelo = false;
+    $("sup-cargando").style.display = "none";
+    btnMas.disabled = false;
+    btnMas.textContent = "Mostrar más";
+  }
+}
+
+function cargarMasEquipos() {
+  cargarSupervision({anadir:true, desde:supEquipos.length});
+}
+
+function supExtracto(texto) {
+  const limpio = String(texto || "").replace(/\s+/g, " ").trim();
+  return limpio.length > 120 ? limpio.slice(0, 117) + "…" : limpio;
+}
+
+function pintarFiltrosTickets() {
+  $("sup-ticket-filtros").querySelectorAll(".sup-ticket-filtro").forEach(b =>
+    b.classList.toggle("activa", b.dataset.estado === supTicketFiltro));
+}
+
+function pintarTicketsSupervision() {
+  const cuerpo = $("sup-tickets-tabla").querySelector("tbody");
+  cuerpo.innerHTML = supTickets.length ? supTickets.map(t => `<tr>
+    <td><b>${esc(t.id || "—")}</b></td>
+    <td>${esc(supFechaCorta(t.creado_en))}</td>
+    <td>${esc(t.maquina || t.dispositivo || "—")}</td>
+    <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
+    <td>${supEstadoTicket(t.estado)}</td>
+    <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
+  </tr>`).join("")
+    : `<tr><td colspan="6" class="sup-lista-vacia">No hay tickets en este filtro.</td></tr>`;
+  $("sup-tickets-mas").style.display = supTicketsTotal > supTickets.length ? "" : "none";
+}
+
+async function cargarTicketsSupervision({mostrarCarga=false, anadir=false, desde=0} = {}) {
+  const solicitud = ++supTicketsSolicitud;
+  if (mostrarCarga) $("sup-tickets-cargando").style.display = "";
+  $("sup-tickets-error").style.display = "none";
+  const btnMas = $("sup-tickets-mas").querySelector("button");
+  if (anadir) { btnMas.disabled = true; btnMas.textContent = "Cargando…"; }
+  const params = new URLSearchParams({estado:supTicketFiltro, desde:String(desde)});
+  try {
+    const d = await api("/api/supervision/tickets?" + params.toString());
+    if (solicitud !== supTicketsSolicitud) return;
+    supTicketsCargados = true;
+    if (!d.disponible) {
+      $("sup-tickets-aviso").textContent = "La bandeja de tickets necesita la clave de servicio en este equipo (SUPABASE_SERVICE_KEY en el .env). Los tickets se siguen guardando en la nube.";
+      $("sup-tickets-aviso").style.display = "";
+      $("sup-ticket-filtros").style.display = "none";
+      $("sup-tickets-lista").style.display = "none";
+      return;
+    }
+    $("sup-tickets-aviso").style.display = "none";
+    $("sup-ticket-filtros").style.display = "";
+    pintarFiltrosTickets();
+    const nuevos = d.tickets || [];
+    if (anadir) {
+      const vistos = new Set(supTickets.map(t => t.id));
+      supTickets.push(...nuevos.filter(t => !vistos.has(t.id)));
+    } else {
+      supTickets = nuevos;
+    }
+    supTicketsTotal = Number(d.total || 0);
+    pintarTicketsSupervision();
+    $("sup-tickets-lista").style.display = "";
+  } catch (e) {
+    if (solicitud !== supTicketsSolicitud) return;
+    $("sup-tickets-error").textContent = e.message;
+    $("sup-tickets-error").style.display = "";
+    $("sup-tickets-lista").style.display = "none";
+  } finally {
+    if (solicitud === supTicketsSolicitud) {
+      $("sup-tickets-cargando").style.display = "none";
+      btnMas.disabled = false;
+      btnMas.textContent = "Mostrar más";
+    }
+  }
+}
+
+function cambiarFiltroTickets(estado) {
+  if (estado === supTicketFiltro && supTicketsCargados) return;
+  supTicketFiltro = estado;
+  supTickets = [];
+  supTicketsTotal = 0;
+  pintarFiltrosTickets();
+  cargarTicketsSupervision({mostrarCarga:true});
+}
+
+function cargarMasTickets() {
+  cargarTicketsSupervision({anadir:true, desde:supTickets.length});
+}
+
+function supJsonLegible(valor) {
+  if (valor === null || valor === undefined) return "Sin informe disponible.";
+  if (typeof valor === "string") {
+    try { return JSON.stringify(JSON.parse(valor), null, 2); }
+    catch (_) { return valor; }
+  }
+  try { return JSON.stringify(valor, null, 2); }
+  catch (_) { return String(valor); }
+}
+
+async function abrirDetalleEquipoSupervision(dispositivo) {
+  $("sup-equipo-overlay").classList.add("visible");
+  $("sup-equipo-titulo").textContent = dispositivo || "Detalle del equipo";
+  $("sup-equipo-cuerpo").innerHTML = `<div class="mut"><span class="spinner"></span> Cargando detalle…</div>`;
+  crecerVentanaPorModal("sup-equipo-caja");
+  try {
+    const d = await api("/api/supervision/equipo/" + encodeURIComponent(dispositivo));
+    const conocido = supEquipos.find(e => e.dispositivo === dispositivo) || {};
+    const equipo = {...conocido, ...(d.equipo || {})};
+    $("sup-equipo-titulo").textContent = supNombreEquipoModal(equipo);
+    const modos = equipo.modo_prueba || equipo.modo_admin
+      ? `<div class="sup-detalle-seccion"><h4>Modos prendidos</h4>${
+          equipo.modo_prueba ? `<div class="sup-dato">Modo prueba</div>` : ""}${
+          equipo.modo_admin ? `<div class="sup-dato">Modo admin</div>` : ""}</div>` : "";
+    const recientes = Array.isArray(d.tickets) && d.tickets.length
+      ? `<div class="sup-detalle-seccion"><h4>Tickets recientes de este equipo</h4>${
+          d.tickets.map(t => `<div class="sup-dato"><b>${esc(t.id || "—")}</b> · ${
+            esc(supFechaCorta(t.creado_en))} · ${supEstadoTicket(t.estado)}</div>`).join("")}</div>` : "";
+    $("sup-equipo-cuerpo").innerHTML = `
+      <div class="sup-detalle-grid">
+        <div>
+          <div class="sup-dato"><span>Estado:</span>${supEstadoEquipo(equipo, false)}</div>
+          <div class="sup-dato"><span>Última vez visto:</span>${esc(supFechaCorta(equipo.visto_en))}</div>
+        </div>
+        <div>
+          <div class="sup-dato"><span>Versión:</span>${esc(equipo.version || "—")}</div>
+          <div class="sup-dato"><span>Plataforma:</span>${esc(equipo.plataforma || "—")}</div>
+        </div>
+      </div>
+      <div class="sup-detalle-seccion"><h4>Sincronización</h4>
+        <div class="sup-dato"><span>Camino:</span>${esc(equipo.camino || "—")}</div>
+        <div class="sup-dato"><span>Cursores:</span>local ${esc(supNumero(equipo.cursor_local))} · nube ${esc(supNumero(supCursorNube))}</div>
+        <div class="sup-dato"><span>Por subir:</span>${esc(supNumero(equipo.outbox_pendientes))}${
+          equipo.outbox_mas_viejo ? ` · más antiguo ${esc(supFechaCorta(equipo.outbox_mas_viejo))}` : ""}</div>
+        ${equipo.outbox_error ? `<div class="sup-dato"><span>Error de cola:</span>${esc(equipo.outbox_error)}</div>` : ""}
+        <div class="sup-dato"><span>Choques:</span>${esc(supNumero(equipo.conflictos))}</div>
+      </div>
+      ${modos}
+      <div class="sup-detalle-seccion"><h4>Informe del último latido</h4>
+        <pre class="sup-pre">${esc(supJsonLegible(equipo.detalle))}</pre>
+      </div>
+      ${recientes}`;
+  } catch (e) {
+    $("sup-equipo-cuerpo").innerHTML = `<div class="desc-error">${esc(e.message)}</div>`;
+  }
+}
+
+function cerrarDetalleEquipoSupervision() {
+  $("sup-equipo-overlay").classList.remove("visible");
+  replantarCajaFlotante();
+}
+
+async function abrirDetalleTicketSupervision(id) {
+  supTicketAbierto = null;
+  $("sup-ticket-overlay").classList.add("visible");
+  $("sup-ticket-titulo").textContent = id || "Ticket";
+  $("sup-ticket-cuerpo").innerHTML = `<div class="mut"><span class="spinner"></span> Cargando ticket…</div>`;
+  $("sup-ticket-estado").disabled = true;
+  $("sup-ticket-nota").disabled = true;
+  $("sup-ticket-guardar").disabled = true;
+  $("sup-ticket-modal-error").style.display = "none";
+  crecerVentanaPorModal("sup-ticket-caja");
+  try {
+    const d = await api("/api/supervision/tickets/" + encodeURIComponent(id));
+    const ticket = d.ticket || {};
+    supTicketAbierto = ticket;
+    $("sup-ticket-titulo").textContent = "Ticket " + (ticket.id || id);
+    $("sup-ticket-cuerpo").innerHTML = `
+      <div class="sup-detalle-grid">
+        <div>
+          <div class="sup-dato"><span>Equipo:</span>${esc(ticket.maquina || ticket.dispositivo || "—")}</div>
+          <div class="sup-dato"><span>Versión:</span>${esc(ticket.version || "—")}</div>
+        </div>
+        <div>
+          <div class="sup-dato"><span>Fecha del equipo:</span>${esc(supFechaCorta(ticket.fecha_local))}</div>
+          <div class="sup-dato"><span>Fecha de la nube:</span>${esc(supFechaCorta(ticket.creado_en))}</div>
+        </div>
+      </div>
+      <div class="sup-detalle-seccion"><h4>Mensaje</h4>
+        <div class="sup-ticket-mensaje-completo">${esc(ticket.mensaje || "—")}</div>
+      </div>
+      <div class="sup-detalle-seccion"><h4>Informe</h4>
+        <pre class="sup-pre">${esc(supJsonLegible(ticket.informe))}</pre>
+      </div>`;
+    $("sup-ticket-estado").value = ticket.estado || "nuevo";
+    $("sup-ticket-nota").value = ticket.nota_admin || "";
+    $("sup-ticket-estado").disabled = false;
+    $("sup-ticket-nota").disabled = false;
+    $("sup-ticket-guardar").disabled = false;
+  } catch (e) {
+    $("sup-ticket-cuerpo").innerHTML = `<div class="desc-error">${esc(e.message)}</div>`;
+  }
+}
+
+function supTicketCoincideFiltro(ticket) {
+  if (supTicketFiltro === "todos") return true;
+  if (supTicketFiltro === "abiertos")
+    return ticket.estado === "nuevo" || ticket.estado === "en_proceso";
+  return ticket.estado === supTicketFiltro;
+}
+
+async function guardarTicketSupervision() {
+  if (!supTicketAbierto) return;
+  const btn = $("sup-ticket-guardar");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Guardando…`;
+  $("sup-ticket-modal-error").style.display = "none";
+  try {
+    const d = await api("/api/supervision/tickets/" + encodeURIComponent(supTicketAbierto.id), {
+      estado: $("sup-ticket-estado").value,
+      nota_admin: $("sup-ticket-nota").value,
+    });
+    const actualizado = d.ticket || {...supTicketAbierto,
+      estado:$("sup-ticket-estado").value, nota_admin:$("sup-ticket-nota").value};
+    const indice = supTickets.findIndex(t => t.id === actualizado.id);
+    if (indice >= 0 && supTicketCoincideFiltro(actualizado)) supTickets[indice] = actualizado;
+    if (indice >= 0 && !supTicketCoincideFiltro(actualizado)) {
+      supTickets.splice(indice, 1);
+      supTicketsTotal = Math.max(0, supTicketsTotal - 1);
+    }
+    pintarTicketsSupervision();
+    cerrarDetalleTicketSupervision();
+    cargarSupervision();
+  } catch (e) {
+    $("sup-ticket-modal-error").textContent = e.message;
+    $("sup-ticket-modal-error").style.display = "";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Guardar";
+  }
+}
+
+function cerrarDetalleTicketSupervision() {
+  supTicketAbierto = null;
+  $("sup-ticket-overlay").classList.remove("visible");
+  replantarCajaFlotante();
+}
+
+function supTicketHayCambios() {
+  return !!supTicketAbierto
+    && ($("sup-ticket-estado").value !== (supTicketAbierto.estado || "nuevo")
+        || $("sup-ticket-nota").value !== (supTicketAbierto.nota_admin || ""));
+}
+
+function intentarCerrarTicketSupervision() {
+  if (supTicketHayCambios()) {
+    pedirConfirmSalida({
+      acciones: $("sup-ticket-caja").querySelector(".editor-acciones"),
+      guardar: () => guardarTicketSupervision(),
+      cerrar: cerrarDetalleTicketSupervision,
+    });
+  } else {
+    cerrarDetalleTicketSupervision();
+  }
+}
+
 function cambiarTab(tab) {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   for (const t of ["pendientes", "procesadas", "descuentos", "ajustes", "admin", "revision"]) {
@@ -5710,6 +6463,7 @@ function cambiarTab(tab) {
   window.scrollTo(0, 0);   // cada cambio de tab arranca arriba
   if (tab === "ajustes" || tab === "admin") cargarAjustes();
   if (tab === "descuentos") renderDescuentos();
+  sincronizarSupervisionConTab(tab);
 }
 
 function cambiarPorPagina(tab, valor) {
