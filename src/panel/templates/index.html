@@ -13743,11 +13743,11 @@ async function abrirCatalogo(tipo, prefill) {
                   onclick="abrirEditor(null)">Agregar ${esc(def.singular)}</button>
         </div>
         <div style="overflow-x:auto"><table id="t-catalogo">
-          <thead><tr>${columnas.map(c => `<th>${
+          ${def.agrupado ? "" : `<thead><tr>${columnas.map(c => `<th>${
             c.origenDato
               ? `<span class="orig-punto ${c.origenDato}" title="${esc(ORIGENES[c.origenDato].titulo)}"></span>`
               : ""}${esc(c.etiqueta)}</th>`).join("")}${
-            def.agrupado || def.acciones ? "<th></th>" : ""}</tr></thead>
+            def.acciones ? "<th></th>" : ""}</tr></thead>`}
           <tbody></tbody>
         </table></div>
         <div class="paginador" id="pag-catalogo"></div>
