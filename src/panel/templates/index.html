@@ -7833,15 +7833,23 @@ function pintarLlenadosPorRevisar(lista) {
     // documento SÍ salió, así que darlo por bueno es una decisión real. El
     // motivo solo lo pregunta Descartar: por qué se reintenta ya lo dice el
     // renglón (qué línea no entró y por qué).
-    // Una fila AJENA se ve igual en todas las máquinas (2026-08-02) pero se
-    // resuelve en su equipo — el documento a medias quedó en esa pantalla —
-    // así que en vez de botones dice dónde atenderla.
+    // Una fila AJENA con ERROR también se resuelve desde aquí (2026-08-04,
+    // pedido del usuario): los mismos botones que su fila de PENDIENTES —
+    // "Llenar igual" quita el candado con motivo y "Descartar" la cierra. La
+    // nota de dónde pasó se queda: el documento a medias sigue en esa
+    // pantalla y alguien debe atenderlo allá. La de líneas omitidas sí se
+    // queda solo informativa: su documento salió en ese equipo y darlo por
+    // bueno o reemitirlo se decide donde está el papel.
     const acciones = modoImplantacion
       ? (f.tipo === "error"
           ? botonPrellenado(f, "Probar reintento", "acento")
           : `<span class="mut" title="Esta decisión cambia una factura real.">Solo en REAL</span>`)
       : f.remota
-      ? `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`
+      ? (f.tipo === "error"
+          ? `<button onclick="tomarIgual('${esc(f.pedido_id)}',${f.parte})">Llenar igual</button>
+             <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
+             <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>`
+          : `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
