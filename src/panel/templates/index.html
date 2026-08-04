@@ -1364,8 +1364,18 @@
   .sup-tabla th { color:var(--mut); font-size:11.5px; background:#fafbfc;
                   font-weight:600; white-space:nowrap; }
   .sup-tabla tbody tr:last-child td { border-bottom:0; }
-  .sup-usuario-admin { text-align:center; }
-  .sup-usuario-admin input { width:16px; height:16px; cursor:pointer; }
+  .sup-rol { white-space:nowrap; }
+  .sup-rol-check { display:inline-flex; align-items:center; gap:4px;
+                   margin-right:10px; font-size:12px; cursor:pointer; }
+  .sup-rol-check input { width:15px; height:15px; cursor:pointer; }
+  .sup-rol-check input:disabled { cursor:default; }
+  .sup-rol-check:has(input:disabled) { color:var(--mut); }
+  .sup-tabla-roles { min-width:0; }
+  .sup-rol-celda { text-align:center; width:90px; }
+  .sup-rol-si { color:#166534; font-weight:600; }
+  .sup-rol-no { color:var(--mut); }
+  .sup-roles-nota { margin-top:8px; font-size:12.5px; color:var(--mut); }
+  .sup-roles-nota p { margin:4px 0; }
   .sup-equipo-nombre { font-weight:600; overflow-wrap:anywhere; }
   .sup-chip { display:inline-flex; align-items:center; border:1px solid;
               border-radius:999px; padding:2px 8px; font-size:11px;
@@ -2673,7 +2683,7 @@
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
-              <th title="Su operador administra el sistema: solo esas PC ven el filtro por máquina en PROCESADAS.">Usuario admin</th>
+              <th title="Rol del operador de esa PC: de él sale qué funciones ve. El cuadro de abajo dice qué habilita cada uno.">Rol</th>
               <th>Atención</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -2681,6 +2691,16 @@
           <div id="sup-equipos-mas" class="sup-mas" style="display:none">
             <button type="button" onclick="cargarMasEquipos()">Mostrar más</button>
           </div>
+        </div>
+        <!-- Qué habilita cada rol. Se pinta del registro del servidor
+             (src/roles.py), así que crece solo a medida que se van definiendo
+             permisos: aquí no hay ninguna diferencia escrita a mano. -->
+        <div class="sup-bloque" id="sup-roles" style="display:none">
+          <h3>Roles y permisos</h3>
+          <div class="sup-tabla-scroll">
+            <table id="sup-roles-tabla" class="sup-tabla sup-tabla-roles"></table>
+          </div>
+          <div id="sup-roles-nota" class="sup-roles-nota"></div>
         </div>
         <div class="sup-bloque sup-actividad-boton">
           <button type="button" onclick="abrirActividadSupervision()">Ver actividad reciente</button>
@@ -6199,39 +6219,112 @@ function supProblemasEquipo(equipo) {
 function supFilaEquipo(equipo, sinDatos) {
   const accion = sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
     esc(equipo.dispositivo || "")}')">Ver detalle</button>`;
-  const host = esc(equipo.dispositivo || "");
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
-    <td class="sup-usuario-admin"><input type="checkbox"
-        ${equipo.usuario_admin ? "checked" : ""}
-        title="Su operador administra el sistema: verá el filtro por máquina en PROCESADAS."
-        onchange="marcarUsuarioAdmin('${host}', this)"></td>
+    <td class="sup-rol">${supCasillasRol(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
 }
 
-// La marca viaja por el catálogo de máquinas: se pone aquí y la PC marcada la
-// aplica en su refresco. Si el guardado falla, la casilla vuelve donde estaba
-// —quedarse marcada mentiría sobre lo que de verdad quedó guardado.
-async function marcarUsuarioAdmin(dispositivo, caja) {
-  const querido = caja.checked;
+// Roles y permisos tal como los mandó el servidor (src/roles.py). La pantalla
+// no sabe qué habilita cada rol: lo pinta de aquí.
+let supRoles = {roles: [], permisos: []};
+
+// Una casilla por rol. Como un admin también es editor, la de Editor va
+// marcada y bloqueada mientras el equipo sea admin: dejar desmarcarla
+// ofrecería un estado que no existe ("admin que no es editor").
+function supCasillasRol(equipo) {
+  const rol = equipo.rol || "";
+  const efectivos = supRolesEfectivos(rol);
+  return (supRoles.roles || []).map(r => {
+    const implicado = r.clave !== rol && efectivos.includes(r.clave);
+    return `<label class="sup-rol-check" title="${
+      implicado ? esc(`Lo es por ser ${nombreRol(rol)}.`)
+                : esc(`Marca este equipo como ${r.nombre}.`)}">
+      <input type="checkbox" ${efectivos.includes(r.clave) ? "checked" : ""}
+             ${implicado ? "disabled" : ""}
+             onchange="cambiarRolEquipo('${esc(equipo.dispositivo || "")}', '${
+               esc(r.clave)}', this)">
+      ${esc(r.nombre)}</label>`;
+  }).join("");
+}
+
+// Los roles que ejerce de hecho quien tiene `rol`: el suyo más los que este
+// implica (el servidor ya mandó esa implicación en el resumen).
+function supRolesEfectivos(rol) {
+  const def = (supRoles.roles || []).find(r => r.clave === rol);
+  return def ? [def.clave, ...(def.implica || [])] : [];
+}
+
+function nombreRol(rol) {
+  const def = (supRoles.roles || []).find(r => r.clave === rol);
+  return def ? def.nombre : "—";
+}
+
+// Marcar un rol lo asigna; desmarcarlo deja el siguiente de menor alcance que
+// el equipo siguiera teniendo (quitarle Admin a alguien lo baja a Editor, no
+// lo deja sin nada) y, si no queda ninguno, lo deja sin rol. El rol viaja por
+// el catálogo de máquinas: se cambia aquí y la PC lo aplica en su refresco.
+async function cambiarRolEquipo(dispositivo, rol, caja) {
+  const equipo = [...supEquipos, ...supSinDatos].find(e => e.dispositivo === dispositivo);
+  const previo = (equipo && equipo.rol) || "";
+  let querido;
+  if (caja.checked) {
+    querido = rol;
+  } else {
+    // Los roles vienen de mayor a menor alcance: el siguiente al que se
+    // desmarcó es el que queda.
+    const orden = (supRoles.roles || []).map(r => r.clave);
+    querido = orden.slice(orden.indexOf(rol) + 1)
+                   .find(r => supRolesEfectivos(previo).includes(r)) || "";
+  }
   caja.disabled = true;
   try {
-    await api("/api/supervision/usuario-admin",
-              {dispositivo, usuario_admin: querido});
-    const equipo = [...supEquipos, ...supSinDatos]
-      .find(e => e.dispositivo === dispositivo);
-    if (equipo) equipo.usuario_admin = querido;
+    await api("/api/supervision/rol", {dispositivo, rol: querido});
+    if (equipo) equipo.rol = querido;
+    pintarEquiposSupervision();   // repinta las casillas implicadas
   } catch (e) {
-    caja.checked = !querido;
-    mensaje("No se pudo cambiar la marca de usuario admin: " + e.message, "error");
-  } finally {
+    caja.checked = !caja.checked;
     caja.disabled = false;
+    mensaje("No se pudo cambiar el rol: " + e.message, "error");
   }
+}
+
+// El cuadro de qué puede cada rol. Sale entero del registro del servidor, así
+// que agregar un permiso allá lo hace aparecer aquí sin tocar esta función.
+// Mientras un rol no tenga ninguno, se dice tal cual en vez de dejar una
+// columna vacía que se lea como un error.
+function pintarRolesSupervision() {
+  const roles = supRoles.roles || [];
+  const permisos = supRoles.permisos || [];
+  if (!roles.length) { $("sup-roles").style.display = "none"; return; }
+  $("sup-roles").style.display = "";
+  const filas = permisos.map(p => `<tr>
+    <td>${esc(p.titulo)}</td>
+    ${roles.map(r => `<td class="sup-rol-celda">${
+      (p.roles || []).includes(r.clave)
+        ? `<span class="sup-rol-si" title="Sí">Sí</span>`
+        : `<span class="sup-rol-no" title="No">—</span>`}</td>`).join("")}
+  </tr>`).join("");
+  $("sup-roles-tabla").innerHTML = `
+    <thead><tr><th>Qué habilita</th>${
+      roles.map(r => `<th class="sup-rol-celda">${esc(r.nombre)}</th>`).join("")}</tr></thead>
+    <tbody>${filas || `<tr><td colspan="${roles.length + 1}" class="sup-lista-vacia">
+      Todavía no hay ninguna función asignada a un rol.</td></tr>`}</tbody>`;
+  const sinNada = roles.filter(r =>
+    !permisos.some(p => (p.roles || []).includes(r.clave)));
+  $("sup-roles-nota").innerHTML = [
+    ...roles.filter(r => (r.implica || []).length).map(r =>
+      `Un <b>${esc(r.nombre)}</b> es también ${
+        r.implica.map(i => `<b>${esc(nombreRol(i))}</b>`).join(" y ")
+      }: puede todo lo que ese pueda.`),
+    ...sinNada.map(r =>
+      `<b>${esc(r.nombre)}</b> todavía no tiene ninguna función propia: se le van a ir asignando.`),
+  ].map(t => `<p>${t}</p>`).join("");
 }
 
 function pintarResumenSupervision(tickets) {
@@ -6318,9 +6411,12 @@ async function cargarSupervision({mostrarCarga=false, anadir=false, desde=0} = {
     supCursorNube = d.cursor_nube;
     supDispositivoPropio = d.dispositivo_propio || "";
     supPagina = d.pagina || {desde, limite:nuevos.length};
+    // Antes de pintar los equipos: las casillas de rol se arman de aquí.
+    if (d.roles) supRoles = d.roles;
     pintarResumenSupervision(d.tickets || {});
     pintarAlertasSupervision(d.alertas || []);
     pintarEquiposSupervision();
+    pintarRolesSupervision();
     pintarActividadSupervision();
     $("sup-overview-contenido").style.display = "";
     supOverviewCargado = true;
