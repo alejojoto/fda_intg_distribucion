@@ -13716,10 +13716,11 @@ async function abrirCatalogo(tipo, prefill) {
     // La cabecera (título, aviso, filtro) se pinta UNA vez; el filtro solo
     // repinta las filas — así el input no pierde el foco al teclear.
     const def = CATALOGOS[tipo];
+    // "Activo" ya no sale aquí (2026-08-04): el toggle vive en la ficha del
+    // cliente (pintarVentanaCliente), esta lista general solo resume.
     const columnas = def.agrupado
       ? [{etiqueta: "Sucursal", origenDato: "appsheet"},
-         {etiqueta: "Código sucursal", origenDato: "winledger"},
-         {etiqueta: "Activo"}]
+         {etiqueta: "Código sucursal", origenDato: "winledger"}]
       : columnasCatalogo(def);
     // El punto de origen va en toda cabecera que declare origen, así el
     // catálogo tenga uno solo (usuario 2026-07-29): las pestañas se ven
@@ -13939,7 +13940,7 @@ function pintarClientesAgrupados(filtro) {
         // título sobra (ya lo dice la pestaña): queda solo la explicación.
         // El ancho tope de la explicación es lo que impide que un párrafo largo
         // estire la tabla entera (2026-08-01).
-        html += `<tr class="grupo"><td colspan="4">${enRevisar ? "" : esc(g.etiqueta)}
+        html += `<tr class="grupo"><td colspan="3">${enRevisar ? "" : esc(g.etiqueta)}
              <div class="mut" style="font-weight:400; max-width:62ch">${g.pendientes
                ? "Sus pedidos esperan en revisión hasta que estén completas. Lo que le falta a cada una está en su fila: el tipo lo trae la app de pedidos, pero el código de cliente se escribe aquí."
                : "No se facturan nunca: sus pedidos se descartan sin pasar por revisión."}</div>
@@ -13955,12 +13956,12 @@ function pintarClientesAgrupados(filtro) {
       const badge = g.esCadena
         ? ` <span class="badge">cadena · ${g.filas.length} sucursales</span>` : "";
       html += `<tr class="grupo abre-editor" title="Clic para ver la ficha del cliente"
-               onclick="editarCliente('${esc(g.codigo)}')"><td colspan="4">${
+               onclick="editarCliente('${esc(g.codigo)}')"><td colspan="3">${
              estrellaCliente(g)}${esc(g.etiqueta)}${badge}</td></tr>`;
     }
   }
   $("t-catalogo").querySelector("tbody").innerHTML =
-    html || `<tr><td colspan="4" class="mut">Sin clientes que coincidan.</td></tr>`;
+    html || `<tr><td colspan="3" class="mut">Sin clientes que coincidan.</td></tr>`;
   // La ficha del cliente vive en su propia ventana: cualquier repintado de la
   // lista la refresca también, para que las dos digan lo mismo.
   if (clienteEnEdicion !== null) pintarVentanaCliente();
@@ -13999,13 +14000,13 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // un botón —la fila entera abre el editor— sino el texto de su hover.
   const accion = !falta ? "editar esta sucursal"
     : falta === "Falta decir qué es" ? "clasificar esta entrada" : "completar esta entrada";
-  // Toggle de un clic (solo dentro de la ficha del cliente, 2026-07-30): fuera
-  // de ahí se conserva el punto informativo, sin click.
+  // Toggle de un clic, solo dentro de la ficha del cliente (2026-07-30): la
+  // lista general (2026-08-04) ya no trae columna "Activo", esa función se ve
+  // por cliente.
   // Un cliente de prueba nunca factura, así que su interruptor no se puede
   // prender (regla del usuario 2026-07-31): el backend ya lo rechaza, esto es
   // que ni se ofrezca el clic.
-  const celdaActivo = !conToggleActivo ? puntoEstado(f.activo)
-    : f.clasificacion === "prueba"
+  const celdaActivo = f.clasificacion === "prueba"
     ? `<label style="cursor:var(--cursor-prohibido); display:inline-flex" title="Un cliente de prueba no se activa: nunca factura, así que este interruptor no tiene efecto.">
          <input type="checkbox" class="switch" disabled></label>`
     : `<label style="cursor:pointer; display:inline-flex" title="${f.activo ? "Activa" : "Inactiva"}: mientras esté apagada, esta sucursal no entra al proceso automático de facturación.">
@@ -14023,7 +14024,7 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
         ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
-    <td${conToggleActivo ? CELDA_ACCIONES : ""}>${celdaActivo}</td>
+    ${conToggleActivo ? `<td${CELDA_ACCIONES}>${celdaActivo}</td>` : ""}
     <td${borrarDefinitivo ? CELDA_ACCIONES : ""}>${borrarDefinitivo}</td>
   </tr>`;
 }
