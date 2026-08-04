@@ -7860,11 +7860,13 @@ function pintarLlenadosPorRevisar(lista) {
       : f.remota
       ? (f.tipo === "error"
           ? `<button onclick="tomarIgual('${esc(f.pedido_id)}',${f.parte})">Llenar igual</button>
+             <button onclick="editarClienteDesdeLlenado('${esc(f.cliente_id)}')" title="Si el código de cliente o sucursal quedó desactualizado, corrígelo aquí.">Editar cliente</button>
              <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
              <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>`
           : `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
+         <button onclick="editarClienteDesdeLlenado('${esc(f.cliente_id)}')" title="Si el código de cliente o sucursal quedó desactualizado, corrígelo aquí.">Editar cliente</button>
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
            onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
@@ -8003,6 +8005,23 @@ async function crearClienteDesdeRevision(i) {
     sucursal_nombre: p.razon_social || "",
     rif: p.rif || "",
   });
+}
+
+// "Editar cliente" desde un llenado fallido (2026-08-04, pedido del usuario):
+// un código de cliente/sucursal que el programa de facturación rechazó puede
+// ser porque allá lo editaron/renombraron, no porque el cruce esté mal
+// clasificado — por eso NO se marca nada solo (regla 2026-08-01, ver
+// cargador.py: un fallo de escritura no prueba que el código esté mal, pudo
+// ser otro campo). Este botón es solo un atajo de navegación al mismo editor
+// de AJUSTES → Clientes: el operador decide si de verdad hace falta corregir
+// algo, igual que si hubiera entrado por Ajustes.
+async function editarClienteDesdeLlenado(clienteId) {
+  if (!clienteId) return;
+  cambiarTab("ajustes");
+  await abrirCatalogo("clientes");
+  const idx = catalogoFilas.findIndex(f => f.cliente_id === clienteId);
+  if (idx >= 0) abrirEditor(idx);
+  else mensaje("Ese cliente ya no está en el catálogo local.", "error");
 }
 
 // "Ya está creado": el operador acaba de darlo de alta en el programa de
