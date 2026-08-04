@@ -536,6 +536,12 @@
   .det-error { color:#a12a2a; font-size:12px; margin-top:6px; }
   .det-nota { color:var(--mut); font-size:11.5px; margin-top:3px; }
   .det-nota.alerta { color:#b54708; }
+  /* "Habilitar edición" (2026-08-05): separado de los botones de acción del
+     pie y con su propio acento ámbar — que se note que destranca algo. */
+  #detalle-editar-btn { margin-left:10px; padding:3px 12px; border-radius:6px;
+    border:1px solid #f3ddb0; background:#fdf3e3; color:#b45309;
+    font-weight:600; cursor:pointer; }
+  #detalle-editar-btn:hover { background:#faeacf; }
   /* La nota general (qué son estos números) abre el cuerpo desde que la
      cabecera vive en #detalle-fijo: aire antes de la tabla. */
   #detalle-cuerpo > .det-nota { margin:0 0 8px; }
@@ -2356,7 +2362,10 @@
     <div class="ajustes-bloque">
       <div class="ajustes-fila" style="justify-content:space-between">
         <h3 style="margin:0">Campañas de descuento</h3>
-        <button class="primario" onclick="nuevoDescuento()">+ Nueva campaña</button>
+        <!-- Crear/editar exige el rol Editor (src/roles.py): sin él la
+             pestaña es solo de consulta y este botón no aparece. -->
+        <button class="primario" id="desc-nueva-btn" style="display:none"
+                onclick="nuevoDescuento()">+ Nueva campaña</button>
       </div>
       <p class="mut" style="margin:8px 0 0">
         Una campaña necesita tres cosas: el porcentaje (uno general o uno por
@@ -2434,17 +2443,59 @@
     <!-- Catálogos y Rutas: cada botón abre el suyo en su propio modal
          (#catalogo-overlay / #rutas-overlay, 2026-08-04) — ver
          pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
-    <div class="ajustes-bloque">
+    <!-- Catálogos y Series por ruta son de Editor/Admin (src/roles.py,
+         permiso ajustes_catalogos): cargarAjustes los muestra según el rol. -->
+    <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
       <h3>Catálogos</h3>
       <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
         códigos usados por programa de facturación.</p>
       <div class="cat-btns" id="cat-btns"></div>
     </div>
-    <div class="ajustes-bloque">
+    <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
       <h3>Series por ruta</h3>
       <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
         seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
       <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
+    </div>
+    <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
+         el 2026-08-05, pedido del usuario): la cambian la supervisión y los
+         equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
+         el mundo — cambiar el corte es operación real, no opción de prueba. -->
+    <div class="ajustes-bloque" id="corte-bloque" style="display:none">
+      <h3>Fecha de corte de producción</h3>
+      <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
+        ofrecen en ninguna parte: son los que se facturaron a mano antes de
+        arrancar con el asistente. Muévela hacia adelante a medida que avance
+        la implantación, para que los días viejos que ya no se van a llenar
+        dejen de estorbar en pendientes y en revisión. Vale para todos los
+        equipos: cada uno la toma en su próximo refresco.</p>
+      <div class="ajustes-fila">
+        <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
+        <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
+      </div>
+      <div id="corte-confirma" style="display:none"></div>
+    </div>
+    <!-- Editores (2026-08-05, solo Admin): dar o quitar el rol Editor a otros
+         equipos. Los admin y los equipos de supervisión no salen en la lista —
+         esos se manejan solo desde Supervisión. -->
+    <div class="ajustes-bloque" id="editores-bloque" style="display:none">
+      <h3>Editores</h3>
+      <p class="mut" style="margin:4px 0 10px">Los equipos marcados pueden
+        editar campañas de descuento, catálogos y datos de pedidos.</p>
+      <div id="editores-lista"></div>
+    </div>
+    <!-- Vista del panel (2026-08-05, solo Admin y supervisión): mirar el
+         panel como lo ve cada rol. Solo baja permisos, nunca los sube, y el
+         backend rechaza igual que la vista esconde — la comprobación es real. -->
+    <div class="ajustes-bloque" id="ver-como-bloque" style="display:none">
+      <h3>Vista del panel</h3>
+      <div class="ajustes-fila">
+        <label for="ver-como-select">Ver el panel como</label>
+        <select id="ver-como-select" onchange="guardarVerComo(this.value)"></select>
+      </div>
+      <p class="mut" style="margin:8px 0 0">Para comprobar qué ve y qué puede
+        hacer cada rol. Este bloque queda visible para volver a la vista
+        completa.</p>
     </div>
    </div>
   </section>
@@ -2645,26 +2696,6 @@
         pulsar el ícono trae la ventana que ya está abierta.<br>
         <b>Navegador:</b> opción de respaldo, por si la ventana propia se queda
         pegada durante un llenado.</p>
-    </div>
-    <!-- Fecha de corte de producción (2026-07-31, pedido del usuario): la
-         implantación es gradual, así que el corte se mueve cada tantos días y
-         no puede seguir siendo una línea de settings.py que haya que editar y
-         publicar. Vive en ADMIN porque decide qué ve TODO el mundo, y fuera
-         del modo admin (como el selector de Carga): cambiar el corte es
-         operación real, no una opción de prueba. -->
-    <div class="ajustes-bloque" id="corte-bloque" style="display:none">
-      <h3>Fecha de corte de producción</h3>
-      <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
-        ofrecen en ninguna parte: son los que se facturaron a mano antes de
-        arrancar con el asistente. Muévela hacia adelante a medida que avance
-        la implantación, para que los días viejos que ya no se van a llenar
-        dejen de estorbar en pendientes y en revisión. Vale para todos los
-        equipos: cada uno la toma en su próximo refresco.</p>
-      <div class="ajustes-fila">
-        <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
-        <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
-      </div>
-      <div id="corte-confirma" style="display:none"></div>
     </div>
     </div>
     <div id="admin-panel-supervision" style="display:none">
@@ -3674,6 +3705,17 @@ let esMaquinaAdmin = false;
 // Última copia de las opciones de modo prueba leídas de /api/ajustes: la usa
 // guardarOpcionesPrueba para no pisar los saltos de la 001 al pasar a la 999.
 let opcionesPrueba = null;
+// Rol de esta máquina ya resuelto por el backend (/api/ajustes → permisos_ui,
+// src/panel/permisos.py): rol real, efectivo (tras "ver como") y cada permiso
+// en true/false. TODA decisión de qué pintar sale de aquí — el JS no vuelve a
+// razonar la jerarquía. Arranca sin permisos: se niega hasta saber.
+let permisosUI = {rol_real: "", rol_efectivo: "", ver_como: "", permisos: {}};
+const tienePermiso = (clave) => !!(permisosUI.permisos || {})[clave];
+// La supervisión EFECTIVA: esMaquinaAdmin dice lo que el equipo ES; esto dice
+// lo que la vista elegida deja pintar (la pestaña ADMIN y sus bloques).
+const esSupervisionEfectiva = () => permisosUI.rol_efectivo === "supervisor";
+// Equipos gestionables desde AJUSTES → Editores (solo llega a los Admin).
+let equiposEditor = [];
 // Fecha vigente del corte de producción; la repinta /api/ajustes y la usa el
 // control de ADMIN para saber si hay algo que cambiar.
 let corteProduccion = "";
@@ -5628,8 +5670,10 @@ function soltarFiltro(cual) {
     $("f-" + cual).value = "";
     actualizarXFecha("f-" + cual);
     sincronizarRangosFecha();   // el otro extremo suelta su tope cruzado
-  } else if (cual === "solo_aqui") $("f-solo-aqui").checked = false;
-  else if (cual === "maquina") {
+  } else if (cual === "solo_aqui") {
+    $("f-solo-aqui").checked = false;
+    mostrarCampoMaquina();   // sin la casilla, el dropdown vuelve a ofrecerse
+  } else if (cual === "maquina") {
     maquinaSeleccionada = "";
     if ($("f-maquina")) $("f-maquina").value = "";
   }
@@ -5637,19 +5681,30 @@ function soltarFiltro(cual) {
 
 // Elegir un equipo suelta "Llenadas en esta máquina": las dos recortan por el
 // mismo criterio y juntas dan lista vacía en cuanto el equipo elegido no es
-// este. La casilla hace lo simétrico (ver aplicarFiltros).
+// este. La casilla hace lo simétrico (ver aplicarFiltros). Elegir ESTA
+// máquina (2026-08-05) es lo mismo que marcar la casilla, y se convierte en
+// eso: la casilla queda marcada y el dropdown se esconde.
 function elegirMaquinaFiltro() {
   maquinaSeleccionada = $("f-maquina").value;
-  if (maquinaSeleccionada) $("f-solo-aqui").checked = false;
+  if (maquinaSeleccionada && maquinaSeleccionada === dispositivoPropio) {
+    $("f-solo-aqui").checked = true;
+    maquinaSeleccionada = "";
+    $("f-maquina").value = "";
+  } else if (maquinaSeleccionada) {
+    $("f-solo-aqui").checked = false;
+  }
+  mostrarCampoMaquina();
   aplicarFiltros();
 }
 
-// El lado simétrico: marcar la casilla suelta el equipo elegido en el dropdown.
+// El lado simétrico: marcar la casilla suelta el equipo elegido en el
+// dropdown y lo esconde; desmarcarla lo vuelve a ofrecer (si hay permiso).
 function marcarSoloAqui() {
   if ($("f-solo-aqui").checked) {
     maquinaSeleccionada = "";
     if ($("f-maquina")) $("f-maquina").value = "";
   }
+  mostrarCampoMaquina();
   aplicarFiltros();
 }
 
@@ -5968,16 +6023,21 @@ function pintarRutas(rutas, haySinRuta) {
 // esta PC puede usarlo, tal como los mandó el último refresco.
 let maquinasFiltro = [];
 let puedeFiltrarPorMaquina = false;
+// El hostname propio, del mismo refresco: marca "(esta máquina)" en el
+// dropdown y convierte elegirla en la casilla "Llenadas en esta máquina".
+let dispositivoPropio = "";
 
 // El dropdown vive en PROCESADAS (la única lista con facturas de otras
-// laptops) y solo en las PC habilitadas. Las dos condiciones se miran juntas
+// laptops) y solo en las PC habilitadas. Las condiciones se miran juntas
 // porque cambian por vías distintas: la tab al clickear, el permiso en el
-// refresco.
+// refresco, la casilla al marcarla (con ella puesta el dropdown sobra: ya se
+// está mirando esta máquina).
 function mostrarCampoMaquina() {
   const campo = $("campo-maquina");
   if (campo)
     campo.style.display =
-      (puedeFiltrarPorMaquina && tabActiva() === "procesadas") ? "" : "none";
+      (puedeFiltrarPorMaquina && tabActiva() === "procesadas"
+       && !$("f-solo-aqui").checked) ? "" : "none";
 }
 
 // Si esta PC deja de estar habilitada (se le quitó la marca desde ADMIN), el
@@ -5993,7 +6053,9 @@ function pintarMaquinasFiltro(puede, equipos) {
   }
   maquinasFiltro = equipos || [];
   mostrarCampoMaquina();
-  const opciones = [["", "Todas"], ...maquinasFiltro.map(m => [m.dispositivo, m.nombre])];
+  const opciones = [["", "Todas"], ...maquinasFiltro.map(m =>
+    [m.dispositivo, m.dispositivo === dispositivoPropio
+                    ? m.nombre + " (esta máquina)" : m.nombre])];
   // El equipo elegido conserva su opción aunque ya no aparezca en la lista
   // (mismo motivo que en pintarRutas: si no, el <select> cae en "Todas" y
   // aparenta que no hay filtro puesto cuando sí lo hay).
@@ -7129,6 +7191,7 @@ async function cargar(conservarScroll = false) {
       }
     }
     pintarRutas(d.rutas, d.hay_sin_ruta);
+    dispositivoPropio = d.dispositivo_propio || "";
     pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
     cargaFallo = false;
@@ -8253,6 +8316,11 @@ let detalleReabriendo = null;         // clave con /api/refacturar en vuelo (not
 // teclearlos —así no se pierde nada si el panel se cierra—, así que deshacerlos
 // es reponer esta foto línea por línea, no dejar de mandar nada.
 let detalleOriginal = null;           // {clave, ajustes:{código:{…}}, repetidas:{código:decisión}}
+// Candado de edición de la ventana (2026-08-05): aun con rol Editor los
+// campos abren BLOQUEADOS y se habilitan con el botón "Habilitar edición" —
+// editar lo que manda la aplicación de pedidos es la excepción, no la regla.
+// Se apaga al abrir y al cerrar: cada factura vuelve a empezar bloqueada.
+let detalleEdicionHabilitada = false;
 let detalleAjustesEnVuelo = [];       // ajustes tecleados que todavía viajan
 const sinDetalleGuardado = new Set(); // claves abiertas cuya factura no guardó sus líneas
 const AVISO_SIN_DETALLE = `De esta factura no quedó guardado el detalle: se marcó
@@ -8288,6 +8356,7 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
   detalleTocado = false;
+  detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
   delete detalleFallos[clave];
@@ -8311,6 +8380,7 @@ function abrirDetalleCargando(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
   detalleTocado = false;
+  detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
   delete detalleFallos[clave];
@@ -8328,6 +8398,7 @@ function cerrarDetalle() {
   $("detalle-overlay").classList.remove("sobre-previo");
   detalleAbierto = null;
   detalleTocado = false;
+  detalleEdicionHabilitada = false;
   detalleOriginal = null;
   // De vuelta a la revisión del lote: lo tecleado aquí (la tasa sobre todo) se
   // refleja en sus cajitas, que quedaron pintadas con el valor de antes.
@@ -8348,7 +8419,10 @@ let detalleTocado = false;
 $("detalle-cuerpo").addEventListener("input", marcarDetalleTocado);
 $("detalle-cuerpo").addEventListener("change", marcarDetalleTocado);
 $("detalle-cuerpo").addEventListener("click", (ev) => {
-  if (ev.target.closest("button")) marcarDetalleTocado();
+  // "Habilitar edición" no cuenta: destrancar no cambia ningún número, y el
+  // pie no debe partirse en Guardar/Descartar por ese clic.
+  if (ev.target.closest("button") && !ev.target.closest("#detalle-editar-btn"))
+    marcarDetalleTocado();
 });
 
 function marcarDetalleTocado() {
@@ -8725,12 +8799,27 @@ function contenidoDetalle(clave) {
   // Con la reapertura en vuelo, lo que se ve es la foto del documento
   // anterior: la nota lo dice y pide paciencia, en vez de la de "cerrada"
   // (que mandaría a hacer justo lo que ya se está haciendo).
+  // Con la factura abierta, la nota depende del rol y del candado de edición
+  // (2026-08-05): sin rol Editor los números solo se consultan; con rol, van
+  // bloqueados hasta pulsar "Habilitar edición" — y ya habilitada, la
+  // advertencia recuerda que editar a mano es la excepción.
   const nota = (!d.editable && detalleReabriendo === clave)
     ? `<div class="det-nota">Reabriendo la factura para editarla — puede tardar
         un poco. Mientras, estas son las cantidades con que salió el documento.</div>`
     : d.editable
-    ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
-        Esto es lo que se escribe en el documento; puedes editar los números.</div>`
+    ? (!d.puede_editar
+      ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+          Esto es lo que se escribe en el documento.</div>`
+      : !detalleEdicionHabilitada
+      ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+          Esto es lo que se escribe en el documento.
+          <button type="button" id="detalle-editar-btn"
+                  onclick="habilitarEdicionDetalle()">Habilitar edición</button></div>`
+      : `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+          Esto es lo que se escribe en el documento; puedes editar los números.</div>
+         <div class="det-nota alerta">Estos datos normalmente conservan lo
+          recibido de la aplicación de pedidos. Edita a mano solo por una
+          discrepancia de despacho, una corrección u otra excepción real.</div>`)
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
@@ -8745,6 +8834,11 @@ function contenidoDetalle(clave) {
     <div class="det-error" id="det-error-${esc(clave)}" style="display:none"></div>`;
 }
 
+// La edición de las líneas está ACTIVA solo con la factura abierta, el rol
+// Editor y el candado levantado con "Habilitar edición" (2026-08-05).
+const detalleEdicionActiva = (d) =>
+  !!(d.editable && d.puede_editar && detalleEdicionHabilitada);
+
 function filaLineaDetalle(d, l) {
   const ref = `'${esc(d.pedido_id)}',${d.parte},'${esc(l.codigo_winledger)}'`;
   const producto = `${esc(l.descripcion || l.codigo_winledger)}
@@ -8756,10 +8850,11 @@ function filaLineaDetalle(d, l) {
   // documento no tiene.
   const omitida = l.omitida
     ? `<div class="det-nota alerta">No entró al documento: ${esc(l.omitida)}.</div>` : "";
-  if (!d.editable) return `
+  if (!detalleEdicionActiva(d)) return `
     <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
       <td class="det-num">${l.n}</td><td>${producto}${omitida}</td>
       <td>${fmtCantidad(l.cantidad)}${l.ajustada
+        || (l.ajuste && (l.ajuste.cantidad !== undefined || l.ajuste.descuento_pct !== undefined))
         ? ` <span class="chip ajustada">a mano</span>` : ""}</td>
       <td>${fmtCantidad(l.descuento_pct)} %</td></tr>`;
 
@@ -8820,6 +8915,13 @@ const volverAutomatico = (ref, campo, valor) =>
 // del aviso de la fila: en el detalle está el contexto de la línea.
 function repetidaEnDetalle(d, l) {
   const decision = l.decision_repetida || "sumar";
+  // Sin la edición habilitada solo se informa: decidir qué fila se factura
+  // cambia el documento, igual que un ajuste de cantidad.
+  if (!detalleEdicionActiva(d))
+    return `<div class="det-nota">Viene en ${l.filas_sumadas} líneas del pedido:
+      ${esc(l.cantidades_origen.map(fmtCantidad).join(" y "))}.
+      ${decision === "sumar" ? "Se facturan sumadas."
+        : `Se factura solo una de las filas.`}</div>`;
   const opcion = (valor, texto, activa) =>
     `<button class="${activa ? "btn-azul" : ""}"${activa ? " disabled" : ""}
       onclick="elegirRepetida(this,'${esc(d.pedido_id)}',${d.parte},
@@ -8864,6 +8966,15 @@ function elegirCantidad(pedidoId, parte, codigo, cual, valor) {
 
 const quitarAjuste = (pedidoId, parte, codigo, campo) =>
   guardarAjuste(pedidoId, parte, codigo, {[campo]: null});
+
+// "Habilitar edición" (2026-08-05): destranca los campos de ESTA apertura de
+// la ventana, sin confirmación — la advertencia queda a la vista mientras se
+// edita. No cuenta como "tocar algo": el pie no cambia hasta que de verdad
+// se ajuste un número.
+function habilitarEdicionDetalle() {
+  detalleEdicionHabilitada = true;
+  if (detalleAbierto) pintarVentanaDetalle(detalleAbierto);
+}
 
 // El detalle que el operador tenga abierto, al día otra vez (cambió la fecha a
 // facturar, se editó una campaña de descuento…).
@@ -12626,8 +12737,11 @@ function pintarBanderasPrueba() {
 // leyendo ESOS controles (nunca un estado propio). Con ADMIN apagado la barra
 // sigue visible; solo Carga queda editable mediante su endpoint propio.
 function pintarBarraRapida() {
-  $("barra-rapida").style.display = esMaquinaAdmin ? "" : "none";
-  if (!esMaquinaAdmin) return;
+  // Supervisión EFECTIVA: con "ver como" en otro rol la barra de prueba
+  // también se esconde — es parte de lo que un operador no ve.
+  const visible = esMaquinaAdmin && esSupervisionEfectiva();
+  $("barra-rapida").style.display = visible ? "" : "none";
+  if (!visible) return;
   $("rapida-modo-apagado").style.display = modoAdmin ? "none" : "";
   pintarModoPrueba();
   const es999 = $("prueba-emp-999").checked;
@@ -12862,9 +12976,29 @@ async function cargarAjustes() {
     // equipo ni siquiera aparece la opción.
     modoAdmin = !!d.modo_admin;
     esMaquinaAdmin = !!d.es_maquina_admin;
-    $("ajustes-admin-bloque").style.display = esMaquinaAdmin ? "" : "none";
-    $("ventana-bloque").style.display = esMaquinaAdmin ? "" : "none";
-    $("corte-bloque").style.display = esMaquinaAdmin ? "" : "none";
+    permisosUI = d.permisos_ui || permisosUI;
+    equiposEditor = d.equipos_editor || [];
+    // Los bloques de admin se pintan por la supervisión EFECTIVA: con "ver
+    // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
+    const supervision = esMaquinaAdmin && esSupervisionEfectiva();
+    $("ajustes-admin-bloque").style.display = supervision ? "" : "none";
+    $("ventana-bloque").style.display = supervision ? "" : "none";
+    // El corte vive en AJUSTES desde 2026-08-05: lo ven supervisión y Admin.
+    $("corte-bloque").style.display =
+      tienePermiso("corte_produccion") ? "" : "none";
+    // La pestaña ADMIN solo existe (Jinja) en equipos con capacidad admin;
+    // aquí solo se esconde/enseña según la vista elegida.
+    const tabAdmin = $("tab-admin");
+    if (tabAdmin) {
+      tabAdmin.style.display = supervision ? "" : "none";
+      if (!supervision && tabActiva() === "admin") irATab("ajustes");
+    }
+    $("catalogos-bloque").style.display =
+      tienePermiso("ajustes_catalogos") ? "" : "none";
+    $("rutas-series-bloque").style.display =
+      tienePermiso("ajustes_catalogos") ? "" : "none";
+    pintarEditores();
+    pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
     pintarModoViejo(d.modo_viejo);
@@ -12875,6 +13009,69 @@ async function cargarAjustes() {
   } catch (e) {
     mensaje("No se pudieron cargar los ajustes: " + e.message, "error");
     return false;
+  }
+}
+
+// Editores (2026-08-05, AJUSTES, solo Admin): un check por equipo. La lista
+// ya viene recortada del backend (sin admins, sin este equipo, sin los de
+// supervisión) y el POST repite ese recorte — esto solo pinta.
+function pintarEditores() {
+  const bloque = $("editores-bloque");
+  if (!tienePermiso("gestionar_editores") || !equiposEditor.length) {
+    bloque.style.display = "none";
+    return;
+  }
+  bloque.style.display = "";
+  $("editores-lista").innerHTML = equiposEditor.map(m => `
+    <label class="desc-todos" style="display:flex;gap:8px;margin:4px 0">
+      <input type="checkbox" ${m.es_editor ? "checked" : ""}
+             onchange="cambiarEditorEquipo('${esc(m.dispositivo)}', this)">
+      ${esc(m.nombre)}
+    </label>`).join("");
+}
+
+async function cambiarEditorEquipo(dispositivo, caja) {
+  try {
+    const r = await api("/api/ajustes/rol-editor",
+                        {dispositivo, editor: caja.checked});
+    equiposEditor = r.equipos_editor || equiposEditor;
+    pintarEditores();
+  } catch (e) {
+    caja.checked = !caja.checked;
+    mensaje("No se pudo cambiar el rol: " + e.message, "error");
+  }
+}
+
+// Vista del panel (2026-08-05): mirar el panel como otro rol. El selector
+// sale del rol REAL (es el camino de vuelta, no puede esconderse a sí mismo);
+// el resto de la pantalla se pinta con el rol EFECTIVO. Tras cambiar se
+// recarga la página entera: es la forma segura de que ninguna vista vieja
+// sobreviva al cambio de rol.
+function pintarVerComo() {
+  const bloque = $("ver-como-bloque");
+  const real = permisosUI.rol_real;
+  if (real !== "admin" && real !== "supervisor") {
+    bloque.style.display = "none";
+    return;
+  }
+  bloque.style.display = "";
+  const opciones = real === "supervisor"
+    ? [["", "Completo (supervisión)"], ["admin", "Admin"],
+       ["editor", "Editor"], ["normal", "Usuario general"]]
+    : [["", "Admin (el rol de este equipo)"], ["editor", "Editor"],
+       ["normal", "Usuario general"]];
+  $("ver-como-select").innerHTML = opciones.map(([v, t]) =>
+    `<option value="${v}">${t}</option>`).join("");
+  $("ver-como-select").value = permisosUI.ver_como || "";
+}
+
+async function guardarVerComo(vista) {
+  try {
+    await api("/api/ajustes/ver-como", {vista});
+    location.reload();
+  } catch (e) {
+    mensaje("No se pudo cambiar la vista: " + e.message, "error");
+    $("ver-como-select").value = permisosUI.ver_como || "";
   }
 }
 
@@ -15515,8 +15712,15 @@ function descChoquesTarjetaHTML(d) {
 
 function pintarListaDescuentos() {
   const cont = $("desc-lista");
+  // Sin el rol Editor la pestaña es SOLO consulta (2026-08-05): ni botón de
+  // crear, ni acciones en las tarjetas, ni Conflictos, ni papelera. El
+  // backend rechaza lo mismo que aquí se esconde.
+  const puedeEditarDesc = tienePermiso("descuentos_editar");
+  $("desc-nueva-btn").style.display = puedeEditarDesc ? "" : "none";
   if (!descCampanas.length) {
-    cont.innerHTML = `<p class="mut" style="margin:14px">${descBorradas.length
+    cont.innerHTML = `<p class="mut" style="margin:14px">${!puedeEditarDesc
+      ? "Todavía no hay campañas de descuento."
+      : descBorradas.length
       ? "No hay campañas en la lista. Las eliminadas siguen abajo y se pueden restaurar."
       : 'Todavía no hay descuentos. Usa "+ Nueva campaña".'}</p>`;
     return;
@@ -15550,7 +15754,9 @@ function pintarListaDescuentos() {
   // no se mezcla en En curso/Futuras/Archivadas, sin importar su vigencia — y
   // esa pestaña solo existe con modo admin prendido, así el operador normal ni
   // se entera de que hay campañas de prueba.
-  if (!modoAdmin && descListaTab === "prueba") descListaTab = "vigentes";
+  const pruebaVisible = modoAdmin && esSupervisionEfectiva();
+  if (!pruebaVisible && descListaTab === "prueba") descListaTab = "vigentes";
+  if (!puedeEditarDesc && descListaTab === "conflictos") descListaTab = "vigentes";
   const buckets = {vigentes: 0, proximas: 0, historico: 0, prueba: 0};
   const bucketDe = d => {
     if (d.es_prueba) return "prueba";
@@ -15578,8 +15784,8 @@ function pintarListaDescuentos() {
   const hayPendiente = (descConflictos.grupos || []).some(g => g.pendiente);
   const barra = avisoBando + `<div class="desc-subtabs">${subtab("vigentes", "En curso")}${
     subtab("proximas", "Futuras")}${subtab("historico", "Archivadas")}${
-    subtab("conflictos", "Conflictos" + (hayPendiente ? " ●" : ""))}${
-    modoAdmin ? subtab("prueba", "Prueba") : ""}</div>`;
+    puedeEditarDesc ? subtab("conflictos", "Conflictos" + (hayPendiente ? " ●" : "")) : ""}${
+    pruebaVisible ? subtab("prueba", "Prueba") : ""}</div>`;
   if (descListaTab === "conflictos") {
     cont.innerHTML = barra + '<div id="desc-conf-cuerpo"></div>';
     pintarConflictos();
@@ -15608,15 +15814,15 @@ function pintarListaDescuentos() {
       <div class="meta cli">${esc(descQuienes(d.objetivos, d.es_global))}</div>
       <div class="meta"><span class="vig-label">Vigencia</span> <span class="vig">${d.vigencia_hasta ? esc(d.vigencia_desde) + " → " + esc(d.vigencia_hasta) : esc(d.vigencia_desde) + " en adelante"}</span>${d.activo ? "" : ' · <b class="card-off">DESACTIVADO</b>'}</div>
       ${conf}
-      <div class="card-acciones">
+      ${puedeEditarDesc ? `<div class="card-acciones">
         <button class="btn-verde" onclick="editarDescuento('${d.id}')">Editar</button>
         <button class="${d.activo ? "btn-ambar" : "btn-azul"}" onclick="${d.activo
           ? `confirmarBorrar(this, () => desactivarDescuento('${d.id}', 0), 'Confirmar desactivar')`
           : `desactivarDescuento('${d.id}', 1)`}">${d.activo ? "Desactivar" : "Activar"}</button>
         <button class="btn-rojo" onclick="confirmarBorrar(this, () => eliminarDescuento('${d.id}'))">Eliminar</button>${
-        (modoImplantacion || modoAdmin) ? ` <button class="btn-rojo" title="Borra la campaña por completo y en todos los equipos, sin pasar por la papelera. Solo existe en modo prueba o modo admin."
+        (modoImplantacion || (modoAdmin && esSupervisionEfectiva())) ? ` <button class="btn-rojo" title="Borra la campaña por completo y en todos los equipos, sin pasar por la papelera. Solo existe en modo prueba o modo admin."
                 onclick="confirmarBorrar(this, () => eliminarDescuentoDefinitivo('${d.id}'))">Borrar de verdad</button>` : ""}
-      </div>
+      </div>` : ""}
       <div class="desc-card-aviso" style="display:none"></div>
     </div>`;
   }).join("");
@@ -16135,6 +16341,9 @@ async function descConfVolver() {
 // estable, así que ese desempate se conserva).
 function pintarDescuentosBorrados() {
   const cont = $("desc-borradas");
+  // La papelera es una herramienta de edición (restaurar): sin el rol Editor
+  // no se ofrece (2026-08-05).
+  if (!tienePermiso("descuentos_editar")) { cont.innerHTML = ""; return; }
   // Lo eliminado pertenece al pasado: la papelera vive SOLO bajo la pestaña
   // Histórico (pedido del usuario 2026-07-25); en Vigentes/Próximas no estorba.
   // Sin ninguna campaña viva no se pintan las pestañas, así que esconderla
