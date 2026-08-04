@@ -6747,10 +6747,37 @@ function cambiarTab(tab) {
   sincronizarSupervisionConTab(tab);
 }
 
+// Cambiar de página arranca arriba: si no, la página nueva se abre a media
+// lista, donde quedó el scroll de la anterior. Sube la caja que de verdad
+// scrollea — la tabla del tab (hermana del pie) o, en catálogos, la ventana
+// que la contiene.
+function subirCajaPaginada(tab) {
+  const pie = $("pag-" + tab);
+  if (!pie || !pie.parentElement) return;
+  const tabla = pie.parentElement.querySelector(".tabla-scroll");
+  if (tabla) { tabla.scrollTop = 0; return; }
+  for (let el = pie.parentElement; el && el !== document.body; el = el.parentElement) {
+    // Un contenedor sin overflow recortado también reporta scrollHeight de
+    // más (el contenido lo desborda a la vista): el que scrollea de verdad es
+    // el que además recorta.
+    const modo = getComputedStyle(el).overflowY;
+    if ((modo === "auto" || modo === "scroll") && el.scrollHeight > el.clientHeight + 1) {
+      el.scrollTop = 0;
+      return;
+    }
+  }
+  window.scrollTo(0, 0);
+}
+
+function repintarPagina(tab) {
+  tab === "catalogo" ? pintarFilasCatalogo() : repintar();
+  subirCajaPaginada(tab);
+}
+
 function cambiarPorPagina(tab, valor) {
   paginacion[tab].porPagina = parseInt(valor, 10);
   paginacion[tab].pagina = 1;
-  tab === "catalogo" ? pintarFilasCatalogo() : repintar();
+  repintarPagina(tab);
 }
 
 function cambiarPagina(tab, delta) {
@@ -6764,11 +6791,11 @@ function cambiarPagina(tab, delta) {
     paginacion.procesadas.pagina += 1;
     // Este escalón baja MÁS histórico de la nube, no repagina lo que ya está.
     const listo = avisarTrabajando("Buscando facturas más antiguas…");
-    cargar().finally(listo);
+    cargar().finally(() => { listo(); subirCajaPaginada(tab); });
     return;
   }
   paginacion[tab].pagina += delta;
-  tab === "catalogo" ? pintarFilasCatalogo() : repintar();
+  repintarPagina(tab);
 }
 
 // Campo de página escrita: el operador teclea el número y el panel se salta
@@ -6795,7 +6822,7 @@ function irAPaginaEscrita(tab, valor) {
       && ensancharProcesadas()) {
     p.pagina = destino;
     const listo = avisarTrabajando("Buscando facturas más antiguas…");
-    cargar().finally(listo);
+    cargar().finally(() => { listo(); subirCajaPaginada(tab); });
     return;
   }
   const pagina = Math.min(destino, p.totalPaginas || 1);
@@ -6810,7 +6837,7 @@ function irAPaginaEscrita(tab, valor) {
   }
   if (pagina === p.pagina) return;   // ya está en esa página: no se repinta
   p.pagina = pagina;
-  tab === "catalogo" ? pintarFilasCatalogo() : repintar();
+  repintarPagina(tab);
 }
 
 // Al salir del campo se descarta lo tecleado a medias y queda la página real.
