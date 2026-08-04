@@ -665,8 +665,9 @@
   /* RESUMEN DE FIN DE LLENADO (2026-08-01): terminado un llenado individual,
      la caja se convierte en el resumen del pedido — el chequeo de qué entró
      al documento, las líneas y los botones Listo / Volver a llenar. La caja
-     es FIJA (plantar_resumen, borde derecho): si el pedido es largo scrollea
-     la lista, no crece la ventana. */
+     va al borde derecho (plantar_resumen) con alto DINÁMICO (2026-08-04): la
+     ventana termina donde termina el contenido; la lista solo scrollea si el
+     pedido no cabe en pantalla. */
   #fin-llenado { display:none; }
   body.modo-fin-llenado #llenado-info,
   body.modo-fin-llenado #statusbar #seguridad { display:none; }
@@ -674,8 +675,9 @@
   #fin-llenado-chequeo { margin-top:6px; padding:6px 9px; border-radius:6px;
                          font-size:12.5px; background:#d1fadf; color:var(--ok); }
   #fin-llenado-chequeo.alerta { background:#fef0c7; color:var(--warn); }
-  /* La resta del calc cubre mensaje + chequeo + botones + aires: con la caja
-     fija, es la lista la que scrollea. */
+  /* El calc es solo el respaldo antes de que plantarVentanaResumen mida: al
+     plantar, el tope inline manda (sin tope si todo cabe en pantalla,
+     recortado justo si no). */
   #fin-llenado-cuerpo { overflow-y:auto; margin-top:6px;
                         max-height:calc(100vh - 230px); }
   #fin-llenado-cuerpo table { width:100%; border-collapse:collapse; font-size:12px; }
@@ -3670,12 +3672,12 @@ const ALTO_FLOTANTE = 200;
 // lo suma ella. Con Edge se usa ALTO_FLOTANTE, que ya lo incluye.
 const ALTO_CONTENIDO_FLOTANTE = 170;
 const MARGEN_SUPERIOR = 8;    // aire contra el borde superior de la pantalla
-// Resumen de fin de llenado: caja FIJA pegada al borde DERECHO para no tapar
-// el documento recién llenado; si el pedido es largo scrollea la lista, no
-// crece la ventana. Espejo de MARGEN_LATERAL_RESUMEN en src/ventana_app.py
-// (la ventana propia hace la misma cuenta en Python).
+// Resumen de fin de llenado: caja pegada al borde DERECHO para no tapar el
+// documento recién llenado; el alto es DINÁMICO (2026-08-04) — lo mide
+// plantarVentanaResumen sobre el contenido pintado. Espejo de
+// MARGEN_LATERAL_RESUMEN en src/ventana_app.py (la ventana propia hace la
+// misma cuenta en Python).
 const MARGEN_LATERAL_RESUMEN = 8;
-const ALTO_CONTENIDO_RESUMEN = 560;
 // Marco fijo del panel completo, para el camino de Edge: espejo de
 // ANCHO_VENTANA / ALTO_VENTANA / MARGEN_SUPERIOR_APERTURA en
 // src/ventana_panel.py (la ventana propia hace la misma cuenta en Python).
@@ -3964,9 +3966,10 @@ function pintarBotonPausa() {
 
 /* --- Resumen de fin de llenado (2026-08-01, pedido del usuario) ------------
    Terminado un llenado individual (producción: el documento queda en
-   pantalla), la caja flotante se convierte en el resumen del pedido, FIJA y
-   pegada al borde DERECHO: el chequeo de qué entró al documento, las líneas
-   (scrollean si el pedido es largo) y Listo / Volver a llenar. Sustituye a
+   pantalla), la caja flotante se convierte en el resumen del pedido, pegada
+   al borde DERECHO: el chequeo de qué entró al documento, las líneas (todas
+   a la vista; scrollean solo si no caben en pantalla) y Listo / Volver a
+   llenar. Sustituye a
    la vista ☰ del 2026-07-31 (retirada a pedido del usuario: pausar a mitad
    de llenado para mirar el pedido descuadraba más de lo que ayudaba —
    durante el llenado quedan solo ⏸ y los hovers de las cajitas). */
@@ -4048,16 +4051,28 @@ async function procesadaDesdeResumen() {
   if (pedido) await marcarFacturaRevisada(pedido.pedido_id, pedido.parte);
 }
 
-// La ventana del resumen: caja FIJA (ALTO_CONTENIDO_RESUMEN), mismo ancho de
-// la barra, pegada al borde DERECHO. Nada de medir contenido: si el pedido
-// es largo scrollea la lista (CSS), no crece la ventana.
+// La ventana del resumen: mismo ancho de la barra, pegada al borde DERECHO y
+// de alto DINÁMICO (2026-08-04, pedido del usuario): termina donde termina el
+// contenido — todas las líneas a la vista, sin espacio libre abajo. El techo
+// lo pone la pantalla (el puente y el fallback recortan igual por su lado);
+// solo si el pedido no cabe completo, la lista vuelve a scrollear. Se mide
+// aquí porque pintarResumenFinal ya corrió (ver esperarEnvioPlataforma).
 function plantarVentanaResumen() {
   if (!resumenFinal) return;
+  const cuerpo = $("fin-llenado-cuerpo");
+  cuerpo.style.maxHeight = "none";     // medir la lista entera, sin el tope CSS
+  const total = Math.ceil($("statusbar").getBoundingClientRect().bottom) + 8;
+  const techo = Math.max((screen.availHeight || screen.height || 0)
+                         - MARGEN_SUPERIOR * 2, 240);
+  const alto = Math.min(total, techo);
+  if (total > techo)
+    cuerpo.style.maxHeight =
+      Math.max(cuerpo.scrollHeight - (total - techo), 80) + "px";
   const api = apiVentana();
   if (api) {
     try {
       if (typeof api.plantar_resumen === "function") {
-        Promise.resolve(api.plantar_resumen(ALTO_CONTENIDO_RESUMEN)).catch(e =>
+        Promise.resolve(api.plantar_resumen(alto)).catch(e =>
           reportarAlPanel({tipo: "puente-rechazo", origen: "fin-llenado",
                            detalle: String(e).slice(0, 2000)}));
       } else {
@@ -4065,7 +4080,7 @@ function plantarVentanaResumen() {
         // se reinicia con el pull): al menos crece centrada — el resumen sirve.
         reportarAlPanel({tipo: "fin-llenado",
                          detalle: "ventana sin plantar_resumen: crece centrada"});
-        Promise.resolve(api.plantar_barra(ALTO_CONTENIDO_RESUMEN)).catch(() => {});
+        Promise.resolve(api.plantar_barra(alto)).catch(() => {});
       }
       return;
     } catch (e) {
@@ -4075,9 +4090,7 @@ function plantarVentanaResumen() {
   }
   try {
     const cromo = Math.max(window.outerHeight - window.innerHeight, 0);
-    window.resizeTo(ANCHO_FLOTANTE,
-                    Math.min(ALTO_CONTENIDO_RESUMEN + cromo,
-                             screen.availHeight - MARGEN_SUPERIOR * 2));
+    window.resizeTo(ANCHO_FLOTANTE, Math.min(alto + cromo, techo));
     window.moveTo(Math.max(screen.availWidth - ANCHO_FLOTANTE - MARGEN_LATERAL_RESUMEN, 0),
                   MARGEN_SUPERIOR);
   } catch (e) { /* pestaña normal: el resumen se ve igual, sin mover la ventana */ }
@@ -9538,18 +9551,17 @@ function familiaDelSiguiente(p = pendientesLlenables()) {
 
 // --- "Llenar en fila" desactivado en producción (2026-07-28, TEMPORAL) ------
 // Pedido del usuario: en producción la barra de la corrida no se muestra y en
-// su lugar queda un solo botón azul, "Llenar siguiente". La barra completa
-// solo existe en PRUEBA AISLADA; ADMIN por sí solo no cambia el flujo.
-// Tiene DOS consumidores, no uno: pintarBarraEnFila (qué barra se ve) y el gate
-// de la espera de envío a plataforma (ver el bloque de éxito de llenar()). O
-// sea que apagar PRUEBA AISLADA cambia el FLUJO del llenado, no solo la
-// apariencia: aparece la espera con su «Listo», igual que producción.
-// El canal manda SOBRE la prueba: con
-// el selector "Carga" (ADMIN) en Producción, la corrida siempre queda
-// oculta — es exactamente para lo que existe ese selector, ver esa vista sin
-// depender de un segundo paso.
+// su lugar queda un solo botón azul, "Llenar siguiente". Desde 2026-08-04
+// (pedido del usuario) el gate es SOLO el canal: la separación ADMIN/PRUEBA
+// del 2026-08-03 dejó la corrida escondida también en desarrollo (antes ADMIN
+// prendía la prueba en silencio y con ella esta barra). PRUEBA sigue mandando
+// sobre el AISLAMIENTO de los resultados, no sobre qué barra se ve.
+// Consumidores: pintarBarraEnFila, las cajitas de info del llenado
+// (pintarInfoLlenado), "ruta completa" y el gate del resumen de fin de
+// llenado (el resumen es exclusivo de producción — ver el bloque de éxito
+// de llenar()).
 const enFilaDisponible = () =>
-  !$("prueba-canal-produccion").checked && modoImplantacion;
+  !$("prueba-canal-produccion").checked;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
@@ -9608,6 +9620,9 @@ function terminarEsperaEnvioPlataforma() {
   esperandoEnvioPlataforma = false;
   exitoTrasEnvio = null;
   resumenFinal = null;
+  // El tope inline lo puso plantarVentanaResumen al medir; fuera del resumen
+  // vuelve a mandar el max-height del CSS.
+  $("fin-llenado-cuerpo").style.maxHeight = "";
   document.body.classList.remove("modo-fin-llenado");
 }
 
