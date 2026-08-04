@@ -1032,11 +1032,26 @@
   .choque-orden .c-manda { width:56px; text-align:center; }
   .choque-orden .c-puesto { width:42px; color:var(--mut); }
   /* El ancho da para el % de la campaña, el de cada acumulable y el total en un
-     solo renglón; lo que le quita al nombre le sobra (el modal es de 1100px). */
-  .choque-orden .c-pct { width:300px; text-align:right; }
+     solo renglón; lo que le quita al nombre le sobra (el modal es de 1100px).
+     Cedió 60px al estrenarse «Si manda esta» (2026-08-04): el desglose largo
+     envuelve, el resultado no. */
+  .choque-orden .c-pct { width:240px; text-align:right; }
   /* Los % desglosados ("10% en 6") no se parten a mitad: si no cabe todo, el
      corte cae entre un porcentaje y el siguiente. */
   .choque-orden .c-pct span { white-space:nowrap; }
+  /* «Si manda esta»: el resultado que se factura con cada una. Va en negrita
+     porque es el número que se compara entre filas — dos iguales dicen que ahí
+     el orden no mueve nada. */
+  .choque-orden .c-si-manda { width:120px; text-align:right; font-weight:600;
+                              white-space:nowrap; }
+  .choque-orden th.c-si-manda { font-weight:700; }
+  /* Las que se suman, agrupadas al pie bajo su propio renglón de título: no
+     compiten, así que no llevan puesto ni flechas. */
+  .choque-orden .fila-titulo-suman td { color:var(--mut); font-size:11px;
+                                        text-transform:uppercase; letter-spacing:.04em;
+                                        padding-top:8px; }
+  .choque-orden .fila-suman td { background:#fafbfc; }
+  .choque-orden .fila-suman .c-puesto { text-align:center; font-weight:700; }
   .choque-orden .c-mover { width:52px; }
   /* Los signos de la suma: separan sin pesar como un número más. */
   .choque-orden .op, .desc-desglose .op { font-style:normal; color:var(--mut);
@@ -14516,37 +14531,62 @@ function descConfCompartido(g) {
     <span><b>Coinciden:</b> ${esc(vig)}</span></div>`;
 }
 
-// Tabla de quién manda. Una por bloque de campañas que CHOCAN: reordenarla es
-// la decisión, y se guarda en el acto contra el servidor (no hay borrador que
-// perder ni botón que recordar pulsar).
-function descConfTablaOrden(g, bloque, i) {
+// Tabla de quién manda. Una por bloque de campañas que compiten: con
+// `ordenable` reordenarla ES la decisión y se guarda en el acto contra el
+// servidor (no hay borrador que perder ni botón que recordar pulsar); sin él se
+// lee, porque quien manda ya lo decide la especificidad o porque ordenar no
+// movería la factura — y el motivo lo dice ahí mismo en vez de esconder la
+// tabla (pedido del usuario 2026-08-04).
+//
+// `conSumas` mete al pie las campañas que no compiten. Va solo en la ÚLTIMA
+// tabla del grupo: se suman encima de la que mande, sea cual sea el bloque.
+function descConfTablaOrden(g, bloque, i, conSumas) {
   const porId = new Map(g.campanas.map(c => [c.id, c]));
   const filas = bloque.ids.map((id, n) => {
     const c = porId.get(id);
     if (!c) return "";
-    const arriba = n > 0 ? `<button type="button" title="Subir un puesto"
+    const arriba = bloque.ordenable && n > 0 ? `<button type="button" title="Subir un puesto"
         onclick="descConfMover('${esc(g.id)}', ${i}, '${esc(id)}', -1)">&#9650;</button>` : "";
-    const abajo = n < bloque.ids.length - 1 ? `<button type="button" title="Bajar un puesto"
+    const abajo = bloque.ordenable && n < bloque.ids.length - 1
+      ? `<button type="button" title="Bajar un puesto"
         onclick="descConfMover('${esc(g.id)}', ${i}, '${esc(id)}', 1)">&#9660;</button>` : "";
+    // El chip "manda" solo donde el orden lo decide: en un bloque de lectura la
+    // de arriba es la que más manda, pero puede mandar en unos productos y otra
+    // en otros — decirlo a secas prometería una decisión que no existe.
     return `<tr>
-      <td class="c-manda">${n === 0 ? '<span class="conf-manda">manda</span>' : ""}</td>
-      <td class="c-puesto">${n + 1}º</td>
+      <td class="c-manda">${n === 0 && bloque.ordenable
+        ? '<span class="conf-manda">manda</span>' : ""}</td>
+      <td class="c-puesto">${bloque.ordenable ? `${n + 1}º` : ""}</td>
       <td>${descConfNombre(c)}</td>
       <td class="c-modo">${descConfSelectorModo(c)}</td>
       <td class="c-pct">${esc(descConfPct(c))}</td>
+      <td class="c-si-manda">${descConfSiManda(c)}</td>
       <td class="c-mover"><div class="choque-mover">${arriba}${abajo}</div></td>
     </tr>`;
   }).join("");
-  const motivo = bloque.pendiente
-    ? `Nadie ha decidido este orden todavía: mientras tanto manda la campaña
-       más reciente. Súbela con las flechas para dejarlo dicho — aunque sea
-       para dejarlo como está.`
-    : "Manda la de arriba porque así lo decidiste. Muévelas para cambiarlo.";
-  return `<p class="mut conf-motivo">${motivo}</p>
+  const motivo = !bloque.ordenable ? (bloque.motivo || "")
+    : bloque.pendiente
+      ? `Nadie ha decidido este orden todavía: mientras tanto manda la campaña
+         más reciente. Súbela con las flechas para dejarlo dicho — aunque sea
+         para dejarlo como está.`
+      : "Manda la de arriba porque así lo decidiste. Muévelas para cambiarlo.";
+  return `${motivo ? `<p class="mut conf-motivo">${motivo}</p>` : ""}
     <table class="choque-orden"><thead><tr>
       <th class="c-manda"></th><th class="c-puesto">#</th><th>Campaña</th>
-      <th class="c-modo">Modo</th><th class="c-pct">%</th><th class="c-mover"></th>
-    </tr></thead><tbody>${filas}</tbody></table>`;
+      <th class="c-modo">Modo</th><th class="c-pct">%</th>
+      <th class="c-si-manda">Si manda esta</th><th class="c-mover"></th>
+    </tr></thead><tbody>${filas}${conSumas ? descConfFilasSuman(g) : ""}</tbody></table>`;
+}
+
+// En cuánto termina la línea si mandara esa campaña — lo calcula el servidor
+// con el MISMO motor que factura. Un solo número cuando no varía; un rango
+// cuando la campaña cubre productos que terminan distinto. Dos filas con el
+// mismo número dicen, sin explicar nada, que ahí el orden da igual.
+function descConfSiManda(c) {
+  const s = c.si_manda;
+  if (!s) return '<span class="mut">—</span>';
+  const num = x => +x.toFixed(6);
+  return s.min === s.max ? `${num(s.max)}%` : `${num(s.min)}% – ${num(s.max)}%`;
 }
 
 // El nombre abre la campaña en su editor y vuelve aquí al cerrarlo. El id sale
@@ -14578,19 +14618,29 @@ function descConfPct(c) {
     + (d.length > 3 ? ` +${d.length - 3} más` : "");
 }
 
-// Las que NO compiten: se suman encima de la que mande, o son exclusivas que
-// bloquean. Van fuera de la tabla de orden porque ahí no hay nada que ordenar.
-function descConfFueraDeOrden(g) {
+// Las que NO compiten van agrupadas al pie de la misma tabla (pedido del
+// usuario 2026-08-04): se suman encima de la que mande, y verlas ahí —en vez de
+// en una tabla aparte— es lo que deja leer el resultado de un tirón. Conservan
+// su selector de modo: desde aquí se las devuelve a competir sin abrir el
+// editor.
+function descConfFilasSuman(g) {
   const enOrden = new Set(g.ordenes.flatMap(o => o.ids));
   const sueltas = g.campanas.filter(c => !enOrden.has(c.id));
   if (!sueltas.length) return "";
-  return `<table class="choque-orden"><thead><tr>
-      <th>Campaña</th><th class="c-modo">Modo</th><th class="c-pct">%</th>
-    </tr></thead><tbody>${sueltas.map(c => `<tr>
+  const hayExclusiva = (g.exclusivas || []).length > 0;
+  const titulo = hayExclusiva
+    ? "Se suman encima de la que mande — salvo que mande una exclusiva, que las deja fuera"
+    : "Se suman encima de la que mande";
+  return `<tr class="fila-titulo-suman"><td></td><td colspan="6">${titulo}</td></tr>`
+    + sueltas.map(c => `<tr class="fila-suman">
+      <td class="c-manda"></td>
+      <td class="c-puesto">+</td>
       <td>${descConfNombre(c)}</td>
       <td class="c-modo">${descConfSelectorModo(c)}</td>
       <td class="c-pct">${esc(descConfPct(c))}</td>
-    </tr>`).join("")}</tbody></table>`;
+      <td class="c-si-manda">${descConfSiManda(c)}</td>
+      <td class="c-mover"></td>
+    </tr>`).join("");
 }
 
 // Por qué el resultado es el que es, pareja por pareja y sin repetir: el
@@ -14645,15 +14695,19 @@ function descConfTarjeta(g) {
   const chip = g.pendiente
     ? '<span class="conf-chip pendiente">falta decidir</span>'
     : '<span class="conf-chip listo">decidido</span>';
-  const ordenes = g.ordenes.map((b, i) => descConfTablaOrden(g, b, i)).join("");
+  // Las que se suman van al pie de la ÚLTIMA tabla; sin ninguna tabla (grupo
+  // donde nadie compite) se pintan solas, que es todo lo que hay que decir.
+  const ordenes = g.ordenes.map((b, i) =>
+    descConfTablaOrden(g, b, i, i === g.ordenes.length - 1)).join("");
   const sinOrden = !g.ordenes.length
     ? `<p class="mut conf-motivo">Estas campañas no compiten entre sí: no hay
-       orden que decidir, solo lo que dice cada renglón de abajo.</p>` : "";
+       orden que decidir, solo lo que dice cada renglón de abajo.</p>
+       <table class="choque-orden"><tbody>${descConfFilasSuman(g)}</tbody></table>` : "";
   return `<div class="conf-card${g.pendiente ? " pendiente" : ""}"
        data-conf-id="${esc(g.id)}">
     <h4>${titulo}${chip}</h4>
     ${descConfCompartido(g)}
-    ${sinOrden}${ordenes}${descConfFueraDeOrden(g)}
+    ${sinOrden}${ordenes}
     ${descConfRelaciones(g)}
     ${descConfDesglose(g)}
   </div>`;
@@ -14785,7 +14839,7 @@ async function descConfRefrescar() {
 async function descConfMover(grupoId, bloqueIdx, id, delta) {
   const g = (descConflictos.grupos || []).find(x => x.id === grupoId);
   const bloque = g && g.ordenes[bloqueIdx];
-  if (!bloque) return;
+  if (!bloque || !bloque.ordenable) return;   // un bloque de lectura no se reordena
   const orden = bloque.ids.slice();
   const i = orden.indexOf(id), j = i + delta;
   if (i < 0 || j < 0 || j >= orden.length) return;
