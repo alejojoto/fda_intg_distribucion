@@ -6217,8 +6217,16 @@ function supProblemasEquipo(equipo) {
 }
 
 function supFilaEquipo(equipo, sinDatos) {
-  const accion = sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
-    esc(equipo.dispositivo || "")}')">Ver detalle</button>`;
+  const host = esc(equipo.dispositivo || "");
+  // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
+  // lo único que se conseguiría es perderle el nombre y el rol.
+  const propio = equipo.dispositivo === supDispositivoPropio;
+  const accion =
+    (sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
+      host}')">Ver detalle</button> `)
+    + (propio ? "" : `<button type="button" class="peligro"
+        title="Lo saca de esta lista. El histórico de lo que llenó se conserva; esas facturas vuelven a mostrar su nombre técnico."
+        onclick="borrarEquipoSupervision(this, '${host}')">Borrar</button>`);
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
@@ -6292,6 +6300,26 @@ async function cambiarRolEquipo(dispositivo, rol, caja) {
     caja.disabled = false;
     mensaje("No se pudo cambiar el rol: " + e.message, "error");
   }
+}
+
+// Saca un equipo de la lista: su ficha de salud y su entrada del catálogo
+// (nombre y rol). Lo que llenó NO se toca — las facturas guardan el hostname
+// en columna propia. Se confirma en el mismo botón, como todo borrado.
+function borrarEquipoSupervision(btn, dispositivo) {
+  confirmarBorrar(btn, async () => {
+    avisarTrabajando("Borrando el equipo…");
+    try {
+      await api("/api/supervision/borrar-equipo", {dispositivo});
+      supEquipos = supEquipos.filter(e => e.dispositivo !== dispositivo);
+      supSinDatos = supSinDatos.filter(e => e.dispositivo !== dispositivo);
+      pintarEquiposSupervision();
+      mensaje("Equipo borrado. Lo que llenó sigue en PROCESADAS, ahora "
+              + "rotulado con su nombre técnico.", "ok");
+    } catch (e) {
+      mensaje("No se pudo borrar el equipo: " + e.message, "error");
+      cargarSupervision({});   // la lista vuelve a lo que de verdad hay
+    }
+  });
 }
 
 // El cuadro de qué puede cada rol. Sale entero del registro del servidor, así
