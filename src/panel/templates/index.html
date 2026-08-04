@@ -741,10 +741,11 @@
      arriba): queda pegada al botón que la produjo, aunque la pestaña cambie. */
   .ajustes-ok { color:#16a34a; font-size:12px; font-weight:600; }
   .cat-btns { display:flex; gap:8px; flex-wrap:wrap; }
-  /* Vista completa de Catálogos/Rutas dentro de AJUSTES (2026-08-02): mismo
-     patrón que PENDIENTES/DESCUENTOS (ocupan solas el área bajo pestañas),
-     solo que anidado un nivel: home ↔ vista se alternan con display, nunca
-     los dos a la vez. */
+  /* Vista completa de Rutas dentro de AJUSTES (2026-08-02): mismo patrón que
+     PENDIENTES/DESCUENTOS (ocupa sola el área bajo pestañas), solo que
+     anidada un nivel: home ↔ vista se alternan con display, nunca las dos a
+     la vez. Catálogos volvió a su botonera de siempre en AJUSTES → cada
+     catálogo abre en su propio modal, ver #catalogo-overlay (2026-08-04). */
   .volver-ajustes { display:inline-flex; align-items:center; gap:6px; margin:14px 0 4px 14px;
                     background:none; border:none; color:#1d4ed8; font:inherit; font-weight:600;
                     cursor:pointer; padding:4px 2px; }
@@ -774,7 +775,20 @@
      visible SOLO cuando la ruta elegida tiene configuración — dice a las
      claras por qué el selector cambió de opciones o de valor solo. */
   #serie-auto-nota { color:#15803d; font-weight:600; font-size:12px; }
-  #catalogo-vista { padding:0; }
+  /* Modal propio de un catálogo (2026-08-04): cada botón de AJUSTES →
+     Catálogos abre el suyo aquí dentro, mismo patrón que #cliente-overlay/
+     #detalle-overlay (título + cuerpo con scroll propio, Cerrar siempre a la
+     vista). Va por DEBAJO de #cliente-overlay (19) y #editor-overlay (20),
+     que se abren ENCIMA cuando el catálogo es Clientes o se edita una fila. */
+  #catalogo-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                      display:none; z-index:18; align-items:flex-start; justify-content:center; }
+  #catalogo-overlay.visible { display:flex; }
+  #catalogo-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
+                   width:min(1000px, 96vw); max-height:85vh; overflow:hidden;
+                   display:flex; flex-direction:column;
+                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #catalogo-caja > .editor-acciones { flex:none; border-top:1px solid #e2e6ec; padding-top:12px; }
+  #catalogo-vista { flex:1 1 auto; min-height:0; overflow:auto; padding:0; }
   #catalogo-vista .cat-cabecera { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
                                   padding:10px 14px; border-bottom:1px solid #eef0f4; }
   /* Las tablas de los catálogos se ajustan a su contenido en vez de estirarse a
@@ -2338,14 +2352,15 @@
   </section>
 
   <section id="sec-ajustes" class="tab-panel" style="display:none">
-   <!-- Vista propia por sección (2026-08-02, pedido del usuario): Catálogos y
-        Rutas dejaron de ser un acordeón bajo "Esta máquina"/"Día de despacho"
-        y pasaron a ocupar el área completa de la pestaña, igual que
-        PENDIENTES/DESCUENTOS — el listado de un catálogo entero (Clientes
-        agrupados, el año de Feriados) apretado bajo dos bloques ajenos se
-        leía peor que solo. Un solo estado (ajustesVista) decide cuál de los
-        tres contenedores de abajo se ve; volverAAjustesHome restaura el
-        scroll con el que se entró (ver ajustesScrollGuardado). -->
+   <!-- Vista propia por sección (2026-08-02, pedido del usuario): Rutas dejó de
+        ser un acordeón bajo "Esta máquina"/"Día de despacho" y pasó a ocupar
+        el área completa de la pestaña, igual que PENDIENTES/DESCUENTOS — la
+        lista de rutas apretada bajo dos bloques ajenos se leía peor que sola.
+        El estado ajustesVista decide cuál de los dos contenedores de abajo se
+        ve; volverAAjustesHome restaura el scroll con el que se entró (ver
+        ajustesScrollGuardado). Catálogos volvió a su botonera de siempre acá
+        en home: cada botón abre su catálogo en modal propio (2026-08-04, ver
+        #catalogo-overlay), no en una vista aparte. -->
    <div id="ajustes-home">
     <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
          computadora, juntas porque son obligatorias juntas — sin las dos no se
@@ -2399,15 +2414,14 @@
         botón del calendario la repone con un clic, y en cualquier factura se
         puede cambiar a mano.</p>
     </div>
-    <!-- Lanzadores: cada uno es TODO lo que se ve en la pantalla principal de
-         AJUSTES (título, ayuda breve y un botón) — la lista/editor de cada
-         catálogo y la lista de rutas viven en su propia vista completa
-         (abajo), no acá debajo. -->
+    <!-- Catálogos: cada botón abre el suyo en su propio modal (#catalogo-overlay,
+         2026-08-04) — ver pintarBotonesCatalogos/alternarCatalogo. Rutas sigue
+         en su vista completa aparte, más abajo. -->
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
       <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
         códigos usados por programa de facturación.</p>
-      <button class="primario" onclick="abrirCatalogosVista()">Abrir catálogos</button>
+      <div class="cat-btns" id="cat-btns"></div>
     </div>
     <div class="ajustes-bloque">
       <h3>Rutas</h3>
@@ -2415,19 +2429,6 @@
         seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
       <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
     </div>
-   </div>
-
-   <!-- Vista completa de Catálogos: abrirCatalogo() sigue pintando adentro de
-        #catalogo-vista, ahora reubicado acá en vez de bajo "Esta máquina". -->
-   <div id="ajustes-catalogos-vista" class="ajustes-vista" style="display:none">
-    <button type="button" class="volver-ajustes" onclick="volverAAjustesHome()">&larr; Volver a Ajustes</button>
-    <div class="ajustes-bloque">
-      <h3>Catálogos</h3>
-      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
-        códigos usados por programa de facturación.</p>
-      <div class="cat-btns" id="cat-btns"></div>
-    </div>
-    <div id="catalogo-vista"></div>
    </div>
 
    <!-- Vista completa de Rutas (2026-08-02): una fila por ruta con su regla
@@ -2876,6 +2877,19 @@
       <button type="button" id="sup-ticket-guardar" class="primario"
               onclick="guardarTicketSupervision()">Guardar</button>
       <button type="button" onclick="intentarCerrarTicketSupervision()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ventana propia de UN catálogo (Clientes/Productos/Vendedores/Feriados),
+     se abre desde el botón respectivo en AJUSTES → Catálogos. abrirCatalogo()
+     pinta adentro de #catalogo-vista; el editor de una fila y, en Clientes, la
+     ventana del cliente se abren ENCIMA de esta. -->
+<div id="catalogo-overlay" onclick="if(event.target===this)cerrarCatalogo()">
+  <div id="catalogo-caja">
+    <div id="catalogo-vista"></div>
+    <div class="editor-acciones">
+      <button type="button" onclick="cerrarCatalogo()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -13267,32 +13281,25 @@ const CATALOGOS = {
 };
 
 // Descuentos vive en su propia pestaña; AJUSTES lista los demás catálogos.
-// --- AJUSTES: navegación entre home / vista de Catálogos / vista de Rutas --
-// (2026-08-02, pedido del usuario): Catálogos y Rutas dejaron de vivir como
-// acordeón bajo "Esta máquina"/"Día de despacho" y pasaron a vista completa,
-// igual que PENDIENTES/DESCUENTOS — un solo estado con tres contenedores que
-// se alternan por display, guardando el scroll de cada uno para no perderlo
-// al ir y volver (AJUSTES deja bajar la página completa, ver .tab-libre en
+// --- AJUSTES: navegación entre home y vista de Rutas ------------------------
+// (2026-08-02, pedido del usuario): Rutas dejó de vivir como acordeón bajo
+// "Esta máquina"/"Día de despacho" y pasó a vista completa, igual que
+// PENDIENTES/DESCUENTOS — un solo estado con los dos contenedores que se
+// alternan por display, guardando el scroll de cada uno para no perderlo al
+// ir y volver (AJUSTES deja bajar la página completa, ver .tab-libre en
 // cambiarTab). Cambiar de pestaña arriba (PENDIENTES, DESCUENTOS…) no toca
-// esto: si se vuelve a AJUSTES, queda la misma vista de antes.
-let ajustesVista = "home";   // "home" | "catalogos" | "rutas"
-const ajustesScrollGuardado = {home: 0, catalogos: 0, rutas: 0};
+// esto: si se vuelve a AJUSTES, queda la misma vista de antes. Catálogos ya
+// no es una vista de esta navegación: volvió a su botonera en ajustes-home y
+// cada uno abre en su propio modal (#catalogo-overlay, 2026-08-04).
+let ajustesVista = "home";   // "home" | "rutas"
+const ajustesScrollGuardado = {home: 0, rutas: 0};
 
 function irAAjustesVista(vista) {
   ajustesScrollGuardado[ajustesVista] = window.scrollY;
   ajustesVista = vista;
   $("ajustes-home").style.display = vista === "home" ? "" : "none";
-  $("ajustes-catalogos-vista").style.display = vista === "catalogos" ? "" : "none";
   $("ajustes-rutas-vista").style.display = vista === "rutas" ? "" : "none";
   window.scrollTo(0, ajustesScrollGuardado[vista] || 0);
-}
-
-// Abrir Catálogos no reabre ningún catálogo por su cuenta: si ya había uno
-// elegido (catalogoActual) su lista sigue tal cual —cerrarCatalogo() es la
-// única vía que la vacía—, y si no había ninguno queda solo la fila de
-// botones.
-function abrirCatalogosVista() {
-  irAAjustesVista("catalogos");
 }
 
 function abrirRutasVista() {
@@ -13333,6 +13340,7 @@ function alternarCatalogo(tipo) {
 function cerrarCatalogo() {
   catalogoActual = null;
   catalogoFilas = [];
+  $("catalogo-overlay").classList.remove("visible");
   $("cliente-overlay").classList.remove("visible");
   clienteEnEdicion = null;
   $("catalogo-vista").innerHTML = "";
@@ -13696,6 +13704,7 @@ async function abrirCatalogo(tipo, prefill) {
     // paginar() recorta sola la página si el catálogo encogió y quedó fuera de rango.
     if (!mismoCatalogo) { paginacion.catalogo.pagina = 1; catClientesTab = "clientes"; }
     pintarBotonesCatalogos();
+    $("catalogo-overlay").classList.add("visible");
     // Esta vista es la de AJUSTES; Descuentos tiene su propia pestaña y su
     // propio render (renderDescuentos), no pasa por aquí.
     const contenedor = "catalogo-vista";
@@ -13712,7 +13721,7 @@ async function abrirCatalogo(tipo, prefill) {
     // parejas y el punto significa siempre lo mismo.
     const leyenda = leyendaOrigenes(def);
     $(contenedor).innerHTML = `
-      <div class="ajustes-bloque" style="border-top:1px solid #e2e6ec">
+      <div class="ajustes-bloque">
         <h3>${esc(def.titulo)}</h3>
         ${def.descripcion ? `<p class="mut" style="margin:0 0 10px">${esc(def.descripcion)}</p>` : ""}
         ${leyenda ? `<div class="orig-leyenda">${leyenda}</div>` : ""}
