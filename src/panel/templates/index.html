@@ -14446,8 +14446,12 @@ function abrirEditor(indice, prefill) {
       </label>`;
     }
     if (c.tipo === "checkbox") {
+      // Solo "Activo" pide confirmación (pedido del usuario 2026-08-04): es un
+      // interruptor más entre varios campos del formulario, fácil de tocar sin
+      // querer al editar otra cosa y arrastrarlo sin darse cuenta hasta Guardar.
+      const onclickActivo = c.campo === "activo" ? ` onclick="return onClickActivoEditorChk(event)"` : "";
       return `<label class="editor-campo" style="flex-direction:row;align-items:center;gap:9px">
-        <input type="checkbox" class="switch" id="ed-${c.campo}" ${valor === undefined || valor ? "checked" : ""}>
+        <input type="checkbox" class="switch" id="ed-${c.campo}" ${valor === undefined || valor ? "checked" : ""}${onclickActivo}>
         ${esc(c.etiqueta)}</label>`;
     }
     // Opciones fijas (presentación, tipo de feriado…) o calculadas al abrir
@@ -14891,6 +14895,20 @@ function onClickEsPruebaChk(ev) {
     editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad();
     editorMarcarObligatorios(); editorRevalidar();
   }, activando ? "Confirmar: no facturará" : "Confirmar: vuelve a facturar");
+  return false;
+}
+
+// Confirmación antes de marcar O de quitar "Activo" desde el editor completo
+// de un catálogo (clientes, vendedores, feriados…), no solo desde el switch
+// rápido de la ficha del cliente (ver onClickActivoSucursal/onClickActivoCliente
+// más arriba). No dispara ningún recálculo: nada más depende de este valor
+// (a diferencia de "es_prueba"), así que basta con fijar el checkbox — se
+// guarda igual que cualquier otro campo recién al pulsar Guardar.
+function onClickActivoEditorChk(ev) {
+  const activando = ev.target.checked;
+  ev.preventDefault();
+  confirmarSinQuitar(ev.target.closest("label"), () => { ev.target.checked = activando; },
+    activando ? "Confirmar: activo" : "Confirmar: inactivo");
   return false;
 }
 
