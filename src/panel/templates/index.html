@@ -231,6 +231,14 @@
   /* Fila de ruta + campos de facturación (encima de los filtros) */
   .rutas-barra { display:flex; gap:10px; align-items:end; flex-wrap:wrap;
                  margin-bottom:10px; font-size:12.5px; color:var(--mut); }
+  /* La botonera de llenado va dentro de esta barra (2026-08-04), separada del
+     último campo y sin el margen inferior de .barra: el de la barra que la
+     contiene ya lo pone. Pegada a los campos y no al extremo derecho, para que
+     el ojo llegue al botón siguiendo los campos que lo alimentan. Repone el
+     tamaño y el color de letra del cuerpo, que es lo que tenía cuando era una
+     fila aparte: aquí adentro heredaría la letra chica y gris de los rótulos
+     de filtro, y el botón —que va con font:inherit— saldría encogido. */
+  .rutas-barra > #llenado-barra { margin:0 0 0 18px; font-size:1rem; color:#1d2433; }
   /* Cada campo viaja pegado a su aviso (2026-07-27): con la ventana angosta la
      barra envuelve, y el aviso ámbar de la tasa se iba solo a la línea de
      abajo — tan lejos del campo que describe que el usuario no lo vio.
@@ -1674,6 +1682,32 @@
   .cal-grid button.otro { color:#c3c9d4; }
   .cal-grid button.hoy { border-color:#1d4ed8; color:#1d4ed8; font-weight:600; }
   .cal-grid button.sel { background:#1d4ed8; border-color:#1d4ed8; color:#fff; font-weight:600; }
+  /* ---- Ventana bajita: modo compacto (2026-08-04) -------------------------
+     Lo que escasea en este panel son filas de la lista: todo lo fijo —la
+     cabecera, la barra de campos, las pestañas, el paginador— se paga en
+     filas que el operador deja de ver. Por debajo de 860 px de alto de
+     ventana (portátiles, y el navegador con su barra de direcciones) el
+     cromo se aprieta y la lista gana unas dos filas; en pantallas altas no
+     cambia nada. Solo espaciados y tamaños: no se oculta ni un control, para
+     que no haya funciones que aparezcan y desaparezcan con el tamaño de la
+     ventana. El margen negativo del statusbar sigue al padding de <main>:
+     si uno cambia, el otro también. */
+  @media (max-height: 860px) {
+    header { padding:6px 18px; gap:11px; }
+    header #logo { width:32px; height:32px; }
+    header h1 { font-size:15.5px; }
+    #barra-rapida { padding-top:6px; gap:6px 14px; }
+    main { padding:10px 18px; }
+    #statusbar { margin:-10px -18px 10px; padding:7px 18px; }
+    .rutas-barra { margin-bottom:7px; }
+    .rotulo { font-size:13px; }
+    .campo { gap:1px; }
+    #filtros-barra { padding:6px 14px; }
+    .tab-btn { padding:5px 15px 6px; }
+    .tab-btn.activa { padding:7px 18px; font-size:14px; }
+    th, td { padding:5px 10px; }
+    .paginador { padding:6px 14px; }
+  }
 </style>
 </head>
 <body>
@@ -1881,92 +1915,96 @@
           title="Se llena sola con la tasa que corresponde al día a facturar (la del BCV, o la del último día hábil por feriado/fin de semana) y queda fija: no se edita a mano. Sin ninguna tasa aplicable se habilita para escribirla."></div>
       <span id="f-tasa-bcv" class="mut" title="Fecha valor declarada por el BCV para la tasa mostrada.">consultando BCV…</span>
     </div>
-  </div>
 
-  <!-- Botonera de llenado en su propia fila (2026-07-20): va a crecer con
-       más controles a futuro. Baby Mix va de último, a la derecha (2026-07-31,
-       pedido del usuario). -->
-  <div class="barra" id="llenado-barra">
-    <!-- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) — SOLO la
-         parte visual del flujo por lotes, en el orden dictado por el usuario:
-         qué llenar, Imprimir sí/no y el botón. Es un DROPDOWN cuyas opciones
-         cambian con el modo de impresión, porque cambia la UNIDAD que se cuenta
-         (2026-07-31, pedido del usuario):
-         · Imprimir: no → se cuentan PEDIDOS completos ("5 pedidos"), nunca se
-           parte uno; los atajos son 1/5/10 y con una ruta elegida aparece
-           además "ruta completa". "1 pedido" ES el viejo "pedido completo", así
-           que esa opción no se repite aquí.
-         · Imprimir: sí → se cuentan FACTURAS (1..10 y nada más: el papel obliga
-           a lotes cortos de tamaño variable) y va primera "pedido completo",
-           que llena el siguiente pedido ENTERO sin importar en cuántas facturas
-           venga; el pedido dividido que el corte parta lo resuelve el aviso de
-           la ventana de revisión.
-         El sustantivo va DENTRO de cada opción para que la etiqueta fija
-         ("Llenar:") no cambie entre una y otra y no quede "pedido completo
-         facturas" (2026-07-23, antes decía "factura completa": un pedido
-         puede SER varias facturas, así que llamarlo "factura" confundía).
-         Ningún lote numérico pasa de 10 (2026-07-31, pedido del usuario): se
-         retiró "otro…" porque una corrida larga arriesga pasarse a la serie
-         equivocada — para llenar más se elige una ruta y se usa "ruta
-         completa". La corrida encadena (CONTRATOS.md 3.1 punto 3, act.
-         2026-07-29): cada documento se llena completo y se ACEPTA al cerrar, y
-         con Imprimir: sí se espera el «Continuar» del operador entre
-         facturas. -->
-    <!-- DESACTIVADO EN PRODUCCIÓN, temporal (2026-07-28, pedido del usuario):
-         el bloque entero solo se muestra con el modo admin prendido o en modo
-         prueba — ver pintarBarraEnFila. Arranca OCULTO para que en producción
-         no asome un instante antes de que /api/ajustes conteste. En su lugar
-         queda el botón "Llenar siguiente" de abajo. Para revertir: quitar el
-         gate de pintarBarraEnFila, este display:none y ese botón. -->
-    <div id="enfila-bloque" style="display:none" title="Llena la cantidad elegida una tras otra: cada documento se acepta al cerrar y sigue con el siguiente. Con Imprimir: sí se espera tu «Continuar» entre facturas.">
-      <b class="rotulo">Llenar:</b>
-      <select id="enfila-cantidad" onchange="fijarCantidad(this.value)"></select>
-      <span>Imprimir:
-        <label><input type="radio" name="enfila-imp" value="si" onchange="cambioImpresionEnFila()"> sí</label>
-        <label><input type="radio" name="enfila-imp" value="no" checked onchange="cambioImpresionEnFila()"> no</label>
-      </span>
-      <!-- Aviso ámbar en línea, solo con "Imprimir: sí" (2026-07-22): sale y
-           se quita con el radio, sin confirmar nada. Corto y visible a propósito
-           (2026-08-01, pedido del usuario): es imperativo, no todo el mundo lee
-           hover. -->
-      <span id="enfila-imp-aviso" style="display:none"
-            title="El programa espera tu confirmación «Continuar» por cada factura; hay que revisar cada impresión y el papel cada cinco facturas antes de seguir.">Hay que controlar manualmente cada impresión.</span>
-      <!-- Nota gris del lado "no", pareja del aviso ámbar (repuesta 2026-07-26
-           a pedido del usuario; hover reescrito 2026-08-01, mismo pedido).
-           Corta y visible por la misma razón que la de arriba: solo el hover
-           no basta. Nombra lo que el operador necesita saber de este lado: sin
-           pausas entre pedido y pedido, el envío a facturación NO lo hace el
-           programa (2026-07-27) y el pedido igual queda guardado, consultable
-           después en facturación. El día que el envío se habilite (CONTRATOS.md
-           3.1 punto 2), este texto cambia. -->
-      <span id="enfila-sinimp-nota" class="mut"
-            title="No hay pausas entre pedido y pedido: no se imprime nada ni se espera tu confirmación entre uno y el siguiente. El envío a facturación queda por fuera, pero el pedido sí queda guardado: se puede ver luego con Consultar, en facturación.">Se guardan pedidos seguidos, sin enviar a facturación</span>
-      <button class="primario" id="btn-secuencia" onclick="lanzarEnFila()">Llenar en fila</button>
-      <button class="peligro" id="btn-detener" onclick="detenerSecuencia()" style="display:none">Detener secuencia</button>
-      <!-- Los botones Reintentar / Cancelar del fallo se mudaron a la barra
-           de estado (2026-07-23, modo llenado): cuando salen, esa barra es lo
-           único visible del panel. -->
-    </div>
-    <!-- Lo único que ve producción mientras "Llenar en fila" esté desactivado
-         (2026-07-28): llena UNA factura, la siguiente de PENDIENTES, con el
-         flujo individual de siempre — llena y se detiene, sin tocar el cierre
-         del documento. Vive FUERA de #enfila-bloque a propósito: ese bloque se
-         oculta entero en producción, y este botón tampoco debe entrar en el
-         juego de mostrar/ocultar de la corrida (iniciarSecuencia, esperarLogin,
-         pausarSecuenciaPorFallo). Un segundo clic durante un llenado lo frenan
-         las guardas de llenar(). -->
-    <button class="primario" id="btn-llenar-siguiente" onclick="llenarSiguiente()"
-            title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en el programa de facturación.">Llenar siguiente</button>
-    <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
-         y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
-         Lo marca pintarGramajeBaby() con el último elegido en esta computadora
-         (125 g mientras nadie lo toque). De último, a la derecha (2026-07-31,
-         pedido del usuario). BORRAR este bloque (y la CSS .babymix-fila, y
-         babyMixControl() más abajo) cuando se acaben los paquetes de 125 g. -->
-    <div class="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
-      <b>Baby Mix</b>
-      <label><input type="radio" name="f-bm" value="125" onchange="elegirGramajeBaby(this.value)"> 125 g</label>
-      <label><input type="radio" name="f-bm" value="150" onchange="elegirGramajeBaby(this.value)"> 150 g</label>
+    <!-- Botonera de llenado. Vivía en su propia fila (2026-07-20); desde
+         2026-08-04 va DENTRO de la barra de Ruta/Serie/Fecha/Tasa, empujada a
+         la derecha: la fila aparte costaba ~50 px de alto en una pantalla
+         donde lo que escasea son filas de la lista. Si no cabe —modo admin,
+         con el bloque "Llenar en fila" visible— baja sola por el flex-wrap de
+         la barra y se ve como antes. Baby Mix va de último, a la derecha
+         (2026-07-31, pedido del usuario). -->
+    <div class="barra" id="llenado-barra">
+      <!-- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) — SOLO la
+           parte visual del flujo por lotes, en el orden dictado por el usuario:
+           qué llenar, Imprimir sí/no y el botón. Es un DROPDOWN cuyas opciones
+           cambian con el modo de impresión, porque cambia la UNIDAD que se cuenta
+           (2026-07-31, pedido del usuario):
+           · Imprimir: no → se cuentan PEDIDOS completos ("5 pedidos"), nunca se
+             parte uno; los atajos son 1/5/10 y con una ruta elegida aparece
+             además "ruta completa". "1 pedido" ES el viejo "pedido completo", así
+             que esa opción no se repite aquí.
+           · Imprimir: sí → se cuentan FACTURAS (1..10 y nada más: el papel obliga
+             a lotes cortos de tamaño variable) y va primera "pedido completo",
+             que llena el siguiente pedido ENTERO sin importar en cuántas facturas
+             venga; el pedido dividido que el corte parta lo resuelve el aviso de
+             la ventana de revisión.
+           El sustantivo va DENTRO de cada opción para que la etiqueta fija
+           ("Llenar:") no cambie entre una y otra y no quede "pedido completo
+           facturas" (2026-07-23, antes decía "factura completa": un pedido
+           puede SER varias facturas, así que llamarlo "factura" confundía).
+           Ningún lote numérico pasa de 10 (2026-07-31, pedido del usuario): se
+           retiró "otro…" porque una corrida larga arriesga pasarse a la serie
+           equivocada — para llenar más se elige una ruta y se usa "ruta
+           completa". La corrida encadena (CONTRATOS.md 3.1 punto 3, act.
+           2026-07-29): cada documento se llena completo y se ACEPTA al cerrar, y
+           con Imprimir: sí se espera el «Continuar» del operador entre
+           facturas. -->
+      <!-- DESACTIVADO EN PRODUCCIÓN, temporal (2026-07-28, pedido del usuario):
+           el bloque entero solo se muestra con el modo admin prendido o en modo
+           prueba — ver pintarBarraEnFila. Arranca OCULTO para que en producción
+           no asome un instante antes de que /api/ajustes conteste. En su lugar
+           queda el botón "Llenar siguiente" de abajo. Para revertir: quitar el
+           gate de pintarBarraEnFila, este display:none y ese botón. -->
+      <div id="enfila-bloque" style="display:none" title="Llena la cantidad elegida una tras otra: cada documento se acepta al cerrar y sigue con el siguiente. Con Imprimir: sí se espera tu «Continuar» entre facturas.">
+        <b class="rotulo">Llenar:</b>
+        <select id="enfila-cantidad" onchange="fijarCantidad(this.value)"></select>
+        <span>Imprimir:
+          <label><input type="radio" name="enfila-imp" value="si" onchange="cambioImpresionEnFila()"> sí</label>
+          <label><input type="radio" name="enfila-imp" value="no" checked onchange="cambioImpresionEnFila()"> no</label>
+        </span>
+        <!-- Aviso ámbar en línea, solo con "Imprimir: sí" (2026-07-22): sale y
+             se quita con el radio, sin confirmar nada. Corto y visible a propósito
+             (2026-08-01, pedido del usuario): es imperativo, no todo el mundo lee
+             hover. -->
+        <span id="enfila-imp-aviso" style="display:none"
+              title="El programa espera tu confirmación «Continuar» por cada factura; hay que revisar cada impresión y el papel cada cinco facturas antes de seguir.">Hay que controlar manualmente cada impresión.</span>
+        <!-- Nota gris del lado "no", pareja del aviso ámbar (repuesta 2026-07-26
+             a pedido del usuario; hover reescrito 2026-08-01, mismo pedido).
+             Corta y visible por la misma razón que la de arriba: solo el hover
+             no basta. Nombra lo que el operador necesita saber de este lado: sin
+             pausas entre pedido y pedido, el envío a facturación NO lo hace el
+             programa (2026-07-27) y el pedido igual queda guardado, consultable
+             después en facturación. El día que el envío se habilite (CONTRATOS.md
+             3.1 punto 2), este texto cambia. -->
+        <span id="enfila-sinimp-nota" class="mut"
+              title="No hay pausas entre pedido y pedido: no se imprime nada ni se espera tu confirmación entre uno y el siguiente. El envío a facturación queda por fuera, pero el pedido sí queda guardado: se puede ver luego con Consultar, en facturación.">Se guardan pedidos seguidos, sin enviar a facturación</span>
+        <button class="primario" id="btn-secuencia" onclick="lanzarEnFila()">Llenar en fila</button>
+        <button class="peligro" id="btn-detener" onclick="detenerSecuencia()" style="display:none">Detener secuencia</button>
+        <!-- Los botones Reintentar / Cancelar del fallo se mudaron a la barra
+             de estado (2026-07-23, modo llenado): cuando salen, esa barra es lo
+             único visible del panel. -->
+      </div>
+      <!-- Lo único que ve producción mientras "Llenar en fila" esté desactivado
+           (2026-07-28): llena UNA factura, la siguiente de PENDIENTES, con el
+           flujo individual de siempre — llena y se detiene, sin tocar el cierre
+           del documento. Vive FUERA de #enfila-bloque a propósito: ese bloque se
+           oculta entero en producción, y este botón tampoco debe entrar en el
+           juego de mostrar/ocultar de la corrida (iniciarSecuencia, esperarLogin,
+           pausarSecuenciaPorFallo). Un segundo clic durante un llenado lo frenan
+           las guardas de llenar(). -->
+      <button class="primario" id="btn-llenar-siguiente" onclick="llenarSiguiente()"
+              title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en el programa de facturación.">Llenar siguiente</button>
+      <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
+           y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
+           Lo marca pintarGramajeBaby() con el último elegido en esta computadora
+           (125 g mientras nadie lo toque). De último, a la derecha (2026-07-31,
+           pedido del usuario). BORRAR este bloque (y la CSS .babymix-fila, y
+           babyMixControl() más abajo) cuando se acaben los paquetes de 125 g. -->
+      <div class="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
+        <b>Baby Mix</b>
+        <label><input type="radio" name="f-bm" value="125" onchange="elegirGramajeBaby(this.value)"> 125 g</label>
+        <label><input type="radio" name="f-bm" value="150" onchange="elegirGramajeBaby(this.value)"> 150 g</label>
+      </div>
     </div>
   </div>
 
