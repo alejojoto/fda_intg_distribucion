@@ -889,6 +889,35 @@
                      #e2e6ec; border-radius:8px; padding:10px; margin:0 0 12px;
                      font-size:11.5px; line-height:1.5; white-space:pre-wrap;
                      word-break:break-word; user-select:text; }
+  /* Ticket de soporte: va ENCIMA del informe (z-index 21) porque se abre desde
+     él y el informe sigue detrás como referencia de lo que se envía. */
+  #ticket-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                    display:none; z-index:21; align-items:flex-start;
+                    justify-content:center; }
+  #ticket-overlay.visible { display:flex; }
+  #ticket-caja { background:#fff; border-radius:10px; padding:18px;
+                 margin-top:6vh; width:min(620px, 94vw); max-height:85vh;
+                 overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #ticket-caja h3 { margin:0 0 12px; font-size:14px; }
+  #ticket-mensaje { font:inherit; font-size:12.5px; width:100%; resize:vertical;
+                    padding:8px; border:1px solid #cbd2dc; border-radius:6px;
+                    box-sizing:border-box; }
+  #ticket-resumen { background:#f6f8fb; border:1px solid #e2e6ec; border-radius:8px;
+                    padding:10px 12px; margin:12px 0 0; font-size:12px; }
+  #ticket-resumen h4 { margin:0 0 6px; font-size:12px; }
+  .ticket-dato { display:flex; gap:10px; line-height:1.7; }
+  .ticket-dato > span:first-child { color:#5a6472; flex:none; width:150px; }
+  .ticket-dato > span:last-child { min-width:0; overflow-wrap:anywhere; }
+  .ticket-nota { color:#5a6472; font-size:11.5px; margin-top:8px; }
+  #ticket-ok { background:#eaf6ec; border:1px solid #b7dfc0; color:#1e6b33;
+               border-radius:8px; padding:10px 12px; margin-top:12px;
+               font-size:12.5px; }
+  #ticket-numero { font-weight:700; letter-spacing:.6px; user-select:text; }
+  #ticket-error { margin-top:12px; }
+  /* El punto giratorio sobre el botón azul necesita su propio contraste. */
+  #ticket-enviar .spinner { border-color:rgba(255,255,255,.45);
+                            border-top-color:#fff; margin-right:6px;
+                            vertical-align:-2px; }
   .conflicto-sync-card { border:1px solid #e2e6ec; border-radius:8px; padding:12px;
                          margin-bottom:12px; }
   .conflicto-sync-titulo { font-weight:700; margin-bottom:10px; }
@@ -2555,13 +2584,39 @@
 </div>
 
 <!-- Informe de sincronización para soporte (se abre desde el estado de la nube) -->
-<div id="diag-sync-overlay" onclick="if(event.target===this)this.classList.remove('visible')">
+<div id="diag-sync-overlay" onclick="if(event.target===this)cerrarDiagnosticoSync()">
   <div id="diag-sync-caja">
     <h3>Informe de sincronización</h3>
     <pre id="diag-sync-texto"></pre>
     <div class="editor-acciones">
+      <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
       <button type="button" onclick="copiarDiagnosticoSync(this)">Copiar informe</button>
-      <button type="button" onclick="$('diag-sync-overlay').classList.remove('visible')">Cerrar</button>
+      <button type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ticket de soporte (2026-08-04): el informe se guarda en la nube junto con
+     el relato del operador, así el reporte no depende de que esta computadora
+     siga encendida ni de que alguien pegue el texto en otro lado. Sin cierre
+     por clic afuera: adentro hay texto escrito que todavía no se envió. -->
+<div id="ticket-overlay">
+  <div id="ticket-caja">
+    <h3>Crear ticket de soporte</h3>
+    <div class="editor-campo">
+      <label for="ticket-mensaje">¿Qué ocurrió? (obligatorio)</label>
+      <textarea id="ticket-mensaje" rows="4" maxlength="4000"
+                placeholder="Qué estabas haciendo y qué salió mal."></textarea>
+    </div>
+    <div id="ticket-resumen"></div>
+    <div id="ticket-error" class="desc-error" style="display:none"></div>
+    <div id="ticket-ok" style="display:none"></div>
+    <div class="editor-acciones">
+      <button type="button" id="ticket-enviar" class="primario" onclick="enviarTicket()">Enviar</button>
+      <button type="button" id="ticket-copiar-id" style="display:none"
+              onclick="copiarIdTicket(this)">Copiar número</button>
+      <button type="button" id="ticket-copiar" onclick="copiarTicket(this)">Copiar informe</button>
+      <button type="button" id="ticket-cancelar" onclick="cerrarTicket()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -6117,6 +6172,11 @@ function armarPopoverNube(clase) {
   return html;
 }
 
+// Último /api/sync/diagnostico recibido: el resumen del ticket lo lee de aquí
+// en vez de pedirlo otra vez (es el mismo informe que el operador tiene
+// delante, y pedirlo de nuevo justo cuando la nube falla solo suma espera).
+let diagSyncDatos = null;
+
 // Informe de sincronización listo para copiar (2026-08-02): junta en un solo
 // texto el estado del motor (camino, cursores, cola de subida, choques) y las
 // líneas del log que importan — así un problema se comparte con un clic en
@@ -6128,6 +6188,7 @@ async function abrirDiagnosticoSync() {
   caja.textContent = "Armando el informe…";
   try {
     const d = await api("/api/sync/diagnostico");
+    diagSyncDatos = d;   // el resumen del ticket sale de aquí, sin pedirlo de nuevo
     const cola = d.outbox || {};
     const filas = [
       `Equipo: ${d.dispositivo}  ·  ${d.version}`,
@@ -6166,6 +6227,190 @@ async function copiarDiagnosticoSync(btn) {
     btn.textContent = "Selecciónalo y copia con Ctrl+C";
   }
   setTimeout(() => { btn.textContent = "Copiar informe"; }, 2500);
+}
+
+function cerrarDiagnosticoSync() {
+  cerrarTicket();   // el ticket va encima: cerrar el de atrás lo dejaría huérfano
+  $("diag-sync-overlay").classList.remove("visible");
+}
+
+// ---------------------------------------------------------------------------
+// Ticket de soporte (2026-08-04). El informe solo se podía copiar: para que
+// llegara a soporte alguien tenía que pegarlo en otro lado, y si la máquina se
+// apagaba antes, el problema se perdía. Ahora se guarda en la nube con el
+// relato del operador y queda ahí aunque se cierre el programa.
+// ---------------------------------------------------------------------------
+
+// El identificador lo arma el REMITENTE y se repite en cada reintento: es la
+// clave primaria del ticket, así que un doble clic o un reintento después de
+// un timeout que en realidad sí llegó no crean un segundo ticket.
+let ticketId = null;
+let ticketEnVuelo = false;
+let ticketCreado = null;      // id ya confirmado por la nube (bloquea reenvíos)
+let ticketBorrador = "";      // lo tecleado, para que cerrar sin querer no lo pierda
+
+// Sin I, L, O ni U: el número se lee por teléfono y se teclea a mano, y esas
+// cuatro se confunden con 1, 0 y V. El servidor valida este mismo formato.
+const TICKET_ALFABETO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+function nuevoIdTicket() {
+  const hoy = new Date();
+  const fecha = hoy.getFullYear()
+      + String(hoy.getMonth() + 1).padStart(2, "0")
+      + String(hoy.getDate()).padStart(2, "0");
+  const bytes = new Uint8Array(8);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+  else for (let i = 0; i < 8; i++) bytes[i] = Math.floor(Math.random() * 256);
+  let sufijo = "";
+  for (const b of bytes) sufijo += TICKET_ALFABETO[b % TICKET_ALFABETO.length];
+  return `TCK-${fecha}-${sufijo}`;
+}
+
+// Qué se envía, dicho en los términos del operador. Sale del informe que ya
+// tiene delante: nada que el panel no supiera antes de abrir esta ventana.
+function pintarResumenTicket() {
+  const d = diagSyncDatos || {};
+  const cola = d.outbox || {};
+  const equipo = (d.maquina && d.maquina !== d.dispositivo)
+      ? `${d.maquina} (${d.dispositivo})` : (d.dispositivo || "este equipo");
+  let nube;
+  // Sin informe cargado (falló al armarse, o todavía viene en camino) no se
+  // inventa un "al día": el ticket se manda igual y el servidor pone el estado
+  // real, pero acá no se afirma nada que no se sepa.
+  if (!diagSyncDatos) nube = "no se pudo leer en esta ventana";
+  else if (d.nube_error) nube = "sin conexión con la nube";
+  else {
+    const partes = [];
+    if (cola.pendientes) partes.push(`${cola.pendientes} por subir`);
+    if (d.conflictos_abiertos) partes.push(`${d.conflictos_abiertos} en choque`);
+    nube = partes.length ? partes.join(", ") : "al día";
+  }
+  const lineas = ($("diag-sync-texto").textContent || "").split("\n").length;
+  const fila = (rotulo, valor) =>
+      `<div class="ticket-dato"><span>${rotulo}</span><span>${esc(valor)}</span></div>`;
+  $("ticket-resumen").innerHTML =
+      `<h4>Se envía junto con tu mensaje</h4>`
+    + fila("Computadora", equipo)
+    + fila("Versión del programa", d.version || "desconocida")
+    + fila("Fecha y hora", new Date().toLocaleString())
+    + fila("Estado de la nube", nube)
+    + fila("Informe técnico", `el de esta ventana (${lineas} líneas)`)
+    + `<div class="ticket-nota">No se envían contraseñas ni claves de acceso.</div>`;
+}
+
+function abrirTicket() {
+  // El mismo botón que lo abre lo cierra.
+  if ($("ticket-overlay").classList.contains("visible")) { cerrarTicket(); return; }
+  if (!ticketId || ticketCreado) { ticketId = nuevoIdTicket(); ticketCreado = null; ticketBorrador = ""; }
+  const campo = $("ticket-mensaje");
+  campo.value = ticketBorrador;
+  campo.disabled = false;
+  $("ticket-error").style.display = "none";
+  $("ticket-ok").style.display = "none";
+  const enviar = $("ticket-enviar");
+  enviar.style.display = ""; enviar.disabled = false; enviar.textContent = "Enviar";
+  $("ticket-copiar-id").style.display = "none";
+  $("ticket-cancelar").textContent = "Cancelar";
+  pintarResumenTicket();
+  $("ticket-overlay").classList.add("visible");
+  campo.focus();
+}
+
+function cerrarTicket() {
+  if (!ticketCreado) ticketBorrador = $("ticket-mensaje").value;
+  $("ticket-overlay").classList.remove("visible");
+}
+
+async function enviarTicket() {
+  if (ticketEnVuelo || ticketCreado) return;   // doble clic: el segundo no sale
+  const texto = $("ticket-mensaje").value.trim();
+  const error = $("ticket-error");
+  if (!texto) {
+    error.textContent = "Escribe qué ocurrió: es lo único que el programa no puede saber solo.";
+    error.style.display = "";
+    $("ticket-mensaje").focus();
+    return;
+  }
+  ticketEnVuelo = true;
+  ticketBorrador = texto;
+  error.style.display = "none";
+  const enviar = $("ticket-enviar");
+  enviar.disabled = true;
+  enviar.innerHTML = `<span class="spinner"></span>Enviando…`;
+  try {
+    const r = await api("/api/soporte/ticket", {
+      id: ticketId,
+      mensaje: texto,
+      informe: $("diag-sync-texto").textContent,
+    });
+    mostrarTicketCreado(r.id);
+  } catch (e) {
+    // El texto escrito NO se toca: el reintento va con el mismo identificador,
+    // así que si el primer envío llegó igual, no se crea un segundo ticket.
+    error.textContent = e.message;
+    error.style.display = "";
+    enviar.disabled = false;
+    enviar.textContent = "Reintentar";
+  } finally {
+    ticketEnVuelo = false;
+  }
+}
+
+function mostrarTicketCreado(id) {
+  ticketCreado = id || ticketId;
+  ticketBorrador = "";
+  const ok = $("ticket-ok");
+  ok.innerHTML = `Ticket guardado. Número: <span id="ticket-numero"></span>`
+    + `<div class="ticket-nota">Queda registrado aunque cierres el programa. `
+    + `Menciona ese número cuando escribas a soporte.</div>`;
+  ok.querySelector("#ticket-numero").textContent = ticketCreado;
+  ok.style.display = "";
+  $("ticket-mensaje").disabled = true;
+  $("ticket-enviar").style.display = "none";
+  $("ticket-copiar-id").style.display = "";
+  $("ticket-cancelar").textContent = "Cerrar";
+}
+
+// Copiado que también funciona sin permiso de portapapeles (http): cae a un
+// campo temporal, que es lo que sí acepta un navegador en contexto inseguro.
+async function copiarTextoSoporte(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch (_) {
+    const tmp = document.createElement("textarea");
+    tmp.value = texto;
+    tmp.style.position = "fixed";
+    tmp.style.opacity = "0";
+    document.body.appendChild(tmp);
+    tmp.select();
+    let listo = false;
+    try { listo = document.execCommand("copy"); } catch (_) { listo = false; }
+    tmp.remove();
+    return listo;
+  }
+}
+
+async function copiarConAviso(btn, texto, rotulo) {
+  const listo = await copiarTextoSoporte(texto);
+  btn.textContent = listo ? "Copiado" : "No se pudo copiar";
+  setTimeout(() => { btn.textContent = rotulo; }, 2500);
+}
+
+// Respaldo cuando la nube no responde: el mismo contenido del ticket, listo
+// para pegarlo donde sea que se pueda avisar.
+function copiarTicket(btn) {
+  const texto = [
+    `Ticket ${ticketCreado || ticketId}`,
+    `Qué ocurrió: ${$("ticket-mensaje").value.trim() || "(sin texto)"}`,
+    "", "--- Informe de sincronización ---",
+    $("diag-sync-texto").textContent,
+  ].join("\n");
+  return copiarConAviso(btn, texto, "Copiar informe");
+}
+
+function copiarIdTicket(btn) {
+  return copiarConAviso(btn, ticketCreado || ticketId || "", "Copiar número");
 }
 
 function pintarNube() {
