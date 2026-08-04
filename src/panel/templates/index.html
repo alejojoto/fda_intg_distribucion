@@ -954,6 +954,16 @@
   .campo-obligatorio input[type="text"],
   .campo-obligatorio input[type="date"] { box-shadow:inset 3px 0 0 #f59e0b; }
   .campo-obligatorio input.lleno { box-shadow:inset 3px 0 0 #16a34a; }
+  /* "Qué es" (Cliente independiente / Sucursal de otro cliente): las dos
+     opciones a la vista en vez de un <select> (pedido del usuario 2026-08-04)
+     — con solo dos o tres opciones, esconder la otra detrás de un clic no
+     ayuda. */
+  .seg-grupo { display:flex; border:1px solid #cbd2dc; border-radius:6px; overflow:hidden; }
+  .seg-btn { flex:1; padding:6px 9px; border:none; border-radius:0; background:#fff;
+             color:var(--mut); font:inherit; }
+  .seg-btn + .seg-btn { border-left:1px solid #cbd2dc; }
+  .seg-btn:hover:not(:disabled) { background:#f4f6f9; }
+  .seg-btn.activa { background:#1d4ed8; color:#fff; font-weight:600; }
   .editor-acciones { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
   /* Ventana de UN cliente (Clientes y sucursales -> Editar): su nombre, sus
      marcas y sus sucursales dejan de pisar la lista. Va por DEBAJO del editor
@@ -13073,8 +13083,7 @@ const CATALOGOS = {
       // Desde 2026-07-29 una entrada marcada como sucursal lo exige siempre:
       // media sucursal no factura.
       {campo: "codigo_sucursal_winledger", etiqueta: "Código de sucursal",
-       obligatorioSi: (get) => get("clasificacion") === "sucursal"
-         || clienteEsCadena(get("codigo_cliente_winledger")),
+       obligatorioSi: sucursalHaceFalta, visibleSi: sucursalHaceFalta,
        etiquetaCond: "obligatorio en sucursales",
        origenDato: "winledger"},
       // El RIF llega del Rif_id de AppSheet (ver cargar_conversiones.py), no se
@@ -13559,6 +13568,17 @@ function puedeSerSucursal(fila) {
   if (!codigo) return true;   // entrada nueva o cruce sin código: no arrastra nada
   return !catalogoFilas.some(f => (f.codigo_cliente_winledger || "") === codigo
                                   && f.cliente_id !== (fila && fila.cliente_id));
+}
+
+// Cuándo el código de sucursal hace falta — obligatorio Y visible, mismo
+// criterio para los dos (pedido del usuario 2026-08-04: un cliente sin
+// sucursales no necesita ver el campo, no solo que deje de exigirlo): en toda
+// entrada marcada sucursal, o en un cliente independiente cuyo código de
+// cliente ya es una cadena en el programa de facturación — ese código reparte
+// en sub-cuentas allá aunque esta entrada no cuelgue de otra.
+function sucursalHaceFalta(get) {
+  return get("clasificacion") === "sucursal"
+    || clienteEsCadena(get("codigo_cliente_winledger"));
 }
 
 // Lee del editor abierto: `claseActual` es lo que la fila era al abrirlo (ver
@@ -14395,20 +14415,37 @@ function abrirEditor(indice, prefill) {
     const opciones = c.opcionesDe ? c.opcionesDe() : c.opciones;
     if (opciones) {
       const ac = c.checkAcompanante;
-      const select = `<select id="ed-${c.campo}" ${esClave ? "disabled" : ""}>
-          ${opciones.map(o => {
+      if (!ac) {
+        const select = `<select id="ed-${c.campo}" ${esClave ? "disabled" : ""}>
+            ${opciones.map(o => {
+              const v = o.valor ?? o, txt = o.etiqueta ?? o;
+              return `<option value="${esc(v)}" ${v === valor ? "selected" : ""}>${esc(txt)}</option>`;
+            }).join("")}
+          </select>`;
+        return `<label class="editor-campo">${linea(notaClave, tag)}${select}</label>`;
+      }
+      // "Qué es" (Cliente/Sucursal): las dos opciones a la vista, no un
+      // dropdown. La opción placeholder ("— elige qué es —") no se pinta como
+      // botón: ningún segmento queda "activa" hasta que se elige una. El valor
+      // real vive en el input oculto ed-${c.campo}, que es lo que leen
+      // firmaEditorCatalogo/editorValidar/editorMarcarObligatorios — mismo
+      // contrato que tenían con el <select> que reemplaza.
+      const segmentos = opciones.filter(o => (o.valor ?? o) !== "");
+      const seg = `<div class="seg-grupo" id="ed-${c.campo}-seg">
+          ${segmentos.map(o => {
             const v = o.valor ?? o, txt = o.etiqueta ?? o;
-            return `<option value="${esc(v)}" ${v === valor ? "selected" : ""}>${esc(txt)}</option>`;
+            return `<button type="button" class="seg-btn${v === valor ? " activa" : ""}"
+                     ${esClave ? "disabled" : ""} data-valor="${esc(v)}"
+                     onclick="editorElegirSegmento('${c.campo}','${esc(v)}')">${esc(txt)}</button>`;
           }).join("")}
-        </select>`;
-      if (!ac) return `<label class="editor-campo">${linea(notaClave, tag)}${select}</label>`;
+        </div><input type="hidden" id="ed-${c.campo}" value="${esc(valor ?? "")}">`;
       return `<div class="editor-campo">${linea(notaClave, tag)}
         <div style="display:flex;align-items:center;gap:12px">
-          <div style="flex:1">${select}</div>
+          <div style="flex:1">${seg}</div>
           <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer"
                  title="${esc(ac.ayuda || "")}">
             <input type="checkbox" id="ed-${ac.campo}" ${fila[ac.campo] ? "checked" : ""}
-                   onchange="editorAplicarPrueba()">${esc(ac.etiqueta)}</label>
+                   onclick="return onClickEsPruebaChk(event)">${esc(ac.etiqueta)}</label>
         </div>
       </div>`;
     }
@@ -14434,7 +14471,8 @@ function abrirEditor(indice, prefill) {
   editorError("");   // sin avisos de una edición anterior
   editorDerivarCampos();   // la presentación de una fila existente se pinta de una
   editorAplicarEtiquetas();   // rótulos que dependen de "Qué es"
-  editorAplicarPrueba();   // apaga el dropdown y los obligatorios si es de prueba
+  editorAplicarPrueba();   // apaga el selector y los obligatorios si es de prueba
+  editorAplicarVisibilidad();   // oculta campos que no aplican con el "Qué es" actual
   editorMarcarObligatorios();   // barras ámbar/azul de los obligatorios desde el arranque
   $("editor-overlay").classList.add("visible");
   // Firma inicial del formulario: sirve para saber al cerrar si algo cambió.
@@ -14763,9 +14801,61 @@ function editorEsPrueba() {
   return !!(el && el.checked);
 }
 
+// Botón segmentado de "Qué es" (Cliente/Sucursal, ver el render de `opciones`
+// más arriba): pinta el elegido, guarda el valor en su input oculto — de ahí
+// en más es indistinguible de lo que dejaba un <select> con su "change" — y
+// dispara la misma cadena de recálculos.
+function editorElegirSegmento(campo, valor) {
+  const oculto = $("ed-" + campo);
+  if (!oculto || oculto.disabled) return;
+  oculto.value = valor;
+  const grupo = $("ed-" + campo + "-seg");
+  if (grupo) grupo.querySelectorAll(".seg-btn").forEach(
+    b => b.classList.toggle("activa", b.dataset.valor === valor));
+  editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad();
+  editorMarcarObligatorios(); editorRevalidar();
+}
+
+// Oculta campos cuyo `visibleSi` da falso con el estado actual del formulario
+// (hoy solo el código de sucursal, ver sucursalHaceFalta). Mismo criterio de
+// lectura que editorMarcarObligatorios: del DOM, no de `fila`, para reflejar
+// lo que el operador ya cambió sin guardar todavía.
+function editorAplicarVisibilidad() {
+  const def = CATALOGOS[catalogoActual];
+  if (!def) return;
+  const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
+  for (const c of def.campos) {
+    if (!c.visibleSi) continue;
+    const el = $("ed-" + c.campo);
+    const contenedor = el && el.closest(".editor-campo");
+    if (contenedor) contenedor.style.display = c.visibleSi(get) ? "" : "none";
+  }
+}
+
+// Confirmación antes de marcar O de quitar "Cliente de prueba" (pedido del
+// usuario 2026-08-04): a diferencia de modo admin (onClickModoAdminChk, que
+// solo confirma al prender), este interruptor tiene consecuencia fiscal en
+// los dos sentidos — marcarlo saca al cliente de facturación, quitarlo lo
+// vuelve a meter — así que los dos se confirman. Mismo patrón: el clic se
+// revierte con preventDefault y confirmarSinQuitar lo repone recién al
+// confirmar.
+function onClickEsPruebaChk(ev) {
+  const activando = ev.target.checked;   // valor que el clic estaba por dejar
+  ev.preventDefault();
+  confirmarSinQuitar(ev.target.closest("label"), () => {
+    ev.target.checked = activando;
+    editorAplicarPrueba();
+    editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad();
+    editorMarcarObligatorios(); editorRevalidar();
+  }, activando ? "Confirmar: no facturará" : "Confirmar: vuelve a facturar");
+  return false;
+}
+
 function editorAplicarPrueba() {
-  const select = $("ed-clasificacion");
-  if (select) select.disabled = editorEsPrueba();
+  const oculto = $("ed-clasificacion");
+  if (oculto) oculto.disabled = editorEsPrueba();
+  const grupoSeg = $("ed-clasificacion-seg");
+  if (grupoSeg) grupoSeg.querySelectorAll(".seg-btn").forEach(b => b.disabled = editorEsPrueba());
   // Un cliente de prueba nunca factura, así que "Activo" no tendría ningún
   // efecto: se apaga y no se puede prender de vuelta (regla del usuario
   // 2026-07-31). El valor que el operador ya tenía puesto se conserva y se
@@ -14792,8 +14882,8 @@ function editorRevalidar() {
   if ($("editor-error").style.display === "none") return;
   editorError(editorValidar());
 }
-$("editor-overlay").addEventListener("input", () => { editorDerivarCampos(); editorAplicarEtiquetas(); editorMarcarObligatorios(); editorRevalidar(); });
-$("editor-overlay").addEventListener("change", () => { editorDerivarCampos(); editorAplicarEtiquetas(); editorMarcarObligatorios(); editorRevalidar(); });
+$("editor-overlay").addEventListener("input", () => { editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad(); editorMarcarObligatorios(); editorRevalidar(); });
+$("editor-overlay").addEventListener("change", () => { editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad(); editorMarcarObligatorios(); editorRevalidar(); });
 
 // --- DESCUENTOS (modelo campaña — PLAN.md pendiente 26, 2ª ronda) -----------
 // Un descuento = porcentaje general + vigencia (desde obligatoria, hasta
