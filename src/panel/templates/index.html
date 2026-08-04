@@ -13008,10 +13008,10 @@ const CONFIGMAQ_TEXTOS = {
   dia_despacho: "si facturas para hoy o para mañana",
 };
 let resolverConfigMaquina = null;
-// Vista previa (?ver_configuracion=1, atajo "olvidar_configuracion.bat" →
-// opción 1, 2026-07-31): la misma pantalla, pero sin que nada esté realmente
-// pendiente — se ve con los valores YA guardados en vez de en blanco, y se
-// puede cerrar sin llenar nada porque no hay ningún dato roto de por medio.
+// Vista previa (?ver_configuracion=1, 2026-07-31): la misma pantalla, pero
+// sin que nada esté realmente pendiente — se ve con los valores YA guardados
+// en vez de en blanco, y se puede cerrar sin llenar nada porque no hay ningún
+// dato roto de por medio.
 let vistaPreviaConfigMaquina = false;
 
 // Devuelve una promesa que resuelve true cuando quedó configurada. Quien la
@@ -17946,10 +17946,9 @@ consultarTasaBCV();   // en paralelo con cargar(): el BCV puede tardar segundos
 // PENDIENTES aparezca correcto desde el primer pintado.
 const ajustesInicial = cargarAjustes();
 borradorAvisoRevisar();   // si el panel se cerró con un editor a medias, ofrece retomarlo
-// Vista previa de la configuración obligatoria (?ver_configuracion=1, atajo
-// scripts/windows/olvidar_configuracion.bat → opción 1, 2026-07-31): no borra
-// nada, espera a que ambas cargas traigan los valores reales de esta
-// computadora y recién ahí abre la pantalla ya llena con ellos.
+// Vista previa de la configuración obligatoria (?ver_configuracion=1,
+// 2026-07-31): no borra nada, espera a que ambas cargas traigan los valores
+// reales de esta computadora y recién ahí abre la pantalla ya llena con ellos.
 if (new URLSearchParams(window.location.search).get("ver_configuracion") === "1") {
   Promise.all([cargaInicial, ajustesInicial]).then(() => abrirConfigMaquina([], true));
 }
