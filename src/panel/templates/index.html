@@ -1387,17 +1387,19 @@
   .sup-ticket-estado.en-proceso { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
   .sup-ticket-estado.resuelto { background:#eaf7ef; border-color:#b7dfc0; color:#15803d; }
   .sup-ticket-estado.descartado { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
-  #sup-equipo-overlay, #sup-ticket-overlay {
+  #sup-equipo-overlay, #sup-ticket-overlay, #sup-actividad-overlay {
     position:fixed; inset:0; background:rgba(29,36,51,.45); display:none;
     z-index:20; align-items:flex-start; justify-content:center;
   }
-  #sup-equipo-overlay.visible, #sup-ticket-overlay.visible { display:flex; }
-  #sup-equipo-caja, #sup-ticket-caja {
+  #sup-equipo-overlay.visible, #sup-ticket-overlay.visible,
+  #sup-actividad-overlay.visible { display:flex; }
+  #sup-equipo-caja, #sup-ticket-caja, #sup-actividad-caja {
     background:#fff; border-radius:10px; padding:18px; margin-top:5vh;
     width:min(760px, 94vw); max-height:88vh; overflow:auto;
     box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
-  #sup-equipo-caja h3, #sup-ticket-caja h3 { margin:0 0 14px; font-size:14px; }
+  #sup-equipo-caja h3, #sup-ticket-caja h3, #sup-actividad-caja h3 { margin:0 0 14px; font-size:14px; }
+  .sup-actividad-boton { padding:10px 12px; }
   .sup-detalle-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 18px;
                       margin-bottom:12px; }
   .sup-detalle-seccion { border-top:1px solid #e2e6ec; padding-top:10px;
@@ -2698,9 +2700,8 @@
             <button type="button" onclick="cargarMasEquipos()">Mostrar más</button>
           </div>
         </div>
-        <div class="sup-bloque">
-          <h3>Actividad reciente</h3>
-          <ul id="sup-actividad-lista"></ul>
+        <div class="sup-bloque sup-actividad-boton">
+          <button type="button" onclick="abrirActividadSupervision()">Ver actividad reciente</button>
         </div>
       </div>
       <div class="sup-bloque" id="sup-tickets-bloque">
@@ -2837,6 +2838,17 @@
     <div id="sup-equipo-cuerpo"></div>
     <div class="editor-acciones">
       <button type="button" onclick="cerrarDetalleEquipoSupervision()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Actividad reciente desde ADMIN → Supervisión. -->
+<div id="sup-actividad-overlay" onclick="if(event.target===this)cerrarActividadSupervision()">
+  <div id="sup-actividad-caja">
+    <h3>Actividad reciente</h3>
+    <ul id="sup-actividad-lista"></ul>
+    <div class="editor-acciones">
+      <button type="button" onclick="cerrarActividadSupervision()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -6141,6 +6153,16 @@ function pintarActividadSupervision() {
           a.conflicto ? `<span class="sup-doble">doble llenado</span>` : ""}</span>
       </li>`).join("")
     : `<li class="sup-lista-vacia">No hay actividad reciente.</li>`;
+}
+
+function abrirActividadSupervision() {
+  $("sup-actividad-overlay").classList.add("visible");
+  crecerVentanaPorModal("sup-actividad-caja");
+}
+
+function cerrarActividadSupervision() {
+  $("sup-actividad-overlay").classList.remove("visible");
+  replantarCajaFlotante();
 }
 
 async function cargarSupervision({mostrarCarga=false, anadir=false, desde=0} = {}) {
