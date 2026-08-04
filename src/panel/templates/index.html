@@ -3764,6 +3764,13 @@ function verDetalleTecnico() {
   return chk ? chk.checked : true;
 }
 
+// Mismo anexo que hace api() con las respuestas de error, para los mensajes
+// que NO viajan como error HTTP: un llenado que falla responde 200 con
+// exito=false, así que su detalle técnico hay que pegarlo aquí.
+function conDetalleTecnico(texto, detalle) {
+  return (detalle && verDetalleTecnico()) ? texto + "  ·  [técnico] " + detalle : texto;
+}
+
 // La tasa NO se va a registrar en este llenado (switch "Saltar puesta a punto →
 // Tasa"). Absorbió al viejo "Llenar sin avisar que falta la tasa del día"
 // (fusión 2026-07-27): si la tasa no se toca, que el BCV no haya publicado la
@@ -10159,7 +10166,8 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // intento, si Winledger todavía pide login, cae solo en el sondeo
       // esperarLogin/sin_login que ya existe) y el aviso se acumula para el
       // mensaje final, para no interrumpir la vista en vivo (2026-07-26).
-      destranquesEnFila.push(`${refFacturaUbicable(pedido_id, parte)}: ${r.error}`);
+      destranquesEnFila.push(conDetalleTecnico(
+        `${refFacturaUbicable(pedido_id, parte)}: ${r.error}`, r.detalle));
       // Tope por factura (2026-07-26): la corrida vuelve a la que destrancó,
       // así que un trancón que se repite en la misma factura cerraría y
       // reabriría Winledger sin fin. Al segundo se pausa: el problema ya no es
@@ -10184,10 +10192,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // llegaba aquí como "en la línea ?" y mandaba a buscar un renglón que
       // nunca existió. El fallo del encabezado tampoco dice nada del código:
       // la factura queda para reintentar, con el motivo tal como salió.
-      const fallo = r.linea_fallida
+      const fallo = conDetalleTecnico(r.linea_fallida
         ? `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)} `
           + `en la línea ${r.linea_fallida}: ${r.error}.`
-        : `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)}: ${r.error}`;
+        : `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)}: ${r.error}`,
+        r.detalle);
       // Destranque en el PRIMER llenado de la sesión (2026-07-26): podría
       // haber pisado trabajo manual ajeno que ya estuviera abierto en
       // Winledger antes de que el asistente tocara nada — se avisa aparte.
