@@ -125,8 +125,12 @@
      este número); esto es la red de seguridad para cuando el panel corre en
      un navegador normal, que no se puede bloquear desde la página — ahí, si
      la ventana del navegador es más angosta que esto, aparece scroll
-     horizontal en vez de tapar botones. */
-  body:not(.modo-llenado) { min-width:1200px; overflow-x:auto; }
+     horizontal en vez de tapar botones.
+     Alto mínimo (2026-08-04, misma lógica): por debajo, la barra superior,
+     los filtros y el paginador se comen la ventana y no queda aire para ver
+     filas. Espejo de ALTO_MINIMO_PANEL en ventana_app.py, misma red de
+     seguridad por CSS para el navegador normal. */
+  body:not(.modo-llenado) { min-width:1200px; min-height:700px; overflow-x:auto; overflow-y:auto; }
   .barra { display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:14px; }
   /* Filtros Buscar/Desde/Hasta: viven entre las tabs y la tabla. Solo se
      ven en PENDIENTES y PROCESADAS (ver cambiarTab), pero son un único
