@@ -6020,9 +6020,13 @@ async function cargar() {
 const REFRESCO_AUTO_MS = 10 * 60 * 1000;
 // Cuerpo compartido entre el intervalo y el botón "Actualizar" del estado de
 // la nube: mismo camino, misma guardia. Devuelve false si un llenado manda.
-async function refrescarTodo() {
+// `manual` distingue quién lo pidió (2026-08-04): el del operador lee la hoja
+// de pedidos fresca, saltándose la copia compartida entre máquinas — es
+// justo el dato del minuto lo que se está pidiendo. El automático usa la
+// copia, que para eso existe.
+async function refrescarTodo(manual = false) {
   if (llenando || secuenciaActiva || esperandoLogin) return false;
-  await api("/api/refrescar", {});
+  await api("/api/refrescar", {manual});
   await cargar();
   pintarAvisoFecha();   // con el panel abierto de un día para otro, el ": hoy" del rótulo pasaría a ser mentira
   consultarTasaBCV();   // asíncrona a propósito: nunca retrasa la lista
@@ -6184,7 +6188,7 @@ async function actualizarNubeAhora() {
   const b = document.getElementById("nube-actualizar");
   if (b) { b.disabled = true; b.textContent = "Actualizando…"; }
   try {
-    await refrescarTodo();
+    await refrescarTodo(true);
     await sondearCompartido();
   } catch (e) {
     mensaje("No se pudo actualizar: " + e.message, "error");
