@@ -6326,7 +6326,7 @@ async function enviarTicket() {
   const texto = $("ticket-mensaje").value.trim();
   const error = $("ticket-error");
   if (!texto) {
-    error.textContent = "Escribe qué ocurrió: es lo único que el programa no puede saber solo.";
+    error.textContent = "Hace falta llenar el campo de qué ocurrió.";
     error.style.display = "";
     $("ticket-mensaje").focus();
     return;
