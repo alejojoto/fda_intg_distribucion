@@ -5950,7 +5950,7 @@ function refFacturaUbicable(pedido_id, parte) {
   return datos.length ? `${pedido_id} (${datos.join(" · ")})` : `${pedido_id}`;
 }
 
-async function cargar() {
+async function cargar(conservarScroll = false) {
   try {
     const d = await api("/api/facturas?" + filtros());
     ultimaLista = d;
@@ -5993,14 +5993,28 @@ async function cargar() {
       rutaPredetAplicada = true;
       if (rutaPredeterminada && rutaSeleccionada !== rutaPredeterminada) {
         rutaSeleccionada = rutaPredeterminada;
-        return cargar();   // recarga ya filtrada (el guard evita el bucle)
+        return cargar(conservarScroll);   // recarga ya filtrada (el guard evita el bucle)
       }
     }
     pintarRutas(d.rutas, d.hay_sin_ruta);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
     cargaFallo = false;
     pintarNube();
+    // El sondeo de fondo reconstruye los tbody completos. Mientras esos nodos
+    // desaparecen, Chromium pierde su ancla y puede llevar la página arriba;
+    // se repone la coordenada que tenía justo antes del repintado. Las cargas
+    // nacidas de filtros, pestañas o botones no pasan esta bandera y conservan
+    // su navegación habitual.
+    const scrollAntes = conservarScroll
+      ? {x: window.scrollX || 0, y: window.scrollY || 0}
+      : null;
     repintar();
+    if (scrollAntes) {
+      window.scrollTo(scrollAntes.x, scrollAntes.y);
+      // pywebview/Chromium puede aplicar el anclaje al cerrar este ciclo de
+      // layout; repetirlo en el próximo frame deja la posición definitiva.
+      requestAnimationFrame(() => window.scrollTo(scrollAntes.x, scrollAntes.y));
+    }
     return true;
   } catch (e) {
     mensaje("No se pudo cargar la lista: " + e.message, "error");
@@ -6244,7 +6258,7 @@ async function actualizarVistasSincronizadas(entidades, cambioCompartido) {
   if (cambioCompartido) accionesSyncPendientes.add("principal");
 
   if (accionesSyncPendientes.has("principal")) {
-    if (await cargar() !== false) accionesSyncPendientes.delete("principal");
+    if (await cargar(true) !== false) accionesSyncPendientes.delete("principal");
   }
   if (accionesSyncPendientes.has("detalle")
       && !detalleTocado && !detalleAjustesEnVuelo.length) {
