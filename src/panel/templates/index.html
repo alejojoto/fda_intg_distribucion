@@ -741,15 +741,6 @@
      arriba): queda pegada al botón que la produjo, aunque la pestaña cambie. */
   .ajustes-ok { color:#16a34a; font-size:12px; font-weight:600; }
   .cat-btns { display:flex; gap:8px; flex-wrap:wrap; }
-  /* Vista completa de Rutas dentro de AJUSTES (2026-08-02): mismo patrón que
-     PENDIENTES/DESCUENTOS (ocupa sola el área bajo pestañas), solo que
-     anidada un nivel: home ↔ vista se alternan con display, nunca las dos a
-     la vez. Catálogos volvió a su botonera de siempre en AJUSTES → cada
-     catálogo abre en su propio modal, ver #catalogo-overlay (2026-08-04). */
-  .volver-ajustes { display:inline-flex; align-items:center; gap:6px; margin:14px 0 4px 14px;
-                    background:none; border:none; color:#1d4ed8; font:inherit; font-weight:600;
-                    cursor:pointer; padding:4px 2px; }
-  .volver-ajustes:hover { text-decoration:underline; }
   /* Regla efectiva de una ruta (lista de AJUSTES → Rutas): automático en
      verde (mismo verde que .punto-estado.si/.ajustes-ok — "esto ya corre
      solo"), manual restringido en el texto normal, sin configurar atenuado
@@ -763,6 +754,18 @@
   #ruta-edit-series { display:flex; gap:12px; flex-wrap:wrap; }
   #ruta-edit-series label { display:flex; align-items:center; gap:5px; cursor:pointer;
                             font-weight:400; color:#1d2433; }
+  /* Ventana propia de Rutas (2026-08-04): mismo patrón que #catalogo-overlay,
+     por DEBAJO de #ruta-editor-overlay (20), que se abre ENCIMA al configurar
+     una ruta. */
+  #rutas-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                   display:none; z-index:18; align-items:flex-start; justify-content:center; }
+  #rutas-overlay.visible { display:flex; }
+  #rutas-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
+                width:min(760px, 96vw); max-height:85vh; overflow:hidden;
+                display:flex; flex-direction:column;
+                box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #rutas-caja > .editor-acciones { flex:none; border-top:1px solid #e2e6ec; padding-top:12px; }
+  #rutas-vista { flex:1 1 auto; min-height:0; overflow:auto; }
   /* Editor de UNA ruta (ventana modal): mismo patrón visual que #editor-overlay. */
   #ruta-editor-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
                          display:none; z-index:20; align-items:flex-start; justify-content:center; }
@@ -2352,15 +2355,9 @@
   </section>
 
   <section id="sec-ajustes" class="tab-panel" style="display:none">
-   <!-- Vista propia por sección (2026-08-02, pedido del usuario): Rutas dejó de
-        ser un acordeón bajo "Esta máquina"/"Día de despacho" y pasó a ocupar
-        el área completa de la pestaña, igual que PENDIENTES/DESCUENTOS — la
-        lista de rutas apretada bajo dos bloques ajenos se leía peor que sola.
-        El estado ajustesVista decide cuál de los dos contenedores de abajo se
-        ve; volverAAjustesHome restaura el scroll con el que se entró (ver
-        ajustesScrollGuardado). Catálogos volvió a su botonera de siempre acá
-        en home: cada botón abre su catálogo en modal propio (2026-08-04, ver
-        #catalogo-overlay), no en una vista aparte. -->
+   <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
+        #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
+        que los abren. -->
    <div id="ajustes-home">
     <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
          computadora, juntas porque son obligatorias juntas — sin las dos no se
@@ -2414,9 +2411,9 @@
         botón del calendario la repone con un clic, y en cualquier factura se
         puede cambiar a mano.</p>
     </div>
-    <!-- Catálogos: cada botón abre el suyo en su propio modal (#catalogo-overlay,
-         2026-08-04) — ver pintarBotonesCatalogos/alternarCatalogo. Rutas sigue
-         en su vista completa aparte, más abajo. -->
+    <!-- Catálogos y Rutas: cada botón abre el suyo en su propio modal
+         (#catalogo-overlay / #rutas-overlay, 2026-08-04) — ver
+         pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
     <div class="ajustes-bloque">
       <h3>Catálogos</h3>
       <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
@@ -2428,31 +2425,6 @@
       <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
         seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
       <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
-    </div>
-   </div>
-
-   <!-- Vista completa de Rutas (2026-08-02): una fila por ruta con su regla
-        efectiva; editar abre #ruta-editor-overlay. Sin fila para una ruta =
-        sin configurar = selección manual de siempre (ver pintarFilasRutas). -->
-   <div id="ajustes-rutas-vista" class="ajustes-vista" style="display:none">
-    <button type="button" class="volver-ajustes" onclick="volverAAjustesHome()">&larr; Volver a Ajustes</button>
-    <div class="ajustes-bloque">
-      <h3>Series por ruta</h3>
-      <p class="mut" style="margin:4px 0 10px">Qué series puede facturar cada
-        ruta y cuál se elige sola al preparar pedidos. No es obligatorio: sin
-        configurar, se elige a mano entre todas.</p>
-      <div class="cat-cabecera" style="padding:0 0 10px">
-        <span class="buscador"><input type="text" id="rutas-filtro" placeholder="filtrar…"
-              oninput="pintarFilasRutas()">
-          <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
-              onclick="limpiarBuscador('rutas-filtro', pintarFilasRutas)">&times;</button></span>
-        <span class="mut" id="rutas-conteo"></span>
-        <button class="primario" style="margin-left:auto" onclick="abrirEditorRuta(null)">Configurar ruta</button>
-      </div>
-      <div style="overflow-x:auto"><table id="t-rutas">
-        <thead><tr><th>Ruta</th><th>Regla</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table></div>
     </div>
    </div>
   </section>
@@ -2904,6 +2876,37 @@
     <div class="editor-acciones">
       <button id="editor-guardar" class="primario" onclick="guardarEditor()">Guardar</button>
       <button onclick="intentarCerrarEditor()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ventana propia de Rutas (2026-08-04, mismo patrón que #catalogo-overlay):
+     se abre desde el botón "Abrir rutas" en AJUSTES. El editor de UNA ruta
+     (#ruta-editor-overlay) se abre ENCIMA de esta. -->
+<div id="rutas-overlay" onclick="if(event.target===this)cerrarRutasVista()">
+  <div id="rutas-caja">
+    <div id="rutas-vista">
+      <div class="ajustes-bloque">
+        <h3>Series por ruta</h3>
+        <p class="mut" style="margin:4px 0 10px">Qué series puede facturar cada
+          ruta y cuál se elige sola al preparar pedidos. No es obligatorio: sin
+          configurar, se elige a mano entre todas.</p>
+        <div class="cat-cabecera" style="padding:0 0 10px">
+          <span class="buscador"><input type="text" id="rutas-filtro" placeholder="filtrar…"
+                oninput="pintarFilasRutas()">
+            <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
+                onclick="limpiarBuscador('rutas-filtro', pintarFilasRutas)">&times;</button></span>
+          <span class="mut" id="rutas-conteo"></span>
+          <button class="primario" style="margin-left:auto" onclick="abrirEditorRuta(null)">Configurar ruta</button>
+        </div>
+        <div style="overflow-x:auto"><table id="t-rutas">
+          <thead><tr><th>Ruta</th><th>Regla</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="editor-acciones">
+      <button type="button" onclick="cerrarRutasVista()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -13279,34 +13282,16 @@ const CATALOGOS = {
 };
 
 // Descuentos vive en su propia pestaña; AJUSTES lista los demás catálogos.
-// --- AJUSTES: navegación entre home y vista de Rutas ------------------------
-// (2026-08-02, pedido del usuario): Rutas dejó de vivir como acordeón bajo
-// "Esta máquina"/"Día de despacho" y pasó a vista completa, igual que
-// PENDIENTES/DESCUENTOS — un solo estado con los dos contenedores que se
-// alternan por display, guardando el scroll de cada uno para no perderlo al
-// ir y volver (AJUSTES deja bajar la página completa, ver .tab-libre en
-// cambiarTab). Cambiar de pestaña arriba (PENDIENTES, DESCUENTOS…) no toca
-// esto: si se vuelve a AJUSTES, queda la misma vista de antes. Catálogos ya
-// no es una vista de esta navegación: volvió a su botonera en ajustes-home y
-// cada uno abre en su propio modal (#catalogo-overlay, 2026-08-04).
-let ajustesVista = "home";   // "home" | "rutas"
-const ajustesScrollGuardado = {home: 0, rutas: 0};
-
-function irAAjustesVista(vista) {
-  ajustesScrollGuardado[ajustesVista] = window.scrollY;
-  ajustesVista = vista;
-  $("ajustes-home").style.display = vista === "home" ? "" : "none";
-  $("ajustes-rutas-vista").style.display = vista === "rutas" ? "" : "none";
-  window.scrollTo(0, ajustesScrollGuardado[vista] || 0);
-}
-
+// Rutas abre en su propio modal (#rutas-overlay, 2026-08-04, mismo patrón
+// que #catalogo-overlay): el botón "Abrir rutas" solo abre, Cerrar/clic
+// afuera cierra — no hay estado de navegación que mantener.
 function abrirRutasVista() {
-  irAAjustesVista("rutas");
+  $("rutas-overlay").classList.add("visible");
   cargarRutasSeries();
 }
 
-function volverAAjustesHome() {
-  irAAjustesVista("home");
+function cerrarRutasVista() {
+  $("rutas-overlay").classList.remove("visible");
 }
 
 const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
