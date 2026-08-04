@@ -14997,6 +14997,11 @@ const descBuscarClientes = debounce(descPintarClientes, 250);
 
 async function renderDescuentos() {
   const cont = $("desc-lista");
+  // El repintado no debe mover al operador de donde está — vale para CUALQUIER
+  // llamador, incluido el sondeo automático en segundo plano (sondearCompartido):
+  // vaciar el contenedor encoge la página y el navegador recorta el scroll solo;
+  // se guarda ANTES de vaciar y se restaura al terminar, gane o pierda la carga.
+  const scrollPrevio = window.scrollY;
   cont.innerHTML = '<p class="mut" style="margin:14px"><span class="spinner"></span> Cargando…</p>';
   try {
     if (!descSelector) descSelector = await api("/api/descuentos/selector");
@@ -15012,9 +15017,11 @@ async function renderDescuentos() {
     descConflictos = conf;
     pintarListaDescuentos();
     pintarDescuentosBorrados();
+    window.scrollTo(0, scrollPrevio);
     return true;
   } catch (e) {
     cont.innerHTML = `<p class="detalle-error" style="margin:14px">No se pudieron cargar los descuentos: ${esc(e.message)}</p>`;
+    window.scrollTo(0, scrollPrevio);
     return false;
   }
 }
