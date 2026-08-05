@@ -7168,6 +7168,7 @@ async function cargar(conservarScroll = false) {
     if (d.nube) {
       nube.carga_ts = d.nube.carga_ts;
       nube.espejo_activo = d.nube.espejo_activo;
+      nube.bajada_error = d.nube.bajada_error;
       pintarAvisoConflictosSync(d.nube.sync_conflictos);
       pintarNube();
     }
@@ -7276,6 +7277,9 @@ function nubeClase() {
   // carga_ts nulo = el servidor está rearmando la lista (arranque, o un
   // cambio que otra máquina acaba de hacer y este panel ya está bajando).
   if (!nube.carga_ts) return "nube-sync";
+  // La conexión responde pero lo bajado no está aterrizando (p. ej. un dato
+  // que esta versión no conoce): decir "Todo al día" aquí sería mentir.
+  if (nube.bajada_error) return "nube-sync";
   return "nube-ok";
 }
 
@@ -7297,12 +7301,18 @@ function armarPopoverNube(clase) {
   const color = clase === "nube-caida" ? "#dc2626"
               : clase === "nube-sync"  ? "#d97706" : "#15803d";
   const titulo = clase === "nube-caida" ? "Sin conexión con la nube"
-               : clase === "nube-sync"  ? "Actualizando…"
+               : clase === "nube-sync"  ? (nube.bajada_error
+                                            ? "No se está pudiendo actualizar"
+                                            : "Actualizando…")
                                         : "Todo al día";
   let html = `<h3><span class="nube-punto" style="background:${color}"></span>${titulo}</h3>`;
   if (clase === "nube-caida") {
     html += `<div class="nube-nota">Lo que hagan las otras computadoras puede `
           + `no verse al día. Se reintenta solo cada pocos segundos.</div>`;
+  } else if (clase === "nube-sync" && nube.bajada_error) {
+    html += `<div class="nube-nota">Los cambios de las otras computadoras no `
+          + `están bajando: lo que se ve puede quedarse viejo. El detalle `
+          + `está en el Informe para soporte.</div>`;
   } else {
     html += `<div class="nube-fila" title="Pedidos, facturas, descuentos y `
           + `catálogos se revisan solos cada pocos segundos.">`
@@ -7348,6 +7358,8 @@ async function abrirDiagnosticoSync() {
         (cola.mas_viejo ? `  (el más viejo: ${cola.mas_viejo})` : "") +
         (cola.trancado ? `  TRANCADO en ${cola.trancado.tabla} tras ` +
           `${cola.trancado.intentos} intento(s): ${cola.trancado.ultimo_error}` : ""),
+      ...(d.bajada_error
+        ? [`BAJADA TRANCADA: ${d.bajada_error}`] : []),
       `Choques sin resolver: ${d.conflictos_abiertos}`,
       `Réplica local: ${d.espejo.facturas} facturas, ${d.espejo.pedidos} pedidos`,
       `Instalación sincronizada: ${d.snapshot || "nunca"}`,
@@ -7718,6 +7730,7 @@ async function sondearCompartido() {
     if (r.nube) {
       nube.carga_ts = r.nube.carga_ts;
       nube.espejo_activo = r.nube.espejo_activo;
+      nube.bajada_error = r.nube.bajada_error;
     }
     pintarNube();
     const cambio = r.cambio;
