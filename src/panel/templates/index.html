@@ -9604,6 +9604,34 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
 }
 
+// --- Historial permanente de la factura (2026-08-05) ------------------------
+// `nota_reemision` dejó de ser solo el rastro de las reaperturas: acumula un
+// renglón fechado por cada fallo y por cada decisión que lo resolvió
+// (descartada, marcada a mano, reabierta, llenada de nuevo). Lo arma
+// local_state._anotar_historial; los encabezados de REAPERTURA son los de
+// local_state._ENCABEZADO_REEMISION — si allá se reescriben, actualizar aquí.
+const ENCABEZADO_REAPERTURA = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} — (Reemisión pedida|Reabierta)/;
+
+// El renglón más nuevo que cuenta una reapertura, para donde el panel promete
+// justamente eso ("Marcada para volver a llenar"): tomar el último renglón a
+// ciegas mostraría el fallo de un reintento posterior.
+function ultimaReapertura(nota) {
+  return (nota || "").split("\n").filter(l => ENCABEZADO_REAPERTURA.test(l.trim())).pop() || "";
+}
+
+// El historial SIN su renglón más nuevo, que es el que ya cuenta la celda de
+// al lado (falló esto, se descartó por aquello, se llenó): repetirlo debajo
+// sería decir dos veces lo mismo en la misma fila. La reapertura es la
+// excepción — no tiene celda propia: una factura marcada para volver a llenar
+// no trae detalle de error que mostrar.
+function historialPrevio(nota) {
+  const renglones = (nota || "").split("\n").filter(l => l.trim());
+  if (!renglones.length) return "";
+  const previos = ENCABEZADO_REAPERTURA.test(renglones[renglones.length - 1])
+    ? renglones : renglones.slice(0, -1);
+  return previos.join("\n");
+}
+
 // Una factura con error deja a su pedido ENTERO esperando aquí: no pasa a
 // PROCESADAS hasta que se reintente o se descarte (regla 2026-07-22). Nada
 // más lo reclamaba, así que la propia factura lo dice: desde cuándo espera y
@@ -9660,7 +9688,7 @@ function avisoDeFactura(f, enFamilia) {
   // renglón gris —igual que en PROCESADAS— en vez de pegada a la frase: cuenta
   // otra cosa que el resultado del último llenado. Sin error que reportar, la
   // reemisión ES el motivo de que esté aquí, y hablar de que "falló" sobra.
-  const ultimaReemision = (f.nota_reemision || "").split("\n").pop();
+  const ultimaReemision = ultimaReapertura(f.nota_reemision);
   const encabezado = (!detalle && ultimaReemision)
     ? `Marcada para volver a llenar: el pedido no queda listo hasta llenarla
        de nuevo o descartarla.`
@@ -9821,7 +9849,7 @@ function pintarLlenadosPorRevisar(lista) {
       : "";
     // Mismos textos que el aviso de PENDIENTES y el renglón de PROCESADAS:
     // la reemisión sin error se dice como lo que es, no como un fallo.
-    const ultimaReemision = (f.nota_reemision || "").split("\n").pop();
+    const ultimaReemision = ultimaReapertura(f.nota_reemision);
     // El doble llenado (tipo "conflicto", 2026-08-05) trae su marca completa:
     // qué pasó, quién llegó primero y qué hay que decidir.
     const quePaso = f.tipo === "conflicto"
@@ -10134,14 +10162,16 @@ function filaProcesada(f, enFamilia) {
     : (f.estado === "descartada" || f.estado === "facturada_a_mano") ? (f.motivo_descarte || "")
     : (f.detalle_error ? f.detalle_error + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "") : "");
   const clave = esc(`${f.pedido_id}|${f.parte}`);
-  // Historial de reemisiones: renglón aparte y en gris debajo del detalle
+  // Historial de la factura: renglón aparte y en gris debajo del detalle
   // (2026-07-27). No es el resultado del último llenado —que es lo que pinta
   // de rojo la celda—, sino la historia de la factura, y se queda ahí para
   // siempre: un documento reemitido tiene que poder explicarse meses después.
+  // Desde 2026-08-05 son TODOS los eventos (fallos y las decisiones que los
+  // resolvieron), menos el más nuevo, que ya lo dice la celda de al lado.
   // Va en todos los estados, también en una reabierta que terminó marcada
   // como llenada a mano (las filas virtuales nunca traen nota: no tienen
   // registro local que reabrir).
-  const reemisiones = f.nota_reemision || "";
+  const reemisiones = historialPrevio(f.nota_reemision);
   // Doble llenado (2026-07-28): renglón propio a todo lo ancho, porque no es
   // un detalle de la factura sino un problema de plata — dos documentos
   // fiscales por el mismo pedido. Mientras esté abierto va en rojo y con su
