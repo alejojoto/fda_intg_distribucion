@@ -15331,6 +15331,29 @@ function clientesPrincipales() {
   return [...vistos.values()].sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
 }
 
+// El cliente principal de una sucursal se reconoce sin asignarlo a mano
+// (pedido del usuario 2026-08-05): por RIF cuando la fila lo trae, y si no
+// por el código común de las sucursales — el Cliente_id de la app de pedidos
+// comparte el tramo antes del último "_" ("J123456789_4" y "J123456789_7"
+// son sucursales del mismo cliente; el Rif_id suele venir vacío, por eso no
+// alcanza solo). Devuelve otra fila del mismo cliente que ya tenga código
+// Winledger, o null. Solo alimenta PRELLENADOS del editor: no cruza nada
+// solo — la regla "no se adivina" sigue, una persona confirma con Guardar.
+function hermanaConCodigo(fila) {
+  const claveCliente = f => {
+    const rif = (f.rif || "").trim();
+    if (rif) return rif;
+    const id = (f.cliente_id || "").trim();
+    const corte = id.lastIndexOf("_");
+    return corte > 0 ? id.slice(0, corte) : "";
+  };
+  const propia = claveCliente(fila);
+  if (!propia) return null;
+  return catalogoFilas.find(f => f.cliente_id !== fila.cliente_id
+    && claveCliente(f) === propia
+    && (f.codigo_cliente_winledger || "").trim()) || null;
+}
+
 // Estado activo/inactivo de una fila: punto verde o rojo (pedido del usuario
 // 2026-07-27), la palabra en el title.
 function puntoEstado(activo) {
@@ -16098,18 +16121,23 @@ function abrirEditor(indice, prefill) {
     fila.es_prueba = esClientePrueba(fila) ? 1 : 0;
     editorFila.claseActual = clasificacionDe(fila);
     fila.clasificacion = editorFila.claseActual;
-    // Sucursal que la app de pedidos ya colgó de un cliente resuelto (mismo
-    // RIF que otra fila con código): el editor abre con el código y el nombre
-    // del cliente ya puestos, editables — solo falta el código de sucursal.
-    if (fila.clasificacion === "sucursal" && !(fila.codigo_cliente_winledger || "").trim()
-        && (fila.rif || "").trim()) {
-      const hermana = catalogoFilas.find(f => f.cliente_id !== fila.cliente_id
-        && (f.rif || "").trim() === fila.rif.trim()
-        && (f.codigo_cliente_winledger || "").trim());
+    // Sucursal que ya se puede colgar de un cliente resuelto: el editor abre
+    // con el código y el nombre del cliente ya puestos, editables — solo
+    // falta el código de sucursal (reconocimiento en hermanaConCodigo).
+    if (fila.clasificacion === "sucursal" && !(fila.codigo_cliente_winledger || "").trim()) {
+      const hermana = hermanaConCodigo(fila);
       if (hermana) {
         fila.codigo_cliente_winledger = hermana.codigo_cliente_winledger;
-        fila.nombre_cliente_winledger = hermana.nombre_cliente_winledger || "";
+        fila.nombre_cliente_winledger = (fila.nombre_cliente_winledger || "").trim()
+          || hermana.nombre_cliente_winledger || "";
       }
+    }
+    // Cliente sin sucursales: su nombre ES el de su única sucursal (decisión
+    // del usuario 2026-08-05) — si el catálogo no lo trae, se prellena con el
+    // nombre que llega de la app de pedidos, editable.
+    if (fila.clasificacion === "cliente" && !(fila.nombre_cliente_winledger || "").trim()
+        && (fila.sucursal_nombre || "").trim()) {
+      fila.nombre_cliente_winledger = fila.sucursal_nombre.trim();
     }
   }
   $("editor-titulo").textContent =
@@ -16566,8 +16594,30 @@ function editorElegirSegmento(campo, valor) {
   const grupo = $("ed-" + campo + "-seg");
   if (grupo) grupo.querySelectorAll(".seg-btn").forEach(
     b => b.classList.toggle("activa", b.dataset.valor === valor));
+  editorPrefillPorClasificacion(campo, valor);
   editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad();
   editorMarcarObligatorios(); editorRevalidar();
+}
+
+// Al ELEGIR "Qué es" se prellena lo que ya se puede saber (pedido del usuario
+// 2026-08-05), solo sobre campos vacíos — nunca pisa lo tecleado: sucursal →
+// código y nombre del cliente principal reconocido (hermanaConCodigo);
+// cliente → su nombre es el de su única sucursal. Mismas reglas que aplica
+// abrirEditor cuando la fila ya viene clasificada.
+function editorPrefillPorClasificacion(campo, valor) {
+  if (campo !== "clasificacion" || catalogoActual !== "clientes" || !editorFila) return;
+  const cod = $("ed-codigo_cliente_winledger"), nom = $("ed-nombre_cliente_winledger");
+  if (valor === "sucursal" && cod && !cod.value.trim()) {
+    const hermana = hermanaConCodigo(editorFila.fila);
+    if (hermana) {
+      cod.value = hermana.codigo_cliente_winledger;
+      if (nom && !nom.value.trim()) nom.value = hermana.nombre_cliente_winledger || "";
+    }
+  }
+  const suc = $("ed-sucursal_nombre");
+  if (valor === "cliente" && nom && !nom.value.trim() && suc && suc.value.trim()) {
+    nom.value = suc.value.trim();
+  }
 }
 
 // Oculta campos cuyo `visibleSi` da falso con el estado actual del formulario
