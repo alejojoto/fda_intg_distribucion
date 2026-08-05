@@ -9745,6 +9745,15 @@ function pintarLlenadosPorRevisar(lista) {
     const botonEditarCliente = tienePermiso("ajustes_catalogos")
       ? `<button onclick="editarClienteDesdeLlenado('${esc(f.cliente_id)}')" title="Si el código de cliente o sucursal quedó desactualizado, corrígelo aquí.">Editar cliente</button>`
       : "";
+    // Y en vez del botón, a quién le toca (2026-08-05, pedido del usuario):
+    // un fallo así suele ser un código de cliente o de producto que cambió en
+    // el programa de facturación, y quien solo factura se quedaba con
+    // Reintentar y Descartar sin saber que el arreglo no está en su equipo. No
+    // se nombra la causa: el aviso del llenado no la distingue (ver
+    // acciones.VerificacionFallida) y acusar una equivocada es peor.
+    const notaEditor = (!tienePermiso("ajustes_catalogos") && f.tipo === "error")
+      ? `<div class="mut">Si hay que corregir un catálogo, lo hace un editor: desde este equipo no se puede.</div>`
+      : "";
     const acciones = modoImplantacion
       ? (f.tipo === "error"
           ? botonPrellenado(f, "Probar reintento", "acento")
@@ -9754,12 +9763,12 @@ function pintarLlenadosPorRevisar(lista) {
           ? `<button onclick="tomarIgual('${esc(f.pedido_id)}',${f.parte})">Llenar igual</button>
              ${botonEditarCliente}
              <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
-             <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>`
+             <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>${notaEditor}`
           : `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          ${botonEditarCliente}
-         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
+         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>${notaEditor}`
       : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
            onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
          <button title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
