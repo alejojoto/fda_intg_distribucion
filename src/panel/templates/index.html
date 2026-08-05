@@ -7812,12 +7812,22 @@ async function abrirDiagnosticoSync() {
   }
 }
 
-function abrirSoporteRemoto(btn) {
-  // Placeholder (2026-08-05): todavía no hay canal de soporte remoto
-  // configurado. Cuando exista, este botón lo abre directo.
+// Abre el programa de soporte remoto que viene con el asistente (2026-08-05).
+// No arranca solo con Windows a propósito: se abre acá, el día que hace falta.
+async function abrirSoporteRemoto(btn) {
+  if (btn.disabled) return;
   const original = btn.textContent;
-  btn.textContent = "Próximamente";
-  setTimeout(() => { btn.textContent = original; }, 2500);
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>Abriendo…`;
+  try {
+    await api("/api/soporte/abrir-remoto", {});   // cuerpo vacío = POST
+    btn.textContent = "Ya está abierto";
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 4000);
+  } catch (e) {
+    mensaje(e.message, "error");
+    btn.textContent = original;
+    btn.disabled = false;
+  }
 }
 
 function cerrarDiagnosticoSync() {
