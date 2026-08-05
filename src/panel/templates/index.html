@@ -2368,7 +2368,9 @@
     <button type="button" id="btn-limpiar-fechas" style="display:none"
             onclick="limpiarFechas()">Limpiar fechas</button>
     <!-- PROCESADAS muestra también lo que llenaron las otras laptops (columna
-         Máquina); esta casilla recorta la lista a lo llenado aquí. -->
+         Máquina); esta casilla recorta la lista a lo llenado aquí. Va con el
+         mismo permiso que el dropdown de al lado (2026-08-05): la visibilidad
+         la decide cada refresco, ver mostrarCampoMaquina. -->
     <label class="campo-check" id="campo-solo-aqui" style="display:none"
            title="Oculta lo que llenaron las otras máquinas y lo que se facturó a mano.">
       <input type="checkbox" id="f-solo-aqui" onchange="marcarSoloAqui()">
@@ -6142,11 +6144,19 @@ let dispositivoPropio = "";
 // porque cambian por vías distintas: la tab al clickear, el permiso en el
 // refresco, la casilla al marcarla (con ella puesta el dropdown sobra: ya se
 // está mirando esta máquina).
+// Los DOS controles de máquina van con el mismo permiso (2026-08-05, pedido
+// del usuario): la casilla "Llenadas en esta máquina" y el dropdown. A quien
+// solo factura no le sirve recortar el historial por equipo.
 function mostrarCampoMaquina() {
+  const enProcesadas = tabActiva() === "procesadas";
+  const casilla = $("campo-solo-aqui");
+  if (casilla)
+    casilla.style.display =
+      (puedeFiltrarPorMaquina && enProcesadas) ? "" : "none";
   const campo = $("campo-maquina");
   if (campo)
     campo.style.display =
-      (puedeFiltrarPorMaquina && tabActiva() === "procesadas"
+      (puedeFiltrarPorMaquina && enProcesadas
        && !$("f-solo-aqui").checked) ? "" : "none";
 }
 
@@ -6158,7 +6168,12 @@ function pintarMaquinasFiltro(puede, equipos) {
   puedeFiltrarPorMaquina = !!puede;
   if (!puede) {
     mostrarCampoMaquina();
-    if (maquinaSeleccionada) { maquinaSeleccionada = ""; aplicarFiltros(); }
+    // La casilla se suelta igual que el dropdown: un filtro que ya no se puede
+    // ver ni quitar dejaría la lista recortada sin explicación.
+    let habiaFiltro = !!maquinaSeleccionada;
+    if ($("f-solo-aqui").checked) { $("f-solo-aqui").checked = false; habiaFiltro = true; }
+    maquinaSeleccionada = "";
+    if (habiaFiltro) aplicarFiltros();
     return;
   }
   maquinasFiltro = equipos || [];
@@ -7146,10 +7161,10 @@ function cambiarTab(tab) {
   $("campo-desde").style.display = fechasVisibles;
   $("campo-hasta").style.display = fechasVisibles;
   $("btn-limpiar-fechas").style.display = fechasVisibles;
-  // "Llenadas en esta máquina" es de PROCESADAS: es la única lista que trae facturas
-  // de otras laptops (ver campo-solo-aqui).
-  $("campo-solo-aqui").style.display = tab === "procesadas" ? "" : "none";
-  mostrarCampoMaquina();   // mismo criterio, más el permiso de esta PC
+  // "Llenadas en esta máquina" y el dropdown de equipo son de PROCESADAS (la
+  // única lista con facturas de otras laptops) y del mismo permiso: los dos
+  // los pinta mostrarCampoMaquina.
+  mostrarCampoMaquina();
   // Cambiar de tab cambia QUÉ filtra (las fechas y la casilla solo cuentan en
   // PROCESADAS): el aviso se repinta con los de la tab que queda a la vista.
   pintarEstadoFiltros();
