@@ -2704,22 +2704,17 @@
            por el mismo motivo que la fila "Carga": ese contenedor se oculta
            con el modo admin apagado, y de una versión vieja hay que poder
            volver sin prender nada más.
-           Detrás sigue el mismo ajuste booleano: "Actual" y 1.0 son sus dos
-           valores reales — 1.0 ES la rama `estable` congelada (lo que antes
-           prendía el modo viejo), "Actual" es lo que antes lo apagaba (las
-           máquinas siguen la versión al día). 1.1 es un CHECKPOINT reservado
-           (pedido 2026-08-05): por ahora no apunta a nada propio y elegirlo
-           hace lo mismo que "Actual" — el hueco queda para cuando el usuario
-           quiera fijar la versión que ya sirvió justo antes de mandar algo
-           nuevo, así hay un punto de vuelta más reciente que 1.0 si ese
-           envío falla. Ese día 1.1 deja de ser alias de "Actual" y el ajuste
-           deja de alcanzar con un solo booleano. -->
+           Tres valores reales desde el release del 2026-08-05: "Actual" es la
+           rama `produccion` (al día), 1.0 ES la rama `estable` congelada (lo
+           que antes prendía el modo viejo) y 1.1 es la rama `estable-1.1`,
+           fija en el release publicado el 2026-08-05 — el punto de vuelta más
+           reciente que 1.0 si un envío nuevo falla. -->
       <div class="ajustes-fila">
         <b class="rotulo">Versión estable:</b>
         <select id="version-estable-sel" onchange="guardarVersionEstable(this.value)"
                 title="La versión que corren todas las computadoras de producción. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
           <option value="actual">Actual</option>
-          <option value="1.1">1.1 — Checkpoint (aún sin fijar)</option>
+          <option value="1.1">1.1 — Release estable del 2026-08-05</option>
           <option value="1.0">1.0 — Primer release estable, antes de producción</option>
         </select>
         <span class="prueba-nota" id="version-estable-nota" style="display:none"
@@ -2727,11 +2722,12 @@
       </div>
       <p class="mut" style="margin:8px 0 0">
         Fija en qué versión corren <b>todas las computadoras de producción</b>.
-        Con la <b>1.0</b> se quedan ahí, sin recibir actualizaciones, hasta que
-        se elija otra: es para cuando una actualización sale lenta o con fallas
-        — siguen facturando con lo que ya servía y se corrige con calma. Cada
-        computadora la toma al reabrir el asistente; este equipo no se mueve,
-        para poder arreglar mientras tanto.</p>
+        Con la <b>1.0</b> o la <b>1.1</b> se quedan ahí, sin recibir
+        actualizaciones, hasta que se elija otra: es para cuando una
+        actualización sale lenta o con fallas — siguen facturando con lo que ya
+        servía y se corrige con calma. Cada computadora la toma al reabrir el
+        asistente; este equipo no se mueve, para poder arreglar mientras
+        tanto.</p>
       <!-- Opciones de PRUEBA AISLADA: ADMIN concede permiso para editarlas y
            el toggle de prueba decide si se aplican. El contenedor se oculta
            salvo que ambos estén prendidos. Se guardan por dispositivo. -->
@@ -14301,7 +14297,7 @@ async function cargarAjustes() {
     pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
-    pintarVersionEstable(d.modo_viejo);
+    pintarVersionEstable(d.version_estable);
     pintarOpcionesPrueba(d.opciones_prueba);
     pintarBotonCorte();
     refrescarVistasModoPrueba();
@@ -14596,30 +14592,28 @@ function pedirCambioCorte() {
 // asistente. El guardado no se anuncia (el selector ya dice en qué versión
 // quedó), pero sí se avisa cuando no se pudo compartir: ahí el hecho importa —
 // las demás computadoras siguieron con su versión.
-// El backend sigue siendo el booleano del modo viejo: 1.0 = congelada en la
-// rama `estable`; "Actual" y 1.1 son las dos caras de apagarlo (versión al
-// día) — 1.1 es un checkpoint reservado (2026-08-05) sin rama propia todavía,
-// así que hoy se guarda igual que "Actual". Al recargar (modo_viejo=false) no
-// hay forma de distinguirlos con un solo booleano, así que el selector cae
-// siempre en "Actual", que es la lectura correcta mientras 1.1 no exista de
-// verdad.
-const VERSION_CONGELADA = "1.0";
+// Tres versiones reales: "actual" (rama produccion, al día), "1.0" (rama
+// estable congelada) y "1.1" (rama estable-1.1, fija en el release del
+// 2026-08-05). El servidor traduce a la clave compartida.
 const VERSION_ACTUAL = "actual";
+let versionEstablePintada = VERSION_ACTUAL;
 
-function pintarVersionEstable(congelada) {
-  $("version-estable-sel").value = congelada ? VERSION_CONGELADA : VERSION_ACTUAL;
-  $("version-estable-nota").style.display = congelada ? "" : "none";
+function pintarVersionEstable(version) {
+  versionEstablePintada = version || VERSION_ACTUAL;
+  $("version-estable-sel").value = versionEstablePintada;
+  $("version-estable-nota").style.display =
+    versionEstablePintada === VERSION_ACTUAL ? "none" : "";
 }
 
 async function guardarVersionEstable(version) {
-  const congelada = version === VERSION_CONGELADA;
+  const anterior = versionEstablePintada;
   try {
-    const r = await api("/api/ajustes/modo-viejo", {activo: congelada});
-    pintarVersionEstable(r.modo_viejo);
+    const r = await api("/api/ajustes/version-estable", {version});
+    pintarVersionEstable(r.version_estable);
     if (r.aviso) mensaje(r.aviso, "alerta");
   } catch (e) {
     // El selector no se queda mostrando una versión que no se guardó.
-    pintarVersionEstable(!congelada);
+    pintarVersionEstable(anterior);
     mensaje("No se pudo cambiar la versión: " + e.message, "error");
   }
 }
