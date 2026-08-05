@@ -1832,6 +1832,20 @@
   #previo-lista .previo-extra { color:#b54708; font-size:11.5px; }
   #previo-lista .previo-num { text-align:right; width:52px; }
   #previo-lista .previo-desc { width:130px; }
+  /* Separador de bloque de ruta (2026-08-05): en una corrida sin ruta elegida
+     la fila va por bloques —una ruta completa tras otra— y cada bloque abre
+     con su renglón: la ruta y la serie con la que salen sus facturas. */
+  #previo-lista .previo-ruta td { background:#eef2f7; color:#344054;
+                                  font-size:12px; font-weight:600;
+                                  padding:4px 10px; }
+  #previo-lista .previo-ruta .previo-ruta-serie { font-weight:400;
+                                                  color:var(--mut); }
+  /* Botones de decisión de la corrida por rutas en la barra (2026-08-05):
+     serie por elegir o confirmación del paso a la siguiente ruta. */
+  #serie-ruta-botones { display:inline-flex; flex-wrap:wrap; gap:6px;
+                        align-items:center; }
+  #serie-ruta-botones label { font-size:12.5px; display:inline-flex;
+                              align-items:center; gap:4px; white-space:nowrap; }
   #previo-lista .previo-desc .pct { color:#047857; font-weight:600; }
   /* Lo que el operador sacó de la fila queda a la vista, solo como registro
      (2026-07-31): la vuelta atrás es cancelar y volver a abrir la fila. */
@@ -2108,6 +2122,11 @@
       <button class="acento" id="btn-reintentar-fila" onclick="reintentarEnFila()" style="display:none">Reintentar</button>
       <button class="peligro" id="btn-cancelar-fila" onclick="cancelarEnFila()" style="display:none">Cancelar</button>
       <button id="btn-cancelar-espera" class="peligro" onclick="cancelarEnFila()" style="display:none">Cancelar</button>
+      <!-- Corrida por rutas (2026-08-05): aquí salen las decisiones de borde —
+           elegir la serie de una ruta que no la tiene asignada (botones, uno
+           por serie) o confirmar el paso a la siguiente ruta con impresión.
+           Viven en la barra porque en modo llenado es lo único visible. -->
+      <span id="serie-ruta-botones" style="display:none"></span>
     </div>
     <!-- Cajitas de qué se está llenando (2026-07-29, pedido del usuario). Solo
          se ven con el panel colapsado en la caja flotante, donde sobraba
@@ -3797,6 +3816,30 @@ let completaEnFila = false;       // true = "pedido completo" (siguiente pedido 
 // pendiente de la ruta elegida. Solo existe sin imprimir, con una ruta elegida
 // y fuera de producción (ver rutaCompletaDisponible).
 let rutaCompletaEnFila = false;
+// "todas las rutas" (2026-08-05, pedido del usuario): sin ruta elegida y sin
+// imprimir, el lote se lleva TODO lo pendiente, ruta por ruta — la corrida va
+// por bloques y al cruzar de bloque cambia sola a la serie asignada de la ruta
+// siguiente (o se detiene a pedirla si no tiene). Es lo que vuelve segura una
+// corrida larga sin ruta: la serie ya no puede quedarse pegada de una ruta
+// anterior.
+let todasRutasEnFila = false;
+// --- Corrida por bloques de ruta (2026-08-05) -------------------------------
+// Sin ruta elegida la fila NUNCA mezcla rutas al azar: se ordena por bloques
+// (ver llenablesEnOrdenDeFila) y la serie se resuelve factura por factura con
+// la asignada de su ruta (AJUSTES → Rutas). Una ruta sin serie asignada
+// DETIENE la corrida antes de su primera factura y el operador elige aquí una
+// serie SOLO para esta ejecución — nada se guarda en la ruta salvo que un
+// Editor marque la opción permanente, que va por /api/rutas-series con su
+// permiso de siempre.
+let seriesTemporalesCorrida = {};   // {ruta: serie} — vale por el resto del bloque
+let serieUnaVezCorrida = null;      // {ruta, serie} — solo la próxima factura
+let serieDelLlenadoEnCurso = null;  // la que viaja en el /api/llenar de la corrida
+let rutaDeLaEnCurso = "";           // ruta de la factura que la corrida está llenando
+let rutaEsperandoSerie = null;      // la corrida está detenida pidiendo serie
+// Confirmación del paso a la siguiente ruta con impresión (2026-08-05): con
+// papel NUNCA se cambia de ruta ni de serie en silencio — al agotarse la ruta
+// con cupo pendiente, la corrida se detiene y ofrece continuar o parar.
+let cambioRutaPendiente = null;     // {siguiente, serie} mientras espera la decisión
 // Corrida encadenada de "Llenar en fila" (2026-07-26, PLAN.md pendiente 8):
 // colaEnFila es la fila EXACTA que el lote va a llenar — la que quedó apartada
 // en el estado compartido al arrancar (pendiente 33), así que ninguna otra
@@ -4107,9 +4150,13 @@ function marcarLlenadoDeOtraVentana(activo) {
 // aquí vía actualizarStatusbar().
 function actualizarModoLlenado() {
   const pausadoPorFallo = $("btn-reintentar-fila").style.display !== "none";
+  // Las esperas de la corrida por rutas (2026-08-05) también son modo llenado:
+  // la decisión —serie de una ruta, o continuar con la siguiente— vive en la
+  // barra, y soltar el modo aquí escondería justo los botones que la piden.
+  const esperaDeRuta = rutaEsperandoSerie !== null || cambioRutaPendiente !== null;
   const activo = llenando || relanzandoTrasConfirmacion || secuenciaActiva ||
                  esperandoLogin || pausadoPorFallo || esperandoEnvioPlataforma ||
-                 llenadoDeOtraVentana;
+                 llenadoDeOtraVentana || esperaDeRuta;
   document.body.classList.toggle("modo-llenado", activo);
   if (!activo) avanceLlenado = null;
   // Fuera del modo llenado el resumen final no tiene sentido: si quedó
@@ -5158,6 +5205,15 @@ const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 // refresca aparte al abrir AJUSTES → Rutas (cargarRutasSeries).
 let rutasSeriesConfig = {};
 const configSerieDeRuta = () => rutasSeriesConfig[rutaSeleccionada] || null;
+// La serie asignada de CUALQUIER ruta ("" si no tiene): la corrida por bloques
+// la consulta ruta por ruta, no solo para la del filtro.
+const serieAsignadaDeRuta = (ruta) =>
+  (rutasSeriesConfig[ruta] || {}).serie_predeterminada || "";
+// Qué series puede usar una ruta: sus permitidas si las tiene, si no las 6.
+const seriesPermitidasDeRuta = (ruta) => {
+  const cfg = rutasSeriesConfig[ruta];
+  return (cfg && cfg.series_permitidas.length) ? cfg.series_permitidas : SERIES;
+};
 
 // Misma regla que la ruta (opcionRutaPredet): la opción solo aparece cuando
 // de verdad va a cambiar algo. Con la predeterminada ya puesta no hay nada que
@@ -8358,7 +8414,9 @@ function repintar() {
 // pedido se vea completo, pero no son trabajo. El lote cuenta ESTAS: cada
 // factura es un documento fiscal, así que un pedido de 3 partes consume 3 del
 // cupo de impresión (regla del usuario 2026-07-22).
-const pendientesLlenables = () => ultimaLista.pendientes.filter(f => f.llenable);
+// (ultimaLista.pendientes || []): firmaCantidades consulta las opciones en
+// cada sincronización (2026-08-05), también antes de la primera carga.
+const pendientesLlenables = () => (ultimaLista.pendientes || []).filter(f => f.llenable);
 
 /* --- Título de la ventana (2026-07-28, pedido del usuario) ----------------
    La barra de arriba repetía casi igual la cabecera del panel. Ahora dice en
@@ -10381,6 +10439,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // Se limpia acá, en la única puerta de entrada, para que ninguna salida
   // temprana la deje pegada manteniendo la ventana flotante sin llenado.
   relanzandoTrasConfirmacion = false;
+  // Fuera de corrida la serie es SIEMPRE la del selector: una resuelta por
+  // bloque en una corrida anterior no puede colarse en un llenado suelto.
+  if (!secuenciaActiva) serieDelLlenadoEnCurso = null;
   // Una espera de envío a la plataforma nunca sobrevive al siguiente llenado
   // (2026-07-28): sin esto, el modo llenado quedaría prendido por una factura
   // que ya no está en pantalla.
@@ -10557,7 +10618,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       {pedido_id, parte, baby_mix_gramaje: gramajeBaby(),
        fecha_facturar: $("f-fecha-facturar").value || null,
        tasa: tasaParaLlenar(),
-       serie: $("f-serie").value || null,
+       // En corrida manda la serie resuelta por bloque de ruta (2026-08-05,
+       // siguienteDeSecuencia); en un llenado suelto, la del selector.
+       serie: serieDelLlenadoEnCurso || $("f-serie").value || null,
        // Imprimir sí/no del control de la barra superior (panel): con el paso
        // de cierre activo, "sí" espera tu «Continuar» entre facturas.
        modo_impresion: imprimirEnFila() ? "imprimir" : "sin_imprimir",
@@ -10663,6 +10726,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       if (secuenciaActiva) {
         hechasEnFila++;
         ultimaLlenadaEnFila = `${pedido_id}|${parte}`;
+        // La serie de "solo esta factura" se consumió con esta (2026-08-05):
+        // la siguiente de la misma ruta vuelve a preguntar, que es justo lo
+        // que pidió el operador al no marcar "para el resto de la ruta".
+        if (serieUnaVezCorrida && serieUnaVezCorrida.ruta === rutaDeLaEnCurso)
+          serieUnaVezCorrida = null;
         // Detener pulsado mientras se esperaba el «Continuar» (2026-07-26): esa
         // factura llega con exito=true porque su documento YA quedó cerrado,
         // así que sin esta rama la corrida encadenaba la siguiente y el Detener
@@ -10682,6 +10750,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
             `${metaEnFila}): faltaron líneas y hay que revisarla.`);
         } else if (hechasEnFila < metaEnFila) {
           continuarEnFila = true;
+        } else if (ofrecerContinuarConOtraRuta()) {
+          // Con impresión, la ruta se agotó antes del cupo pedido: la corrida
+          // queda esperando la decisión del cambio de ruta (2026-08-05).
         } else {
           // Fin de la corrida. Si la última dejó avisos, el mensaje ámbar de
           // arriba se queda (no se pisa con el resumen).
@@ -11511,15 +11582,25 @@ function rutaCompletaDisponible() {
   return !imprimirEnFila() && rutaSeleccionada !== "" && enFilaDisponible();
 }
 
+// "todas las rutas" (2026-08-05): el espejo de "ruta completa" para cuando NO
+// hay ruta elegida — solo sin imprimir. La corrida va por bloques de ruta y la
+// serie cambia sola al cruzar de bloque (o se pide si la ruta no tiene), así
+// que la corrida larga ya no arriesga salir con la serie equivocada.
+function todasRutasDisponible() {
+  return !imprimirEnFila() && rutaSeleccionada === "" && enFilaDisponible();
+}
+
 // El <select> se reconstruye solo cuando cambia lo que muestra (si "ruta
 // completa" está o no, y con cuántas facturas): repintarlo en cada recarga de
 // la lista le cerraría el desplegable al operador justo mientras lo mira.
 let firmaCantidadesPintada = null;
 function firmaCantidades() {
-  // La ruta entra en la firma, no solo la cuenta: cambiar de una ruta a otra
-  // con la misma cantidad de pendientes dejaba el hover nombrando la anterior.
-  return rutaCompletaDisponible()
-    ? `ruta|${rutaSeleccionada}|${pendientesLlenables().length}` : "sin-ruta";
+  // La firma son las opciones mismas (2026-08-05): el menú cambia con la
+  // impresión, la ruta y sus cuentas ("ruta completa", "todas las rutas", el
+  // 1 solo de imprimir sin ruta), y enumerar aquí cada combinación se quedaba
+  // corto — cambiar de ruta con la misma cantidad dejaba el hover nombrando la
+  // anterior, y el tope de imprimir sin ruta ni entraba.
+  return opcionesDeCantidad().map(o => `${o.valor}|${o.texto}|${o.hover || ""}`).join(";");
 }
 function sincronizarCantidades() {
   if (firmaCantidades() !== firmaCantidadesPintada) pintarCantidades();
@@ -11576,11 +11657,31 @@ function opcionesDeCantidad() {
   // menú tiene que poder decirla — no puede mostrar una cantidad distinta de la
   // que se va a llenar. Esa es la ÚNICA vía a un número fuera de la lista: a
   // mano no se teclea nada, el tope de lo que se elige son 10 (2026-07-31).
-  const numeros = imp ? NUMEROS_CON_IMPRESION : NUMEROS_SIN_IMPRESION;
-  const numerico = !completaEnFila && !rutaCompletaEnFila;
+  // Con impresión y SIN ruta elegida el tope es 1 (2026-08-05, regla del
+  // usuario): con papel una corrida es de una sola ruta — la serie y el
+  // talonario van amarrados a ella —, así que el lote de varias exige elegirla.
+  // "Pedido completo" se queda: sus facturas son de un solo pedido, o sea de
+  // una sola ruta.
+  const numeros = imp
+    ? (rutaSeleccionada !== "" ? NUMEROS_CON_IMPRESION : [1])
+    : NUMEROS_SIN_IMPRESION;
+  const hoverImpSinRuta = imp && rutaSeleccionada === ""
+    ? "Con impresión, más de una factura por corrida solo con una ruta "
+      + "elegida: la serie y el papel van amarrados a la ruta." : "";
+  const numerico = !completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila;
   for (const n of (numerico && !numeros.includes(cantidadEnFila)
                    ? [...numeros, cantidadEnFila].sort((a, b) => a - b) : numeros))
-    ops.push({valor: String(n), texto: unidadEnFila(n)});
+    ops.push({valor: String(n), texto: unidadEnFila(n),
+              ...(hoverImpSinRuta ? {hover: hoverImpSinRuta} : {})});
+  if (todasRutasDisponible()) {
+    ops.push({
+      valor: "todas",
+      texto: `todas las rutas (${unidadEnFila(unidadesDe(pendientesLlenables()))})`,
+      hover: `Llena todos los pedidos pendientes, ruta por ruta y en orden: `
+           + `cada bloque sale con la serie asignada de su ruta, y si una ruta `
+           + `no tiene serie la corrida se detiene ahí para que la elijas.`,
+    });
+  }
   if (rutaCompletaDisponible()) {
     // "(sin ruta)" es un grupo real de pedidos, no la ausencia de filtro: se
     // nombra distinto para que el hover no diga "la ruta __sin_ruta__".
@@ -11603,7 +11704,8 @@ function opcionesDeCantidad() {
 // La opción elegida AHORA, con el mismo valor que llevan los <option>.
 const valorCantidadActual = () =>
   completaEnFila ? "completa"
-  : rutaCompletaEnFila ? "ruta" : String(cantidadEnFila);
+  : rutaCompletaEnFila ? "ruta"
+  : todasRutasEnFila ? "todas" : String(cantidadEnFila);
 
 const opcionesCantidadHtml = () => {
   const actual = valorCantidadActual();
@@ -11619,10 +11721,14 @@ const opcionesCantidadHtml = () => {
 // cantidad mayor traída de un lote de ruta baja a 10.
 function acomodarCantidadAlModo() {
   if (!rutaCompletaDisponible()) rutaCompletaEnFila = false;
+  if (!todasRutasDisponible()) todasRutasEnFila = false;
   // Sin imprimir "pedido completo" no se ofrece porque "1 pedido" es lo mismo:
   // la elección cae en su equivalente exacto, no en el estándar.
   if (completaEnFila && enFilaEnPedidos()) { completaEnFila = false; cantidadEnFila = 1; }
   if (imprimirEnFila() && cantidadEnFila > 10) cantidadEnFila = 10;
+  // Con impresión y sin ruta el tope es 1 (2026-08-05): ver opcionesDeCantidad.
+  if (imprimirEnFila() && rutaSeleccionada === "" && cantidadEnFila > 1)
+    cantidadEnFila = 1;
 }
 
 function pintarCantidades() {
@@ -11644,7 +11750,9 @@ function pintarCantidades() {
 function fijarCantidad(valor) {
   completaEnFila = valor === "completa";
   rutaCompletaEnFila = valor === "ruta";
-  if (!completaEnFila && !rutaCompletaEnFila) cantidadEnFila = parseInt(valor, 10);
+  todasRutasEnFila = valor === "todas";
+  if (!completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila)
+    cantidadEnFila = parseInt(valor, 10);
 }
 
 // ¿La cantidad elegida parte por la mitad un pedido dividido en varias
@@ -11655,7 +11763,7 @@ function fijarCantidad(valor) {
 // se procesaron no están en la lista y no vuelven a llenarse.
 // `p` llega desde la revisión previa con los pedidos que quedaron fuera ya
 // descontados: el corte que importa es el de la fila que se está enseñando.
-function familiaPartidaPorElCorte(n, p = pendientesLlenables()) {
+function familiaPartidaPorElCorte(n, p = llenablesEnOrdenDeFila()) {
   if (n >= p.length) return null;   // el lote se lleva todo lo que hay
   const ultimaDentro = p[n - 1];
   if (!ultimaDentro || ultimaDentro.pedido_id !== p[n].pedido_id) return null;
@@ -11680,7 +11788,7 @@ function familiaPartidaPorElCorte(n, p = pendientesLlenables()) {
 // CONTIGUAS al frente de la lista (el backend ordena por fecha, pedido y
 // parte). Cuenta las pendientes, no total_partes: las ya procesadas no se
 // vuelven a llenar.
-function familiaDelSiguiente(p = pendientesLlenables()) {
+function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
   const pedido_id = p[0].pedido_id;
   let partes = 1;
   while (partes < p.length && p[partes].pedido_id === pedido_id) partes++;
@@ -11782,17 +11890,26 @@ function lanzarEnFila() {
   // sentido enseñar un lote que igual no va a arrancar.
   if (!pendientesLlenables().length) { mensaje("No hay pendientes.", "info"); return; }
   if (completaEnFila) { arrancarSecuencia(familiaDelSiguiente().partes); return; }
-  // Ruta completa: el lote se lleva TODO lo pendiente de la ruta, así que no
-  // hay corte que pueda partir un pedido en dos lotes y nada que preguntar.
-  if (rutaCompletaEnFila) { arrancarSecuencia(pendientesLlenables().length); return; }
-  arrancarSecuencia(facturasDeCantidad(cantidadEnFila, pendientesLlenables()));
+  // Ruta completa / todas las rutas: el lote se lleva TODO lo pendiente (de la
+  // ruta, o de todas por bloques), así que no hay corte que pueda partir un
+  // pedido en dos lotes y nada que preguntar.
+  if (rutaCompletaEnFila || todasRutasEnFila) {
+    arrancarSecuencia(pendientesLlenables().length);
+    return;
+  }
+  arrancarSecuencia(facturasDeCantidad(cantidadEnFila, llenablesEnOrdenDeFila()));
 }
 
 // Prefijo "Factura i de N: " de la barra durante una corrida encadenada; en
 // una corrida de una sola factura no dice nada.
 const enFilaPrefijo = () =>
   (secuenciaActiva && metaEnFila > 1)
-    ? `Factura ${hechasEnFila + 1} de ${metaEnFila}: ` : "";
+    ? `Factura ${hechasEnFila + 1} de ${metaEnFila}${
+        // En una corrida por bloques se dice de qué ruta es la factura en
+        // curso (2026-08-05): el cambio de bloque es automático y esto es lo
+        // que lo hace visible.
+        rutaSeleccionada === "" && rutaDeLaEnCurso
+          ? ` — ruta ${nombreRuta(rutaDeLaEnCurso)}` : ""}: ` : "";
 
 // --- Revisión previa de la corrida (2026-07-30, pedido del usuario) ---------
 // Mandar facturas en serie compromete de una sola vez la SERIE del lote entero
@@ -11949,6 +12066,13 @@ async function pedirDescuentosDelLote(cola) {
 // tasa no se toca a propósito.
 const sinTasaParaLlenar = () => !saltandoTasa() && !tasaParaLlenar();
 
+// Sin serie no se llena (regla 2026-07-30 del backend): el lote de UNA ruta la
+// exige aquí, antes de arrancar. En la corrida por bloques (sin ruta elegida)
+// no hay una serie del lote que exigir — se resuelve ruta por ruta y la que
+// falte se pide al llegar su bloque.
+const faltaSerieParaElLote = () =>
+  rutaSeleccionada !== "" && !saltandoPuestaAPunto("serie") && !serieSeleccionada;
+
 // El botón dice qué falta y se apaga hasta que esté: la fila, la cantidad
 // escrita o la tasa. Va aparte de pintarPrevioLote porque el tecleo de la tasa
 // lo mueve sin repintar las cajitas (perdería el foco).
@@ -11961,13 +12085,14 @@ function pintarBotonPrevio() {
   // hasta que el operador elija una salida—, así que el botón se apaga: dejarlo
   // vivo llenaba el pedido que ya se veía como sacado (2026-07-31).
   btn.disabled = previoCargando || !previoCola.length || sinTasaParaLlenar()
-    || !!previoQuitando;
+    || faltaSerieParaElLote() || !!previoQuitando;
   // Con una sola unidad el botón dice "Llenar siguiente" (2026-07-31, pedido del
   // usuario): "Llenar 1 factura" contaba algo que no hace falta contar.
   btn.textContent = previoCargando ? "Rehaciendo la fila…"
     : previoQuitando ? "Decide qué pasa con la fila"
     : !previoCola.length ? "No hay nada que llenar"
     : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
+    : faltaSerieParaElLote() ? "Elige la serie para llenar"
     : n === 1 ? "Llenar siguiente"
     : `Llenar ${unidadEnFila(n)}`;
 }
@@ -11993,11 +12118,17 @@ function pintarPrevioLote() {
        : conDescuento ? ` · ${conDescuento} factura${conDescuento === 1 ? "" : "s"} con descuento`
        : " · ninguna lleva descuento")
     + (previoDescuentosFallo ? ` · ${previoDescuentosFallo}` : "");
+  // En una corrida sin ruta elegida la fila va por bloques (2026-08-05): cada
+  // bloque abre con su renglón — la ruta y la serie con la que salen sus
+  // facturas — para que el operador vea ANTES de arrancar qué cambia y dónde.
+  const separador = (f, i) =>
+    rutaSeleccionada === "" && (i === 0 || (f.ruta || "") !== (filas[i - 1].ruta || ""))
+      ? filaSeparadorRuta(f.ruta || "") : "";
   $("previo-lista").innerHTML = `<table><thead><tr>
       <th></th><th>Pedido</th><th>Cliente</th>
       <th class="previo-num">Líneas</th><th class="previo-desc">Descuento</th>
     </tr></thead><tbody>${filas.length
-      ? filas.map(filaPrevio).join("")
+      ? filas.map((f, i) => separador(f, i) + filaPrevio(f, i)).join("")
       : `<tr><td colspan="5" class="mut">${esc(previoMensajeFilaVacia())}</td></tr>`
     }</tbody></table>`;
   pintarPrevioSacados();
@@ -12032,6 +12163,25 @@ function pintarPrevioSacados() {
   caja.textContent = `Fuera de la fila por decisión tuya: `
     + `${previoQuitados.join(" · ")}. Para devolver algo, cancela y vuelve `
     + `a abrir la fila.`;
+}
+
+// El renglón que abre cada bloque de ruta en la revisión (2026-08-05): la ruta
+// y su serie — la asignada, la temporal ya elegida en esta corrida, o el aviso
+// de que se pedirá al llegar el bloque.
+function filaSeparadorRuta(ruta) {
+  // El bloque sin ruta (caso que FDA confirma inexistente) no tiene flujo
+  // propio: sale con la serie que esté elegida en la barra, como siempre.
+  if (!ruta) {
+    const detalle = serieSeleccionada
+      ? `serie ${serieSeleccionada}` : "sin serie elegida";
+    return `<tr class="previo-ruta"><td colspan="5">Sin ruta `
+      + `<span class="previo-ruta-serie">— ${esc(detalle)}</span></td></tr>`;
+  }
+  const serie = serieAsignadaDeRuta(ruta) || seriesTemporalesCorrida[ruta] || "";
+  const detalle = serie
+    ? `serie ${serie}` : "sin serie asignada: se pide al llegar";
+  return `<tr class="previo-ruta"><td colspan="5">Ruta ${esc(etiquetaRutaCorta(ruta))} `
+    + `<span class="previo-ruta-serie">— ${esc(detalle)}</span></td></tr>`;
 }
 
 function filaPrevio(f, i) {
@@ -12144,7 +12294,8 @@ function descuentoPrevio(f) {
 // repintarPuestaAPunto).
 const cajitaOpciones = (lista, actual) => lista.map(([valor, texto]) =>
   `<option value="${esc(valor)}"${valor === actual ? " selected" : ""}>${esc(texto)}</option>`).join("");
-const cajitaFija = (rot, val, ojo) => `<div class="cajita${ojo ? " ojo" : ""}">
+const cajitaFija = (rot, val, ojo, hover) => `<div class="cajita${ojo ? " ojo" : ""}"${
+    hover ? ` title="${esc(hover)}"` : ""}>
     <span class="cj-rot">${esc(rot)}</span>
     <span class="cj-val">${esc(val)}</span></div>`;
 const cajitaEditable = (rot, control, ojo, hover) => `<label class="cajita${
@@ -12172,8 +12323,15 @@ const cajitaTasa = () => saltandoTasa()
               value="${esc($("f-tasa").value)}" placeholder="escríbela"
               oninput="cajitaTasaTecleada(this)">`, !tasaParaLlenar());
 
-const cajitaSerie = () => saltandoPuestaAPunto("serie")
+// `porBloques` (2026-08-05): en una corrida sin ruta elegida no hay UNA serie
+// del lote — cada bloque usa la de su ruta —, así que la cajita lo dice en vez
+// de ofrecer un selector que mentiría.
+const cajitaSerie = (porBloques) => saltandoPuestaAPunto("serie")
   ? cajitaFija("Serie", "no se elige", true)
+  : porBloques
+  ? cajitaFija("Serie", "por ruta", false,
+      "Cada bloque sale con la serie asignada de su ruta (AJUSTES → Rutas). "
+      + "Si una ruta no la tiene, la corrida se detiene ahí y la eliges en la barra.")
   : cajitaEditable("Serie",
       `<select class="cj-edit" onchange="cajitaSerieElegida(this.value)">${
         cajitaOpciones([["", "la que esté puesta"],
@@ -12249,7 +12407,7 @@ function pintarPrevioCajitas() {
 
   cajitas.push(`<span class="cj-salto"></span>`);
 
-  cajitas.push(cajitaSerie());
+  cajitas.push(cajitaSerie(rutaSeleccionada === ""));
 
   // La cantidad también se elige AQUÍ (2026-07-31, pedido del usuario): el mismo
   // menú de la barra, y cambiarlo rehace la fila a la vista. Sus opciones salen
@@ -12352,7 +12510,7 @@ function previoCantidadElegida(valor) {
 // los divididos que no cabían completos en la cantidad elegida.
 const fueraDeLaFila = () => previoQuitados.concat(previoFamiliaSaltados);
 const pendientesParaLaFila = () =>
-  pendientesLlenables().filter(f => !fueraDeLaFila().includes(f.pedido_id));
+  llenablesEnOrdenDeFila().filter(f => !fueraDeLaFila().includes(f.pedido_id));
 
 // Rehace la fila con lo que esté elegido AHORA y vuelve a pedir los descuentos.
 function rehacerPrevioLote() {
@@ -12380,7 +12538,7 @@ function rehacerPrevioLote() {
 // siguiente). Sin imprimir la numérica viene en pedidos y se traduce aquí.
 function metaDelModo() {
   const hay = pendientesParaLaFila();
-  if (rutaCompletaEnFila) return hay.length;
+  if (rutaCompletaEnFila || todasRutasEnFila) return hay.length;
   if (completaEnFila) return hay.length ? familiaDelSiguiente(hay).partes : 0;
   return facturasDeCantidad(cantidadEnFila, hay);
 }
@@ -12454,7 +12612,8 @@ function previoQuitarSinReponer() {
 // fila se rehace para que lo que está a la vista sea lo que se va a llenar.
 function cambioImpresionEnFila() {
   const numeros = imprimirEnFila() ? NUMEROS_CON_IMPRESION : NUMEROS_SIN_IMPRESION;
-  if (!completaEnFila && !rutaCompletaEnFila && !numeros.includes(cantidadEnFila))
+  if (!completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila
+      && !numeros.includes(cantidadEnFila))
     cantidadEnFila = CANTIDAD_ESTANDAR;
   pintarCantidades();          // las cantidades ofrecidas dependen del papel
   if (previoResolver) rehacerPrevioLote();  // la línea de proceso también cambia
@@ -12473,12 +12632,14 @@ function cajitaImpresionElegida(valor) {
 // ventana de prellenado sobre su única factura. Se repinta solo, sin tocar las
 // cajitas: cada aviso desaparece en cuanto se corrige su cajita, incluso a
 // media tecla.
-function avisosPuestaAPunto(n) {
+function avisosPuestaAPunto(n, porBloques = false) {
   const avisos = [];
-  if (!saltandoPuestaAPunto("serie") && !serieSeleccionada)
-    avisos.push(`No hay serie elegida: ${n === 1 ? "la factura sale" :
-      `las ${n} facturas salen`} con la que el programa de facturación tenga `
-      + `puesta al empezar${n === 1 ? "" : " cada una"}. Elígela aquí mismo, arriba.`);
+  // Sin serie no se llena (regla 2026-07-30 del backend). En una corrida por
+  // bloques (sin ruta elegida) aquí no se exige nada: la serie se resuelve
+  // ruta por ruta, y la que falte se pide al llegar su bloque.
+  if (!saltandoPuestaAPunto("serie") && !porBloques && !serieSeleccionada)
+    avisos.push(`No hay serie elegida: sin ella no se llena ${n === 1
+      ? "la factura" : "ninguna factura del lote"}. Elígela aquí mismo, arriba.`);
   const motivoTasa = saltandoTasa() ? null : motivoTasaAusente();
   if (motivoTasa)
     avisos.push(`${motivoTasa} Escríbela aquí arriba, en Tasa: sin ella no se `
@@ -12488,6 +12649,21 @@ function avisosPuestaAPunto(n) {
 
 const htmlAvisosPuestaAPunto = (avisos) =>
   avisos.map(t => `<div class="pap-ojo">${esc(t)}</div>`).join("");
+
+// Botones de serie al pie del aviso (2026-08-05, regla del usuario: cuando hay
+// que elegir serie se ofrecen botones directos, no un dropdown): salen cuando
+// falta la serie y fijan la del selector — la elección vale por esta
+// ejecución, como siempre; la asignación de la ruta vive en AJUSTES → Rutas.
+// En la corrida por bloques (porBloques) no salen: ahí la serie se pide al
+// llegar cada bloque, en la barra.
+function botonesSerieRapidos(porBloques) {
+  if (porBloques || saltandoPuestaAPunto("serie") || serieSeleccionada) return "";
+  const series = rutaSeleccionada !== ""
+    ? seriesPermitidasDeRuta(rutaSeleccionada) : SERIES;
+  return `<div class="pap-ojo"><div class="previo-acciones">${series.map(s =>
+    `<button onclick="cajitaSerieElegida('${esc(s)}')">${esc(s)}</button>`)
+    .join("")}</div></div>`;
+}
 
 // --- El pedido no es del día anterior (2026-08-01, pedido del usuario) -------
 // Un pedido se factura al día SIGUIENTE de su orden de salida: llenando para
@@ -12576,7 +12752,9 @@ function avisoFechaDelPedido(facturas) {
 
 function pintarPrevioAvisos() {
   $("previo-avisos").innerHTML =
-    htmlAvisosPuestaAPunto(avisosPuestaAPunto(previoCola.length))
+    htmlAvisosPuestaAPunto(avisosPuestaAPunto(previoCola.length,
+                                              rutaSeleccionada === ""))
+    + botonesSerieRapidos(rutaSeleccionada === "")
     + avisoFechaDelPedido(previoCola.map(c => filaDeFactura(c.pedido_id, c.parte)))
     + avisoFamiliaEstirada();
 }
@@ -12586,6 +12764,7 @@ function pintarPrevioAvisos() {
 function htmlAvisosDetalle(clave) {
   const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
   return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
+       + botonesSerieRapidos(false)
        + avisoFechaDelPedido(fila ? [fila] : []);
 }
 
@@ -12662,14 +12841,30 @@ function previoFamiliaCortarAntes(cuantas) {
   rehacerPrevioLote();
 }
 
+// Orden de la fila (2026-08-05, regla del usuario): con ruta elegida la lista
+// ya es de esa sola ruta y se respeta tal cual. Sin ruta, la fila va por
+// BLOQUES de ruta — nunca mezcla rutas al azar —: los bloques en el orden
+// ascendente del filtro (el criterio existente para listar rutas) y, dentro de
+// cada bloque, el orden de la lista (fecha, pedido, parte), que mantiene
+// contiguas las partes de un pedido. El sort es estable, así que basta ordenar
+// por ruta. Una factura sin ruta (caso que FDA confirma inexistente) cae al
+// final, sin flujo especial.
+function llenablesEnOrdenDeFila() {
+  if (rutaSeleccionada !== "") return pendientesLlenables();
+  const clave = (f) => f.ruta || "\uffff";
+  return [...pendientesLlenables()].sort((a, b) =>
+    clave(a) < clave(b) ? -1 : clave(a) > clave(b) ? 1 : 0);
+}
+
 // La fila que le toca a un lote: las llenables de la lista YA filtrada (ruta,
-// fechas, búsqueda), en su orden, hasta la cantidad pedida y sin los pedidos que
-// quedaron fuera. La usan el arranque (que deja fuera, si acaso, el pedido
-// saltado por el aviso de familia) y la revisión previa, que la rehace cada vez
-// que ahí se cambia algo.
+// fechas, búsqueda), en el orden de la fila (por bloques de ruta cuando no hay
+// ruta elegida), hasta la cantidad pedida y sin los pedidos que quedaron
+// fuera. La usan el arranque (que deja fuera, si acaso, el pedido saltado por
+// el aviso de familia) y la revisión previa, que la rehace cada vez que ahí se
+// cambia algo.
 const colaDelLote = (meta, fueraPedidos) => {
   const fuera = [].concat(fueraPedidos || []).filter(Boolean);
-  return pendientesLlenables()
+  return llenablesEnOrdenDeFila()
     .filter(f => !fuera.includes(f.pedido_id))
     .slice(0, meta)
     .map(f => ({pedido_id: f.pedido_id, parte: f.parte}));
@@ -12729,9 +12924,9 @@ async function arrancarSecuencia(meta) {
   // ya apartadas en otra máquina. Si había menos pendientes que las pedidas,
   // la meta real ya nace más corta y no hay con qué reponer.
   metaPedidaEnFila = meta;
-  // Con "ruta completa" el lote ya se llevó todo lo que había en la ruta: si
-  // alguna factura resulta ajena, no queda ninguna con que reponerla.
-  reponerEnFila = !completaEnFila && !rutaCompletaEnFila;
+  // Con "ruta completa" o "todas las rutas" el lote ya se llevó todo lo que
+  // había: si alguna factura resulta ajena, no queda ninguna con que reponerla.
+  reponerEnFila = !completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila;
   pedidosFueraEnFila = fueraDelLote;
   descartadasEnFila = [];
   reposicionesEnFila = [];
@@ -12740,6 +12935,13 @@ async function arrancarSecuencia(meta) {
   ultimaLlenadaEnFila = null;
   destranquesEnFila = [];
   destranquesPorFactura = {};
+  // Corrida nueva, decisiones de serie nuevas (2026-08-05): las temporales de
+  // una corrida anterior no sobreviven — fueron "solo por esta corrida".
+  seriesTemporalesCorrida = {};
+  serieUnaVezCorrida = null;
+  serieDelLlenadoEnCurso = null;
+  rutaDeLaEnCurso = "";
+  cambioRutaPendiente = null;
   iniciarSecuencia();
   vigilarReserva();
 }
@@ -12878,7 +13080,7 @@ async function reponerLote() {
   // resumen final. La ruta tampoco puede cambiar a mitad de corrida: el modo
   // llenado oculta su barra.
   const clave = f => `${f.pedido_id}|${f.parte}`;
-  const libres = pendientesLlenables().filter(f =>
+  const libres = llenablesEnOrdenDeFila().filter(f =>
     !colaEnFila.some(c => c.pedido_id === f.pedido_id && c.parte === f.parte)
     && !descartadasEnFila.includes(clave(f))
     && !pedidosFueraEnFila.includes(f.pedido_id)
@@ -12930,6 +13132,7 @@ function iniciarSecuencia() {
   if (!pendientesLlenables().length) { mensaje("No hay pendientes.", "info"); return; }
   secuenciaActiva = true;
   ocultarBotonesFalloEnFila();   // por si venía de un fallo previo
+  ocultarBotonesSerieDeRuta();   // ídem: una espera de serie no sobrevive al relanzamiento
   $("btn-secuencia").style.display = "none";
   $("btn-detener").style.display = "";
   siguienteDeSecuencia();
@@ -12942,8 +13145,12 @@ function siguienteDeSecuencia() {
   // entraron a la cola) y una factura nueva de un refresco no se cuela.
   const enCola = (f) => colaEnFila.some(
     c => c.pedido_id === f.pedido_id && c.parte === f.parte);
-  const siguiente = pendientesLlenables().find(enCola);
-  if (!siguiente) { detenerSecuencia("Secuencia terminada: no quedan pendientes."); return; }
+  const siguiente = llenablesEnOrdenDeFila().find(enCola);
+  if (!siguiente) {
+    if (ofrecerContinuarConOtraRuta()) return;
+    detenerSecuencia("Secuencia terminada: no quedan pendientes.");
+    return;
+  }
   // Guarda anti doble llenado: si la recarga de la lista falló, la recién
   // llenada seguiría de primera — detener antes que llenarla dos veces.
   if (`${siguiente.pedido_id}|${siguiente.parte}` === ultimaLlenadaEnFila) {
@@ -12951,7 +13158,281 @@ function siguienteDeSecuencia() {
                      "se detiene para no repetir una factura.");
     return;
   }
+  // Serie del bloque (2026-08-05): antes de cada factura se resuelve la serie
+  // que le toca a SU ruta. Sin serie definida la corrida se detiene aquí — a
+  // preguntar, nunca a adivinar ni a arrastrar la del bloque anterior. En modo
+  // prueba con la puesta a punto de serie saltada no aplica: ahí la serie no
+  // se toca a propósito. Una factura SIN ruta (caso que FDA confirma
+  // inexistente, sin flujo propio a propósito) sigue como siempre: manda el
+  // selector de la barra.
+  const ruta = siguiente.ruta || "";
+  if (ruta) {
+    const serie = serieParaLaCorrida(ruta);
+    if (!serie && !saltandoPuestaAPunto("serie")) { pausarPorSerieDeRuta(ruta); return; }
+    serieDelLlenadoEnCurso = serie || null;
+  } else {
+    serieDelLlenadoEnCurso = null;
+  }
+  rutaDeLaEnCurso = ruta;
   llenar(siguiente.pedido_id, siguiente.parte);
+}
+
+// La serie con la que sale la próxima factura de la corrida, o "" si hay que
+// preguntar. Prioridad: la asignada de su ruta (AJUSTES → Rutas) → la temporal
+// elegida para el resto del bloque → la de "solo esta factura" → y, en una
+// corrida de UNA sola ruta (filtro puesto), la del selector de la barra, que
+// es la elección del operador para esta ejecución. En una corrida por bloques
+// el selector NO cuenta: usarlo sería arrastrar en silencio la serie de una
+// ruta a la siguiente.
+function serieParaLaCorrida(ruta) {
+  const asignada = serieAsignadaDeRuta(ruta);
+  if (asignada) return asignada;
+  if (seriesTemporalesCorrida[ruta]) return seriesTemporalesCorrida[ruta];
+  if (serieUnaVezCorrida && serieUnaVezCorrida.ruta === ruta)
+    return serieUnaVezCorrida.serie;
+  if (rutaSeleccionada !== "" && serieSeleccionada) return serieSeleccionada;
+  return "";
+}
+
+// --- Serie de una ruta sin asignación (2026-08-05, regla del usuario) --------
+// La corrida se detiene ANTES de la primera factura de una ruta sin serie
+// definida: el operador elige aquí con qué serie salen — botones, uno por
+// serie permitida de esa ruta — y la elección vale SOLO por esta corrida. La
+// casilla "para el resto de la ruta" (marcada de fábrica) evita re-preguntar
+// factura por factura; sin ella se vuelve a preguntar en cada una. Nada de
+// esto toca la asignación de la ruta: guardarla es la casilla aparte, que solo
+// existe con rol Editor y va por /api/rutas-series (el permiso se re-verifica
+// en el servidor).
+function pausarPorSerieDeRuta(ruta) {
+  secuenciaActiva = false;
+  rutaEsperandoSerie = ruta;
+  $("btn-secuencia").style.display = "none";
+  $("btn-detener").style.display = "none";
+  pintarBotonesSerieDeRuta(ruta);
+  const talonario = imprimirEnFila()
+    ? " Antes de elegir, revisa el talonario: la serie y el número de factura "
+      + "deben coincidir con el papel puesto." : "";
+  mensaje(`La ruta ${etiquetaRutaCorta(ruta)} no tiene serie asignada. Elige `
+    + `la serie para sus facturas — vale solo por esta corrida.${talonario}`,
+    "alerta", false);
+  actualizarModoLlenado();
+}
+
+function pintarBotonesSerieDeRuta(ruta) {
+  const caja = $("serie-ruta-botones");
+  const botones = seriesPermitidasDeRuta(ruta).map(s =>
+    `<button class="acento" onclick="serieDeRutaElegida('${esc(s)}')">${esc(s)}</button>`
+  ).join("");
+  const permanente = tienePermiso("ajustes_catalogos")
+    ? `<label title="Guarda la serie elegida como la asignada de esta ruta `
+      + `(AJUSTES → Rutas): las próximas corridas la usan solas.">`
+      + `<input type="checkbox" id="serie-ruta-permanente"> asignarla a la ruta</label>`
+    : "";
+  caja.innerHTML = botones
+    + `<label title="Con la casilla puesta, todas las facturas que le queden a `
+    + `esta ruta en la corrida salen con la serie elegida. Sin ella, se vuelve `
+    + `a preguntar en cada factura.">`
+    + `<input type="checkbox" id="serie-ruta-resto" checked> para el resto de la ruta</label>`
+    + permanente
+    + `<button class="peligro" onclick="detenerDesdeSerieDeRuta()">Detener el lote</button>`;
+  caja.style.display = "";
+}
+
+// Guarda la serie como asignada de la ruta (casilla del Editor). Es un extra:
+// si el guardado falla, la corrida sigue igual con la serie temporal.
+async function guardarSerieEnRuta(ruta, serie) {
+  try {
+    const permitidas = seriesPermitidasDeRuta(ruta);
+    const r = await api("/api/rutas-series", {
+      ruta,
+      series_permitidas: permitidas.includes(serie)
+        ? permitidas : [...permitidas, serie],
+      serie_predeterminada: serie});
+    rutasSeriesConfig[ruta] = {
+      series_permitidas: r.fila.series_permitidas,
+      serie_predeterminada: r.fila.serie_predeterminada};
+    pintarSeries();
+  } catch (e) {
+    mensaje(`La serie no se pudo guardar en la ruta (${e.message}): la corrida `
+      + `sigue con ${serie} solo por esta vez.`, "alerta");
+  }
+}
+
+async function serieDeRutaElegida(serie) {
+  const ruta = rutaEsperandoSerie;
+  if (ruta === null) return;
+  const cajaResto = $("serie-ruta-resto");
+  const paraResto = !cajaResto || cajaResto.checked;
+  const cajaPerm = $("serie-ruta-permanente");
+  const permanente = !!(cajaPerm && cajaPerm.checked);
+  ocultarBotonesSerieDeRuta();
+  if (permanente) await guardarSerieEnRuta(ruta, serie);
+  if (paraResto) {
+    // En una corrida de UNA ruta la elección vive en el selector de la barra
+    // (es la serie de toda la ejecución); en una por bloques queda apuntada a
+    // SU ruta, para no arrastrarla a la siguiente.
+    if (rutaSeleccionada !== "") cambioSerie(serie);
+    else seriesTemporalesCorrida[ruta] = serie;
+  } else {
+    serieUnaVezCorrida = {ruta, serie};
+  }
+  secuenciaActiva = true;
+  $("btn-detener").style.display = "";
+  siguienteDeSecuencia();
+}
+
+function detenerDesdeSerieDeRuta() {
+  const ruta = rutaEsperandoSerie;
+  ocultarBotonesSerieDeRuta();
+  detenerSecuencia(`Detenido: la corrida paró en la ruta ${
+    etiquetaRutaCorta(ruta || "")} sin elegir serie. Lo que no se llenó sigue pendiente.`);
+}
+
+function ocultarBotonesSerieDeRuta() {
+  rutaEsperandoSerie = null;
+  cambioRutaPendiente = null;
+  const caja = $("serie-ruta-botones");
+  caja.style.display = "none";
+  caja.innerHTML = "";
+}
+
+// --- Paso a la siguiente ruta con impresión (2026-08-05, regla del usuario) --
+// Con papel una corrida es de UNA sola ruta. Si la ruta se agotó y el lote
+// todavía tiene cupo, no se termina en silencio: se ofrece seguir con la
+// próxima ruta con pendientes (en el orden del filtro), diciendo la serie que
+// se usaría. NUNCA sigue sola — ni con la serie asignada — porque cambiar de
+// ruta con papel es cambiar el talonario físico.
+function rutasQueSiguen() {
+  const porRuta = ultimaLista.pendientes_por_ruta || {};
+  return Object.keys(porRuta)
+    .filter(r => r && r !== rutaSeleccionada && porRuta[r] > 0)
+    .sort();
+}
+
+function ofrecerContinuarConOtraRuta() {
+  if (!imprimirEnFila() || rutaSeleccionada === "" || completaEnFila) return false;
+  // El cupo se mide contra la cantidad que el OPERADOR eligió (cantidadEnFila):
+  // metaPedidaEnFila ya nace recortada a lo que la ruta tenía — con ella la
+  // ruta corta jamás dejaría cupo que ofrecer.
+  if (hechasEnFila === 0 || hechasEnFila >= cantidadEnFila) return false;
+  const siguiente = rutasQueSiguen()[0];
+  if (!siguiente) return false;
+  const serie = serieAsignadaDeRuta(siguiente);
+  secuenciaActiva = false;
+  cambioRutaPendiente = {siguiente, serie};
+  $("btn-secuencia").style.display = "none";
+  $("btn-detener").style.display = "none";
+  pintarBotonesCambioDeRuta(siguiente, serie);
+  mensaje(`Ruta ${etiquetaRutaCorta(rutaSeleccionada)} terminada: `
+    + `${hechasEnFila} de ${cantidadEnFila} llenadas. Sigue la ruta `
+    + `${etiquetaRutaCorta(siguiente)}${serie
+        ? `, con la serie ${serie}` : ", que no tiene serie asignada"}. `
+    + `Antes de continuar revisa el talonario: la serie y el número de `
+    + `factura deben coincidir con el papel puesto.`, "alerta", false);
+  actualizarModoLlenado();
+  return true;
+}
+
+function pintarBotonesCambioDeRuta(ruta, serie) {
+  const caja = $("serie-ruta-botones");
+  if (serie) {
+    caja.innerHTML =
+      `<button class="acento" onclick="confirmarCambioDeRuta()">Continuar con `
+      + `la ruta ${esc(etiquetaRutaCorta(ruta))}</button>`
+      + `<button class="peligro" onclick="detenerCambioDeRuta()">Detener el lote</button>`;
+  } else {
+    // Sin serie asignada, elegirla ES la confirmación: los mismos botones de
+    // serie, con el recordatorio del talonario ya dicho en el mensaje.
+    const botones = seriesPermitidasDeRuta(ruta).map(s =>
+      `<button class="acento" onclick="confirmarCambioDeRuta('${esc(s)}')">${esc(s)}</button>`
+    ).join("");
+    const permanente = tienePermiso("ajustes_catalogos")
+      ? `<label title="Guarda la serie elegida como la asignada de esta ruta `
+        + `(AJUSTES → Rutas).">`
+        + `<input type="checkbox" id="serie-ruta-permanente"> asignarla a la ruta</label>`
+      : "";
+    caja.innerHTML = botones
+      + `<label title="Con la casilla puesta, todas las facturas que le queden a `
+      + `esta ruta en la corrida salen con la serie elegida. Sin ella, se vuelve `
+      + `a preguntar en cada factura.">`
+      + `<input type="checkbox" id="serie-ruta-resto" checked> para el resto de la ruta</label>`
+      + permanente
+      + `<button class="peligro" onclick="detenerCambioDeRuta()">Detener el lote</button>`;
+  }
+  caja.style.display = "";
+}
+
+async function confirmarCambioDeRuta(serieElegida) {
+  const pendiente = cambioRutaPendiente;
+  if (!pendiente) return;
+  const serie = pendiente.serie || serieElegida || "";
+  const cajaResto = $("serie-ruta-resto");
+  const paraResto = !cajaResto || cajaResto.checked;
+  const cajaPerm = $("serie-ruta-permanente");
+  const permanente = !!(cajaPerm && cajaPerm.checked);
+  ocultarBotonesSerieDeRuta();
+  if (!serie) return;   // defensivo: sin serie no hay con qué seguir
+  if (permanente && serieElegida)
+    await guardarSerieEnRuta(pendiente.siguiente, serieElegida);
+  // El cambio de ruta es A LA VISTA: el filtro pasa a la ruta nueva (el
+  // selector de serie se acomoda solo en pintarSeries — la asignada se elige
+  // sola) y la lista se recarga con ella.
+  rutaSeleccionada = pendiente.siguiente;
+  $("f-ruta").value = rutaSeleccionada;
+  pintarSeries();
+  if (!serieAsignadaDeRuta(rutaSeleccionada)) {
+    // Serie elegida a mano para la ruta nueva: con "para el resto" va al
+    // selector (vale toda la etapa); sin la casilla, solo la próxima factura —
+    // y el selector se VACÍA, porque si conservara la serie de la ruta
+    // anterior la corrida la usaría en silencio en la factura siguiente.
+    if (paraResto) {
+      cambioSerie(serie);
+    } else {
+      serieUnaVezCorrida = {ruta: rutaSeleccionada, serie};
+      cambioSerie("");
+    }
+  }
+  avisarTrabajando(`Cambiando a la ruta ${etiquetaRutaCorta(rutaSeleccionada)}…`);
+  try {
+    await cargar();
+  } catch (e) {
+    detenerSecuencia(`No se pudo cargar la lista de la ruta ${
+      etiquetaRutaCorta(rutaSeleccionada)}: ${e.message}.`);
+    return;
+  }
+  pintarCantidades();
+  // La corrida sigue con el cupo que faltaba, apartándolo primero como al
+  // arrancar. Sin reconciliación de la reserva a propósito: si algo resultó
+  // ajeno, el reclamo atómico de esa factura la detiene con su aviso de
+  // siempre — la reserva nunca fue el candado.
+  previoQuitados = [];
+  previoFamiliaCompleta = null;
+  const cupo = Math.max(1, cantidadEnFila - hechasEnFila);
+  const cola = colaDelLote(metaSinPartirFamilia(cupo), fueraDeLaFila());
+  if (!cola.length) {
+    detenerSecuencia(`En la ruta ${etiquetaRutaCorta(rutaSeleccionada)} no `
+      + `quedó nada que llenar.`);
+    return;
+  }
+  try {
+    await api("/api/reservar_lote", {facturas: cola});
+  } catch (e) {
+    mensaje(`No se pudo apartar el resto del lote: ${e.message}. La corrida `
+      + `se detiene.`, "error");
+    detenerSecuencia();
+    return;
+  }
+  colaEnFila = cola;
+  metaEnFila = hechasEnFila + cola.length;
+  secuenciaActiva = true;
+  $("btn-detener").style.display = "";
+  siguienteDeSecuencia();
+}
+
+function detenerCambioDeRuta() {
+  ocultarBotonesSerieDeRuta();
+  detenerSecuencia(`Llenado en fila terminado: ${hechasEnFila} de `
+    + `${cantidadEnFila} facturas (la ruta se quedó sin pendientes).`, "exito");
 }
 
 // Vuelca los destranques acumulados de la corrida (si hay) en un sufijo de
@@ -12977,6 +13458,8 @@ function notaDestranquesEnFila() {
 function detenerSecuencia(texto, tipo) {
   secuenciaActiva = false;
   ocultarBotonesFalloEnFila();
+  ocultarBotonesSerieDeRuta();
+  serieDelLlenadoEnCurso = null;
   $("btn-secuencia").style.display = "";
   $("btn-detener").style.display = "none";
   const nota = notaDestranquesEnFila() + notaLoteEnFila();
@@ -13122,6 +13605,8 @@ function cancelarEnFila() {
   secuenciaActiva = false;
   detenerEsperaLogin();              // corta el sondeo si estaba esperando login
   ocultarBotonesFalloEnFila();
+  ocultarBotonesSerieDeRuta();
+  serieDelLlenadoEnCurso = null;
   $("btn-detener").style.display = "none";
   $("btn-secuencia").style.display = "";
   // Cancelada tras un fallo, la factura quedó EN REVISIÓN (y el panel salta
