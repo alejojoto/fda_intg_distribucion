@@ -5086,6 +5086,14 @@ const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 let rutasSeriesConfig = {};
 const configSerieDeRuta = () => rutasSeriesConfig[rutaSeleccionada] || null;
 
+// Misma regla que la ruta (opcionRutaPredet): la opción solo aparece cuando
+// de verdad va a cambiar algo. Con la predeterminada ya puesta no hay nada que
+// hacer, y sin serie elegida "hacerla predeterminada" borraría la guardada.
+function opcionSeriePredet(predetDeRuta) {
+  if (predetDeRuta || !serieSeleccionada || serieSeleccionada === seriePredeterminada) return "";
+  return `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`;
+}
+
 function pintarSeries() {
   const cfg = configSerieDeRuta();
   // Sin config: las 6 series de siempre. Con config: SOLO las permitidas —
@@ -5109,7 +5117,7 @@ function pintarSeries() {
   $("f-serie").innerHTML = vacia
     + opciones.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
         ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("")
-    + (predetDeRuta ? "" : `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`);
+    + opcionSeriePredet(predetDeRuta);
   const nota = $("serie-auto-nota");
   nota.style.display = predetDeRuta ? "" : "none";
   nota.textContent = predetDeRuta ? "automático por ruta" : "";
