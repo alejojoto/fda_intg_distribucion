@@ -1457,6 +1457,7 @@
   .sup-chip.sin-reportar { background:#fdecec; border-color:#f0b4b4; color:#b42318; }
   .sup-chip.sin-datos { background:#f8fafc; border:1px dashed #98a2b3; color:#667085; }
   .sup-estado-nota { margin-top:3px; color:var(--mut); font-size:11px; }
+  .sup-estado-nota.atrasada { color:var(--warn); }
   .sup-nube-lineas { display:flex; gap:4px 8px; flex-wrap:wrap; max-width:210px; }
   .sup-nube-lineas .sup-nube-ok { color:#15803d; font-weight:600; }
   .sup-nube-lineas .sup-nube-mal { color:#b42318; font-weight:600; }
@@ -6616,9 +6617,27 @@ function supCanalEquipo(equipo) {
   return rama ? (SUP_CANALES[rama] || rama) : "";
 }
 
+// El release más nuevo que reporta el parque de OPERACIÓN, en milisegundos. El
+// equipo admin corre desarrollo a propósito, así que no marca el ritmo de nadie.
+function supReleaseMasNuevo() {
+  let masNuevo = 0;
+  for (const e of supEquipos) {
+    if (e.modo_admin) continue;
+    const t = Date.parse(e.fecha_release || "");
+    if (Number.isFinite(t) && t > masNuevo) masNuevo = t;
+  }
+  return masNuevo;
+}
+
 function supFilaEquipo(equipo, sinDatos) {
   const host = esc(equipo.dispositivo || "");
   const canal = supCanalEquipo(equipo);
+  // De cuándo es el código que corre. Se compara por fecha del commit fuente y
+  // no por `version`: esa es el hash del build, que difiere entre canales
+  // aunque el código sea idéntico.
+  const tRelease = Date.parse(equipo.fecha_release || "");
+  const atrasada = !sinDatos && !equipo.modo_admin && Number.isFinite(tRelease)
+    && tRelease < supReleaseMasNuevo();
   // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
   // lo único que se conseguiría es perderle el nombre y el rol.
   const propio = equipo.dispositivo === supDispositivoPropio;
@@ -6632,7 +6651,12 @@ function supFilaEquipo(equipo, sinDatos) {
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
-      !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}</td>
+      !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}${
+      !sinDatos && equipo.fecha_release
+        ? `<div class="sup-estado-nota${atrasada ? " atrasada" : ""}">${
+            esc(supFechaCorta(equipo.fecha_release))}${
+            atrasada ? " · atrasada" : ""}</div>`
+        : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
