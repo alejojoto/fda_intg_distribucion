@@ -6609,8 +6609,16 @@ function supProblemasEquipo(equipo) {
       esc(SUP_PROBLEMAS[p.tipo] || p.tipo || "atención")}</span>`).join("")}</div>`;
 }
 
+const SUP_CANALES = {produccion: "Producción", estable: "Estable (1.0)", "estable-1.1": "Estable 1.1", main: "Desarrollo"};
+function supCanalEquipo(equipo) {
+  const rama = equipo.rama || "";
+  // Una rama fuera del mapa (worktree de desarrollo) se muestra tal cual.
+  return rama ? (SUP_CANALES[rama] || rama) : "";
+}
+
 function supFilaEquipo(equipo, sinDatos) {
   const host = esc(equipo.dispositivo || "");
+  const canal = supCanalEquipo(equipo);
   // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
   // lo único que se conseguiría es perderle el nombre y el rol.
   const propio = equipo.dispositivo === supDispositivoPropio;
@@ -6623,7 +6631,8 @@ function supFilaEquipo(equipo, sinDatos) {
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
-    <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}</td>
+    <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
+      !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
     <td class="sup-rol">${supCasillasRol(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
@@ -7106,6 +7115,8 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         </div>
         <div>
           <div class="sup-dato"><span>Versión:</span>${esc(equipo.version || "—")}</div>
+          ${equipo.rama ? `<div class="sup-dato"><span>Canal:</span>${
+            esc(supCanalEquipo(equipo))}</div>` : ""}
           <div class="sup-dato"><span>Plataforma:</span>${esc(equipo.plataforma || "—")}</div>
         </div>
       </div>
