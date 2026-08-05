@@ -95,8 +95,27 @@
   .rapida-chip:hover:not(:disabled) { background:rgba(255,255,255,.14); }
   .rapida-chip.on { background:#f2f4f8; border-color:#f2f4f8; color:#1d2433; font-weight:600; }
   .rapida-chip:disabled { opacity:.4; }
+  /* Los saltos son tres letras (2026-08-05): mismo ancho para que las tres
+     cajas se lean como un juego y no como tres botones de largos distintos. */
+  .rapida-chip.letra { padding:2px 0; width:26px; text-align:center; font-weight:600; }
+  /* Un switch de dos estados se lee mejor como casilla que como par de chips
+     (2026-08-05, pedido del usuario): prendido/apagado se ve en el color. */
+  .rapida-check { display:inline-flex; align-items:center; gap:5px; cursor:pointer;
+          border:1px solid rgba(255,255,255,.3); border-radius:999px;
+          padding:2px 11px 2px 8px; font-size:12px; color:#dbe1ea; }
+  .rapida-check:hover:not(.inerte) { background:rgba(255,255,255,.14); }
+  .rapida-check input { width:13px; height:13px; margin:0; accent-color:#1d2433; }
+  .rapida-check.on { background:#f2f4f8; border-color:#f2f4f8; color:#1d2433; font-weight:600; }
+  /* La prueba prendida va en ámbar: es el estado que hay que ver de lejos. */
+  .rapida-check.alerta.on { background:#f5a524; border-color:#f5a524; color:#3a2705; }
+  .rapida-check.inerte { opacity:.4; cursor:default; }
   #rapida-modo-apagado { color:#ffdca8; font-size:12px; font-weight:600; }
   #rapida-n { width:44px; padding:2px 4px; text-align:center; font-size:12px; }
+  /* El desplegable de vista hereda el fondo oscuro de la barra; las opciones
+     se pintan claras aparte porque el menú del sistema no lo hereda. */
+  #rapida-vista { background:rgba(255,255,255,.1); color:#f2f4f8; font-size:12px;
+          border:1px solid rgba(255,255,255,.3); border-radius:999px; padding:2px 6px; }
+  #rapida-vista option { background:#fff; color:#1d2433; }
   /* Aviso de conexión perdida (2026-07-27). Primera fila del body (que es un
      flex column): empuja al resto en vez de taparlo, sin posicionamiento fijo
      ni compensar altura a mano. Vive FUERA de <main> y no es <header>, así
@@ -1962,40 +1981,48 @@
        una propiedad de la instalación y sigue editable con ADMIN apagado. -->
   <div id="barra-rapida" style="display:none">
     <span id="rapida-modo-apagado" style="display:none">ADMIN apagado · la prueba está bloqueada; Carga sigue disponible</span>
-    <span class="rapida-grupo">
+    <span class="rapida-grupo" id="rapida-grupo-llena">
       <b>Llena</b>
-      <button type="button" class="rapida-chip" id="rapida-completa" onclick="rapidaCuanto(false)"
-              title="Todas las líneas de la factura, igual que en producción.">Completa</button>
-      <button type="button" class="rapida-chip" id="rapida-recorte" onclick="rapidaCuanto(true)"
-              title="Solo las primeras líneas de cada factura, para no esperar el llenado entero.">Primeras</button>
+      <label class="rapida-check" id="rapida-completa-lbl"
+             title="Marcado: todas las líneas de la factura, igual que en producción. Sin marcar: solo las primeras que digas.">
+        <input type="checkbox" id="rapida-completa" onchange="rapidaCuanto(!this.checked)">
+        Completa</label>
       <input type="number" id="rapida-n" min="0" max="25" step="1" onchange="rapidaRecorteN()"
+             style="display:none"
              title="Cuántas líneas se llenan de cada factura. Con 0 se llena solo el encabezado.">
     </span>
-    <span class="rapida-grupo">
+    <span class="rapida-grupo" id="rapida-grupo-salta">
       <b>Salta</b>
-      <button type="button" class="rapida-chip" id="rapida-salto-tasa" onclick="rapidaSalto('tasa')"
-              title="No se registra la tasa: la factura sale con el Cambio que el programa ya tenga.">Tasa</button>
-      <button type="button" class="rapida-chip" id="rapida-salto-fecha" onclick="rapidaSalto('fecha')"
-              title="No se cambia el período: el documento queda con la fecha que la Ficha traiga.">Fecha</button>
-      <button type="button" class="rapida-chip" id="rapida-salto-serie" onclick="rapidaSalto('serie')"
-              title="No se elige serie: queda la que esté puesta en el programa.">Serie</button>
+      <button type="button" class="rapida-chip letra" id="rapida-salto-tasa" onclick="rapidaSalto('tasa')"
+              title="Tasa: no se registra, la factura sale con el Cambio que el programa ya tenga.">T</button>
+      <button type="button" class="rapida-chip letra" id="rapida-salto-fecha" onclick="rapidaSalto('fecha')"
+              title="Fecha: no se cambia el período, el documento queda con la fecha que la Ficha traiga.">F</button>
+      <button type="button" class="rapida-chip letra" id="rapida-salto-serie" onclick="rapidaSalto('serie')"
+              title="Serie: no se elige, queda la que esté puesta en el programa.">S</button>
     </span>
-    <span class="rapida-grupo">
-      <b>Estado</b>
-      <button type="button" class="rapida-chip" id="rapida-estado-real" onclick="rapidaModoPrueba(false)"
-              title="Las listas usan la verdad central y cada cambio de este equipo se sincroniza con los demás.">REAL · sincroniza</button>
-      <button type="button" class="rapida-chip" id="rapida-estado-prueba" onclick="rapidaModoPrueba(true)"
-              title="Los llenados quedan solo en la memoria de esta sesión y no cambian SQLite ni la nube.">PRUEBA · solo aquí</button>
+    <span class="rapida-grupo" id="rapida-grupo-prueba">
+      <label class="rapida-check alerta" id="rapida-prueba-lbl"
+             title="Marcado: los llenados quedan solo en la memoria de esta sesión y no cambian SQLite ni la nube. Sin marcar: estado real, las listas usan la verdad central y cada cambio se sincroniza con los demás equipos.">
+        <input type="checkbox" id="rapida-prueba" onclick="return onClickRapidaPrueba(event)">
+        Prueba</label>
       <button type="button" class="rapida-chip" id="rapida-olvidar-prueba" style="display:none"
               onclick="olvidarLlenadasPrueba()"
               title="Las llenadas en esta prueba vuelven a pendientes. No hay registro que borrar: esa marca solo vive mientras el panel esté abierto.">Olvidar llenadas</button>
     </span>
-    <span class="rapida-grupo">
-      <b>Carga</b>
-      <button type="button" class="rapida-chip" id="rapida-canal-desarrollo" onclick="rapidaCanal('desarrollo')"
-              title="Todo lo que se sube al repositorio, apenas se sube.">Dev</button>
-      <button type="button" class="rapida-chip" id="rapida-canal-produccion" onclick="rapidaCanal('produccion')"
-              title="La misma versión exacta que corren las máquinas de operación. Se aplica al reabrir el asistente.">Producción</button>
+    <span class="rapida-grupo" id="rapida-grupo-canal">
+      <label class="rapida-check" id="rapida-prod-lbl"
+             title="Marcado: carga la misma versión exacta que corren las máquinas de operación, al reabrir el asistente. Sin marcar: Dev, todo lo que se sube al repositorio, apenas se sube.">
+        <input type="checkbox" id="rapida-prod" onclick="rapidaCanal(this.checked ? 'produccion' : 'desarrollo')">
+        Prod</label>
+    </span>
+    <!-- Vista por rol (2026-08-05): el mismo selector de AJUSTES → Vista del
+         panel, a un clic. Solo BAJA de rol; el backend rechaza igual que la
+         vista esconde. Con la vista degradada la barra se esconde entera menos
+         este grupo — si no, la vuelta obligaría a ir a buscarla a AJUSTES. -->
+    <span class="rapida-grupo" id="rapida-grupo-vista" style="display:none">
+      <b>Vista</b>
+      <select id="rapida-vista" onchange="guardarVerComo(this.value)"
+              title="Mirar el panel como lo ve cada rol, para comprobar qué ve y qué puede hacer."></select>
     </span>
   </div>
 </header>
@@ -12751,23 +12778,40 @@ function pintarBanderasPrueba() {
 // Espejo en el encabezado de los switches de ADMIN → Ajustes de admin: se pinta
 // leyendo ESOS controles (nunca un estado propio). Con ADMIN apagado la barra
 // sigue visible; solo Carga queda editable mediante su endpoint propio.
+const GRUPOS_RAPIDA_SUPERVISION = ["rapida-grupo-llena", "rapida-grupo-salta",
+                                   "rapida-grupo-prueba", "rapida-grupo-canal"];
+
 function pintarBarraRapida() {
   // Supervisión EFECTIVA: con "ver como" en otro rol la barra de prueba
-  // también se esconde — es parte de lo que un operador no ve.
-  const visible = esMaquinaAdmin && esSupervisionEfectiva();
-  $("barra-rapida").style.display = visible ? "" : "none";
-  if (!visible) return;
-  $("rapida-modo-apagado").style.display = modoAdmin ? "none" : "";
+  // también se esconde — es parte de lo que un operador no ve. Sobrevive el
+  // selector de vista, que es la vuelta a la vista completa.
+  const supervision = esMaquinaAdmin && esSupervisionEfectiva();
+  const puedeVerComo = esMaquinaAdmin &&
+    (permisosUI.rol_real === "admin" || permisosUI.rol_real === "supervisor");
+  $("barra-rapida").style.display = (supervision || puedeVerComo) ? "" : "none";
+  pintarRapidaVista(puedeVerComo);
+  for (const id of GRUPOS_RAPIDA_SUPERVISION)
+    $(id).style.display = supervision ? "" : "none";
+  $("rapida-modo-apagado").style.display = (supervision && !modoAdmin) ? "" : "none";
+  if (!supervision) return;
   pintarModoPrueba();
   const es999 = $("prueba-emp-999").checked;
   const recorta = $("prueba-cuanto-recorte").checked;
-  const marcar = (id, on) => $(id).classList.toggle("on", on);
-  marcar("rapida-estado-real", !modoImplantacion);
-  marcar("rapida-estado-prueba", modoImplantacion);
-  marcar("rapida-completa", !recorta);
-  marcar("rapida-recorte", recorta);
+  // Un check pinta tres cosas a la vez: su marca, su color y si se puede tocar.
+  const marcarChk = (id, on, editable) => {
+    const chk = $(id);
+    chk.checked = on;
+    chk.disabled = !editable;
+    const lbl = chk.closest(".rapida-check");
+    lbl.classList.toggle("on", on);
+    lbl.classList.toggle("inerte", !editable);
+  };
+  marcarChk("rapida-prueba", modoImplantacion, modoAdmin && !modoPruebaForzado);
+  marcarChk("rapida-completa", !recorta, modoAdmin && modoImplantacion);
+  // El número solo tiene sentido cuando NO se llena completa: es el "primeras N".
+  $("rapida-n").style.display = recorta ? "" : "none";
   $("rapida-n").value = $("prueba-recortar-n").value;
-  $("rapida-n").disabled = !modoAdmin || !modoImplantacion || !recorta;
+  $("rapida-n").disabled = !modoAdmin || !modoImplantacion;
   for (const cual of ["tasa", "fecha", "serie"]) {
     const chip = $("rapida-salto-" + cual);
     chip.classList.toggle("on", $("prueba-saltar-" + cual).checked);
@@ -12775,14 +12819,22 @@ function pintarBarraRapida() {
     // regla que abajo, ver pintarOpcionesPrueba).
     chip.disabled = !modoAdmin || !modoImplantacion || es999;
   }
-  marcar("rapida-canal-produccion", $("prueba-canal-produccion").checked);
-  marcar("rapida-canal-desarrollo", $("prueba-canal-desarrollo").checked);
-  for (const id of ["rapida-completa", "rapida-recorte"])
-    $(id).disabled = !modoAdmin || !modoImplantacion;
-  for (const id of ["rapida-estado-real", "rapida-estado-prueba"])
-    $(id).disabled = !modoAdmin || modoPruebaForzado;
-  for (const id of ["rapida-olvidar-prueba"])
-    $(id).disabled = !modoAdmin;
+  // El canal es propiedad de la instalación: sigue editable con ADMIN apagado.
+  marcarChk("rapida-prod", $("prueba-canal-produccion").checked, true);
+  $("rapida-olvidar-prueba").disabled = !modoAdmin;
+}
+
+// Mismas opciones que el bloque de AJUSTES (pintarVerComo), con los rótulos
+// cortos que pide la barra. "Dev" es la vista completa de supervisión.
+function pintarRapidaVista(puede) {
+  $("rapida-grupo-vista").style.display = puede ? "" : "none";
+  if (!puede) return;
+  const opciones = permisosUI.rol_real === "supervisor"
+    ? [["", "Dev"], ["admin", "Admin"], ["editor", "Editor"], ["normal", "Usuario"]]
+    : [["", "Admin"], ["editor", "Editor"], ["normal", "Usuario"]];
+  $("rapida-vista").innerHTML = opciones.map(([v, t]) =>
+    `<option value="${v}">${t}</option>`).join("");
+  $("rapida-vista").value = permisosUI.ver_como || "";
 }
 
 function rapidaCuanto(recortar) {
@@ -12802,15 +12854,19 @@ function rapidaSalto(cual) {
   guardarOpcionesPrueba();
 }
 
-function rapidaModoPrueba(encendido) {
-  if (!encendido) {
+// Prender la prueba se confirma (mismo trato que el switch de AJUSTES): el
+// check no se marca hasta que se confirme, y la confirmación sale en su sitio.
+function onClickRapidaPrueba(ev) {
+  if (!ev.target.checked) {
     aplicarModoPrueba(false);
-    return;
+    return true;
   }
+  ev.preventDefault();
   confirmarSinQuitar(
-    $("rapida-estado-prueba"), () => aplicarModoPrueba(true),
+    $("rapida-prueba-lbl"), () => aplicarModoPrueba(true),
     "Confirmar: los llenados quedarán solo en esta sesión"
   );
+  return false;
 }
 
 // --- Procesadas FANTASMA del modo prueba (2026-07-30) -----------------------
