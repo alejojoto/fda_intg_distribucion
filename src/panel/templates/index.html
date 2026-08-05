@@ -2695,29 +2695,36 @@
         Apagada: este equipo ve la verdad central y sus cambios se sincronizan.
         Prendida: los llenados no reclaman ni registran facturas reales; quedan
         solo en esta sesión. En el Mac, WinLedger sigue simulado en ambos casos.</p>
-      <!-- Modo viejo (2026-07-31, pedido del usuario): NO es una preferencia
-           de este equipo sino del parque entero — se guarda como ajuste global
-           (asistente_ajustes) y cada máquina lo baja en su refresco. Va FUERA
-           de #ajustes-admin-opciones por el mismo motivo que la fila "Carga":
-           ese contenedor se oculta con el modo admin apagado, y de la versión
-           vieja hay que poder volver sin prender nada más. -->
+      <!-- Versión estable del parque (nació 2026-07-31 como el interruptor
+           "Modo viejo"; pasó a selector de versiones el 2026-08-05, pedido del
+           usuario): NO es una preferencia de este equipo sino del parque
+           entero — se guarda como ajuste global (asistente_ajustes) y cada
+           máquina lo baja en su refresco. Va FUERA de #ajustes-admin-opciones
+           por el mismo motivo que la fila "Carga": ese contenedor se oculta
+           con el modo admin apagado, y de una versión vieja hay que poder
+           volver sin prender nada más.
+           Detrás sigue el mismo ajuste booleano: 1.0 ES la rama `estable`
+           congelada (lo que antes prendía el modo viejo) y 1.1 es un
+           PLACEHOLDER del primer release — todavía no apunta a ninguna rama
+           propia, elegirla hace exactamente lo que hacía desmarcar el modo
+           viejo (devolver las máquinas a la versión al día). -->
       <div class="ajustes-fila">
-        <b class="rotulo">Versión:</b>
-        <label class="desc-todos"
-               title="Manda a todas las computadoras de producción a la última versión estable. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
-          <input type="checkbox" id="modo-viejo-chk"
-                 onchange="guardarModoViejo(this.checked)">
-          Modo viejo en producción</label>
-        <span class="prueba-nota" id="modo-viejo-nota" style="display:none"
-              title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Activo en todas las computadoras</span>
+        <b class="rotulo">Versión estable:</b>
+        <select id="version-estable-sel" onchange="guardarVersionEstable(this.value)"
+                title="La versión que corren todas las computadoras de producción. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
+          <option value="1.1">1.1 — Primer release</option>
+          <option value="1.0">1.0 — Primer release estable, antes de producción</option>
+        </select>
+        <span class="prueba-nota" id="version-estable-nota" style="display:none"
+              title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Congelada: no reciben actualizaciones</span>
       </div>
       <p class="mut" style="margin:8px 0 0">
-        Manda a <b>todas las computadoras de producción</b> a la última versión
-        estable y las deja ahí, sin recibir actualizaciones, hasta que se
-        desmarque. Es para cuando una actualización sale lenta o con fallas: se
-        marca, siguen facturando con lo que ya servía, y se corrige con calma.
-        Cada computadora lo toma al reabrir el asistente; este equipo no se
-        mueve, para poder arreglar mientras tanto.</p>
+        Fija en qué versión corren <b>todas las computadoras de producción</b>.
+        Con la <b>1.0</b> se quedan ahí, sin recibir actualizaciones, hasta que
+        se elija otra: es para cuando una actualización sale lenta o con fallas
+        — siguen facturando con lo que ya servía y se corrige con calma. Cada
+        computadora la toma al reabrir el asistente; este equipo no se mueve,
+        para poder arreglar mientras tanto.</p>
       <!-- Opciones de PRUEBA AISLADA: ADMIN concede permiso para editarlas y
            el toggle de prueba decide si se aplican. El contenedor se oculta
            salvo que ambos estén prendidos. Se guardan por dispositivo. -->
@@ -14277,7 +14284,7 @@ async function cargarAjustes() {
     pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
-    pintarModoViejo(d.modo_viejo);
+    pintarVersionEstable(d.modo_viejo);
     pintarOpcionesPrueba(d.opciones_prueba);
     pintarBotonCorte();
     refrescarVistasModoPrueba();
@@ -14566,24 +14573,33 @@ function pedirCambioCorte() {
   };
 }
 
-// Modo viejo (2026-07-31): ajuste de TODAS las computadoras de producción, no
-// de este equipo. Se guarda compartido y cada máquina lo aplica al reabrir el
-// asistente. El guardado no se anuncia (el check y su nota ya lo dicen), pero
-// sí se avisa cuando no se pudo compartir: ahí el hecho importa — las demás
-// computadoras siguieron con su versión.
-function pintarModoViejo(activo) {
-  $("modo-viejo-chk").checked = !!activo;
-  $("modo-viejo-nota").style.display = activo ? "" : "none";
+// Versión estable del parque (2026-07-31 como "modo viejo", selector desde
+// 2026-08-05): ajuste de TODAS las computadoras de producción, no de este
+// equipo. Se guarda compartido y cada máquina lo aplica al reabrir el
+// asistente. El guardado no se anuncia (el selector ya dice en qué versión
+// quedó), pero sí se avisa cuando no se pudo compartir: ahí el hecho importa —
+// las demás computadoras siguieron con su versión.
+// El backend sigue siendo el booleano del modo viejo: 1.0 = congelada en la
+// rama `estable`; 1.1 = placeholder del primer release, que hoy no apunta a
+// ninguna rama propia y equivale a quitar el modo viejo (versión al día).
+const VERSION_CONGELADA = "1.0";
+const VERSION_AL_DIA = "1.1";
+
+function pintarVersionEstable(congelada) {
+  $("version-estable-sel").value = congelada ? VERSION_CONGELADA : VERSION_AL_DIA;
+  $("version-estable-nota").style.display = congelada ? "" : "none";
 }
 
-async function guardarModoViejo(activo) {
+async function guardarVersionEstable(version) {
+  const congelada = version === VERSION_CONGELADA;
   try {
-    const r = await api("/api/ajustes/modo-viejo", {activo});
-    pintarModoViejo(r.modo_viejo);
+    const r = await api("/api/ajustes/modo-viejo", {activo: congelada});
+    pintarVersionEstable(r.modo_viejo);
     if (r.aviso) mensaje(r.aviso, "alerta");
   } catch (e) {
-    pintarModoViejo(!activo);   // el check no se queda marcando lo que no se guardó
-    mensaje("No se pudo cambiar el modo viejo: " + e.message, "error");
+    // El selector no se queda mostrando una versión que no se guardó.
+    pintarVersionEstable(!congelada);
+    mensaje("No se pudo cambiar la versión: " + e.message, "error");
   }
 }
 
