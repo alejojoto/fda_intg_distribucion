@@ -4645,18 +4645,25 @@ function pintarResumenFinal() {
 // decisiones posibles, en el orden en que se toman — rehacerla, darla por
 // buena, o dejarla para después. Sin líneas saltadas no hay nada que decidir y
 // la botonera se queda como estaba.
+// Rehacerla es reemitir el documento que acaba de salir: mismo permiso que el
+// "Volver a llenar" de PROCESADAS (reabrir_factura, 2026-08-05). Sin él las
+// salidas que quedan son darla por buena o dejarla en revisión, y con líneas
+// saltadas la nota dice que reemitirla es de un editor — quien factura no se
+// queda pensando que el documento incompleto no tiene arreglo.
 function pintarAccionesResumen(hayOmitidas) {
+  const puedeReabrir = tienePermiso("reabrir_factura");
   $("fin-llenado-acciones").innerHTML = hayOmitidas
-    ? `<button class="primario" onclick="volverALlenarDesdeResumen()"
-         title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel.">Volver a intentar</button>
-       <button onclick="procesadaDesdeResumen()"
+    ? `${puedeReabrir ? `<button class="primario" onclick="volverALlenarDesdeResumen()"
+         title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel.">Volver a intentar</button>` : ""}
+       <button${puedeReabrir ? "" : ` class="primario"`} onclick="procesadaDesdeResumen()"
          title="El documento queda como salió: la factura no pasa por EN REVISIÓN.">Marcar como procesada</button>
        <button onclick="listoEnvioPlataforma()"
-         title="Vuelve el panel y la factura espera en EN REVISIÓN para decidir después.">Dejar en revisión</button>`
+         title="Vuelve el panel y la factura espera en EN REVISIÓN para decidir después.">Dejar en revisión</button>
+       ${puedeReabrir ? "" : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`}`
     : `<button class="primario" onclick="listoEnvioPlataforma()"
          title="La factura quedó despachada: vuelve el panel completo.">Listo</button>
-       <button onclick="volverALlenarDesdeResumen()"
-         title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>`;
+       ${puedeReabrir ? `<button onclick="volverALlenarDesdeResumen()"
+         title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>` : ""}`;
 }
 
 // "Marcar como procesada": lo que faltó se resuelve por fuera y la factura no
@@ -8525,6 +8532,15 @@ const botonPrellenado = (f, etiqueta, clase) =>
     esc(f.pedido_id)}',${f.parte}${f.tiene_detalle === false ? ",true" : ""})">${
     etiqueta}</button>`;
 
+// "Volver a llenar" reabre un documento fiscal YA CERRADO: emite uno nuevo y
+// el anterior queda anulado en papel. Es de Editor/Admin (2026-08-05, regla
+// del usuario; permiso reabrir_factura en src/roles.py). Sin el permiso la
+// fila no se queda muda: dice a quién le toca, igual que la nota del editor
+// de catálogos en EN REVISIÓN.
+const botonVolverALlenar = (f) => tienePermiso("reabrir_factura")
+  ? `<button onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`
+  : `<span class="mut" title="Emitir otra vez un documento ya cerrado lo hace un editor.">Volver a llenar: lo hace un editor</span>`;
+
 function accionesDeFila(f) {
   const id = esc(f.pedido_id);
   // Pendiente vieja fuera de la ventana (fila VIRTUAL, sin registro local): no
@@ -8551,7 +8567,7 @@ function accionesDeFila(f) {
     return `<span class="mut" title="La prueba aislada no cambia el estado compartido.">Solo en REAL</span>`;
   if (f.remota)
     return f.refacturable
-      ? `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`
+      ? botonVolverALlenar(f)
       : ["reservada", "llenando", "error_llenado"].includes(f.estado)
         ? `<button onclick="tomarIgual('${id}',${f.parte})">Llenar igual</button>` +
           `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`
@@ -8592,7 +8608,7 @@ function accionesDeFila(f) {
       || f.estado === "facturada_a_mano")
     return modoImplantacion
       ? `<span class="mut" title="La prueba aislada no reabre facturas reales.">Solo en REAL</span>`
-      : `<button onclick="volverAFacturar('${id}',${f.parte})">Volver a llenar</button>`;
+      : botonVolverALlenar(f);
   return "";
 }
 
@@ -9016,12 +9032,17 @@ function llenadoDirecto(f) {
 // prellenado cuando la acción aterriza.
 function reabrirDesdeDetalle(f) {
   if (!f) return null;
+  // Reabrir una cerrada es de Editor/Admin (permiso reabrir_factura): sin él
+  // el pie se queda sin botón, como en cualquier fila que no tenga acción.
+  // "Llenar igual" es otra cosa (quitar un candado, no reemitir) y no se toca.
+  const puedeReabrir = tienePermiso("reabrir_factura");
   if (f.remota)
     return f.refacturable
-      ? {texto: "Volver a llenar", abrir: volverAFacturar}
+      ? (puedeReabrir ? {texto: "Volver a llenar", abrir: volverAFacturar} : null)
       : ["reservada", "llenando", "error_llenado"].includes(f.estado)
         ? {texto: "Llenar igual", abrir: tomarIgual}
         : null;
+  if (!puedeReabrir) return null;
   // La que cerró con líneas de menos se reintenta sin preguntar nada
   // (2026-08-01, pedido del usuario): el porqué ya está registrado, igual que
   // en su fila de EN REVISIÓN y en el resumen de fin de llenado.
@@ -9266,7 +9287,9 @@ function contenidoDetalle(clave) {
           discrepancia de despacho, una corrección u otra excepción real.</div>`)
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
-      : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
+      : tienePermiso("reabrir_factura")
+        ? `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`
+        : `<div class="det-nota">Esta factura ya está cerrada. Volver a llenarla emite un documento nuevo, y eso lo hace un editor.</div>`;
   return `
     ${nota}
     <table><thead><tr>
@@ -9813,6 +9836,16 @@ function pintarLlenadosPorRevisar(lista) {
     const notaEditor = (!tienePermiso("ajustes_catalogos") && f.tipo === "error")
       ? `<div class="mut">Si hay que corregir un catálogo, lo hace un editor: desde este equipo no se puede.</div>`
       : "";
+    // El "Reintentar" de las líneas omitidas reabre un documento YA CERRADO y
+    // emite uno nuevo: pide el mismo permiso que el "Volver a llenar" de
+    // PROCESADAS (reabrir_factura, 2026-08-05). Sin él quedan las otras dos
+    // salidas —darla por buena o descartarla— y la nota dice a quién le toca.
+    const botonReemitirOmitidas = tienePermiso("reabrir_factura")
+      ? `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
+           onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
+      : "";
+    const notaReemitir = tienePermiso("reabrir_factura") ? ""
+      : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`;
     const acciones = modoImplantacion
       ? (f.tipo === "error"
           ? botonPrellenado(f, "Probar reintento", "acento")
@@ -9828,11 +9861,10 @@ function pintarLlenadosPorRevisar(lista) {
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          ${botonEditarCliente}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>${notaEditor}`
-      : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
-           onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
+      : `${botonReemitirOmitidas}
          <button title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
-         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`;
+         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>${notaReemitir}`;
     return `
     <tr${filaDetalle(f, atrasada ? "fila-atrasada" : "")}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
