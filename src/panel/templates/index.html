@@ -11929,8 +11929,17 @@ function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
 // (pintarInfoLlenado), "ruta completa" y el gate del resumen de fin de
 // llenado (el resumen es exclusivo de producción — ver el bloque de éxito
 // de llenar()).
+// El canal por sí solo NO alcanza (2026-08-05): en una máquina de operación la
+// clave de canal está VACÍA — el automático por hostname del lanzador la manda
+// a `produccion`, pero el panel solo veía el radio de ADMIN sin marcar y daba
+// la corrida por disponible. De ahí que producción viera "Llenar en fila".
+// `esMaquinaAdmin` (capacidad por hostname, /api/ajustes) es la condición que
+// no depende de config alguna; el radio sigue mandando dentro del equipo admin
+// para poder ver la vista de producción sin cambiar de máquina. Arranca en
+// false, así que hasta que carguen los ajustes se ve la barra de producción,
+// que es el lado seguro.
 const enFilaDisponible = () =>
-  !$("prueba-canal-produccion").checked;
+  esMaquinaAdmin && !$("prueba-canal-produccion").checked;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
