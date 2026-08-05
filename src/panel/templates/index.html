@@ -1358,26 +1358,6 @@
   #admin-subtab-supervision:hover { background:#ead9fd; }
   #admin-subtab-supervision.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
   #admin-panel-supervision { padding:0 14px 18px; }
-  #admin-subtab-despliegue { background:#ccfbf1; border-color:#5eead4; color:#0f766e; }
-  #admin-subtab-despliegue:hover { background:#b9efe2; }
-  #admin-subtab-despliegue.activa { background:#0d9488; border-color:#0d9488; color:#fff; }
-  #admin-panel-despliegue { padding:0 14px 18px; }
-  .desp-semaforo { display:flex; align-items:center; gap:10px; margin:10px 0 14px;
-                   padding:10px 14px; border-radius:8px; font-weight:600; }
-  .desp-semaforo.ok { background:#dcfce7; color:#166534; }
-  .desp-semaforo.aviso { background:#fef9c3; color:#854d0e; }
-  .desp-semaforo.falta { background:#fee2e2; color:#991b1b; }
-  .desp-check { display:flex; gap:10px; align-items:baseline; padding:7px 0;
-                border-bottom:1px solid #f1f5f9; }
-  .desp-check:last-child { border-bottom:none; }
-  .desp-chip { flex:none; font-size:12px; font-weight:600; padding:2px 8px;
-               border-radius:10px; }
-  .desp-chip.ok { background:#dcfce7; color:#166534; }
-  .desp-chip.aviso { background:#fef9c3; color:#854d0e; }
-  .desp-chip.falta { background:#fee2e2; color:#991b1b; }
-  .desp-chip.info { background:#e2e8f0; color:#475569; }
-  .desp-titulo { font-weight:600; }
-  .desp-detalle { color:#64748b; }
   #sup-cargando { padding:26px 4px; color:var(--mut); }
   #sup-error, #sup-tickets-error, #sup-ticket-modal-error {
     background:#fdecec; border:1px solid #f0b4b4; color:#a12a2a;
@@ -2551,13 +2531,8 @@
     <div id="sup-subtabs" class="desc-subtabs">
       <button type="button" id="admin-subtab-ajustes" class="desc-subtab activa"
               onclick="irASubtabAdmin('ajustes')">Ajustes</button>
-      <!-- "Equipos" hacia el usuario; el id interno sigue siendo
-           "supervision" (endpoints, funciones y estilos ya viven con ese
-           nombre y renombrarlos no cambia nada visible). -->
       <button type="button" id="admin-subtab-supervision" class="desc-subtab"
-              onclick="irASubtabAdmin('supervision')">Equipos</button>
-      <button type="button" id="admin-subtab-despliegue" class="desc-subtab"
-              onclick="irASubtabAdmin('despliegue')">Despliegue</button>
+              onclick="irASubtabAdmin('supervision')">Supervisión</button>
     </div>
     <div id="admin-panel-ajustes">
     <!-- Ajustes de admin: tiene su propia pestaña, visible solo en equipos con
@@ -2821,34 +2796,6 @@
           <div id="sup-tickets-mas" class="sup-mas" style="display:none">
             <button type="button" onclick="cargarMasTickets()">Mostrar más</button>
           </div>
-        </div>
-      </div>
-    </div>
-    <!-- ADMIN → Despliegue (2026-08-05): el checklist de publicación como
-         semáforo (código, migraciones de la nube, banderas y versiones del
-         parque) más el estado de las fuentes de pedidos y la tasa. -->
-    <div id="admin-panel-despliegue" style="display:none">
-      <div id="desp-cargando" style="display:none">
-        <span class="spinner"></span> Revisando el estado del despliegue…
-      </div>
-      <div id="desp-error" style="display:none"></div>
-      <div id="desp-contenido" style="display:none">
-        <div class="sup-bloque">
-          <h3>Listo para publicar</h3>
-          <div id="desp-semaforo" class="desp-semaforo"></div>
-          <div id="desp-checks"></div>
-        </div>
-        <div class="sup-bloque">
-          <h3>Cadena de distribución</h3>
-          <div id="desp-cadena"></div>
-        </div>
-        <div class="sup-bloque">
-          <h3>Fuentes de pedidos y tasa</h3>
-          <div id="desp-fuentes"></div>
-        </div>
-        <div class="sup-bloque">
-          <h3>Base de datos compartida</h3>
-          <div id="desp-bd"></div>
         </div>
       </div>
     </div>
@@ -6225,7 +6172,6 @@ const SUP_PROBLEMAS = {
   sync_degradada: "sync degradada",
   atraso_cursor: "atrasada",
   modo_prueba: "modo prueba",
-  banderas: "banderas de prueba",
 };
 
 const SUP_RESULTADOS = {
@@ -6251,24 +6197,15 @@ function supVisible() {
       && document.visibilityState === "visible";
 }
 
-function despVisible() {
-  return $("sec-admin").style.display !== "none"
-      && $("admin-panel-despliegue").style.display !== "none"
-      && document.visibilityState === "visible";
-}
-
 function irASubtabAdmin(id) {
-  if (id !== "ajustes" && id !== "supervision" && id !== "despliegue") return;
+  if (id !== "ajustes" && id !== "supervision") return;
   subtabAdminActiva = id;
-  for (const s of ["ajustes", "supervision", "despliegue"]) {
-    $("admin-subtab-" + s).classList.toggle("activa", id === s);
-    $("admin-panel-" + s).style.display = id === s ? "" : "none";
-  }
-  if ($("sec-admin").style.display !== "none") {
-    if (id === "supervision")
-      refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
-    if (id === "despliegue") cargarDespliegue({mostrarCarga: !despCargado});
-  }
+  $("admin-subtab-ajustes").classList.toggle("activa", id === "ajustes");
+  $("admin-subtab-supervision").classList.toggle("activa", id === "supervision");
+  $("admin-panel-ajustes").style.display = id === "ajustes" ? "" : "none";
+  $("admin-panel-supervision").style.display = id === "supervision" ? "" : "none";
+  if (id === "supervision" && $("sec-admin").style.display !== "none")
+    refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
   actualizarRefrescoSupervision();
 }
 
@@ -6277,18 +6214,15 @@ function actualizarRefrescoSupervision() {
     clearInterval(supRefrescoInterval);
     supRefrescoInterval = null;
   }
-  if (!supVisible() && !despVisible()) return;
+  if (!supVisible()) return;
   supRefrescoInterval = setInterval(() => {
     if (supVisible()) refrescarSupervision(false, false);
-    if (despVisible()) cargarDespliegue({});
   }, 60000);
 }
 
 function sincronizarSupervisionConTab(tab) {
   if (tab === "admin" && subtabAdminActiva === "supervision")
     refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
-  if (tab === "admin" && subtabAdminActiva === "despliegue")
-    cargarDespliegue({mostrarCarga: !despCargado});
   actualizarRefrescoSupervision();
 }
 
@@ -6626,125 +6560,6 @@ function cargarMasEquipos() {
   cargarSupervision({anadir:true, desde:supEquipos.length});
 }
 
-// --- ADMIN → Despliegue ------------------------------------------------------
-// El semáforo viaja por /api/despliegue; la tasa se pide en paralelo por el
-// /api/tasa_bcv de siempre (con caché frío esa consulta puede tardar y no
-// tiene por qué frenar el resto de la tarjeta).
-let despCargado = false;
-let despEnVuelo = false;
-
-const DESP_CHIP = {ok: "En orden", aviso: "Aviso", falta: "Por resolver",
-                   info: "Sin dato"};
-
-function despCheckHTML(c) {
-  return `
-    <div class="desp-check">
-      <span class="desp-chip ${esc(c.estado || "aviso")}">${
-        esc(DESP_CHIP[c.estado] || c.estado || "—")}</span>
-      <span><span class="desp-titulo">${esc(c.titulo || "")}.</span>
-        <span class="desp-detalle">${esc(c.detalle || "")}</span></span>
-    </div>`;
-}
-
-async function cargarDespliegue({mostrarCarga=false} = {}) {
-  if (despEnVuelo) return;
-  despEnVuelo = true;
-  if (mostrarCarga) {
-    $("desp-cargando").style.display = "";
-    $("desp-contenido").style.display = "none";
-  }
-  $("desp-error").style.display = "none";
-  try {
-    const [d, tasa] = await Promise.all([
-      api("/api/despliegue"),
-      api("/api/tasa_bcv").catch(() => null),
-    ]);
-    pintarDespliegue(d, tasa);
-    $("desp-contenido").style.display = "";
-    despCargado = true;
-  } catch (e) {
-    $("desp-error").textContent = e.message;
-    $("desp-error").style.display = "";
-    if (!despCargado) $("desp-contenido").style.display = "none";
-  } finally {
-    despEnVuelo = false;
-    $("desp-cargando").style.display = "none";
-  }
-}
-
-function pintarDespliegue(d, tasa) {
-  const sem = d.semaforo || {};
-  const cartel = $("desp-semaforo");
-  cartel.className = "desp-semaforo " + (sem.nivel || "aviso");
-  cartel.textContent = sem.texto || "";
-  $("desp-checks").innerHTML = (d.checks || []).map(despCheckHTML).join("");
-  $("desp-cadena").innerHTML = (d.cadena || []).length
-    ? d.cadena.map(despCheckHTML).join("")
-    : `<div class="mut">Sin datos de la cadena en esta máquina.</div>`;
-  $("desp-fuentes").innerHTML = pintarFuentesDespliegue(d.fuentes || {}, tasa);
-  $("desp-bd").innerHTML = pintarBaseDatosDespliegue(d.bd || {});
-}
-
-function pintarBaseDatosDespliegue(bd) {
-  const partes = [];
-  for (const t of (bd.tablas || []))
-    partes.push(`<div class="sup-dato"><span>${esc(t.titulo || t.tabla)}:</span>${
-      t.error ? `no se pudo contar (${esc(t.error)})`
-              : `${esc(String(t.filas))} filas`}</div>`);
-  const poda = bd.poda || {};
-  if (poda.error) {
-    partes.push(`<div class="sup-dato"><span>Poda de tumbas:</span>${
-      esc(poda.error)}</div>`);
-  } else if (!poda.fila || !poda.fila.podado_en) {
-    partes.push(`<div class="sup-dato"><span>Poda de tumbas:</span>todavía no `
-      + `corre ninguna (cualquier panel la pide cada ~6 horas).</div>`);
-  } else {
-    const f = poda.fila;
-    partes.push(`<div class="sup-dato"><span>Poda de tumbas:</span>última ${
-      esc(supFechaCorta(f.podado_en))} — retiró ${esc(String(f.ultimas_borradas ?? 0))}, `
-      + `podó hasta el cambio ${esc(String(f.purgado_hasta ?? 0))}`
-      + (f.ultimo_piso !== null && f.ultimo_piso !== undefined
-        ? ` (piso del parque: ${esc(String(f.ultimo_piso))})` : "")
-      + `.</div>`);
-  }
-  return partes.join("");
-}
-
-function pintarFuentesDespliegue(f, tasa) {
-  const partes = [];
-  const hoja = f.hoja;
-  if (hoja && hoja.generacion_activa !== null && hoja.generacion_activa !== undefined) {
-    partes.push(`<div class="sup-dato"><span>Hoja de pedidos:</span>copia central `
-      + `generación ${esc(String(hoja.generacion_activa))}, publicada ${
-        esc(supFechaCorta(hoja.activado_en))}`
-      + (hoja.lease_maquina ? `, mantenida por ${esc(hoja.lease_maquina)}` : "")
-      + `</div>`);
-  } else {
-    partes.push(`<div class="sup-dato"><span>Hoja de pedidos:</span>sin copia `
-      + `central en la nube (migración 025 sin correr, o nube caída).</div>`);
-  }
-  if (f.drive_liviano_caido)
-    partes.push(`<div class="sup-dato"><span>Chequeo liviano de Drive:</span>`
-      + `no responde — el vigía relee el libro completo con la cadencia de `
-      + `respaldo. Habilitar la Drive API en el proyecto de Google Cloud lo `
-      + `abarata.</div>`);
-  partes.push(`<div class="sup-dato"><span>Pedidos facturables:</span>`
-    + (f.pedidos_facturables === null || f.pedidos_facturables === undefined
-      ? `no se pudo contar${f.pedidos_error ? ` (${esc(f.pedidos_error)})` : ""}`
-      : `${esc(String(f.pedidos_facturables))} desde el ${esc(f.pedidos_desde || "—")}`)
-    + `</div>`);
-  if (tasa && (tasa.tasa || tasa.error)) {
-    partes.push(`<div class="sup-dato"><span>Tasa BCV:</span>`
-      + (tasa.tasa
-        ? `${esc(tasa.tasa)} Bs/USD, fecha valor ${esc(tasa.fecha_valor || "—")}`
-        : `sin tasa todavía`)
-      + (tasa.error ? ` — ${esc(tasa.error)}` : "") + `</div>`);
-  } else {
-    partes.push(`<div class="sup-dato"><span>Tasa BCV:</span>no se pudo consultar.</div>`);
-  }
-  return partes.join("");
-}
-
 function supExtracto(texto) {
   const limpio = String(texto || "").replace(/\s+/g, " ").trim();
   return limpio.length > 120 ? limpio.slice(0, 117) + "…" : limpio;
@@ -6847,13 +6662,10 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
     const conocido = supEquipos.find(e => e.dispositivo === dispositivo) || {};
     const equipo = {...conocido, ...(d.equipo || {})};
     $("sup-equipo-titulo").textContent = supNombreEquipoModal(equipo);
-    const banderasEq = equipo.banderas || [];
-    const modos = equipo.modo_prueba || equipo.modo_admin || banderasEq.length
+    const modos = equipo.modo_prueba || equipo.modo_admin
       ? `<div class="sup-detalle-seccion"><h4>Modos prendidos</h4>${
           equipo.modo_prueba ? `<div class="sup-dato">Modo prueba</div>` : ""}${
-          equipo.modo_admin ? `<div class="sup-dato">Modo admin</div>` : ""}${
-          banderasEq.length ? `<div class="sup-dato">Banderas del .env: ${
-            esc(banderasEq.join(", "))}</div>` : ""}</div>` : "";
+          equipo.modo_admin ? `<div class="sup-dato">Modo admin</div>` : ""}</div>` : "";
     const recientes = Array.isArray(d.tickets) && d.tickets.length
       ? `<div class="sup-detalle-seccion"><h4>Tickets recientes de este equipo</h4>${
           d.tickets.map(t => `<div class="sup-dato"><b>${esc(t.id || "—")}</b> · ${
@@ -6878,21 +6690,10 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         <div class="sup-dato"><span>Choques:</span>${esc(supNumero(equipo.conflictos))}</div>
       </div>
       ${modos}
-      <div class="sup-detalle-seccion"><h4>Log del equipo</h4>
-        <div id="sup-log-estado" class="mut"><span class="spinner"></span> Consultando…</div>
-        <div style="margin:6px 0">
-          <button type="button" id="sup-log-boton" style="display:none"
-                  onclick="pedirLogEquipo()">Traer el log</button>
-        </div>
-        <pre class="sup-pre" id="sup-log-texto" style="display:none"></pre>
-      </div>
       <div class="sup-detalle-seccion"><h4>Informe del último latido</h4>
         <pre class="sup-pre">${esc(supJsonLegible(equipo.detalle))}</pre>
       </div>
       ${recientes}`;
-    supLogDispositivo = dispositivo;
-    supLogSondeos = 0;
-    refrescarLogEquipo();
   } catch (e) {
     $("sup-equipo-cuerpo").innerHTML = `<div class="desc-error">${esc(e.message)}</div>`;
   }
@@ -6900,104 +6701,7 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
 
 function cerrarDetalleEquipoSupervision() {
   $("sup-equipo-overlay").classList.remove("visible");
-  supLogDispositivo = null;
-  clearTimeout(supLogTimer);
   replantarCajaFlotante();
-}
-
-// --- Log remoto del equipo (2026-08-05) --------------------------------------
-// "Traer el log" deja un pedido en la nube; la máquina lo entrega en su
-// próxima sonda (~1 min) y aquí se sondea el resultado cada 5 s mientras el
-// detalle siga abierto. Sin respuesta en ~3 min se deja de sondear (equipo
-// apagado: el log llegará cuando vuelva a prender).
-let supLogDispositivo = null;
-let supLogTimer = null;
-let supLogSondeos = 0;
-const SUP_LOG_SONDEOS_MAX = 36;
-
-function programarSondeoLog() {
-  clearTimeout(supLogTimer);
-  supLogTimer = setTimeout(refrescarLogEquipo, 5000);
-}
-
-async function refrescarLogEquipo() {
-  if (!supLogDispositivo) return;
-  const disp = supLogDispositivo;
-  try {
-    const d = await api("/api/supervision/log/" + encodeURIComponent(disp));
-    if (disp !== supLogDispositivo) return;
-    pintarLogEquipo(d.log);
-  } catch (e) {
-    if (disp !== supLogDispositivo) return;
-    const est = $("sup-log-estado");
-    if (est) est.textContent = "No se pudo consultar el log: " + e.message;
-    mostrarBotonLog("Reintentar");
-  }
-}
-
-function mostrarBotonLog(texto) {
-  const btn = $("sup-log-boton");
-  if (!btn) return;
-  btn.style.display = "";
-  btn.disabled = false;
-  btn.textContent = texto;
-}
-
-function pintarLogEquipo(fila) {
-  const est = $("sup-log-estado"), pre = $("sup-log-texto");
-  if (!est || !pre) return;
-  if (!fila) {
-    est.textContent = "El equipo manda el final de su log al pedirlo; tarda "
-      + "hasta un minuto en responder.";
-    mostrarBotonLog("Traer el log");
-    pre.style.display = "none";
-    return;
-  }
-  if (fila.estado === "pedido") {
-    if (++supLogSondeos > SUP_LOG_SONDEOS_MAX) {
-      est.textContent = "El equipo no ha respondido: puede estar apagado. El "
-        + "log llegará cuando vuelva a prender; vuelve a abrir este detalle "
-        + "para verlo.";
-      mostrarBotonLog("Seguir esperando");
-      supLogSondeos = 0;
-      return;
-    }
-    est.innerHTML = `<span class="spinner"></span> Pedido a las ${
-      esc(supFechaCorta(fila.pedido_en))}; el equipo responde en su próxima `
-      + `sonda (hasta un minuto)…`;
-    $("sup-log-boton").style.display = "none";
-    pre.style.display = "none";
-    programarSondeoLog();
-    return;
-  }
-  if (fila.estado === "error") {
-    est.textContent = "El equipo no pudo entregar su log: "
-      + (fila.error || "motivo desconocido") + ".";
-    mostrarBotonLog("Volver a pedirlo");
-    pre.style.display = "none";
-    return;
-  }
-  est.textContent = `Recibido ${supFechaCorta(fila.entregado_en)} · ${
-    fila.lineas || 0} líneas (el final del log).`;
-  mostrarBotonLog("Actualizar el log");
-  pre.textContent = fila.log || "";
-  pre.style.display = "";
-  pre.scrollTop = pre.scrollHeight;
-}
-
-async function pedirLogEquipo() {
-  if (!supLogDispositivo) return;
-  const btn = $("sup-log-boton");
-  btn.disabled = true;
-  try {
-    await api("/api/supervision/pedir-log", {dispositivo: supLogDispositivo});
-    supLogSondeos = 0;
-    refrescarLogEquipo();
-  } catch (e) {
-    btn.disabled = false;
-    const est = $("sup-log-estado");
-    if (est) est.textContent = e.message;
-  }
 }
 
 async function abrirDetalleTicketSupervision(id) {
