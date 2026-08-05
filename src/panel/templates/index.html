@@ -9689,6 +9689,13 @@ function pintarLlenadosPorRevisar(lista) {
     // pantalla y alguien debe atenderlo allá. La de líneas omitidas sí se
     // queda solo informativa: su documento salió en ese equipo y darlo por
     // bueno o reemitirlo se decide donde está el papel.
+    // "Editar cliente" abre el editor del catálogo de Clientes: es edición de
+    // catálogo, así que solo lo ve quien puede editarlo (permiso
+    // ajustes_catalogos, src/roles.py) — el mismo criterio que esconde el
+    // bloque Catálogos de AJUSTES. Quien factura y nada más no lo ve.
+    const botonEditarCliente = tienePermiso("ajustes_catalogos")
+      ? `<button onclick="editarClienteDesdeLlenado('${esc(f.cliente_id)}')" title="Si el código de cliente o sucursal quedó desactualizado, corrígelo aquí.">Editar cliente</button>`
+      : "";
     const acciones = modoImplantacion
       ? (f.tipo === "error"
           ? botonPrellenado(f, "Probar reintento", "acento")
@@ -9696,13 +9703,13 @@ function pintarLlenadosPorRevisar(lista) {
       : f.remota
       ? (f.tipo === "error"
           ? `<button onclick="tomarIgual('${esc(f.pedido_id)}',${f.parte})">Llenar igual</button>
-             <button onclick="editarClienteDesdeLlenado('${esc(f.cliente_id)}')" title="Si el código de cliente o sucursal quedó desactualizado, corrígelo aquí.">Editar cliente</button>
+             ${botonEditarCliente}
              <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
              <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>`
           : `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
-         <button onclick="editarClienteDesdeLlenado('${esc(f.cliente_id)}')" title="Si el código de cliente o sucursal quedó desactualizado, corrígelo aquí.">Editar cliente</button>
+         ${botonEditarCliente}
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`
       : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
            onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>
@@ -9853,6 +9860,9 @@ async function crearClienteDesdeRevision(i) {
 // algo, igual que si hubiera entrado por Ajustes.
 async function editarClienteDesdeLlenado(clienteId) {
   if (!clienteId) return;
+  // Sin el permiso de catálogos no se abre el editor: el botón ya no se
+  // pinta, pero el atajo tampoco puede quedar disponible por otra vía.
+  if (!tienePermiso("ajustes_catalogos")) return;
   cambiarTab("ajustes");
   await abrirCatalogo("clientes");
   const idx = catalogoFilas.findIndex(f => f.cliente_id === clienteId);
