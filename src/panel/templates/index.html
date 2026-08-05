@@ -261,7 +261,13 @@
      tamaño y el color de letra del cuerpo, que es lo que tenía cuando era una
      fila aparte: aquí adentro heredaría la letra chica y gris de los rótulos
      de filtro, y el botón —que va con font:inherit— saldría encogido. */
-  .rutas-barra > #llenado-barra { margin:0 0 0 18px; font-size:1rem; color:#1d2433; }
+  .rutas-barra > #llenado-barra { margin:0; font-size:1rem; color:#1d2433; }
+  /* La separación extra la pone el ÚLTIMO campo por su derecha, no la botonera
+     por su izquierda (2026-08-05): con la barra envuelta —el caso normal en
+     modo admin— un margen izquierdo dejaba la botonera corrida hacia adentro y
+     desalineada contra Ruta y contra todo lo de abajo. Del lado del campo, el
+     margen sobrante muere al final de la línea anterior y no se ve. */
+  .rutas-barra > .campo-separador { margin-right:18px; }
   /* Cada campo viaja pegado a su aviso (2026-07-27): con la ventana angosta la
      barra envuelve, y el aviso ámbar de la tasa se iba solo a la línea de
      abajo — tan lejos del campo que describe que el usuario no lo vio.
@@ -2221,7 +2227,7 @@
           title="Pre-seleccionada con el día de despacho de esta máquina (hoy o mañana, se elige en AJUSTES) y se puede cambiar a mano. Los fines de semana y feriados no la mueven — afectan la tasa (va la última publicada, nunca una posterior). Se escribe en el Período del programa de facturación si la Ficha no coincide."></div>
       <span id="f-fecha-aviso"></span>
     </div>
-    <div class="campo-con-aviso">
+    <div class="campo-con-aviso campo-separador">
       <div class="campo"><span class="rotulo">Tasa</span><input type="text" id="f-tasa" placeholder="—" style="width:90px"
           oninput="pintarAvisoBCV()" onchange="restaurarTasaSiVacia()"
           title="Se llena sola con la tasa que corresponde al día a facturar (la del BCV, o la del último día hábil por feriado/fin de semana) y queda fija: no se edita a mano. Sin ninguna tasa aplicable se habilita para escribirla."></div>
