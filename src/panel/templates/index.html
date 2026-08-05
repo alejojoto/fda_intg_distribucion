@@ -1358,6 +1358,10 @@
   #admin-subtab-supervision:hover { background:#ead9fd; }
   #admin-subtab-supervision.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
   #admin-panel-supervision { padding:0 14px 18px; }
+  #admin-subtab-tickets { background:#ffedd5; border-color:#fdba74; color:#9a3412; }
+  #admin-subtab-tickets:hover { background:#fed9ae; }
+  #admin-subtab-tickets.activa { background:#ea580c; border-color:#ea580c; color:#fff; }
+  #admin-panel-tickets { padding:0 14px 18px; }
   #admin-subtab-despliegue { background:#ccfbf1; border-color:#5eead4; color:#0f766e; }
   #admin-subtab-despliegue:hover { background:#b9efe2; }
   #admin-subtab-despliegue.activa { background:#0d9488; border-color:#0d9488; color:#fff; }
@@ -2571,6 +2575,8 @@
            nombre y renombrarlos no cambia nada visible). -->
       <button type="button" id="admin-subtab-supervision" class="desc-subtab"
               onclick="irASubtabAdmin('supervision')">Equipos</button>
+      <button type="button" id="admin-subtab-tickets" class="desc-subtab"
+              onclick="irASubtabAdmin('tickets')">Tickets<span id="admin-subtab-tickets-badge"></span></button>
       <button type="button" id="admin-subtab-despliegue" class="desc-subtab"
               onclick="irASubtabAdmin('despliegue')">Despliegue</button>
     </div>
@@ -2804,6 +2810,12 @@
           <button type="button" onclick="abrirActividadSupervision()">Ver actividad reciente</button>
         </div>
       </div>
+    </div>
+    <!-- ADMIN → Tickets (2026-08-05, antes al fondo de Equipos): la bandeja
+         de soporte tiene su propio ritmo de revisión (filtrar, leer, resolver)
+         que no depende de mirar el parque, así que se separó a su propio
+         subtab. -->
+    <div id="admin-panel-tickets" style="display:none">
       <div class="sup-bloque" id="sup-tickets-bloque">
         <h3>Bandeja de tickets</h3>
         <div id="sup-tickets-aviso" style="display:none"></div>
@@ -6289,6 +6301,12 @@ function supVisible() {
       && document.visibilityState === "visible";
 }
 
+function ticketsVisible() {
+  return $("sec-admin").style.display !== "none"
+      && $("admin-panel-tickets").style.display !== "none"
+      && document.visibilityState === "visible";
+}
+
 function despVisible() {
   return $("sec-admin").style.display !== "none"
       && $("admin-panel-despliegue").style.display !== "none"
@@ -6296,15 +6314,15 @@ function despVisible() {
 }
 
 function irASubtabAdmin(id) {
-  if (id !== "ajustes" && id !== "supervision" && id !== "despliegue") return;
+  if (!["ajustes", "supervision", "tickets", "despliegue"].includes(id)) return;
   subtabAdminActiva = id;
-  for (const s of ["ajustes", "supervision", "despliegue"]) {
+  for (const s of ["ajustes", "supervision", "tickets", "despliegue"]) {
     $("admin-subtab-" + s).classList.toggle("activa", id === s);
     $("admin-panel-" + s).style.display = id === s ? "" : "none";
   }
   if ($("sec-admin").style.display !== "none") {
-    if (id === "supervision")
-      refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
+    if (id === "supervision") cargarSupervision({mostrarCarga: !supOverviewCargado});
+    if (id === "tickets") cargarTicketsSupervision({mostrarCarga: !supTicketsCargados});
     if (id === "despliegue") cargarDespliegue({mostrarCarga: !despCargado});
   }
   actualizarRefrescoSupervision();
@@ -6315,29 +6333,25 @@ function actualizarRefrescoSupervision() {
     clearInterval(supRefrescoInterval);
     supRefrescoInterval = null;
   }
-  if (!supVisible() && !despVisible()) return;
+  if (!supVisible() && !ticketsVisible() && !despVisible()) return;
   supRefrescoInterval = setInterval(() => {
-    if (supVisible()) refrescarSupervision(false, false);
+    if (supVisible()) cargarSupervision({});
+    if (ticketsVisible()) cargarTicketsSupervision({});
     if (despVisible()) cargarDespliegue({});
   }, 60000);
 }
 
 function sincronizarSupervisionConTab(tab) {
   if (tab === "admin" && subtabAdminActiva === "supervision")
-    refrescarSupervision(!supOverviewCargado, !supTicketsCargados);
+    cargarSupervision({mostrarCarga: !supOverviewCargado});
+  if (tab === "admin" && subtabAdminActiva === "tickets")
+    cargarTicketsSupervision({mostrarCarga: !supTicketsCargados});
   if (tab === "admin" && subtabAdminActiva === "despliegue")
     cargarDespliegue({mostrarCarga: !despCargado});
   actualizarRefrescoSupervision();
 }
 
 document.addEventListener("visibilitychange", actualizarRefrescoSupervision);
-
-function refrescarSupervision(cargarOverview, cargarTickets) {
-  return Promise.allSettled([
-    cargarSupervision({mostrarCarga:!!cargarOverview}),
-    cargarTicketsSupervision({mostrarCarga:!!cargarTickets}),
-  ]);
-}
 
 function supFechaCorta(valor) {
   if (!valor) return "—";
@@ -6555,7 +6569,7 @@ function pintarRolesSupervision() {
   ].map(t => `<p>${t}</p>`).join("");
 }
 
-function pintarResumenSupervision(tickets) {
+function pintarResumenSupervision() {
   const tarjetas = [
     [Number(supResumen.equipos || 0) + supSinDatos.length, "Equipos"],
     [supNumero(supResumen.activos), "Activos"],
@@ -6563,11 +6577,19 @@ function pintarResumenSupervision(tickets) {
     [supNumero(supResumen.sin_reportar), "Sin reportar"],
     [supNumero(supResumen.apagados), "Apagados"],
   ];
-  if (tickets && tickets.disponible)
-    tarjetas.push([tickets.error ? "—" : supNumero(tickets.nuevos), "Tickets sin atender"]);
   $("sup-resumen").innerHTML = tarjetas.map(([numero, rotulo]) =>
     `<div class="sup-resumen-card"><span class="sup-resumen-num">${esc(numero)}</span>`
     + `<span class="sup-resumen-label">${rotulo}</span></div>`).join("");
+}
+
+// El aviso de tickets sin atender ahora vive como insignia del subtab
+// Tickets: llega gratis en la misma respuesta de /api/supervision que ya
+// carga Equipos, así que no hace falta un viaje aparte para pintarlo.
+function pintarBadgeTickets(tickets) {
+  const badge = $("admin-subtab-tickets-badge");
+  if (!badge) return;
+  const n = tickets && tickets.disponible && !tickets.error ? Number(tickets.nuevos || 0) : 0;
+  badge.textContent = n > 0 ? ` (${n})` : "";
 }
 
 function pintarAlertasSupervision(alertas) {
@@ -6641,7 +6663,8 @@ async function cargarSupervision({mostrarCarga=false, anadir=false, desde=0} = {
     supPagina = d.pagina || {desde, limite:nuevos.length};
     // Antes de pintar los equipos: las casillas de rol se arman de aquí.
     if (d.roles) supRoles = d.roles;
-    pintarResumenSupervision(d.tickets || {});
+    pintarResumenSupervision();
+    pintarBadgeTickets(d.tickets || {});
     pintarAlertasSupervision(d.alertas || []);
     pintarEquiposSupervision();
     pintarRolesSupervision();
