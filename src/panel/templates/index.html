@@ -1724,6 +1724,48 @@
   #desactivada-caja h2 { margin:0 0 10px; font-size:16px; }
   #desactivada-caja p { margin:0; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
+  /* Activación de esta computadora (2026-08-05): mismo tratamiento que el
+     aviso de desactivada — tapa el panel ENTERO mientras la instalación
+     espera aprobación, porque hasta entonces no hay datos que mostrar. Se
+     quita sola en cuanto el administrador la activa (el sondeo la trae). */
+  #acceso-overlay { position:fixed; inset:0; background:#f4f5f7;
+      display:none; z-index:61; align-items:center; justify-content:center; }
+  #acceso-overlay.visible { display:flex; }
+  body.modo-llenado #acceso-overlay { display:none; }
+  #acceso-caja { background:#fff; border-radius:10px; padding:24px 26px;
+      width:min(480px, 92vw); box-shadow:0 6px 30px rgba(0,0,0,.12); }
+  #acceso-caja h2 { margin:0 0 10px; font-size:16px; }
+  #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
+      line-height:1.5; }
+  #acceso-caja input[type=text] { width:100%; box-sizing:border-box;
+      padding:8px 10px; font-size:14px; border:1px solid var(--bor);
+      border-radius:6px; }
+  #acceso-error { color:var(--peligro); font-size:13px; margin:0 0 10px;
+      display:none; }
+  #acceso-espera { display:flex; align-items:center; gap:10px;
+      font-size:13.5px; color:var(--mut); }
+  #acceso-datos { font-size:12.5px; color:var(--mut); margin-top:14px;
+      border-top:1px solid var(--bor); padding-top:10px; }
+  /* Solicitudes de activación (AJUSTES → Computadoras) */
+  .solicitud { border:1px solid var(--bor); border-radius:8px; padding:12px 14px;
+      margin-bottom:10px; }
+  .solicitud-cab { display:flex; align-items:baseline; gap:8px;
+      flex-wrap:wrap; margin-bottom:6px; }
+  .solicitud-cab b { font-size:14px; }
+  .solicitud-datos { font-size:12.5px; color:var(--mut); line-height:1.6;
+      margin-bottom:10px; }
+  .solicitud-acciones { display:flex; gap:8px; align-items:center;
+      flex-wrap:wrap; }
+  .solicitud-acciones input[type=text] { padding:6px 8px; font-size:13px;
+      border:1px solid var(--bor); border-radius:6px; min-width:180px; }
+  .etiqueta-estado { font-size:11.5px; border-radius:10px; padding:2px 8px;
+      border:1px solid var(--bor); color:var(--mut); }
+  .etiqueta-estado.pendiente { border-color:#d79a00; color:#8a6400;
+      background:#fff8e6; }
+  .etiqueta-estado.activo { border-color:#2f8f4e; color:#1f6b39;
+      background:#eefaf1; }
+  .etiqueta-estado.rechazado, .etiqueta-estado.desactivado {
+      border-color:#c0483c; color:#95352b; background:#fdeeec; }
   #tasa-overlay, #docencurso-overlay, #repetida-overlay,
   #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay,
   #babymix-overlay {
@@ -2601,6 +2643,26 @@
          nombre y vendedor con identidad_maquina, Editor con
          gestionar_editores y Activa con activar_maquinas — un editor no ve
          las dos últimas. -->
+    <!-- Solicitudes de activación (2026-08-05). Una instalación nueva no opera
+         hasta que alguien la aprueba aquí; el bloque solo existe para la
+         supervisión y los equipos con rol Admin. -->
+    <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
+      <h3>Computadoras esperando activación</h3>
+      <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
+        entrar con el nombre que le puso quien la instaló. Hasta que se active
+        no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
+        de activarlo — el instalador se descarga por un enlace público.</p>
+      <div id="solicitudes-lista"></div>
+      <p class="mut" id="solicitudes-vacio" style="margin:0; display:none">
+        No hay ninguna computadora esperando activación.</p>
+      <p class="mut" id="solicitudes-error"
+         style="margin:0; display:none; color:var(--peligro)"></p>
+      <div style="margin-top:12px">
+        <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
+                class="secundario">Ver también las ya activas</button>
+      </div>
+    </div>
+
     <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
       <h3>Computadoras</h3>
       <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
@@ -3582,6 +3644,36 @@
   </div>
 </div>
 
+<!-- Activación de esta computadora (2026-08-05). El instalador es público y no
+     trae llaves: la instalación pide un nombre, queda esperando aprobación y
+     hasta entonces no muestra ni un dato. Sin botón de salida a propósito —
+     no hay nada que elegir: o la aprueban, o esta computadora no opera. -->
+<div id="acceso-overlay">
+  <div id="acceso-caja">
+    <h2 id="acceso-titulo">Activa esta computadora</h2>
+    <p id="acceso-texto"></p>
+    <p id="acceso-error"></p>
+    <div id="acceso-form" style="display:none">
+      <label for="acceso-nombre" style="font-size:13px; font-weight:600;
+             display:block; margin-bottom:6px">Nombre de esta computadora</label>
+      <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2">
+      <p class="mut" style="margin:6px 0 0; font-size:12.5px">
+        Es el nombre con el que el administrador la reconoce al aprobarla, y
+        con el que después aparecen tus llenados en el historial de las demás.</p>
+      <div class="editor-acciones" style="margin-top:16px">
+        <button class="primario" id="acceso-enviar"
+                onclick="enviarSolicitudAcceso()">Pedir activación</button>
+      </div>
+    </div>
+    <div id="acceso-espera" style="display:none">
+      <span class="spinner"></span>
+      <span id="acceso-espera-texto">Esperando que un administrador active
+        esta computadora…</span>
+    </div>
+    <div id="acceso-datos"></div>
+  </div>
+</div>
+
 <div id="configmaq-overlay">
   <div id="configmaq-caja">
     <h3>Antes de facturar, configura esta computadora</h3>
@@ -3605,6 +3697,13 @@
       <select id="configmaq-serie"></select>
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
         Queda como la serie predeterminada de esta computadora.</p>
+    </div>
+    <div class="configmaq-campo" id="configmaq-campo-ruta" style="display:none">
+      <label for="configmaq-ruta">Ruta con la que trabajas</label>
+      <select id="configmaq-ruta"></select>
+      <p class="mut" style="margin:4px 0 0; font-size:12.5px">
+        Esta computadora factura una ruta a la vez; puedes cambiarla en la
+        barra del panel cuando termines con ella.</p>
     </div>
     <div class="configmaq-campo">
       <label>Día de despacho de esta computadora</label>
@@ -6276,6 +6375,10 @@ function filtroBusquedaDinamico() {
 }
 
 // Nombre corto de una ruta para el dropdown ("Ruta LPG" → "LPG").
+// Esta computadora factura UNA ruta a la vez (sin el permiso ver_todas_rutas,
+// 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
+// así que esto solo decide qué se pinta.
+let exigeRuta = false;
 const nombreRuta = (r) => r.replace(/^ruta\s+/i, "");
 
 // Cómo se nombra una ruta en un menú o en un botón: corto, como el dropdown.
@@ -6310,6 +6413,18 @@ function opcionRutaPredet() {
 }
 
 function pintarRutas(rutas, haySinRuta) {
+  // Quien no puede ver todas las rutas trabaja dentro de la suya: el selector
+  // pierde "Todas" y las opciones de predeterminada (2026-08-05). Cambiar de
+  // ruta sigue siendo suyo — lo que no existe es no elegir ninguna.
+  if (exigeRuta) {
+    const opcionesUna = (rutas || []).map(r => [r, nombreRuta(r)]);
+    if (rutaSeleccionada && !opcionesUna.some(([v]) => v === rutaSeleccionada))
+      opcionesUna.push([rutaSeleccionada, etiquetaRutaCorta(rutaSeleccionada)]);
+    $("f-ruta").innerHTML = opcionesUna.map(([valor, texto]) => `
+      <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
+        ${esc(texto)}</option>`).join("");
+    return;
+  }
   const opciones = [["", "Todas"], ...(rutas || []).map(r => [r, nombreRuta(r)])];
   if (haySinRuta) opciones.push(["__sin_ruta__", "(sin ruta)"]);
   // La ruta puesta y la predeterminada tienen su opción aunque ya no les quede
@@ -13516,7 +13631,7 @@ function rutasQueSiguen() {
 }
 
 function ofrecerContinuarConOtraRuta() {
-  if (!imprimirEnFila() || rutaSeleccionada === "" || completaEnFila) return false;
+  if (rutaSeleccionada === "" || completaEnFila) return false;
   // El cupo se mide contra la cantidad que el OPERADOR eligió (cantidadEnFila):
   // metaPedidaEnFila ya nace recortada a lo que la ruta tenía — con ella la
   // ruta corta jamás dejaría cupo que ofrecer.
@@ -13524,6 +13639,19 @@ function ofrecerContinuarConOtraRuta() {
   const siguiente = rutasQueSiguen()[0];
   if (!siguiente) return false;
   const serie = serieAsignadaDeRuta(siguiente);
+  // SIN papel la corrida sigue sola con la ruta que viene, avisando cuál es
+  // (2026-08-05, regla del usuario): ahí cambiar de ruta no cambia ningún
+  // talonario físico, y parar a preguntar solo hacía esperar al operador.
+  // Con papel se sigue preguntando SIEMPRE — y sin serie asignada también,
+  // porque elegir serie sí es una decisión.
+  if (!imprimirEnFila() && serie) {
+    cambioRutaPendiente = {siguiente, serie};
+    mensaje(`Ruta ${etiquetaRutaCorta(rutaSeleccionada)} terminada: `
+      + `${hechasEnFila} de ${cantidadEnFila} llenadas. Sigue sola con la `
+      + `ruta ${etiquetaRutaCorta(siguiente)}, serie ${serie}.`, "ok", false);
+    confirmarCambioDeRuta();
+    return true;
+  }
   secuenciaActiva = false;
   cambioRutaPendiente = {siguiente, serie};
   $("btn-secuencia").style.display = "none";
@@ -14263,12 +14391,16 @@ async function cargarAjustes() {
     permisosUI = d.permisos_ui || permisosUI;
     equipos = d.equipos_gestionables || [];
     maquinaDesactivada = !!d.maquina_desactivada;
+    exigeRuta = !!d.exige_ruta;
+    accesoGestion = !!d.acceso_gestion;
+    acceso = d.acceso || acceso;
     pintarDesactivada();
+    pintarAcceso();
     pintarBloqueoMaquina();
-    // Instalación nueva (o configuración borrada para probar): el aviso sale
-    // solo, sin esperar a que el operador intente llenar algo. Se abre después
-    // de leer los permisos porque también protege los datos ya configurados.
-    if ((d.configuracion_pendiente || []).length && !resolverConfigMaquina)
+    // Mientras la computadora espera activación no se pide configurarla: la
+    // pantalla de activación ya la tapa y el nombre lo toma de ahí.
+    if (!ACCESO_TAPA.includes(acceso.estado || "activo")
+        && (d.configuracion_pendiente || []).length && !resolverConfigMaquina)
       abrirConfigMaquina(d.configuracion_pendiente);
     // Los bloques de admin se pintan por la supervisión EFECTIVA: con "ver
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
@@ -14290,6 +14422,7 @@ async function cargarAjustes() {
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
+    cargarSolicitudesAcceso();
     pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
@@ -14309,6 +14442,239 @@ async function cargarAjustes() {
 // compartido el que trae la reactivación y quita el aviso solo.
 function pintarDesactivada() {
   $("desactivada-overlay").classList.toggle("visible", maquinaDesactivada);
+}
+
+// --- Activación de esta computadora (2026-08-05) --------------------------
+// El instalador es público y no trae llaves: una instalación nueva pide un
+// nombre, queda esperando y no ve ni un dato hasta que la aprueban. El sondeo
+// solo corre mientras el aviso está puesto: en cuanto activan, se quita y no
+// vuelve a viajar por esto.
+let acceso = {estado: "activo"};
+let accesoSondeo = null;
+
+const ACCESO_TAPA = ["sin_credencial", "desconocido", "pendiente",
+                     "rechazado", "desactivado"];
+
+function pintarAcceso() {
+  const estado = acceso.estado || "activo";
+  const tapa = ACCESO_TAPA.includes(estado);
+  $("acceso-overlay").classList.toggle("visible", tapa);
+  if (!tapa) { detenerSondeoAcceso(); return; }
+  const pideNombre = estado === "sin_credencial" || estado === "desconocido";
+  $("acceso-form").style.display = pideNombre ? "" : "none";
+  $("acceso-espera").style.display = estado === "pendiente" ? "flex" : "none";
+  const titulo = {
+    sin_credencial: "Activa esta computadora",
+    desconocido: "Activa esta computadora",
+    pendiente: "Esperando activación",
+    rechazado: "Esta computadora no fue activada",
+    desactivado: "Esta computadora ya no tiene acceso",
+  }[estado];
+  const texto = {
+    sin_credencial: "Es la primera vez que se abre el asistente aquí. Ponle un "
+      + "nombre y pide la activación: un administrador la aprueba y esta "
+      + "computadora queda lista.",
+    desconocido: "Ponle un nombre a esta computadora y pide la activación: un "
+      + "administrador la aprueba y queda lista.",
+    pendiente: "Ya se pidió la activación. En cuanto un administrador la "
+      + "apruebe, esta pantalla se quita sola y podrás terminar de "
+      + "configurarla — no hace falta cerrar ni volver a abrir el asistente.",
+    rechazado: "Un administrador rechazó la solicitud, así que desde aquí no "
+      + "se puede facturar. Si fue un error, pídele que la active desde "
+      + "AJUSTES → Computadoras.",
+    desactivado: "Un administrador le quitó el acceso a esta computadora. "
+      + "Para volver a usarla, tiene que activarla desde AJUSTES → "
+      + "Computadoras.",
+  }[estado];
+  $("acceso-titulo").textContent = titulo;
+  $("acceso-texto").textContent = texto
+    + (acceso.motivo ? ` Motivo anotado: ${acceso.motivo}` : "");
+  const nombre = acceso.nombre_solicitado || "";
+  $("acceso-datos").textContent = acceso.sin_conexion
+    ? "Sin conexión con el servidor; se sigue intentando."
+    : (nombre ? `Nombre pedido: ${nombre}` : "");
+  if (pideNombre && nombre && !$("acceso-nombre").value)
+    $("acceso-nombre").value = nombre;
+  arrancarSondeoAcceso();
+}
+
+function arrancarSondeoAcceso() {
+  if (accesoSondeo) return;
+  accesoSondeo = setInterval(sondearAcceso, 5000);
+}
+
+function detenerSondeoAcceso() {
+  if (!accesoSondeo) return;
+  clearInterval(accesoSondeo);
+  accesoSondeo = null;
+}
+
+async function sondearAcceso() {
+  try {
+    const r = await api("/api/acceso/estado");
+    const eraTapado = ACCESO_TAPA.includes(acceso.estado);
+    acceso = r;
+    pintarAcceso();
+    // Recién activada: el nombre ya quedó puesto por el servidor, así que se
+    // recarga todo y el formulario pide únicamente lo que falta.
+    if (eraTapado && !ACCESO_TAPA.includes(r.estado)) {
+      await cargarAjustes();
+      cargar();
+    }
+  } catch (e) {
+    $("acceso-datos").textContent =
+      "Sin conexión con el servidor; se sigue intentando.";
+  }
+}
+
+// --- Gestión de activaciones (AJUSTES → Computadoras esperando activación) --
+// Solo para la supervisión y los equipos con rol Admin: un Editor sin Admin
+// no gestiona activaciones (regla del usuario, 2026-08-05). El backend repite
+// el candado en cada endpoint; esto decide qué se pinta.
+let accesoGestion = false;
+let solicitudes = [];
+let verEquiposActivos = false;
+
+const fechaAcceso = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d) ? "—" : d.toLocaleString("es-VE",
+    {day: "2-digit", month: "2-digit", year: "numeric",
+     hour: "2-digit", minute: "2-digit"});
+};
+
+async function cargarSolicitudesAcceso() {
+  const bloque = $("solicitudes-bloque");
+  if (!accesoGestion) { bloque.style.display = "none"; return; }
+  bloque.style.display = "";
+  try {
+    const r = await api("/api/acceso/equipos");
+    solicitudes = r.equipos || [];
+    $("solicitudes-error").style.display = "none";
+  } catch (e) {
+    solicitudes = [];
+    $("solicitudes-error").textContent = e.message;
+    $("solicitudes-error").style.display = "";
+  }
+  pintarSolicitudes();
+}
+
+function mostrarEquiposActivos() {
+  verEquiposActivos = !verEquiposActivos;
+  pintarSolicitudes();
+}
+
+function pintarSolicitudes() {
+  const espera = solicitudes.filter(
+    s => s.estado === "pendiente" || s.reinstalacion_pendiente);
+  const resto = solicitudes.filter(s => !espera.includes(s));
+  const lista = verEquiposActivos ? [...espera, ...resto] : espera;
+  $("solicitudes-ver-activos").textContent = verEquiposActivos
+    ? "Ver solo las que esperan" : "Ver también las ya activas";
+  $("solicitudes-ver-activos").style.display = resto.length ? "" : "none";
+  $("solicitudes-vacio").style.display =
+    (!lista.length && !$("solicitudes-error").textContent) ? "" : "none";
+  $("solicitudes-lista").innerHTML = lista.map(pintarUnaSolicitud).join("");
+}
+
+function pintarUnaSolicitud(s) {
+  const host = esc(s.dispositivo);
+  const nombre = esc(s.nombre || s.nombre_solicitado || "");
+  const reinstala = s.reinstalacion_pendiente;
+  const estado = reinstala ? "pendiente" : s.estado;
+  const rotulo = reinstala ? "reinstalación por aprobar" : s.estado;
+  const so = s.huella && s.huella.so ? ` · ${esc(s.huella.so)}` : "";
+  const cuando = reinstala ? s.reinstalacion_solicitada_en : s.solicitado_en;
+  const quien = s.activado_por || s.rechazado_por || s.desactivado_por;
+  const cuandoAccion = s.activado_en || s.rechazado_en || s.desactivado_en;
+  const historia = quien
+    ? `<br>Última decisión: ${esc(quien)} el ${esc(fechaAcceso(cuandoAccion))}`
+    : "";
+  const motivo = s.motivo_rechazo || s.motivo_desactivacion;
+  const enEspera = estado === "pendiente";
+  const acciones = enEspera
+    ? `<input type="text" id="sol-nombre-${host}" maxlength="40"
+              value="${nombre}" placeholder="Nombre de la computadora">
+       <button class="primario" onclick="activarEquipo('${host}')">Activar</button>
+       <button class="secundario" onclick="rechazarEquipo(this, '${host}')">Rechazar</button>`
+    : (s.estado === "activo"
+        ? `<button class="secundario"
+                   onclick="desactivarEquipo(this, '${host}')">Quitar acceso</button>`
+        : `<button class="primario" onclick="activarEquipo('${host}')">Activar</button>`);
+  return `<div class="solicitud">
+    <div class="solicitud-cab">
+      <b>${nombre || host}</b>
+      <span class="etiqueta-estado ${esc(estado)}">${esc(rotulo)}</span>
+    </div>
+    <div class="solicitud-datos">
+      Identificador: ${host}${so}<br>
+      ${reinstala ? "Reinstalada" : "Solicitada"}: ${esc(fechaAcceso(cuando))}
+      · Versión: ${esc(s.version || "—")}<br>
+      Última señal: ${esc(fechaAcceso(s.ultima_verificacion))}
+      ${motivo ? `<br>Motivo anotado: ${esc(motivo)}` : ""}${historia}
+    </div>
+    <div class="solicitud-acciones">${acciones}</div>
+  </div>`;
+}
+
+async function activarEquipo(host) {
+  const campo = $(`sol-nombre-${host}`);
+  const nombre = campo ? campo.value.trim() : "";
+  try {
+    const r = await api("/api/acceso/activar", {dispositivo: host, nombre});
+    mensaje(r.aviso || `Computadora ${nombre || host} activada.`,
+            r.aviso ? "alerta" : "ok");
+    await cargarSolicitudesAcceso();
+    cargarAjustes();
+  } catch (e) {
+    mensaje("No se pudo activar: " + e.message, "error");
+  }
+}
+
+function rechazarEquipo(btn, host) {
+  confirmarBorrar(btn, async () => {
+    try {
+      await api("/api/acceso/rechazar", {dispositivo: host});
+      mensaje(`Solicitud de ${host} rechazada.`, "ok");
+      await cargarSolicitudesAcceso();
+    } catch (e) {
+      mensaje("No se pudo rechazar: " + e.message, "error");
+    }
+  }, "Confirmar rechazo");
+}
+
+function desactivarEquipo(btn, host) {
+  confirmarBorrar(btn, async () => {
+    try {
+      await api("/api/acceso/desactivar", {dispositivo: host});
+      mensaje(`La computadora ${host} quedó sin acceso.`, "ok");
+      await cargarSolicitudesAcceso();
+      cargarAjustes();
+    } catch (e) {
+      mensaje("No se pudo quitar el acceso: " + e.message, "error");
+    }
+  }, "Confirmar quitar acceso");
+}
+
+async function enviarSolicitudAcceso() {
+  const nombre = $("acceso-nombre").value.trim();
+  const error = (texto) => {
+    $("acceso-error").textContent = texto;
+    $("acceso-error").style.display = "";
+  };
+  if (!nombre) return error("Escribe el nombre de esta computadora.");
+  const boton = $("acceso-enviar");
+  boton.disabled = true;
+  $("acceso-error").style.display = "none";
+  try {
+    const r = await api("/api/acceso/solicitar", {nombre});
+    acceso = {...(r.acceso || {}), nombre_solicitado: nombre};
+    pintarAcceso();
+  } catch (e) {
+    error(e.message);
+  } finally {
+    boton.disabled = false;
+  }
 }
 
 // Las demás computadoras, en UNA tabla (2026-08-05; antes eran dos bloques,
@@ -14752,6 +15118,7 @@ const CONFIGMAQ_TEXTOS = {
   vendedor: "el vendedor con el que facturas",
   serie: "la serie con la que facturas",
   dia_despacho: "si facturas para hoy o para mañana",
+  ruta: "la ruta con la que trabajas",
 };
 let resolverConfigMaquina = null;
 // Vista previa (?ver_configuracion=1, 2026-07-31): la misma pantalla, pero
@@ -14789,6 +15156,17 @@ function abrirConfigMaquina(falta, soloVista = false) {
   $("configmaq-serie").innerHTML = serieVacia + SERIES.map(s =>
     `<option value="${s}" ${s === seriePredeterminada ? "selected" : ""}>${s}</option>`
   ).join("");
+  // La ruta solo se pide a quien factura una a la vez (2026-08-05).
+  $("configmaq-campo-ruta").style.display = exigeRuta ? "" : "none";
+  if (exigeRuta) {
+    const rutas = [...new Set([...(ultimaLista.rutas || []),
+                               ...Object.keys(rutasSeriesConfig || {})])].sort();
+    const vacia = rutaPredeterminada
+      ? "" : `<option value="" selected>— Elige una ruta —</option>`;
+    $("configmaq-ruta").innerHTML = vacia + rutas.map(r =>
+      `<option value="${esc(r)}" ${r === rutaPredeterminada ? "selected" : ""}
+        >${esc(nombreRuta(r))}</option>`).join("");
+  }
   document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
     r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
   });
@@ -14800,6 +15178,7 @@ function abrirConfigMaquina(falta, soloVista = false) {
     nombre: () => $("configmaq-nombre"),
     vendedor: () => $("configmaq-vendedor"),
     serie: () => $("configmaq-serie"),
+    ruta: () => $("configmaq-ruta"),
     dia_despacho: () => document.querySelector("input[name=configmaq-dia]"),
   };
   setTimeout(() => (foco[pendientes[0]] || foco.nombre)().focus(), 50);
@@ -14840,9 +15219,11 @@ async function guardarConfigMaquina() {
     $("configmaq-error").textContent = texto;
     $("configmaq-error").style.display = "";
   };
+  const ruta = exigeRuta ? $("configmaq-ruta").value : null;
   if (!nombre) return error("Escribe el nombre de esta computadora.");
   if (!codigo) return error("Elige el vendedor con el que factura esta computadora.");
   if (!serie) return error("Elige la serie con la que factura esta computadora.");
+  if (exigeRuta && !ruta) return error("Elige la ruta con la que trabaja esta computadora.");
   if (!radioDia) return error("Elige si esta computadora factura para hoy o para mañana.");
   const boton = $("configmaq-guardar");
   boton.disabled = true;
@@ -14862,6 +15243,13 @@ async function guardarConfigMaquina() {
       seriePredeterminada = r.serie_predeterminada;
       serieSeleccionada = r.serie_predeterminada;
       pintarSeries();
+      configPendiente = r.configuracion_pendiente || [];
+    }
+    if (ruta && (ruta !== (rutaPredeterminada || "")
+                 || configPendiente.includes("ruta"))) {
+      const r = await api("/api/ajustes/ruta", {ruta});
+      rutaPredeterminada = r.ruta_predeterminada;
+      rutaSeleccionada = r.ruta_predeterminada;
       configPendiente = r.configuracion_pendiente || [];
     }
     const dia = radioDia.value;
