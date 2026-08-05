@@ -9499,7 +9499,7 @@ function filaLineaDetalle(d, l) {
 
 const opcionCantidad = (ref, cual, valor, activa) =>
   `<button class="${activa ? "btn-azul" : ""}"${activa ? " disabled" : ""}
-     onclick="elegirCantidad(${ref},'${cual}',${valor})">${
+     onclick="elegirCantidad(this,${ref},'${cual}',${valor})">${
      cual === "aprobada" ? "Aprobada" : "Despachada"}: ${fmtCantidad(valor)}</button>`;
 
 // El automático se dice con su valor y con el botón que lo devuelve: quien lo
@@ -9555,10 +9555,16 @@ function ajustarDescuento(input, pedidoId, parte, codigo) {
                 {descuento_pct: valor === "" ? null : pctNumero(valor)});
 }
 
-function elegirCantidad(pedidoId, parte, codigo, cual, valor) {
-  guardarAjuste(pedidoId, parte, codigo, cual === "aprobada"
-    ? {cantidad: null}
-    : {cantidad: valor, origen: "despachada"});
+// Pasar a lo despachado aparta la factura de lo aprobado, así que se confirma
+// ahí mismo (2026-08-05). Volver a lo aprobado es deshacer — devuelve el
+// automático y no pregunta nada.
+function elegirCantidad(btn, pedidoId, parte, codigo, cual, valor) {
+  if (cual === "aprobada")
+    return guardarAjuste(pedidoId, parte, codigo, {cantidad: null});
+  confirmarSinQuitar(btn,
+    () => guardarAjuste(pedidoId, parte, codigo,
+                        {cantidad: valor, origen: "despachada"}),
+    `Confirmar ${fmtCantidad(valor)}`);
 }
 
 const quitarAjuste = (pedidoId, parte, codigo, campo) =>
