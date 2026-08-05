@@ -1435,7 +1435,8 @@
   .sup-tabla th { color:var(--mut); font-size:11.5px; background:#fafbfc;
                   font-weight:600; white-space:nowrap; }
   .sup-tabla tbody tr:last-child td { border-bottom:0; }
-  .sup-rol { white-space:nowrap; }
+  /* .sup-rol-check también viste las casillas de rol de AJUSTES →
+     Computadoras, donde vive la asignación desde 2026-08-05. */
   .sup-rol-check { display:inline-flex; align-items:center; gap:4px;
                    margin-right:10px; font-size:12px; cursor:pointer; }
   .sup-rol-check input { width:15px; height:15px; cursor:pointer; }
@@ -2860,7 +2861,6 @@
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
-              <th title="Rol del operador de esa PC: de él sale qué funciones ve. El cuadro de abajo dice qué habilita cada uno.">Rol</th>
               <th>Atención</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -6609,8 +6609,16 @@ function supProblemasEquipo(equipo) {
       esc(SUP_PROBLEMAS[p.tipo] || p.tipo || "atención")}</span>`).join("")}</div>`;
 }
 
+const SUP_CANALES = {produccion: "Producción", estable: "Estable (1.0)", "estable-1.1": "Estable 1.1", main: "Desarrollo"};
+function supCanalEquipo(equipo) {
+  const rama = equipo.rama || "";
+  // Una rama fuera del mapa (worktree de desarrollo) se muestra tal cual.
+  return rama ? (SUP_CANALES[rama] || rama) : "";
+}
+
 function supFilaEquipo(equipo, sinDatos) {
   const host = esc(equipo.dispositivo || "");
+  const canal = supCanalEquipo(equipo);
   // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
   // lo único que se conseguiría es perderle el nombre y el rol.
   const propio = equipo.dispositivo === supDispositivoPropio;
@@ -6623,9 +6631,9 @@ function supFilaEquipo(equipo, sinDatos) {
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
-    <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}</td>
+    <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
+      !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
-    <td class="sup-rol">${supCasillasRol(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
@@ -6633,66 +6641,13 @@ function supFilaEquipo(equipo, sinDatos) {
 
 // Roles y permisos tal como los mandó el servidor (src/roles.py). La pantalla
 // no sabe qué habilita cada rol: lo pinta de aquí.
+// La ASIGNACIÓN del rol ya no vive en esta tabla (2026-08-05, pedido del
+// usuario): estaba repetida con AJUSTES → Computadoras y quedó SOLO allá.
 let supRoles = {roles: [], permisos: []};
-
-// Una casilla por rol. Como un admin también es editor, la de Editor va
-// marcada y bloqueada mientras el equipo sea admin: dejar desmarcarla
-// ofrecería un estado que no existe ("admin que no es editor").
-function supCasillasRol(equipo) {
-  const rol = equipo.rol || "";
-  const efectivos = supRolesEfectivos(rol);
-  return (supRoles.roles || []).map(r => {
-    const implicado = r.clave !== rol && efectivos.includes(r.clave);
-    return `<label class="sup-rol-check" title="${
-      implicado ? esc(`Lo es por ser ${nombreRol(rol)}.`)
-                : esc(`Marca este equipo como ${r.nombre}.`)}">
-      <input type="checkbox" ${efectivos.includes(r.clave) ? "checked" : ""}
-             ${implicado ? "disabled" : ""}
-             onchange="cambiarRolEquipo('${esc(equipo.dispositivo || "")}', '${
-               esc(r.clave)}', this)">
-      ${esc(r.nombre)}</label>`;
-  }).join("");
-}
-
-// Los roles que ejerce de hecho quien tiene `rol`: el suyo más los que este
-// implica (el servidor ya mandó esa implicación en el resumen).
-function supRolesEfectivos(rol) {
-  const def = (supRoles.roles || []).find(r => r.clave === rol);
-  return def ? [def.clave, ...(def.implica || [])] : [];
-}
 
 function nombreRol(rol) {
   const def = (supRoles.roles || []).find(r => r.clave === rol);
   return def ? def.nombre : "—";
-}
-
-// Marcar un rol lo asigna; desmarcarlo deja el siguiente de menor alcance que
-// el equipo siguiera teniendo (quitarle Admin a alguien lo baja a Editor, no
-// lo deja sin nada) y, si no queda ninguno, lo deja sin rol. El rol viaja por
-// el catálogo de máquinas: se cambia aquí y la PC lo aplica en su refresco.
-async function cambiarRolEquipo(dispositivo, rol, caja) {
-  const equipo = [...supEquipos, ...supSinDatos].find(e => e.dispositivo === dispositivo);
-  const previo = (equipo && equipo.rol) || "";
-  let querido;
-  if (caja.checked) {
-    querido = rol;
-  } else {
-    // Los roles vienen de mayor a menor alcance: el siguiente al que se
-    // desmarcó es el que queda.
-    const orden = (supRoles.roles || []).map(r => r.clave);
-    querido = orden.slice(orden.indexOf(rol) + 1)
-                   .find(r => supRolesEfectivos(previo).includes(r)) || "";
-  }
-  caja.disabled = true;
-  try {
-    await api("/api/supervision/rol", {dispositivo, rol: querido});
-    if (equipo) equipo.rol = querido;
-    pintarEquiposSupervision();   // repinta las casillas implicadas
-  } catch (e) {
-    caja.checked = !caja.checked;
-    caja.disabled = false;
-    mensaje("No se pudo cambiar el rol: " + e.message, "error");
-  }
 }
 
 // Saca un equipo de la lista: su ficha de salud y su entrada del catálogo
@@ -7106,6 +7061,8 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         </div>
         <div>
           <div class="sup-dato"><span>Versión:</span>${esc(equipo.version || "—")}</div>
+          ${equipo.rama ? `<div class="sup-dato"><span>Canal:</span>${
+            esc(supCanalEquipo(equipo))}</div>` : ""}
           <div class="sup-dato"><span>Plataforma:</span>${esc(equipo.plataforma || "—")}</div>
         </div>
       </div>
@@ -9542,7 +9499,7 @@ function filaLineaDetalle(d, l) {
 
 const opcionCantidad = (ref, cual, valor, activa) =>
   `<button class="${activa ? "btn-azul" : ""}"${activa ? " disabled" : ""}
-     onclick="elegirCantidad(${ref},'${cual}',${valor})">${
+     onclick="elegirCantidad(this,${ref},'${cual}',${valor})">${
      cual === "aprobada" ? "Aprobada" : "Despachada"}: ${fmtCantidad(valor)}</button>`;
 
 // El automático se dice con su valor y con el botón que lo devuelve: quien lo
@@ -9598,10 +9555,16 @@ function ajustarDescuento(input, pedidoId, parte, codigo) {
                 {descuento_pct: valor === "" ? null : pctNumero(valor)});
 }
 
-function elegirCantidad(pedidoId, parte, codigo, cual, valor) {
-  guardarAjuste(pedidoId, parte, codigo, cual === "aprobada"
-    ? {cantidad: null}
-    : {cantidad: valor, origen: "despachada"});
+// Pasar a lo despachado aparta la factura de lo aprobado, así que se confirma
+// ahí mismo (2026-08-05). Volver a lo aprobado es deshacer — devuelve el
+// automático y no pregunta nada.
+function elegirCantidad(btn, pedidoId, parte, codigo, cual, valor) {
+  if (cual === "aprobada")
+    return guardarAjuste(pedidoId, parte, codigo, {cantidad: null});
+  confirmarSinQuitar(btn,
+    () => guardarAjuste(pedidoId, parte, codigo,
+                        {cantidad: valor, origen: "despachada"}),
+    `Confirmar ${fmtCantidad(valor)}`);
 }
 
 const quitarAjuste = (pedidoId, parte, codigo, campo) =>
@@ -14342,14 +14305,31 @@ function pintarEquipos() {
   bloque.style.display = "";
   $("equipos-nota-editor").style.display = puedeRol ? "" : "none";
   $("equipos-nota-activa").style.display = puedeActivar ? "" : "none";
+  // La supervisión asigna los dos roles DESDE AQUÍ (2026-08-05, pedido del
+  // usuario): las casillas que vivían en ADMIN → Equipos estaban repetidas
+  // con esta tabla y quedaron solo en esta. Con "ver como" en un rol menor
+  // se ve la versión acotada, fiel a lo que ve ese rol.
+  const asignaAdmin = esSupervisionEfectiva();
   const filas = equipos.map(m => {
     const host = esc(m.dispositivo);
-    // Un admin ya es editor: la casilla va marcada y sin tocar, igual que en
-    // la pantalla de Equipos — "admin que no es editor" no existe.
-    const editor = `<td class="equipos-check">
+    // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
+    // no es editor" no existe.
+    const editor = asignaAdmin ? `<td>
+      <label class="sup-rol-check" title="${m.es_admin
+          ? "Quitarlo lo deja como Editor."
+          : "Marca esta computadora como Admin."}">
+        <input type="checkbox" ${m.es_admin ? "checked" : ""}
+               onchange="cambiarRolEquipo('${host}', 'admin', this)"> Admin</label>
+      <label class="sup-rol-check" title="${m.es_admin
+          ? "Lo es por ser Admin."
+          : "Marca esta computadora como Editor."}">
+        <input type="checkbox" ${m.es_editor ? "checked" : ""}
+               ${m.es_admin ? "disabled" : ""}
+               onchange="cambiarRolEquipo('${host}', 'editor', this)"> Editor</label></td>`
+    : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}
              ${m.es_admin ? "disabled" : ""}
-             title="${m.es_admin ? "Lo es por ser Admin; su rol se cambia en la pestaña ADMIN."
+             title="${m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
                                  : "Marca esta computadora como Editor."}"
              onchange="cambiarEditorEquipo('${host}', this)"></td>`;
     const activa = `<td class="equipos-check">
@@ -14370,7 +14350,8 @@ function pintarEquipos() {
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
       <th>Computadora</th><th>Nombre</th><th>Vendedor</th>
-      ${puedeRol ? "<th class=\"equipos-check\">Editor</th>" : ""}
+      ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
+                                : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
       <th></th>
     </tr></thead>
@@ -14389,6 +14370,24 @@ async function cambiarEditorEquipo(dispositivo, caja) {
     pintarEquipos();
   } catch (e) {
     caja.checked = !caja.checked;
+    mensaje("No se pudo cambiar el rol: " + e.message, "error");
+  }
+}
+
+// Casillas de la supervisión: marcar asigna ese rol; desmarcar Admin lo baja
+// a Editor (un admin también es editor), desmarcar Editor lo deja sin rol.
+// El rol viaja por el catálogo de máquinas y la PC lo aplica en su refresco.
+async function cambiarRolEquipo(dispositivo, rol, caja) {
+  const m = equipos.find(e => e.dispositivo === dispositivo) || {};
+  const querido = caja.checked ? rol : (rol === "admin" ? "editor" : "");
+  caja.disabled = true;
+  try {
+    const r = await api("/api/supervision/rol", {dispositivo, rol: querido});
+    equipos = r.equipos_gestionables || equipos;
+    pintarEquipos();
+  } catch (e) {
+    caja.checked = !caja.checked;
+    caja.disabled = false;
     mensaje("No se pudo cambiar el rol: " + e.message, "error");
   }
 }
