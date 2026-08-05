@@ -748,6 +748,21 @@
   .ajustes-bloque { padding:14px; border-bottom:1px solid #e2e6ec; }
   .ajustes-bloque h3 { margin:0 0 10px; font-size:13.5px; }
   .ajustes-fila { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
+     y las casillas de rol y de servicio comparten fila, así se lee de un
+     vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
+  .equipos-tabla { border-collapse:collapse; }
+  .equipos-tabla th { text-align:left; font-size:11.5px; font-weight:700;
+      letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
+      padding:0 10px 6px 0; white-space:nowrap; }
+  .equipos-tabla td { padding:4px 10px 4px 0; vertical-align:middle; }
+  .equipos-tabla .equipos-host { color:var(--mut); font-size:12.5px;
+      min-width:110px; }
+  .equipos-tabla input[type=text] { width:190px; }
+  .equipos-tabla .equipos-check { text-align:center; }
+  /* Casilla marcada por implicación (un admin también es editor): se ve
+     marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
+  .equipos-tabla input:disabled { cursor:not-allowed; }
   /* Opciones del modo prueba agrupadas por tema (2026-07-27, pedido del
      usuario): antes eran una columna de líneas sueltas con un párrafo de
      explicación debajo de cada una. Ahora cada grupo lleva un rótulo y sus
@@ -1683,6 +1698,23 @@
   /* Modal de la tasa que falta (2026-07-22, pedido del usuario), que sale al
      dar Llenar, y sus hermanos: SÍ son preguntas — hay salidas distintas entre
      las que elegir — y por eso interrumpen. */
+  /* Computadora desactivada desde otro equipo (2026-08-05): tapa el panel
+     ENTERO y OPACO — desde aquí no se factura ni se consulta nada — y se quita
+     sola en cuanto la vuelvan a activar. Por encima de todos los demás avisos
+     (el más alto es 21): puede aparecer con cualquiera de ellos abierto. */
+  #desactivada-overlay { position:fixed; inset:0; background:#f4f5f7;
+      display:none; z-index:60; align-items:center; justify-content:center; }
+  #desactivada-overlay.visible { display:flex; }
+  /* Nunca durante un llenado: taparía la barrita flotante, y ahí vive el
+     Detener. El llenado que ya arrancó no se interrumpe — lo que se niega es
+     empezar otro —, así que el aviso espera a que la barra se cierre. */
+  body.modo-llenado #desactivada-overlay { display:none; }
+  #desactivada-caja { background:#fff; border-radius:10px; padding:24px 26px;
+      width:min(460px, 92vw); box-shadow:0 6px 30px rgba(0,0,0,.12);
+      text-align:center; }
+  #desactivada-caja h2 { margin:0 0 10px; font-size:16px; }
+  #desactivada-caja p { margin:0; font-size:13.5px; color:var(--mut);
+      line-height:1.5; }
   #tasa-overlay, #docencurso-overlay, #repetida-overlay,
   #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay,
   #babymix-overlay {
@@ -2535,25 +2567,26 @@
       </div>
       <div id="corte-confirma" style="display:none"></div>
     </div>
-    <!-- Editores (2026-08-05, solo Admin): dar o quitar el rol Editor a otros
-         equipos. Los admin y los equipos de supervisión no salen en la lista —
-         esos se manejan solo desde Supervisión. -->
-    <div class="ajustes-bloque" id="editores-bloque" style="display:none">
-      <h3>Editores</h3>
-      <p class="mut" style="margin:4px 0 10px">Los equipos marcados pueden
-        editar campañas de descuento, catálogos y datos de pedidos.</p>
-      <div id="editores-lista"></div>
-    </div>
-    <!-- Nombre y vendedor de los demás equipos (2026-08-05, pedido del
-         usuario): permite corregirlos sin ir hasta cada computadora y solo lo
-         ven los equipos con permiso de identidad de máquina. -->
-    <div class="ajustes-bloque" id="equipos-identidad-bloque" style="display:none">
-      <h3>Nombre y vendedor de cada computadora</h3>
+    <!-- Las demás computadoras, en UNA sola tabla (2026-08-05, pedido del
+         usuario: antes eran dos bloques sueltos, "Editores" y "Nombre y
+         vendedor de cada computadora"). Cada columna la habilita su permiso:
+         nombre y vendedor con identidad_maquina, Editor con
+         gestionar_editores y Activa con activar_maquinas — un editor no ve
+         las dos últimas. -->
+    <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
+      <h3>Computadoras</h3>
       <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
         datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
         próximo refresco. Los de esta computadora se cambian arriba, en
         "Esta máquina".</p>
-      <div id="equipos-identidad-lista"></div>
+      <p class="mut" id="equipos-nota-editor" style="margin:4px 0 10px; display:none">
+        Los equipos marcados como <b>Editor</b> pueden editar campañas de
+        descuento, catálogos, y los datos de los pedidos y las facturas.</p>
+      <p class="mut" id="equipos-nota-activa" style="margin:4px 0 10px; display:none">
+        Al quitarle <b>Activa</b> a una computadora, esa queda fuera de
+        servicio: quien la abra solo ve un aviso y no puede facturar desde
+        ella.</p>
+      <div id="equipos-lista"></div>
     </div>
     <!-- Vista del panel (2026-08-05, solo Admin y supervisión): mirar el
          panel como lo ve cada rol. Solo baja permisos, nunca los sube, y el
@@ -3501,6 +3534,18 @@
      Trae los campos resueltos ahí mismo (no manda a AJUSTES) y, si venía de un
      Llenar, ese llenado sigue solo al guardar. SIN cierre por clic afuera ni
      botón de salida: no hay alternativa que elegir — sin esto no se factura. -->
+<!-- Computadora sacada de servicio desde otro equipo (2026-08-05). No tiene
+     botones a propósito: desde aquí no hay nada que decidir ni que corregir;
+     el aviso se va solo cuando la vuelven a activar. -->
+<div id="desactivada-overlay">
+  <div id="desactivada-caja">
+    <h2>Esta computadora está desactivada</h2>
+    <p>La sacaron de servicio desde otro equipo, así que desde aquí no se
+      puede facturar ni ver los pedidos. Un equipo con rol Admin la vuelve a
+      activar en AJUSTES; en cuanto lo haga, este aviso se quita solo.</p>
+  </div>
+</div>
+
 <div id="configmaq-overlay">
   <div id="configmaq-caja">
     <h3>Antes de facturar, configura esta computadora</h3>
@@ -3826,10 +3871,12 @@ const tienePermiso = (clave) => !!(permisosUI.permisos || {})[clave];
 // La supervisión EFECTIVA: esMaquinaAdmin dice lo que el equipo ES; esto dice
 // lo que la vista elegida deja pintar (la pestaña ADMIN y sus bloques).
 const esSupervisionEfectiva = () => permisosUI.rol_efectivo === "supervisor";
-// Equipos gestionables desde AJUSTES → Editores (solo llega a los Admin).
-let equiposEditor = [];
-// Equipos cuya identidad se puede corregir desde otra computadora autorizada.
-let equiposIdentidad = [];
+// Las demás computadoras, tal como llegan de /api/ajustes: nombre, vendedor,
+// rol Editor y si siguen en servicio. Solo viaja a quien puede tocarlas.
+let equipos = [];
+// Si a ESTA computadora la sacaron de servicio desde otra: el panel se tapa
+// entero con el aviso hasta que la vuelvan a activar.
+let maquinaDesactivada = false;
 // Fecha vigente del corte de producción; la repinta /api/ajustes y la usa el
 // control de ADMIN para saber si hay algo que cambiar.
 let corteProduccion = "";
@@ -13420,8 +13467,9 @@ async function cargarAjustes() {
     modoAdmin = !!d.modo_admin;
     esMaquinaAdmin = !!d.es_maquina_admin;
     permisosUI = d.permisos_ui || permisosUI;
-    equiposEditor = d.equipos_editor || [];
-    equiposIdentidad = d.equipos_identidad || [];
+    equipos = d.equipos_gestionables || [];
+    maquinaDesactivada = !!d.maquina_desactivada;
+    pintarDesactivada();
     pintarBloqueoMaquina();
     // Instalación nueva (o configuración borrada para probar): el aviso sale
     // solo, sin esperar a que el operador intente llenar algo. Se abre después
@@ -13447,8 +13495,7 @@ async function cargarAjustes() {
       tienePermiso("ajustes_catalogos") ? "" : "none";
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
-    pintarEditores();
-    pintarEquiposIdentidad();
+    pintarEquipos();
     pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
@@ -13463,65 +13510,104 @@ async function cargarAjustes() {
   }
 }
 
-// Editores (2026-08-05, AJUSTES, solo Admin): un check por equipo. La lista
-// ya viene recortada del backend (sin admins, sin este equipo, sin los de
-// supervisión) y el POST repite ese recorte — esto solo pinta.
-function pintarEditores() {
-  const bloque = $("editores-bloque");
-  if (!tienePermiso("gestionar_editores") || !equiposEditor.length) {
+// Computadora desactivada desde otro equipo (2026-08-05): el panel se tapa
+// entero. No se detiene ningún sondeo — es justo el sondeo del estado
+// compartido el que trae la reactivación y quita el aviso solo.
+function pintarDesactivada() {
+  $("desactivada-overlay").classList.toggle("visible", maquinaDesactivada);
+}
+
+// Las demás computadoras, en UNA tabla (2026-08-05; antes eran dos bloques,
+// "Editores" y "Nombre y vendedor de cada computadora"). El backend ya recorta
+// la lista —sin este equipo ni los de supervisión— y repite ese recorte en
+// cada POST; los permisos se vuelven a comprobar aquí para que una vista
+// reducida no conserve columnas pintadas con permisos anteriores.
+function pintarEquipos() {
+  const bloque = $("equipos-bloque");
+  const puedeIdentidad = tienePermiso("identidad_maquina");
+  const puedeRol = tienePermiso("gestionar_editores");
+  const puedeActivar = tienePermiso("activar_maquinas");
+  if ((!puedeIdentidad && !puedeRol && !puedeActivar) || !equipos.length) {
     bloque.style.display = "none";
+    $("equipos-lista").innerHTML = "";
     return;
   }
   bloque.style.display = "";
-  $("editores-lista").innerHTML = equiposEditor.map(m => `
-    <label class="desc-todos" style="display:flex;gap:8px;margin:4px 0">
+  $("equipos-nota-editor").style.display = puedeRol ? "" : "none";
+  $("equipos-nota-activa").style.display = puedeActivar ? "" : "none";
+  const filas = equipos.map(m => {
+    const host = esc(m.dispositivo);
+    // Un admin ya es editor: la casilla va marcada y sin tocar, igual que en
+    // la pantalla de Equipos — "admin que no es editor" no existe.
+    const editor = `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}
-             onchange="cambiarEditorEquipo('${esc(m.dispositivo)}', this)">
-      ${esc(m.nombre)}
-    </label>`).join("");
+             ${m.es_admin ? "disabled" : ""}
+             title="${m.es_admin ? "Lo es por ser Admin; su rol se cambia en la pestaña ADMIN."
+                                 : "Marca esta computadora como Editor."}"
+             onchange="cambiarEditorEquipo('${host}', this)"></td>`;
+    const activa = `<td class="equipos-check">
+      <input type="checkbox" ${m.activa ? "checked" : ""}
+             title="Al quitarla, esa computadora queda fuera de servicio."
+             onchange="cambiarActivaEquipo('${host}', this)"></td>`;
+    return `<tr>
+      <td class="equipos-host">${host}</td>
+      <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
+                 placeholder="Sin nombre" ${puedeIdentidad ? "" : "disabled"}></td>
+      <td><select ${puedeIdentidad ? "" : "disabled"}></select></td>
+      ${puedeRol ? editor : ""}
+      ${puedeActivar ? activa : ""}
+      <td>${puedeIdentidad ? `<button class="primario"
+              onclick="guardarEquipoIdentidad('${host}', this)">Guardar</button>` : ""}</td>
+    </tr>`;
+  }).join("");
+  $("equipos-lista").innerHTML = `<table class="equipos-tabla">
+    <thead><tr>
+      <th>Computadora</th><th>Nombre</th><th>Vendedor</th>
+      ${puedeRol ? "<th class=\"equipos-check\">Editor</th>" : ""}
+      ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
+      <th></th>
+    </tr></thead>
+    <tbody>${filas}</tbody></table>`;
+  $("equipos-lista").querySelectorAll("tbody tr").forEach((fila, indice) => {
+    pintarSelectVendedores(fila.querySelector("select"),
+                           equipos[indice].vendedor || "");
+  });
 }
 
 async function cambiarEditorEquipo(dispositivo, caja) {
   try {
     const r = await api("/api/ajustes/rol-editor",
                         {dispositivo, editor: caja.checked});
-    equiposEditor = r.equipos_editor || equiposEditor;
-    pintarEditores();
+    equipos = r.equipos_gestionables || equipos;
+    pintarEquipos();
   } catch (e) {
     caja.checked = !caja.checked;
     mensaje("No se pudo cambiar el rol: " + e.message, "error");
   }
 }
 
-// Identidad de las demás computadoras (2026-08-05): el backend ya recorta la
-// lista; el permiso vuelve a comprobarse aquí para que una vista reducida no
-// conserve filas pintadas con permisos anteriores.
-function pintarEquiposIdentidad() {
-  const bloque = $("equipos-identidad-bloque");
-  if (!tienePermiso("identidad_maquina") || !equiposIdentidad.length) {
-    bloque.style.display = "none";
-    $("equipos-identidad-lista").innerHTML = "";
-    return;
+// Desactivar una computadora la deja fuera de servicio: quien la abra solo ve
+// el aviso. Lo aplica en su próximo refresco, así que el cambio se confirma
+// diciendo eso y no "listo".
+async function cambiarActivaEquipo(dispositivo, caja) {
+  const activa = caja.checked;
+  try {
+    const r = await api("/api/ajustes/equipo-activa", {dispositivo, activa});
+    equipos = r.equipos_gestionables || equipos;
+    pintarEquipos();
+    const nombre = (equipos.find(m => m.dispositivo === dispositivo) || {}).nombre;
+    mensaje(activa
+      ? `${nombre || dispositivo} vuelve a estar en servicio; lo toma en su próximo refresco.`
+      : `${nombre || dispositivo} queda fuera de servicio; lo toma en su próximo refresco.`,
+      "info");
+  } catch (e) {
+    caja.checked = !caja.checked;
+    mensaje("No se pudo cambiar el estado de la computadora: " + e.message, "error");
   }
-  bloque.style.display = "";
-  const lista = $("equipos-identidad-lista");
-  lista.innerHTML = equiposIdentidad.map(m => `
-    <div class="ajustes-fila" style="margin:6px 0">
-      <span class="mut" style="min-width:130px;font-size:12.5px">${esc(m.dispositivo)}</span>
-      <input type="text" maxlength="40" value="${esc(m.nombre || "")}"
-             placeholder="Sin nombre" style="width:190px">
-      <select></select>
-      <button class="primario" data-dispositivo="${esc(m.dispositivo)}"
-              onclick="guardarEquipoIdentidad(this.dataset.dispositivo, this)">Guardar</button>
-    </div>`).join("");
-  lista.querySelectorAll(".ajustes-fila").forEach((fila, indice) => {
-    pintarSelectVendedores(fila.querySelector("select"),
-                            equiposIdentidad[indice].vendedor || "");
-  });
 }
 
 async function guardarEquipoIdentidad(dispositivo, boton) {
-  const fila = boton.closest(".ajustes-fila");
+  const fila = boton.closest("tr");
   const nombre = fila.querySelector('input[type="text"]').value.trim();
   const vendedor = fila.querySelector("select").value;
   if (!nombre) {
@@ -13532,8 +13618,8 @@ async function guardarEquipoIdentidad(dispositivo, boton) {
   try {
     const r = await api("/api/ajustes/equipo-identidad",
                         {dispositivo, nombre, vendedor});
-    equiposIdentidad = r.equipos_identidad || [];
-    pintarEquiposIdentidad();
+    equipos = r.equipos_gestionables || [];
+    pintarEquipos();
     mensaje(r.aviso ? `Datos guardados. ${r.aviso}`
                     : "Datos de la computadora guardados.",
             r.aviso ? "alerta" : "info");
