@@ -8975,6 +8975,7 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
+  fechaDesfaseOk.detalle = "";      // la fecha se decide una vez por factura
   delete detalleFallos[clave];
   if (sinDetalle) sinDetalleGuardado.add(clave);
   else sinDetalleGuardado.delete(clave);
@@ -8999,6 +9000,7 @@ function abrirDetalleCargando(pedidoId, parte) {
   detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
+  fechaDesfaseOk.detalle = "";      // la fecha se decide una vez por factura
   delete detalleFallos[clave];
   delete detalleDatos[clave];
   sinDetalleGuardado.delete(clave); // reabrir la vuelve a armar: sí habrá detalle
@@ -9336,10 +9338,13 @@ function pintarBotonLlenarDetalle() {
   const etiqueta = llenadoDirecto(fila);
   if (etiqueta) {
     boton.style.display = "";
-    boton.disabled = sinTasaParaLlenar();
+    // Mismo candado que el lote para el desfase de fecha del pedido (2026-08-05).
+    const faltaFecha = faltaDecidirLaFecha("detalle");
+    boton.disabled = sinTasaParaLlenar() || faltaFecha;
     // Llegando desde la revisión del lote, llenar ESTA deja el lote sin arrancar
     // (llenarDesdeDetalle): el botón lo dice antes de pulsarlo.
-    boton.textContent = boton.disabled ? "Escribe la tasa para llenar"
+    boton.textContent = sinTasaParaLlenar() ? "Escribe la tasa para llenar"
+      : faltaFecha ? "Decide la fecha para llenar"
       : (previoResolver && etiqueta === "Llenar") ? "Llenar esta factura sola"
       : etiqueta;
     return;
@@ -10588,6 +10593,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     conectando: `Buscando la ventana del programa de facturación…`,
     entorno: `Ajustando fecha, serie y tasa para ${refFactura(pedido_id, parte)}…`,
     lineas: `Llenando ${refFactura(pedido_id, parte)}…`,
+    // Líneas ya escritas, releyendo grid/totales/fecha/tasa/serie antes de
+    // cerrar (2026-08-05): sin esto la barra seguía diciendo "Llenando…"
+    // durante este tramo, en cualquier modo (llenado suelto, en fila con o
+    // sin imprimir — el resumen posterior, si lo hay, llega recién después).
+    verificando: `Verificando ${refFactura(pedido_id, parte)}…`,
     // Paso de cierre (CONTRATOS.md 3.1, act. 2026-07-29): tras las líneas, y
     // solo en modo prueba, el cargador Acepta el documento y —con "Imprimir:
     // sí"— espera aquí entre facturas. El mensaje enuncia el estado; la acción
@@ -12089,6 +12099,7 @@ function revisarLotePrevio(meta) {
   previoDescuentosFallo = "";
   previoTocado = false;
   previoAbiertoEn = Date.now();
+  fechaDesfaseOk.previo = "";       // la fecha se decide una vez por lote
   pintarPrevioLote();
   // Los descuentos se piden EN PARALELO: la ventana abre con lo que el panel
   // ya tiene en la lista y esa columna se completa sola al llegar la
@@ -12198,8 +12209,11 @@ function pintarBotonPrevio() {
   // Con la pregunta del − abierta el pedido TODAVÍA está en la fila —no sale
   // hasta que el operador elija una salida—, así que el botón se apaga: dejarlo
   // vivo llenaba el pedido que ya se veía como sacado (2026-07-31).
+  // El desfase de fecha del pedido pide una decisión antes de llenar
+  // (2026-08-05): o se mueve la fecha, o se confirma la que está puesta.
+  const faltaFecha = faltaDecidirLaFecha("previo");
   btn.disabled = previoCargando || !previoCola.length || sinTasaParaLlenar()
-    || faltaSerieParaElLote() || !!previoQuitando;
+    || faltaSerieParaElLote() || !!previoQuitando || faltaFecha;
   // Con una sola unidad el botón dice "Llenar siguiente" (2026-07-31, pedido del
   // usuario): "Llenar 1 factura" contaba algo que no hace falta contar.
   btn.textContent = previoCargando ? "Rehaciendo la fila…"
@@ -12207,6 +12221,7 @@ function pintarBotonPrevio() {
     : !previoCola.length ? "No hay nada que llenar"
     : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
     : faltaSerieParaElLote() ? "Elige la serie para llenar"
+    : faltaFecha ? "Decide la fecha para llenar"
     : n === 1 ? "Llenar siguiente"
     : `Llenar ${unidadEnFila(n)}`;
 }
@@ -12781,12 +12796,14 @@ function botonesSerieRapidos(porBloques) {
 
 // --- El pedido no es del día anterior (2026-08-01, pedido del usuario) -------
 // Un pedido se factura al día SIGUIENTE de su orden de salida: llenando para
-// hoy, el pedido es de ayer; para mañana, de hoy. Cuando no calza no se bloquea
-// nada —se recupera un pedido de días atrás, se factura con retraso— pero se
-// dice antes de llenar, porque el documento sale con la fecha a facturar y no
-// con la del pedido. La corrección va en el propio aviso, que es lo que este
-// dato tiene de distinto respecto a la serie o la tasa: no hay nada que
-// escribir, solo mover la fecha al día que le toca a ese pedido.
+// hoy, el pedido es de ayer; para mañana, de hoy. Cuando no calza se dice antes
+// de llenar, porque el documento sale con la fecha a facturar y no con la del
+// pedido. La corrección va en el propio aviso, que es lo que este dato tiene de
+// distinto respecto a la serie o la tasa: no hay nada que escribir, solo mover
+// la fecha al día que le toca a ese pedido.
+// Desde 2026-08-05 (pedido del usuario) no es una sugerencia que se pueda pasar
+// de largo: el botón de llenar queda apagado hasta que el operador elija una de
+// las dos fechas — la que el aviso propone o la que ya está puesta.
 const diaAntesDe = (iso) => {
   const d = calDesdeISO(iso);
   if (!d) return "";
@@ -12814,20 +12831,60 @@ const TRIANGULO_ALERTA =
   + `L.62 20.99A1 1 0 0 0 1.49 22.5h21.02a1 1 0 0 0 .87-1.51L12.87 2.51ZM11 9h2v6h-2`
   + `V9Zm0 8h2v2h-2v-2Z"/></svg>`;
 
-function avisoFechaDelPedido(facturas) {
+// El desfase se calcula aparte del aviso porque también lo necesitan los
+// botones de llenar, que se pintan ANTES que los avisos y no pueden leerlo del
+// HTML ya pintado.
+function desfaseDeFechas(facturas) {
   const isoFacturar = $("f-fecha-facturar").value;
   // Sin fecha puesta no hay contra qué comparar. Saltando la puesta a punto de
   // la fecha el aviso SIGUE saliendo (2026-08-02, pedido del usuario: tiene que
   // verse igual con el modo admin prendido y apagado); lo que cambia es el
   // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
-  if (!isoFacturar) return "";
+  if (!isoFacturar) return null;
   const esperada = diaAntesDe(isoFacturar);
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
   const desfasadas = fechas.filter(f => f !== esperada);
-  if (!desfasadas.length) return "";
+  if (!desfasadas.length) return null;
   const distintas = [...new Set(desfasadas)].sort();
+  // La firma ES la decisión: mover la fecha a facturar o cambiar los días
+  // desfasados de la fila plantea otro caso y se vuelve a preguntar. Sacar una
+  // factura sin que cambien esos días NO deshace lo ya decidido.
+  return {isoFacturar, esperada, fechas, desfasadas, distintas,
+          firma: `${isoFacturar}|${distintas.join(",")}`};
+}
+
+// Decisión tomada sobre el desfase, por ventana (la firma aceptada). Se limpia
+// al abrir cada ventana: la fecha se decide una vez por lote y una vez por
+// factura suelta.
+const fechaDesfaseOk = {previo: "", detalle: ""};
+
+const facturasDeLaVentana = (donde) =>
+  (donde === "previo"
+    ? previoCola.map(c => filaDeFactura(c.pedido_id, c.parte))
+    : detalleAbierto ? [filaDeLista(...partesDeClave(detalleAbierto))] : []
+  ).filter(Boolean);
+
+function faltaDecidirLaFecha(donde) {
+  const d = desfaseDeFechas(facturasDeLaVentana(donde));
+  return !!d && d.firma !== fechaDesfaseOk[donde];
+}
+
+// "Se factura para el día que está puesto, a propósito": deja el aviso a la
+// vista (el hecho sigue siendo cierto) y suelta el botón de llenar.
+function confirmarFechaDesfase(donde) {
+  const d = desfaseDeFechas(facturasDeLaVentana(donde));
+  fechaDesfaseOk[donde] = d ? d.firma : "";
+  if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
+  else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+}
+
+function avisoFechaDelPedido(facturas, donde) {
+  const desfase = desfaseDeFechas(facturas);
+  if (!desfase) return "";
+  const {isoFacturar, esperada, fechas, desfasadas, distintas} = desfase;
+  const sinDecidir = desfase.firma !== fechaDesfaseOk[donde];
   const corta = (iso) => fechaCortaDelAviso(iso, isoFacturar);
   // Cuatro fechas o más no se enumeran: la lista se vuelve ilegible y lo que
   // hay que saber es que son de días que no corresponden, no cuáles.
@@ -12843,20 +12900,37 @@ function avisoFechaDelPedido(facturas) {
         : `Las ${fechas.length} facturas son de pedidos ${dias}`)
     : `${desfasadas.length} de las ${fechas.length} facturas son de pedidos ${dias}`;
   const unaSola = fechas.length === 1;
-  // El botón solo cuando mover la fecha arregla TODAS: con parte del lote en
+  // Mover la fecha solo se ofrece cuando arregla TODAS: con parte del lote en
   // regla, correrla dejaría fuera de sitio a las que estaban bien.
-  const salida = (todas && distintas.length === 1)
-    ? `<div class="previo-acciones"><button title="Mueve la Fecha a facturar al `
+  const cambiar = (todas && distintas.length === 1)
+    ? `<button title="Mueve la Fecha a facturar al `
       + `día siguiente del pedido. La tasa vuelve a la que corresponda a ese día."
          onclick="cajitaFechaElegida('${esc(diaDespuesDe(distintas[0]))}')">Facturar `
-      + `para el ${esc(corta(diaDespuesDe(distintas[0])))}</button></div>`
+      + `para el ${esc(corta(diaDespuesDe(distintas[0])))}</button>`
     : "";
-  const cierre = saltandoPuestaAPunto("fecha")
+  // La otra salida: dejar la fecha donde está. Saltando la puesta a punto de la
+  // fecha el documento NO sale con ella, así que el botón no puede prometerla.
+  const confirmar = sinDecidir
+    ? `<button title="Deja la Fecha a facturar como está: se factura para ese `
+      + `día a propósito." onclick="confirmarFechaDesfase('${donde}')">${
+        saltandoPuestaAPunto("fecha") ? "Llenar igual"
+          : `Facturar para el ${esc(corta(isoFacturar))}`}</button>`
+    : "";
+  const salida = (cambiar || confirmar)
+    ? `<div class="previo-acciones">${cambiar}${confirmar}</div>` : "";
+  const destino = saltandoPuestaAPunto("fecha")
     ? (unaSola ? "La fecha no se pone: el documento sale"
                : "La fecha no se pone: los documentos salen")
       + " con la que tenga el programa de facturación."
-    : (unaSola ? "Se llena igual: el documento sale"
-               : "Se llenan igual: los documentos salen") + " con la fecha de arriba.";
+    : (unaSola ? "El documento sale" : "Los documentos salen")
+      + " con la fecha de arriba.";
+  // Sin decidir, el botón de llenar está apagado: el aviso dice qué se espera.
+  // Con una sola salida no se "elige" nada: se confirma.
+  const pedido = saltandoPuestaAPunto("fecha") ? " Decide antes de llenar:"
+    : cambiar ? " Elige para qué día se factura:"
+    : " Confirma la fecha antes de llenar:";
+  const cierre = sinDecidir ? destino + pedido
+    : (unaSola ? "Se llena igual. " : "Se llenan igual. ") + destino;
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
       TRIANGULO_ALERTA}</div><div>${
       esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}: lo normal es `
@@ -12869,7 +12943,8 @@ function pintarPrevioAvisos() {
     htmlAvisosPuestaAPunto(avisosPuestaAPunto(previoCola.length,
                                               rutaSeleccionada === ""))
     + botonesSerieRapidos(rutaSeleccionada === "")
-    + avisoFechaDelPedido(previoCola.map(c => filaDeFactura(c.pedido_id, c.parte)))
+    + avisoFechaDelPedido(previoCola.map(c => filaDeFactura(c.pedido_id, c.parte)),
+                          "previo")
     + avisoFamiliaEstirada();
 }
 
@@ -12879,7 +12954,7 @@ function htmlAvisosDetalle(clave) {
   const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
   return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
        + botonesSerieRapidos(false)
-       + avisoFechaDelPedido(fila ? [fila] : []);
+       + avisoFechaDelPedido(fila ? [fila] : [], "detalle");
 }
 
 // El div de avisos del detalle existe solo con la factura llenable (lo crea
