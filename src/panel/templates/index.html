@@ -10653,6 +10653,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // /api/llenar está en vuelo se sondea la fase — primero "Ajustando fecha,
   // serie y tasa…" (entorno.py) y después "Llenando…" (líneas).
   const TEXTO_FASE = {
+    // La caché del lote no estaba lista (primera carga tras abrir el panel,
+    // o el rearmado de una reapertura vieja): casi nunca se ve, pero cuando
+    // pasa la barra dice qué se espera en vez de un "Preparando…" quieto.
+    preparando_datos: `Actualizando los datos de ${refFactura(pedido_id, parte)}…`,
     conectando: `Buscando la ventana del programa de facturación…`,
     entorno: `Ajustando fecha, serie y tasa para ${refFactura(pedido_id, parte)}…`,
     lineas: `Llenando ${refFactura(pedido_id, parte)}…`,
@@ -10682,11 +10686,13 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     pregunta_trancon: `Parece que el programa de facturación se trancó: responde el aviso.`,
     reiniciando: `Reiniciando el programa de facturación: se cierra y se abre de nuevo…`,
   };
-  // Fases en las que el llenado está DETENIDO esperando al operador: el
-  // programa no manda ni una tecla hasta que él actúe (⏸, «Continuar» tras
-  // imprimir, cerrar el aviso de Winledger, responder si se reinicia).
+  // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
+  // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
+  // si se reinicia) — el aviso "no tocar" se esconde y la jaula se suelta.
+  // 'preparando_datos' entra aquí por lo mismo (aún no se toca Winledger),
+  // pero es el programa quien trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
-                              "pregunta_trancon"];
+                              "pregunta_trancon", "preparando_datos"];
   const pollFase = setInterval(async () => {
     try {
       const f = await api("/api/fase_llenado");
@@ -10723,7 +10729,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
                 + (pausaPedida && f.fase !== "pausado"
                    ? " Pausa pedida: se detiene al terminar el paso en curso." : ""),
                 "info",
-                !FASES_DEL_OPERADOR.includes(f.fase));
+                // Punto giratorio solo cuando trabaja el PROGRAMA. En
+                // 'preparando_datos' trabaja el programa (trae los datos del
+                // pedido) aunque el mouse siga libre: gira igual.
+                !FASES_DEL_OPERADOR.includes(f.fase)
+                  || f.fase === "preparando_datos");
       // El aviso solo vale mientras el programa teclea. En las fases donde el
       // que actúa es el OPERADOR —pausa, imprimir en Winledger, cerrar un aviso
       // suyo— el llenado está parado esperándolo: ahí el mouse y el teclado son
