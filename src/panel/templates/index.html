@@ -2439,6 +2439,18 @@
         #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
         que los abren. -->
    <div id="ajustes-home">
+    <!-- Catálogos primero en Ajustes (2026-08-05, pedido del usuario): mismo
+         bloque de siempre, solo que ahora abre la vista en vez de ir al
+         final — sigue oculto salvo permiso ajustes_catalogos (Editor/Admin). -->
+    <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
+         #catalogo-overlay / #rutas-overlay) — ver
+         pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
+    <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
+      <h3>Catálogos</h3>
+      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
+        códigos usados por programa de facturación.</p>
+      <div class="cat-btns" id="cat-btns"></div>
+    </div>
     <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
          computadora, juntas porque son obligatorias juntas — sin las dos no se
          llena nada (ver el aviso #configmaq-overlay). El nombre salió del
@@ -2493,17 +2505,8 @@
         botón del calendario la repone con un clic, y en cualquier factura se
         puede cambiar a mano.</p>
     </div>
-    <!-- Catálogos y Rutas: cada botón abre el suyo en su propio modal
-         (#catalogo-overlay / #rutas-overlay, 2026-08-04) — ver
-         pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
-    <!-- Catálogos y Series por ruta son de Editor/Admin (src/roles.py,
-         permiso ajustes_catalogos): cargarAjustes los muestra según el rol. -->
-    <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
-      <h3>Catálogos</h3>
-      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
-        códigos usados por programa de facturación.</p>
-      <div class="cat-btns" id="cat-btns"></div>
-    </div>
+    <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
+         ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
     <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
       <h3>Series por ruta</h3>
       <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
