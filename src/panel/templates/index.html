@@ -4617,56 +4617,6 @@ function marcarLlenando(activo) {
     b.textContent = "■ Detener";
   }
   actualizarStatusbar();
-  if (activo) {
-    // El servidor borra las zonas al terminar cada llenado: la firma se
-    // resetea para que el turno nuevo SIEMPRE las reporte, aunque la barra
-    // no se haya movido (sin esto la jaula solo se armaba en el primer
-    // llenado tras abrir el panel).
-    ultimasZonasJaula = "";
-    reportarZonasJaula();
-  }
-}
-
-// --- Jaula de mouse y teclado (2026-08-05) ----------------------------------
-// Mientras el programa teclea, el input físico del operador no llega a ninguna
-// parte (src/winledger_ui/jaula.py): el cursor queda confinado a esta ventana y
-// solo responden los botones de la barra. Aquí solo se mide lo que el frontend
-// sabe medir bien: los rects CSS de los botones relativos al viewport y el
-// tamaño del viewport — la posición real en pantalla la pone el servidor con
-// la ventana (HWND), así el marco, el DPI y el zoom no corren las zonas.
-// Sin este reporte la jaula no encierra nada: encerrar el cursor sin dejar
-// clickeable ni Detener sería una trampa.
-let ultimasZonasJaula = "";
-
-function reportarZonasJaula() {
-  try { medirYMandarZonasJaula(); }
-  catch (_) {
-    // Reportar las zonas es accesorio: si falla, el llenado sigue igual y la
-    // jaula simplemente no se arma (sin zonas no encierra a nadie). Nunca
-    // puede tumbar a quien llama, que es el arranque del llenado.
-  }
-}
-
-function medirYMandarZonasJaula() {
-  // Todo botón VISIBLE de la barra: Detener y ⏸ siempre, y los que aparecen
-  // según la fase (Continuar, Reintentar, Cancelar, elegir serie de la ruta).
-  // Se leen de la barra en vez de listarlos: un botón nuevo queda clickeable
-  // solo por estar ahí, sin que haya que acordarse de anotarlo aquí.
-  const zonas = [];
-  for (const b of $("statusbar").querySelectorAll("button")) {
-    const rect = b.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0)
-      zonas.push({x: rect.left, y: rect.top, w: rect.width, h: rect.height});
-  }
-  const viewport = {w: innerWidth, h: innerHeight};
-  const firma = JSON.stringify([viewport, zonas]);
-  if (firma === ultimasZonasJaula) return;   // ni la ventana ni los botones cambiaron
-  ultimasZonasJaula = firma;
-  api("/api/jaula/zonas", {zonas, viewport}).catch(() => {
-    // Que el reporte falle no puede tumbar el llenado: sin zonas frescas la
-    // jaula se queda como estaba (y sin ninguna, no se arma).
-    ultimasZonasJaula = "";
-  });
 }
 
 // --- Pausar / reanudar el llenado (⏸ ▶, 2026-07-27) ------------------------
@@ -10688,9 +10638,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
-  // si se reinicia) — el aviso "no tocar" se esconde y la jaula se suelta.
-  // 'preparando_datos' entra aquí por lo mismo (aún no se toca Winledger),
-  // pero es el programa quien trabaja: el spinner se maneja aparte, abajo.
+  // si se reinicia) y el aviso "no tocar" se esconde. 'preparando_datos' entra
+  // aquí por lo mismo (aún no se toca Winledger), pero es el programa quien
+  // trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
                               "pregunta_trancon", "preparando_datos"];
   const pollFase = setInterval(async () => {
@@ -10740,10 +10690,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // suyos y el aviso estorba justo cuando toca lo contrario.
       $("aviso-no-tocar").style.display =
         FASES_DEL_OPERADOR.includes(f.fase) ? "none" : "";
-      // La jaula usa estas mismas fases para soltarse, pero necesita saber
-      // dónde quedaron los botones: la ventana se mueve y la botonera cambia
-      // con la fase. Solo manda algo cuando de verdad cambió.
-      if (llenando) reportarZonasJaula();
       // «Continuar» solo se ve en la fase 'esperando_impresion' (paso de
       // cierre con Imprimir: sí) — se apaga sola al salir de ella. Al tocar
       // papel cambia color/texto/ícono para romper la inercia de cuatro
