@@ -4617,15 +4617,23 @@ function marcarLlenando(activo) {
     b.textContent = "■ Detener";
   }
   actualizarStatusbar();
-  if (activo) reportarZonasJaula();
+  if (activo) {
+    // El servidor borra las zonas al terminar cada llenado: la firma se
+    // resetea para que el turno nuevo SIEMPRE las reporte, aunque la barra
+    // no se haya movido (sin esto la jaula solo se armaba en el primer
+    // llenado tras abrir el panel).
+    ultimasZonasJaula = "";
+    reportarZonasJaula();
+  }
 }
 
 // --- Jaula de mouse y teclado (2026-08-05) ----------------------------------
 // Mientras el programa teclea, el input físico del operador no llega a ninguna
 // parte (src/winledger_ui/jaula.py): el cursor queda confinado a esta ventana y
-// solo responden los botones de la barra. El servidor no puede saber dónde
-// quedó la ventana ni qué botones están visibles en esta fase, así que se los
-// manda el panel — en pixeles FÍSICOS de pantalla, que es lo que ve Windows.
+// solo responden los botones de la barra. Aquí solo se mide lo que el frontend
+// sabe medir bien: los rects CSS de los botones relativos al viewport y el
+// tamaño del viewport — la posición real en pantalla la pone el servidor con
+// la ventana (HWND), así el marco, el DPI y el zoom no corren las zonas.
 // Sin este reporte la jaula no encierra nada: encerrar el cursor sin dejar
 // clickeable ni Detener sería una trampa.
 let ultimasZonasJaula = "";
@@ -4640,13 +4648,6 @@ function reportarZonasJaula() {
 }
 
 function medirYMandarZonasJaula() {
-  const r = devicePixelRatio || 1;
-  const aPantalla = (rect) => ({
-    x: Math.round((screenX + rect.left) * r),
-    y: Math.round((screenY + rect.top) * r),
-    w: Math.round(rect.width * r),
-    h: Math.round(rect.height * r),
-  });
   // Todo botón VISIBLE de la barra: Detener y ⏸ siempre, y los que aparecen
   // según la fase (Continuar, Reintentar, Cancelar, elegir serie de la ruta).
   // Se leen de la barra en vez de listarlos: un botón nuevo queda clickeable
@@ -4654,15 +4655,14 @@ function medirYMandarZonasJaula() {
   const zonas = [];
   for (const b of $("statusbar").querySelectorAll("button")) {
     const rect = b.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) zonas.push(aPantalla(rect));
+    if (rect.width > 0 && rect.height > 0)
+      zonas.push({x: rect.left, y: rect.top, w: rect.width, h: rect.height});
   }
-  // La caja es la ventana del panel: durante el llenado está encogida a la
-  // barra flotante, que es justo "la región con los controles de la corrida".
-  const caja = aPantalla({left: 0, top: 0, width: innerWidth, height: innerHeight});
-  const firma = JSON.stringify([caja, zonas]);
-  if (firma === ultimasZonasJaula) return;   // la ventana no se movió ni cambió de botones
+  const viewport = {w: innerWidth, h: innerHeight};
+  const firma = JSON.stringify([viewport, zonas]);
+  if (firma === ultimasZonasJaula) return;   // ni la ventana ni los botones cambiaron
   ultimasZonasJaula = firma;
-  api("/api/jaula/zonas", {caja, zonas}).catch(() => {
+  api("/api/jaula/zonas", {zonas, viewport}).catch(() => {
     // Que el reporte falle no puede tumbar el llenado: sin zonas frescas la
     // jaula se queda como estaba (y sin ninguna, no se arma).
     ultimasZonasJaula = "";
