@@ -2833,7 +2833,7 @@
     <pre id="diag-sync-texto"></pre>
     <div class="editor-acciones">
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
-      <button type="button" onclick="copiarDiagnosticoSync(this)">Copiar informe</button>
+      <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
       <button type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
   </div>
@@ -7374,19 +7374,12 @@ async function abrirDiagnosticoSync() {
   }
 }
 
-async function copiarDiagnosticoSync(btn) {
-  try {
-    await navigator.clipboard.writeText($("diag-sync-texto").textContent);
-    btn.textContent = "Copiado";
-  } catch (_) {
-    // Sin permiso de portapapeles (http): seleccionar el texto ya deja
-    // el copiado a un Cmd/Ctrl+C de distancia.
-    const r = document.createRange();
-    r.selectNodeContents($("diag-sync-texto"));
-    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-    btn.textContent = "Selecciónalo y copia con Ctrl+C";
-  }
-  setTimeout(() => { btn.textContent = "Copiar informe"; }, 2500);
+function abrirSoporteRemoto(btn) {
+  // Placeholder (2026-08-05): todavía no hay canal de soporte remoto
+  // configurado. Cuando exista, este botón lo abre directo.
+  const original = btn.textContent;
+  btn.textContent = "Próximamente";
+  setTimeout(() => { btn.textContent = original; }, 2500);
 }
 
 function cerrarDiagnosticoSync() {
