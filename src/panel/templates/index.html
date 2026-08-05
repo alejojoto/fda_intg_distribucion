@@ -9822,7 +9822,11 @@ function pintarLlenadosPorRevisar(lista) {
     // Mismos textos que el aviso de PENDIENTES y el renglón de PROCESADAS:
     // la reemisión sin error se dice como lo que es, no como un fallo.
     const ultimaReemision = (f.nota_reemision || "").split("\n").pop();
-    const quePaso = f.tipo === "error"
+    // El doble llenado (tipo "conflicto", 2026-08-05) trae su marca completa:
+    // qué pasó, quién llegó primero y qué hay que decidir.
+    const quePaso = f.tipo === "conflicto"
+      ? esc(f.conflicto || "").replaceAll("\n", "<br>")
+      : f.tipo === "error"
       ? ((!detalle && ultimaReemision)
           ? "Marcada para volver a llenar."
           : `${falloHace(f.fecha_cargado)}: ${detalle}`)
@@ -9866,7 +9870,11 @@ function pintarLlenadosPorRevisar(lista) {
       : "";
     const notaReemitir = tienePermiso("reabrir_factura") ? ""
       : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`;
-    const acciones = modoImplantacion
+    // El conflicto ignora la rama remota a propósito: resolverlo es cosa del
+    // PERMISO (botonesResolverConflicto), no de cuál máquina tiene la fila.
+    const acciones = f.tipo === "conflicto"
+      ? botonesResolverConflicto(f)
+      : modoImplantacion
       ? (f.tipo === "error"
           ? botonPrellenado(f, "Probar reintento", "acento")
           : `<span class="mut" title="Esta decisión cambia una factura real.">Solo en REAL</span>`)
@@ -10143,12 +10151,7 @@ function filaProcesada(f, enFamilia) {
         data-factura-key="${clave}">
       <td colspan="12">
         <span>${esc(f.conflicto).replaceAll("\n", "<br>")}</span>
-        ${f.conflicto_abierto && !f.remota
-          ? (f.conflicto_ganadora
-              ? `<button class="peligro" onclick="confirmarBorrar(this, () => resolverConAnulacion('${esc(f.pedido_id)}',${f.parte}), 'Confirmar: ya se anuló')">Ya la anulé</button> `
-              : "")
-            + `<button class="peligro" onclick="abrirResolverConflicto('${esc(f.pedido_id)}',${f.parte})">Resolver</button>`
-          : ""}
+        ${f.conflicto_abierto ? botonesResolverConflicto(f) : ""}
       </td>
     </tr>` : "";
   // Líneas omitidas (2026-07-29): renglón propio a todo lo ancho, igual que
@@ -10970,13 +10973,29 @@ function pintarAvisoConflictos(cuantos) {
       + "documentos fiscales y uno tiene que anularse. Toca aquí para resolverlo.";
 }
 
-// Lleva a la fila del conflicto, que está arriba de todo en PROCESADAS.
+// Lleva a la revisión del doble llenado: desde 2026-08-05 la factura en
+// conflicto vive en EN REVISIÓN → "Llenados por revisar" (sale de PROCESADAS
+// mientras el conflicto siga abierto, igual que un error de llenado).
 function irAConflictos() {
-  cambiarTab("procesadas");
-  paginacion.procesadas.pagina = 1;
+  subtabRevisionActiva = "llenados";
+  cambiarTab("revision");
   repintar();
-  const fila = document.querySelector("#t-procesadas tr.fila-conflicto.abierto");
-  if (fila) fila.scrollIntoView({block: "center"});
+}
+
+// Botones de resolver un doble llenado (2026-08-05): por PERMISO, no por
+// máquina — la dueña de la fila puede no tener la marca local (la anota la
+// que llegó de segunda a la carrera) y resolver es decisión de un Editor,
+// desde cualquier equipo. El candado real está en el backend (403); esto
+// solo esconde los botones y dice a quién le toca.
+function botonesResolverConflicto(f) {
+  if (modoImplantacion)
+    return `<span class="mut" title="Esta decisión cambia una factura real.">Solo en REAL</span>`;
+  if (!tienePermiso("resolver_doble_llenado"))
+    return `<span class="mut">Resolverlo lo hace un editor: decide cuál documento queda y cuál se anula.</span>`;
+  return (f.conflicto_ganadora
+      ? `<button class="peligro" onclick="confirmarBorrar(this, () => resolverConAnulacion('${esc(f.pedido_id)}',${f.parte}), 'Confirmar: ya se anuló')">Ya la anulé</button> `
+      : "")
+    + `<button class="peligro" onclick="abrirResolverConflicto('${esc(f.pedido_id)}',${f.parte})">Resolver</button>`;
 }
 
 // --- Doble llenado: resolver cuál documento queda vivo (2026-07-28) ---------
