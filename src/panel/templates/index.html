@@ -8563,8 +8563,16 @@ function accionesDeFila(f) {
   //     cuando ese equipo no está disponible — "Llenar igual" no sirve si lo
   //     que corresponde es NO facturarla, y antes esa fila solo forzaba a
   //     llenarla igual.
+  //     Con el llenado CORRIENDO allá no hay ninguno de los dos (2026-08-05,
+  //     regla del usuario): mientras ese proceso no diga en qué quedó, hay un
+  //     documento fiscal saliendo, y tanto tomarla como descartarla terminan
+  //     en dos documentos de la misma factura. Los botones vuelven cuando
+  //     llega el resultado o cuando pasa la espera sin respuesta (el equipo se
+  //     cayó) — lo decide el panel, ver _llenado_ajeno_en_curso.
   if (f.remota && modoImplantacion)
     return `<span class="mut" title="La prueba aislada no cambia el estado compartido.">Solo en REAL</span>`;
+  if (f.remota && f.llenandose_ahora)
+    return `<span class="mut" title="Mientras el llenado corre allá no se puede tomar ni descartar: saldría un segundo documento de la misma factura. Cuando ese llenado diga en qué quedó, la lista lo muestra sola.">Llenándose en '${esc(f.maquina || "otra máquina")}'</span>`;
   if (f.remota)
     return f.refacturable
       ? botonVolverALlenar(f)
@@ -9036,6 +9044,8 @@ function reabrirDesdeDetalle(f) {
   // el pie se queda sin botón, como en cualquier fila que no tenga acción.
   // "Llenar igual" es otra cosa (quitar un candado, no reemitir) y no se toca.
   const puedeReabrir = tienePermiso("reabrir_factura");
+  // Llenándose en otra máquina: tampoco desde aquí (ver accionesDeFila).
+  if (f.remota && f.llenandose_ahora) return null;
   if (f.remota)
     return f.refacturable
       ? (puedeReabrir ? {texto: "Volver a llenar", abrir: volverAFacturar} : null)
