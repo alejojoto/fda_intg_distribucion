@@ -3896,6 +3896,14 @@ let llenadoTrasLogin = null;      // {pedido_id, parte, autorizarCancelar} a rea
 // llenado (la caja del resumen) aunque ya no haya nada llenándose.
 let esperandoEnvioPlataforma = false;
 let exitoTrasEnvio = null;        // {texto, tipo} del llenado, para cuando pulse Listo
+// Corrida "en fila" con impresión (2026-08-05, regla del usuario): es el MISMO
+// aviso que ya advierte "hay que controlar cada impresión" — cada factura
+// impresa pausa la corrida en este resumen hasta el Listo del operador, antes
+// de seguir con la siguiente. Sin imprimir la corrida sigue encadenando sola
+// (ese modo se blinda con validación de datos, no con revisión humana por
+// factura). {avisos, cierre} de la factura que dejó la corrida esperando; null
+// si no hay nada pendiente (llenado individual, o corrida sin imprimir).
+let corridaResumenPendiente = null;
 // Estado efectivo de PRUEBA AISLADA. Puede venir del toggle local o de una
 // bandera forzada de entorno/settings; ADMIN es independiente.
 let modoImplantacion = false;
@@ -4705,6 +4713,16 @@ function pintarResumenFinal() {
 // queda pensando que el documento incompleto no tiene arreglo.
 function pintarAccionesResumen(hayOmitidas) {
   const puedeReabrir = tienePermiso("reabrir_factura");
+  // En corrida (2026-08-05): el resumen es la pausa de "en fila" con
+  // impresión (una por factura, ver corridaResumenPendiente), y el botón
+  // normal de la corrida (#btn-detener) queda escondido en modo llenado —
+  // vive fuera de #statusbar, que es lo único que se ve. Sin este botón aquí
+  // no habría forma de parar el lote mientras el resumen está a la vista.
+  // No convive con líneas omitidas: esas ya pasan por pausarSecuenciaPorFallo,
+  // que detiene la corrida antes de llegar aquí.
+  const enCorrida = secuenciaActiva && !hayOmitidas;
+  const detener = enCorrida
+    ? `<button class="peligro" onclick="detenerLoteDesdeResumen()">Detener el lote</button>` : "";
   $("fin-llenado-acciones").innerHTML = hayOmitidas
     ? `${puedeReabrir ? `<button class="primario" onclick="volverALlenarDesdeResumen()"
          title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel.">Volver a intentar</button>` : ""}
@@ -4714,9 +4732,22 @@ function pintarAccionesResumen(hayOmitidas) {
          title="Vuelve el panel y la factura espera en EN REVISIÓN para decidir después.">Dejar en revisión</button>
        ${puedeReabrir ? "" : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`}`
     : `<button class="primario" onclick="listoEnvioPlataforma()"
-         title="La factura quedó despachada: vuelve el panel completo.">Listo</button>
-       ${puedeReabrir ? `<button onclick="volverALlenarDesdeResumen()"
-         title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>` : ""}`;
+         title="${enCorrida ? "Sigue con la siguiente factura de la corrida."
+                             : "La factura quedó despachada: vuelve el panel completo."}">${
+         enCorrida ? "Listo, sigue la corrida" : "Listo"}</button>
+       ${(puedeReabrir && !enCorrida) ? `<button onclick="volverALlenarDesdeResumen()"
+         title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>` : ""}
+       ${detener}`;
+}
+
+// Detener el lote desde la pausa del resumen (2026-08-05): cierra el resumen
+// de ESTA factura (ya quedó lista, no se deshace nada) y detiene la corrida —
+// lo que falte por llenar sigue pendiente.
+function detenerLoteDesdeResumen() {
+  terminarEsperaEnvioPlataforma();
+  corridaResumenPendiente = null;
+  detenerSecuencia(`Detenido: ${hechasEnFila} de ${metaEnFila} facturas llenadas. ` +
+    `La corrida no sigue.`);
 }
 
 // "Marcar como procesada": lo que faltó se resuelve por fuera y la factura no
@@ -10747,12 +10778,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // solo ahora.
       const huboOmitidas = r.lineas_omitidas && Object.keys(r.lineas_omitidas).length > 0;
       // Resumen de fin de llenado (2026-08-01, reemplaza a la espera pelada
-      // del 2026-07-28): solo en producción, solo en llenado individual y
-      // solo si el documento quedó EN PANTALLA (r.cierre null) — si el paso
-      // de cierre ya lo canceló o lo aceptó no hay nada que revisar ni
-      // enviar. La caja queda a la derecha hasta que el operador pulse Listo
-      // o Volver a llenar.
-      const entraResumen = !secuenciaActiva && !r.cierre && !enFilaDisponible();
+      // del 2026-07-28; regla ampliada 2026-08-05 — pedido del usuario: se ve
+      // al terminar CUALQUIER llenado, sin importar el canal de este equipo ni
+      // si el paso de cierre ya aceptó el documento — enviar a la plataforma
+      // sigue siendo manual en los dos casos. La ÚNICA excepción es la corrida
+      // "en fila" SIN imprimir: ese modo encadena solo, blindado con
+      // validación de datos en vez de revisión humana por factura. La caja
+      // queda a la derecha hasta que el operador pulse Listo o Volver a
+      // llenar.
+      const entraResumen = !secuenciaActiva || imprimirEnFila();
       if (huboOmitidas) {
         // En el resumen las omitidas ya se ven ahí mismo, con su salida: el
         // modal aparte queda para la corrida y las máquinas con fila.
@@ -10794,14 +10828,24 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         } else if (huboOmitidas) {
           // La corrida no sigue sola sobre una factura incompleta: se pausa
           // igual que ante cualquier otro fallo, para que el operador decida.
+          // Manda por encima del resumen (que igual salió arriba): una
+          // factura a medias pide Reintentar/Cancelar, no "envíala".
           pausarSecuenciaPorFallo(
             `${refFacturaUbicable(pedido_id, parte)} quedó incompleta (${hechasEnFila} de ` +
             `${metaEnFila}): faltaron líneas y hay que revisarla.`);
+        } else if (entraResumen) {
+          // Con impresión, cada factura pausa la corrida en el resumen de
+          // arriba hasta el Listo del operador (2026-08-05, regla del
+          // usuario): es el mismo control que ya advierte "hay que
+          // controlar cada impresión" junto al radio — avanzarCorridaTrasResumen
+          // decide qué sigue (otra factura, cambio de ruta, o el fin) recién
+          // ahí, con la lista ya recargada por el `finally` de este llenado.
+          corridaResumenPendiente = {avisos, cierre: r.cierre};
         } else if (hechasEnFila < metaEnFila) {
           continuarEnFila = true;
         } else if (ofrecerContinuarConOtraRuta()) {
-          // Con impresión, la ruta se agotó antes del cupo pedido: la corrida
-          // queda esperando la decisión del cambio de ruta (2026-08-05).
+          // Sin imprimir esto no aplica (ofrecerContinuarConOtraRuta exige
+          // imprimir); queda solo por si algún día cambia esa regla.
         } else {
           // Fin de la corrida. Si la última dejó avisos, el mensaje ámbar de
           // arriba se queda (no se pisa con el resumen).
@@ -11897,13 +11941,34 @@ function esperarEnvioPlataforma(texto, tipo, factura) {
   plantarVentanaResumen();
 }
 
-// Listo: la factura ya se despachó. Vuelve el panel entero y el mensaje queda
+// Listo: la factura ya se despachó. Vuelve el panel entero (o, en corrida,
+// sigue con lo que tocaba tras esta factura — 2026-08-05) y el mensaje queda
 // sin la instrucción, que ya se cumplió.
 function listoEnvioPlataforma() {
   if (!esperandoEnvioPlataforma) return;
   const previo = exitoTrasEnvio;
+  const pendiente = corridaResumenPendiente;
+  corridaResumenPendiente = null;
   terminarEsperaEnvioPlataforma();
   mensaje(previo ? previo.texto : "", previo ? previo.tipo : "", false);
+  if (pendiente) avanzarCorridaTrasResumen(pendiente);
+}
+
+// Qué sigue tras el "Listo" de una factura impresa en corrida (2026-08-05):
+// la misma decisión que antes se tomaba de una (siguiente factura / cambio de
+// ruta / fin del lote), pospuesta hasta que el operador confirmó el envío a la
+// plataforma. La lista ya está fresca — el `finally` de llenar() la recargó
+// mientras se esperaba el Listo — así que no hace falta pedirla de nuevo.
+function avanzarCorridaTrasResumen(pendiente) {
+  if (!secuenciaActiva) return;   // Detener el lote (u otra salida) ya cerró la corrida
+  if (hechasEnFila < metaEnFila) {
+    siguienteDeSecuencia();
+  } else if (!ofrecerContinuarConOtraRuta()) {
+    detenerSecuencia(pendiente.avisos ? undefined
+      : `Llenado en fila terminado: ${hechasEnFila} de ${metaEnFila} facturas llenadas` +
+        (pendiente.cierre === "aceptado" ? " y aceptadas." : "."),
+      "exito");
+  }
 }
 
 // Salida silenciosa (no repinta): la usan Listo y Volver a llenar antes de su
@@ -12991,6 +13056,7 @@ async function arrancarSecuencia(meta) {
   serieDelLlenadoEnCurso = null;
   rutaDeLaEnCurso = "";
   cambioRutaPendiente = null;
+  corridaResumenPendiente = null;
   iniciarSecuencia();
   vigilarReserva();
 }
@@ -13509,6 +13575,7 @@ function detenerSecuencia(texto, tipo) {
   ocultarBotonesFalloEnFila();
   ocultarBotonesSerieDeRuta();
   serieDelLlenadoEnCurso = null;
+  corridaResumenPendiente = null;
   $("btn-secuencia").style.display = "";
   $("btn-detener").style.display = "none";
   const nota = notaDestranquesEnFila() + notaLoteEnFila();
@@ -13656,6 +13723,7 @@ function cancelarEnFila() {
   ocultarBotonesFalloEnFila();
   ocultarBotonesSerieDeRuta();
   serieDelLlenadoEnCurso = null;
+  corridaResumenPendiente = null;
   $("btn-detener").style.display = "none";
   $("btn-secuencia").style.display = "";
   // Cancelada tras un fallo, la factura quedó EN REVISIÓN (y el panel salta
