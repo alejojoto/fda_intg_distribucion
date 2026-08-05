@@ -5830,6 +5830,11 @@ let maquinaSeleccionada = "";
 // usuario): quien fija su ruta con ★ trabaja siempre esa y ver el aviso en
 // cada pantalla sería ruido permanente. Cualquier OTRA ruta sí cuenta.
 function filtrosActivos(tab) {
+  // EN REVISIÓN no se filtra NUNCA (2026-08-05, decisión del usuario): ahí
+  // debería haber poco o nada, y esconder un pedido tras un filtro puesto en
+  // otra pestaña haría creer que no queda ninguno por revisar. No tiene barra
+  // (ver cambiarTab) y el servidor tampoco recorta esas dos listas.
+  if (tab === "revision") return [];
   const activos = [];
   const buscar = ($("f-buscar").value || "").trim();
   if (buscar) activos.push({cual: "buscar", texto: `Buscar: ${buscar}`});
@@ -5883,7 +5888,7 @@ function pintarEstadoFiltros() {
   const tab = tabActiva();
   const activos = filtrosActivos(tab);
   $("filtros-barra").classList.toggle("filtrando", activos.length > 0);
-  $("f-ruta").classList.toggle("filtro-on", rutaFiltrando());
+  $("f-ruta").classList.toggle("filtro-on", tab !== "revision" && rutaFiltrando());
   $("campo-solo-aqui").classList.toggle(
     "filtro-on", tab === "procesadas" && $("f-solo-aqui").checked);
   $("filtro-aviso").style.display = activos.length ? "" : "none";
@@ -6019,6 +6024,23 @@ function aplicarFiltros(textoTrabajando) {
   // El aviso se borra solo si sigue siendo el suyo: un error de cargar() manda.
   const listo = avisarTrabajando(textoTrabajando || "Actualizando la lista…");
   return cargar().finally(listo);
+}
+
+// Cambiar de pestaña con un filtro puesto lo vuelve a aplicar contra la nube
+// (2026-08-05, decisión del usuario): el filtro es UNO solo para las tres
+// listas, así que buscar un pedido en PENDIENTES y saltar a PROCESADAS tiene
+// que traerlo recortado sin volver a escribirlo. Cuesta una consulta, pero
+// menos que teclear el filtro de nuevo en cada pestaña. Sin filtro puesto no
+// cuesta nada: no hay nada que re-aplicar.
+//
+// No pasa por aplicarFiltros a propósito: el filtro no cambió, así que la
+// página vigente y el escalón de histórico ya bajado de PROCESADAS se quedan
+// donde están.
+function reaplicarFiltroDeLaTab(tab) {
+  if (tab !== "pendientes" && tab !== "procesadas") return;
+  if (!filtrosActivos(tab).length) return;
+  const listo = avisarTrabajando("Aplicando el filtro…");
+  cargar().finally(listo);
 }
 
 // Limpiar fechas: vacía SOLO el rango Desde/Hasta y vuelve a la vista estándar
@@ -7290,12 +7312,17 @@ function cambiarTab(tab) {
     if (btn) btn.classList.toggle("activa", t === tab);
     $("sec-" + t).style.display = t === tab ? "" : "none";
   }
-  // El buscador aplica (y se ve) en PENDIENTES, PROCESADAS y EN REVISIÓN; las
-  // fechas Desde/Hasta y el botón de histórico son exclusivos de PROCESADAS —
+  // El buscador aplica (y se ve) en PENDIENTES y PROCESADAS; las fechas
+  // Desde/Hasta y el botón de histórico son exclusivos de PROCESADAS —
   // PENDIENTES muestra siempre todas sus facturas, sin recorte por fecha
   // (2026-07-20).
+  //
+  // EN REVISIÓN no tiene barra (2026-08-05, decisión del usuario): esa lista
+  // debería estar en poco o nada, así que filtrarla no aporta y sí engaña —
+  // un pedido escondido por un filtro se lee como "no queda ninguno por
+  // revisar". El servidor tampoco recorta esas dos listas (ver /api/facturas).
   $("filtros-barra").style.display =
-    (tab === "pendientes" || tab === "procesadas" || tab === "revision") ? "" : "none";
+    (tab === "pendientes" || tab === "procesadas") ? "" : "none";
   const fechasVisibles = tab === "procesadas" ? "" : "none";
   $("campo-desde").style.display = fechasVisibles;
   $("campo-hasta").style.display = fechasVisibles;
@@ -7307,6 +7334,7 @@ function cambiarTab(tab) {
   // Cambiar de tab cambia QUÉ filtra (las fechas y la casilla solo cuentan en
   // PROCESADAS): el aviso se repinta con los de la tab que queda a la vista.
   pintarEstadoFiltros();
+  reaplicarFiltroDeLaTab(tab);   // la lista que se abre sale ya recortada
   // DESCUENTOS, AJUSTES y ADMIN dejan bajar la página completa; las demás
   // tabs quedan encapsuladas a la ventana (solo su tabla hace scroll).
   document.body.classList.toggle("tab-libre", tab === "descuentos" || tab === "ajustes" || tab === "admin");
@@ -7651,9 +7679,21 @@ function refFacturaUbicable(pedido_id, parte) {
   return datos.length ? `${pedido_id} (${datos.join(" · ")})` : `${pedido_id}`;
 }
 
+// Consultas de lista en vuelo: manda SIEMPRE la última pedida (2026-08-05).
+// El panel tiene dos caminos que llaman a cargar() por su cuenta —el sondeo
+// del estado compartido y todo lo que dispara un filtro—, y sus respuestas
+// pueden aterrizar en desorden: la del sondeo salió con el buscador todavía
+// vacío y, si llega después, pintaba la lista COMPLETA con el filtro puesto
+// en la barra (el texto se veía guardado y la lista salía sin recortar).
+let cargaSeq = 0;
+
 async function cargar(conservarScroll = false) {
+  const mia = ++cargaSeq;
   try {
     const d = await api("/api/facturas?" + filtros());
+    // Una respuesta ya superada no pinta nada: la consulta que la desplazó
+    // trae los filtros de ahora y es la que manda.
+    if (mia !== cargaSeq) return true;
     ultimaLista = d;
     listaCargada = true;   // desde aquí el título de la ventana ya puede contar
     if (d.version) versionAsistente = d.version;
@@ -7721,6 +7761,9 @@ async function cargar(conservarScroll = false) {
     }
     return true;
   } catch (e) {
+    // El fallo de una consulta ya superada no se anuncia ni marca nada: quien
+    // dice cómo quedó la lista es la que la desplazó, que sigue en vuelo.
+    if (mia !== cargaSeq) return true;
     mensaje("No se pudo cargar la lista: " + e.message, "error");
     // Sin lista no se está viendo nada confiable, y el sondeo por su cuenta
     // no lo nota (la nube responde; lo que falló fue armar la lista). Sin
