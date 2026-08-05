@@ -6,11 +6,12 @@
      barra y en el Alt+Tab. Si cambia, hay que cambiar TITULO_VENTANA en
      src/panel/ventana_encima.py.
      Es la BASE del título: en el camino de Edge, pintarTituloVentana le agrega
-     el estado detrás ("Asistente FDA (beta) 1.0.8 — llenando 3 de 10")
-     conservando este prefijo. El "(beta)" (2026-07-28) y la versión van
-     DESPUÉS de "Asistente FDA", así el prefijo que busca ventana_encima sigue
-     matcheando; el "(beta)" se quita cuando salga de beta. -->
-<title>Asistente FDA (beta) 1.0.8</title>
+     el estado detrás ("Asistente FDA (beta) — llenando 3 de 10") conservando
+     este prefijo. El "(beta)" (2026-07-28) va DESPUÉS de "Asistente FDA", así
+     el prefijo que busca ventana_encima sigue matcheando; se quita cuando
+     salga de beta. Sin número de versión (2026-08-05, pedido del usuario):
+     era un número a mano que se desfasaba del instalador. -->
+<title>Asistente FDA (beta)</title>
 <!-- Color de la barra de título de la ventana de app de Edge (la pinta con el
      theme-color de la página): claro a propósito, para que no se confunda con
      la cabecera oscura del panel. En un navegador normal no se nota. -->
@@ -8520,7 +8521,7 @@ const pendientesLlenables = () => (ultimaLista.pendientes || []).filter(f => f.l
    ventana propia se reconoce por él para no abrir una segunda
    (ventana_app.TITULO_VENTANA) y, en el camino de Edge, ventana_encima busca
    la del panel por el prefijo del <title>. */
-const TITULO_PAGINA = "Asistente FDA (beta) 1.0.8";  // el <title> del <head>; ver ventana_encima.py
+const TITULO_PAGINA = "Asistente FDA (beta)";  // el <title> del <head>; ver ventana_encima.py
 const TITULO_FASE = {
   conectando: "buscando el programa",
   entorno: "ajustando fecha y serie",
@@ -8533,7 +8534,7 @@ const TITULO_FASE = {
 let faseActual = null;      // última fase que devolvió /api/fase_llenado
 let tituloPuesto = null;    // lo último escrito: cambiarlo es un viaje a la ventana
 let listaCargada = false;   // la lista llegó al menos una vez (ver cargar)
-let versionAsistente = "";  // instalador · commit corto; la manda /api/facturas (ver cargar)
+let versionAsistente = "";  // commit corto; lo manda /api/facturas (ver cargar)
 
 // Cuántas facturas por llenar tiene la ruta puesta (o todas juntas, sin ruta
 // elegida): SIEMPRE de pendientes_por_ruta, que el backend arma sin aplicar
