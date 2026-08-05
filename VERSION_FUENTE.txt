@@ -1,3 +1,3 @@
 Distribucion del Asistente FDA (bytecode; el codigo fuente no viaja).
-commit_fuente: 402258380fe4878fc5a08f656be32191ca1ed602
+commit_fuente: d68d3c6bf88bfa6edff630850e4dc7457800637a
 python: 3.12

@@ -2450,10 +2450,12 @@
         <label for="vendedor-select" style="margin-left:12px">Vendedor</label>
         <select id="vendedor-select" onchange="ocultarMaquinaGuardado()"
                 title="Con este código se llena el campo Vendedor de cada factura que salga de esta computadora."></select>
-        <button class="primario" onclick="guardarMaquina()">Guardar</button>
+        <button class="primario" id="maquina-guardar" onclick="guardarMaquina()">Guardar</button>
         <span class="ajustes-ok" id="maquina-guardado" style="display:none">Guardado</span>
         <span class="mut" id="vendedor-info"></span>
       </div>
+      <p class="mut" id="maquina-bloqueo" style="display:none;margin:8px 0 0">
+        Ya está configurado. Para cambiarlo hace falta un equipo con permiso de editor.</p>
       <p class="mut" style="margin:8px 0 0">
         El <b>nombre</b> es con el que las demás computadoras ven tus llenados
         en el historial; no puede repetirse con el de otra. El
@@ -2530,6 +2532,17 @@
       <p class="mut" style="margin:4px 0 10px">Los equipos marcados pueden
         editar campañas de descuento, catálogos y datos de pedidos.</p>
       <div id="editores-lista"></div>
+    </div>
+    <!-- Nombre y vendedor de los demás equipos (2026-08-05, pedido del
+         usuario): permite corregirlos sin ir hasta cada computadora y solo lo
+         ven los equipos con permiso de identidad de máquina. -->
+    <div class="ajustes-bloque" id="equipos-identidad-bloque" style="display:none">
+      <h3>Nombre y vendedor de cada computadora</h3>
+      <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
+        datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
+        próximo refresco. Los de esta computadora se cambian arriba, en
+        "Esta máquina".</p>
+      <div id="equipos-identidad-lista"></div>
     </div>
     <!-- Vista del panel (2026-08-05, solo Admin y supervisión): mirar el
          panel como lo ve cada rol. Solo baja permisos, nunca los sube, y el
@@ -3796,6 +3809,8 @@ const tienePermiso = (clave) => !!(permisosUI.permisos || {})[clave];
 const esSupervisionEfectiva = () => permisosUI.rol_efectivo === "supervisor";
 // Equipos gestionables desde AJUSTES → Editores (solo llega a los Admin).
 let equiposEditor = [];
+// Equipos cuya identidad se puede corregir desde otra computadora autorizada.
+let equiposIdentidad = [];
 // Fecha vigente del corte de producción; la repinta /api/ajustes y la usa el
 // control de ADMIN para saber si hay algo que cambiar.
 let corteProduccion = "";
@@ -13333,10 +13348,6 @@ async function cargarAjustes() {
     // Sin "equipo: …": el nombre está en el campo de al lado (2026-07-29).
     $("vendedor-info").textContent =
       d.espejo_activo ? "nube: conectada" : "nube: sin conexión";
-    // Instalación nueva (o configuración borrada para probar): el aviso sale
-    // solo, sin esperar a que el operador intente llenar algo.
-    if ((d.configuracion_pendiente || []).length && !resolverConfigMaquina)
-      abrirConfigMaquina(d.configuracion_pendiente);
     pintarDiaDespacho(d.dia_despacho);
     pintarVentanaPanel(d.ventana);
     pintarBotonesCatalogos();
@@ -13355,6 +13366,13 @@ async function cargarAjustes() {
     esMaquinaAdmin = !!d.es_maquina_admin;
     permisosUI = d.permisos_ui || permisosUI;
     equiposEditor = d.equipos_editor || [];
+    equiposIdentidad = d.equipos_identidad || [];
+    pintarBloqueoMaquina();
+    // Instalación nueva (o configuración borrada para probar): el aviso sale
+    // solo, sin esperar a que el operador intente llenar algo. Se abre después
+    // de leer los permisos porque también protege los datos ya configurados.
+    if ((d.configuracion_pendiente || []).length && !resolverConfigMaquina)
+      abrirConfigMaquina(d.configuracion_pendiente);
     // Los bloques de admin se pintan por la supervisión EFECTIVA: con "ver
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
     const supervision = esMaquinaAdmin && esSupervisionEfectiva();
@@ -13375,6 +13393,7 @@ async function cargarAjustes() {
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEditores();
+    pintarEquiposIdentidad();
     pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
@@ -13416,6 +13435,57 @@ async function cambiarEditorEquipo(dispositivo, caja) {
   } catch (e) {
     caja.checked = !caja.checked;
     mensaje("No se pudo cambiar el rol: " + e.message, "error");
+  }
+}
+
+// Identidad de las demás computadoras (2026-08-05): el backend ya recorta la
+// lista; el permiso vuelve a comprobarse aquí para que una vista reducida no
+// conserve filas pintadas con permisos anteriores.
+function pintarEquiposIdentidad() {
+  const bloque = $("equipos-identidad-bloque");
+  if (!tienePermiso("identidad_maquina") || !equiposIdentidad.length) {
+    bloque.style.display = "none";
+    $("equipos-identidad-lista").innerHTML = "";
+    return;
+  }
+  bloque.style.display = "";
+  const lista = $("equipos-identidad-lista");
+  lista.innerHTML = equiposIdentidad.map(m => `
+    <div class="ajustes-fila" style="margin:6px 0">
+      <span class="mut" style="min-width:130px;font-size:12.5px">${esc(m.dispositivo)}</span>
+      <input type="text" maxlength="40" value="${esc(m.nombre || "")}"
+             placeholder="Sin nombre" style="width:190px">
+      <select></select>
+      <button class="primario" data-dispositivo="${esc(m.dispositivo)}"
+              onclick="guardarEquipoIdentidad(this.dataset.dispositivo, this)">Guardar</button>
+    </div>`).join("");
+  lista.querySelectorAll(".ajustes-fila").forEach((fila, indice) => {
+    pintarSelectVendedores(fila.querySelector("select"),
+                            equiposIdentidad[indice].vendedor || "");
+  });
+}
+
+async function guardarEquipoIdentidad(dispositivo, boton) {
+  const fila = boton.closest(".ajustes-fila");
+  const nombre = fila.querySelector('input[type="text"]').value.trim();
+  const vendedor = fila.querySelector("select").value;
+  if (!nombre) {
+    mensaje("Escribe el nombre de la computadora.", "error");
+    return;
+  }
+  boton.disabled = true;
+  try {
+    const r = await api("/api/ajustes/equipo-identidad",
+                        {dispositivo, nombre, vendedor});
+    equiposIdentidad = r.equipos_identidad || [];
+    pintarEquiposIdentidad();
+    mensaje(r.aviso ? `Datos guardados. ${r.aviso}`
+                    : "Datos de la computadora guardados.",
+            r.aviso ? "alerta" : "info");
+  } catch (e) {
+    mensaje(e.message, "error");
+  } finally {
+    boton.disabled = false;
   }
 }
 
@@ -13605,6 +13675,18 @@ async function guardarModoViejo(activo) {
 // los dos campos, para que un "Guardado" viejo no quede confirmando otra cosa.
 let maquinaGuardadoTimer = null;
 
+function pintarBloqueoMaquina() {
+  const puedeEditar = tienePermiso("identidad_maquina");
+  const nombreBloqueado = !puedeEditar && !!(nombreMaquina || "").trim();
+  const vendedorBloqueado = !puedeEditar && !!vendedorMaquina;
+  $("maquina-nombre").disabled = nombreBloqueado;
+  $("vendedor-select").disabled = vendedorBloqueado;
+  $("maquina-guardar").style.display =
+    nombreBloqueado && vendedorBloqueado ? "none" : "";
+  $("maquina-bloqueo").style.display =
+    nombreBloqueado || vendedorBloqueado ? "" : "none";
+}
+
 function ocultarMaquinaGuardado() {
   clearTimeout(maquinaGuardadoTimer);
   $("maquina-guardado").style.display = "none";
@@ -13715,6 +13797,11 @@ function abrirConfigMaquina(falta, soloVista = false) {
   }
   $("configmaq-nombre").value = nombreMaquina || "";
   pintarSelectVendedores($("configmaq-vendedor"), vendedorMaquina);
+  const puedeEditarIdentidad = tienePermiso("identidad_maquina");
+  $("configmaq-nombre").disabled =
+    !puedeEditarIdentidad && !!(nombreMaquina || "").trim();
+  $("configmaq-vendedor").disabled =
+    !puedeEditarIdentidad && !!vendedorMaquina;
   const serieVacia = seriePredeterminada
     ? "" : `<option value="" selected>— Elige una serie —</option>`;
   $("configmaq-serie").innerHTML = serieVacia + SERIES.map(s =>
