@@ -8,7 +8,11 @@ logs/*
 !logs/.gitkeep
 reports/*
 !reports/.gitkeep
-build/
+# Con barra INICIAL a proposito: `build/` a secas ignora cualquier carpeta
+# llamada build a cualquier profundidad, y se tragaba scripts/build/ entero —
+# armar_bundle.pyc e instalador.iss se armaban pero nunca llegaban al repo de
+# distribucion (equipo admin sin poder compilar, 2026-08-06).
+/build/
 __pycache__/
 *.db
 *.sqlite3

@@ -1076,6 +1076,17 @@
                    font-size:11px; font-weight:600; cursor:pointer;
                    color:#4b5563; background:#f3f4f6; border:1px solid #d7dbe2; }
   .copiar-pedido:hover { background:#e8ebf0; }
+  /* Menú de clic derecho de los campos de texto (2026-08-06). La ventana propia
+     corre sobre WebView2 y pywebview le apaga el menú nativo fuera de modo
+     depuración, así que cortar/copiar/pegar los pinta la página. */
+  #menu-contexto { position:fixed; z-index:200; min-width:132px; padding:4px;
+                   background:#fff; border:1px solid #d7dbe2; border-radius:8px;
+                   box-shadow:0 6px 20px rgba(15,23,42,.18); }
+  #menu-contexto button { display:block; width:100%; padding:5px 10px; margin:0;
+                          border:0; border-radius:5px; background:none; font:inherit;
+                          font-size:13px; text-align:left; color:#1f2937; cursor:pointer; }
+  #menu-contexto button:hover { background:#eef2f7; }
+  #menu-contexto button[disabled] { color:#9aa2ad; background:none; cursor:default; }
   .detalle-parte { display:inline-block; padding:2px 8px; border-radius:6px;
                    font-size:12px; font-weight:700; color:#1d4ed8; background:#e8efff;
                    border:1px solid #c7d7fb; }
@@ -8336,20 +8347,43 @@ function mostrarTicketCreado(id) {
 
 // Copiado que también funciona sin permiso de portapapeles (http): cae a un
 // campo temporal, que es lo que sí acepta un navegador en contexto inseguro.
+// El respaldo se endurece para la ventana propia (2026-08-06): ahí el permiso
+// de portapapeles lo tiene que conceder el anfitrión WebView2 y pywebview no
+// lo atiende, así que la promesa se rechaza y TODO depende de este camino.
+// execCommand copia la selección del documento, y para eso el campo tiene que
+// estar enfocado de verdad: con solo select() sobre un elemento en opacity 0
+// hay motores que no le dan el foco y la copia sale vacía. Se enfoca explícito,
+// se marca readonly (evita que salte el teclado en pantalla) y se devuelve el
+// foco a donde estaba, para no dejar al operador fuera del control que tocó.
 async function copiarTextoSoporte(texto) {
   try {
     await navigator.clipboard.writeText(texto);
     return true;
   } catch (_) {
+    const previo = document.activeElement;
     const tmp = document.createElement("textarea");
     tmp.value = texto;
+    tmp.setAttribute("readonly", "");
     tmp.style.position = "fixed";
+    tmp.style.top = "0";
+    tmp.style.left = "0";
+    tmp.style.width = "1px";
+    tmp.style.height = "1px";
+    tmp.style.padding = "0";
+    tmp.style.border = "none";
     tmp.style.opacity = "0";
     document.body.appendChild(tmp);
-    tmp.select();
     let listo = false;
-    try { listo = document.execCommand("copy"); } catch (_) { listo = false; }
+    try {
+      tmp.focus({ preventScroll: true });
+      tmp.select();
+      tmp.setSelectionRange(0, String(texto).length);
+      listo = document.execCommand("copy");
+    } catch (_) { listo = false; }
     tmp.remove();
+    if (previo && previo.focus) {
+      try { previo.focus({ preventScroll: true }); } catch (_) {}
+    }
     return listo;
   }
 }
@@ -8386,6 +8420,117 @@ function copiarIdTicket(btn) {
 // se busca a mano en la aplicación de pedidos y transcribirlo se presta a error.
 function copiarNumeroPedido(btn) {
   return copiarConAviso(btn, btn.dataset.pedido || "", "Copiar");
+}
+
+// Menú de clic derecho de los campos de texto (2026-08-06, pedido del usuario:
+// el número copiado no se podía pegar con el ratón en el buscador). La ventana
+// propia corre sobre WebView2 y pywebview le apaga el menú nativo salvo en modo
+// depuración, así que sin esto el clic derecho no hace nada. Cortar y copiar van
+// por copiarTextoSoporte —el mismo camino ya probado—; pegar no puede ir por
+// navigator.clipboard, ver leerPortapapeles.
+const CAMPOS_MENU_CONTEXTO =
+  'textarea, input[type="text"], input[type="search"], input:not([type])';
+let menuCampo = null;          // campo sobre el que se abrió el menú
+let menuIni = 0, menuFin = 0;  // su selección al abrirlo: pulsar el menú la pierde
+
+function menuContextoCerrar() {
+  const menu = $("menu-contexto");
+  if (menu) menu.style.display = "none";
+  menuCampo = null;
+}
+
+document.addEventListener("contextmenu", (e) => {
+  const campo = e.target && e.target.closest
+      ? e.target.closest(CAMPOS_MENU_CONTEXTO) : null;
+  const menu = $("menu-contexto");
+  if (!campo || !menu) { menuContextoCerrar(); return; }
+  e.preventDefault();
+  menuCampo = campo;
+  menuIni = campo.selectionStart || 0;
+  menuFin = campo.selectionEnd || 0;
+  // Cortar y copiar solo tienen sentido con algo seleccionado; pegar siempre
+  // (saber si el portapapeles trae texto exigiría leerlo, y leerlo es la acción).
+  const conSeleccion = menuFin > menuIni;
+  const opciones = menu.querySelectorAll("button");
+  opciones[0].disabled = !conSeleccion || campo.readOnly;
+  opciones[1].disabled = !conSeleccion;
+  opciones[2].disabled = campo.readOnly;
+  // Se muestra oculto para medirlo y que no se salga de la ventana: durante el
+  // llenado el panel queda reducido a la barra flotante y hay muy poco sitio.
+  menu.style.visibility = "hidden";
+  menu.style.display = "block";
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  const caja = menu.getBoundingClientRect();
+  menu.style.left = Math.max(4, Math.min(e.clientX, window.innerWidth - caja.width - 4)) + "px";
+  menu.style.top = Math.max(4, Math.min(e.clientY, window.innerHeight - caja.height - 4)) + "px";
+  menu.style.visibility = "";
+});
+
+document.addEventListener("pointerdown", (e) => {
+  const menu = $("menu-contexto");
+  if (menu && menu.style.display !== "none" && !menu.contains(e.target)) menuContextoCerrar();
+}, true);
+
+// En captura y cortando la propagación: con el menú abierto, Escape lo cierra a
+// él y no al modal que haya detrás.
+document.addEventListener("keydown", (e) => {
+  const menu = $("menu-contexto");
+  if (e.key === "Escape" && menu && menu.style.display !== "none") {
+    e.stopPropagation();
+    menuContextoCerrar();
+  }
+}, true);
+document.addEventListener("scroll", menuContextoCerrar, true);
+window.addEventListener("resize", menuContextoCerrar);
+window.addEventListener("blur", menuContextoCerrar);
+
+// El portapapeles solo se puede LEER desde fuera de la página: dentro de la
+// ventana propia WebView2 rechaza navigator.clipboard.readText (el permiso lo
+// concede el anfitrión y pywebview no lo atiende), así que ahí lo lee Python.
+// Devuelve null si no hubo ninguna vía — distinto de "", que es el portapapeles
+// vacío de verdad.
+async function leerPortapapeles() {
+  const api = window.pywebview && window.pywebview.api;
+  if (api && api.leer_portapapeles) {
+    try {
+      const texto = await api.leer_portapapeles();
+      if (texto !== null && texto !== undefined) return String(texto);
+    } catch (_) {}
+  }
+  try { return await navigator.clipboard.readText(); } catch (_) { return null; }
+}
+
+async function menuContextoAccion(accion, btn) {
+  const campo = menuCampo;
+  if (!campo) { menuContextoCerrar(); return; }
+  const ini = menuIni, fin = menuFin;
+  // El foco y la selección se reponen a mano: setRangeText trabaja con índices,
+  // pero el operador tiene que quedar de vuelta en su campo, con el cursor donde
+  // corresponde y sin que la lista salte.
+  try {
+    campo.focus({ preventScroll: true });
+    campo.setSelectionRange(ini, fin);
+  } catch (_) {}
+  if (accion === "pegar") {
+    const texto = await leerPortapapeles();
+    if (texto === null) {
+      btn.textContent = "No se pudo pegar";
+      setTimeout(() => { btn.textContent = "Pegar"; menuContextoCerrar(); }, 1800);
+      return;
+    }
+    campo.setRangeText(texto, ini, fin, "end");
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+    menuContextoCerrar();
+    return;
+  }
+  const listo = await copiarTextoSoporte(campo.value.slice(ini, fin));
+  if (listo && accion === "cortar") {
+    try { campo.focus({ preventScroll: true }); } catch (_) {}
+    campo.setRangeText("", ini, fin, "end");
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  menuContextoCerrar();
 }
 
 function pintarNube() {
@@ -20497,5 +20642,14 @@ if (new URLSearchParams(window.location.search).get("ver_configuracion") === "1"
   Promise.all([cargaInicial, ajustesInicial]).then(() => abrirConfigMaquina([], true));
 }
 </script>
+<!-- Menú de clic derecho de los campos de texto (2026-08-06). Va al final del
+     documento para quedar sobre todo lo demás; el JS lo busca al abrirlo, no
+     al cargar. El preventDefault del mousedown evita que el campo pierda el
+     foco al pulsar una opción. -->
+<div id="menu-contexto" style="display:none" onmousedown="event.preventDefault()">
+  <button type="button" onclick="menuContextoAccion('cortar', this)">Cortar</button>
+  <button type="button" onclick="menuContextoAccion('copiar', this)">Copiar</button>
+  <button type="button" onclick="menuContextoAccion('pegar', this)">Pegar</button>
+</div>
 </body>
 </html>
