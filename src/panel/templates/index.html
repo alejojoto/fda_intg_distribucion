@@ -14453,19 +14453,21 @@ let acceso = {estado: "activo"};
 let accesoSondeo = null;
 
 const ACCESO_TAPA = ["sin_credencial", "desconocido", "pendiente",
-                     "rechazado", "desactivado"];
+                     "rechazado", "desactivado", "olvidado"];
 
 function pintarAcceso() {
   const estado = acceso.estado || "activo";
   const tapa = ACCESO_TAPA.includes(estado);
   $("acceso-overlay").classList.toggle("visible", tapa);
   if (!tapa) { detenerSondeoAcceso(); return; }
-  const pideNombre = estado === "sin_credencial" || estado === "desconocido";
+  const pideNombre = estado === "sin_credencial" || estado === "desconocido"
+    || estado === "olvidado";
   $("acceso-form").style.display = pideNombre ? "" : "none";
   $("acceso-espera").style.display = estado === "pendiente" ? "flex" : "none";
   const titulo = {
     sin_credencial: "Activa esta computadora",
     desconocido: "Activa esta computadora",
+    olvidado: "Registra esta computadora de nuevo",
     pendiente: "Esperando activación",
     rechazado: "Esta computadora no fue activada",
     desactivado: "Esta computadora ya no tiene acceso",
@@ -14476,6 +14478,9 @@ function pintarAcceso() {
       + "computadora queda lista.",
     desconocido: "Ponle un nombre a esta computadora y pide la activación: un "
       + "administrador la aprueba y queda lista.",
+    olvidado: "Un administrador olvidó el registro de esta computadora, así "
+      + "que debe registrarse otra vez. Ponle un nombre y pide la "
+      + "activación; su configuración de siempre no se pierde.",
     pendiente: "Ya se pidió la activación. En cuanto un administrador la "
       + "apruebe, esta pantalla se quita sola y podrás terminar de "
       + "configurarla — no hace falta cerrar ni volver a abrir el asistente.",
@@ -14592,6 +14597,10 @@ function pintarUnaSolicitud(s) {
     : "";
   const motivo = s.motivo_rechazo || s.motivo_desactivacion;
   const enEspera = estado === "pendiente";
+  const olvidar = `<button class="secundario" title="Su próxima apertura
+        vuelve a pedir nombre y aprobación, como una instalación nueva; su
+        configuración no se pierde."
+        onclick="olvidarEquipo(this, '${host}')">Olvidar</button>`;
   const acciones = enEspera
     ? `<input type="text" id="sol-nombre-${host}" maxlength="40"
               value="${nombre}" placeholder="Nombre de la computadora">
@@ -14599,8 +14608,8 @@ function pintarUnaSolicitud(s) {
        <button class="secundario" onclick="rechazarEquipo(this, '${host}')">Rechazar</button>`
     : (s.estado === "activo"
         ? `<button class="secundario"
-                   onclick="desactivarEquipo(this, '${host}')">Quitar acceso</button>`
-        : `<button class="primario" onclick="activarEquipo('${host}')">Activar</button>`);
+                   onclick="desactivarEquipo(this, '${host}')">Quitar acceso</button>${olvidar}`
+        : `<button class="primario" onclick="activarEquipo('${host}')">Activar</button>${olvidar}`);
   return `<div class="solicitud">
     <div class="solicitud-cab">
       <b>${nombre || host}</b>
@@ -14654,6 +14663,19 @@ function desactivarEquipo(btn, host) {
       mensaje("No se pudo quitar el acceso: " + e.message, "error");
     }
   }, "Confirmar quitar acceso");
+}
+
+function olvidarEquipo(btn, host) {
+  confirmarBorrar(btn, async () => {
+    try {
+      await api("/api/acceso/olvidar", {dispositivo: host});
+      mensaje(`La computadora ${host} quedó olvidada: en su próxima apertura `
+        + `vuelve a pedir nombre y aprobación.`, "ok");
+      await cargarSolicitudesAcceso();
+    } catch (e) {
+      mensaje("No se pudo olvidar: " + e.message, "error");
+    }
+  }, "Confirmar olvidar");
 }
 
 async function enviarSolicitudAcceso() {
