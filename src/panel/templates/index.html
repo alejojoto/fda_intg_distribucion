@@ -3076,6 +3076,7 @@
     <pre id="diag-sync-texto"></pre>
     <div class="editor-acciones">
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
+      <button type="button" id="diag-sync-copiar" onclick="copiarInformeSync(this)">Copiar informe</button>
       <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
       <button type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
@@ -6613,6 +6614,7 @@ const SUP_PROBLEMAS = {
   outbox_acumulado: "cambios sin subir",
   choques: "choques",
   nube: "error de nube",
+  no_actualiza: "no se actualiza",
   sync_degradada: "sync degradada",
   atraso_cursor: "atrasada",
   modo_prueba: "modo prueba",
@@ -7281,6 +7283,8 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         <div style="margin:6px 0">
           <button type="button" id="sup-log-boton" style="display:none"
                   onclick="pedirLogEquipo()">Traer el log</button>
+          <button type="button" id="sup-log-copiar" style="display:none"
+                  onclick="copiarLogEquipo(this)">Copiar el log</button>
         </div>
         <pre class="sup-pre" id="sup-log-texto" style="display:none"></pre>
       </div>
@@ -7341,9 +7345,24 @@ function mostrarBotonLog(texto) {
   btn.textContent = texto;
 }
 
+function mostrarCopiarLog(visible) {
+  const btn = $("sup-log-copiar");
+  if (btn) btn.style.display = visible ? "" : "none";
+}
+
+// El log copiado lleva de qué equipo salió: pegado en un ticket o en un chat,
+// el texto solo no dice a qué máquina pertenece.
+function copiarLogEquipo(btn) {
+  const pre = $("sup-log-texto");
+  const texto = [`Log de ${supLogDispositivo || "?"}`, "",
+                 pre ? pre.textContent : ""].join("\n");
+  return copiarConAviso(btn, texto, "Copiar el log");
+}
+
 function pintarLogEquipo(fila) {
   const est = $("sup-log-estado"), pre = $("sup-log-texto");
   if (!est || !pre) return;
+  mostrarCopiarLog(false);   // solo hay algo que copiar con el log ya recibido
   if (!fila) {
     est.textContent = "El equipo manda el final de su log al pedirlo; tarda "
       + "hasta un minuto en responder.";
@@ -7378,6 +7397,7 @@ function pintarLogEquipo(fila) {
   est.textContent = `Recibido ${supFechaCorta(fila.entregado_en)} · ${
     fila.lineas || 0} líneas (el final del log).`;
   mostrarBotonLog("Actualizar el log");
+  mostrarCopiarLog(true);
   pre.textContent = fila.log || "";
   pre.style.display = "";
   pre.scrollTop = pre.scrollHeight;
@@ -8312,6 +8332,12 @@ function copiarTicket(btn) {
     $("diag-sync-texto").textContent,
   ].join("\n");
   return copiarConAviso(btn, texto, "Copiar informe");
+}
+
+// El mismo informe que se ve en pantalla, para pegarlo donde se pueda avisar
+// sin depender de que el ticket llegue a la nube.
+function copiarInformeSync(btn) {
+  return copiarConAviso(btn, $("diag-sync-texto").textContent, "Copiar informe");
 }
 
 function copiarIdTicket(btn) {
@@ -12716,7 +12742,13 @@ const babyMixControl = (grupo) => {
 // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
 // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
 // De solo lectura: se cambia en ADMIN, no a un clic de llenar.
+// El radio NO alcanza como señal (2026-08-06): su valor por defecto es 999 y el
+// backend manda las opciones de prueba a TODA máquina, así que en una
+// instalación limpia queda marcado aunque la prueba esté apagada — el rótulo
+// decía "999 (prueba)" en un equipo que factura contra la 001. Manda el modo
+// efectivo, que es lo que selectors.aplicar_opciones_prueba usa de verdad.
 const cajitaEmpresa = () => {
+  if (!modoImplantacion) return "";
   const p999 = $("prueba-emp-999");
   return (p999 && p999.checked) ? cajitaFija("Empresa", "999 (prueba)", true) : "";
 };
