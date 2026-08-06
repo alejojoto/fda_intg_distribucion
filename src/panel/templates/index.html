@@ -14869,12 +14869,12 @@ function pintarEquipos() {
     return `<tr>
       <td class="equipos-host">${host}</td>
       <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
-                 placeholder="Sin nombre" ${puedeIdentidad ? "" : "disabled"}></td>
-      <td><select ${puedeIdentidad ? "" : "disabled"}></select></td>
+                 placeholder="Sin nombre" ${puedeIdentidad
+                   ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></td>
+      <td><select ${puedeIdentidad
+                   ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></select></td>
       ${puedeRol ? editor : ""}
       ${puedeActivar ? activa : ""}
-      <td>${puedeIdentidad ? `<button class="primario"
-              onclick="guardarEquipoIdentidad('${host}', this)">Guardar</button>` : ""}</td>
     </tr>`;
   }).join("");
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
@@ -14883,7 +14883,6 @@ function pintarEquipos() {
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
-      <th></th>
     </tr></thead>
     <tbody>${filas}</tbody></table>`;
   $("equipos-lista").querySelectorAll("tbody tr").forEach((fila, indice) => {
@@ -14984,15 +14983,18 @@ async function cambiarActivaEquipo(dispositivo, caja) {
   }
 }
 
-async function guardarEquipoIdentidad(dispositivo, boton) {
-  const fila = boton.closest("tr");
+// Sin botón Guardar (2026-08-06, pedido del usuario): nombre y vendedor
+// guardan al salir del campo o elegir en el selector. Tras un error NO se
+// repinta: lo tecleado queda a la vista para corregirlo.
+async function guardarEquipoIdentidad(dispositivo, control) {
+  const fila = control.closest("tr");
   const nombre = fila.querySelector('input[type="text"]').value.trim();
   const vendedor = fila.querySelector("select").value;
   if (!nombre) {
     mensaje("Escribe el nombre de la computadora.", "error");
     return;
   }
-  boton.disabled = true;
+  control.disabled = true;
   try {
     const r = await api("/api/ajustes/equipo-identidad",
                         {dispositivo, nombre, vendedor});
@@ -15004,7 +15006,7 @@ async function guardarEquipoIdentidad(dispositivo, boton) {
   } catch (e) {
     mensaje(e.message, "error");
   } finally {
-    boton.disabled = false;
+    control.disabled = false;
   }
 }
 
