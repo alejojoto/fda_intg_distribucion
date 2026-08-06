@@ -6384,8 +6384,10 @@ function filtroBusquedaDinamico() {
 // 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
 // así que esto solo decide qué se pinta.
 let exigeRuta = false;
+// El vendedor tiene una sola ruta asignada, así que no hay entre qué elegir.
+let rutaFija = false;
 // Este catálogo llega sin esperar la carga de pedidos, que tarda segundos.
-let rutasConocidas = [];
+let rutasOfrecidas = [];
 const nombreRuta = (r) => r.replace(/^ruta\s+/i, "");
 
 // Cómo se nombra una ruta en un menú o en un botón: corto, como el dropdown.
@@ -6410,9 +6412,15 @@ function pendientesFueraDeLaRuta() {
 // misma "Hacer predeterminada la ruta actual", elegida con "Todas" puesto,
 // BORRABA la ruta guardada sin avisar — pasó el 19-jul, 16 segundos después de
 // fijarla, y desde entonces el panel abría sin filtro.
+function opcionHacerPredetRuta() {
+  return (rutaSeleccionada && rutaSeleccionada !== rutaPredeterminada)
+    ? `<option value="${HACER_PREDET}">★ Hacer predeterminada la ruta actual</option>`
+    : "";
+}
+
 function opcionRutaPredet() {
-  if (rutaSeleccionada && rutaSeleccionada !== rutaPredeterminada)
-    return `<option value="${HACER_PREDET}">★ Hacer predeterminada la ruta actual</option>`;
+  const hacer = opcionHacerPredetRuta();
+  if (hacer) return hacer;
   if (rutaPredeterminada)
     return `<option value="${QUITAR_PREDET}">Quitar la ruta predeterminada (${
       esc(etiquetaRutaCorta(rutaPredeterminada))})</option>`;
@@ -6420,16 +6428,22 @@ function opcionRutaPredet() {
 }
 
 function pintarRutas(rutas, haySinRuta) {
-  // Quien no puede ver todas las rutas trabaja dentro de la suya: el selector
-  // pierde "Todas" y las opciones de predeterminada (2026-08-05). Cambiar de
-  // ruta sigue siendo suyo — lo que no existe es no elegir ninguna.
+  // Cambiar de ruta sigue siendo suyo y, desde el 2026-08-06, también cuál
+  // abre el panel: la que eligió al instalar no queda clavada. Nunca se ofrece
+  // QUITAR la predeterminada porque sin ruta no puede trabajar y el servidor
+  // rechaza la ruta vacía. Con una sola asignada, el desplegable se bloquea.
+  $("f-ruta").disabled = exigeRuta && rutaFija;
   if (exigeRuta) {
     const opcionesUna = (rutas || []).map(r => [r, nombreRuta(r)]);
-    if (rutaSeleccionada && !opcionesUna.some(([v]) => v === rutaSeleccionada))
+    // Con la ruta fija no se cuela la que estuviera puesta: si dejó de ser
+    // suya, ofrecerla sería ofrecerle trabajo que no le toca.
+    if (!rutaFija && rutaSeleccionada
+        && !opcionesUna.some(([v]) => v === rutaSeleccionada))
       opcionesUna.push([rutaSeleccionada, etiquetaRutaCorta(rutaSeleccionada)]);
     $("f-ruta").innerHTML = opcionesUna.map(([valor, texto]) => `
       <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
-        ${esc(texto)}</option>`).join("");
+        ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
+      + (rutaFija ? "" : opcionHacerPredetRuta());
     return;
   }
   const opciones = [["", "Todas"], ...(rutas || []).map(r => [r, nombreRuta(r)])];
@@ -14491,7 +14505,8 @@ async function cargarAjustes() {
     equipos = d.equipos_gestionables || [];
     maquinaDesactivada = !!d.maquina_desactivada;
     exigeRuta = !!d.exige_ruta;
-    rutasConocidas = d.rutas_conocidas || [];
+    rutasOfrecidas = d.rutas_ofrecidas || [];
+    rutaFija = !!d.ruta_fija;
     accesoGestion = !!d.acceso_gestion;
     acceso = d.acceso || acceso;
     pintarDesactivada();
@@ -15314,7 +15329,7 @@ let vistaPreviaConfigMaquina = false;
 // el desplegable salía vacío y, como la ruta es obligatoria y esta pantalla no
 // tiene salida, la computadora quedaba trancada (reporte del usuario 2026-08-06).
 function rutasParaConfigMaquina() {
-  return [...new Set([...(rutasConocidas || []),
+  return [...new Set([...(rutasOfrecidas || []),
                       ...(ultimaLista.rutas || []),
                       ...Object.keys(rutasSeriesConfig || {})])].sort();
 }
@@ -15327,6 +15342,12 @@ function pintarRutaConfigMaquina() {
   const rutas = rutasParaConfigMaquina();
   const sel = $("configmaq-ruta");
   const nota = $("configmaq-ruta-nota");
+  if (rutaFija && rutas.length === 1) {
+    sel.innerHTML = `<option value="${esc(rutas[0])}" selected>${esc(nombreRuta(rutas[0]))}</option>`;
+    sel.disabled = true;
+    nota.textContent = "Es la ruta asignada a tu vendedor: se factura con ella.";
+    return;
+  }
   if (!rutas.length) {
     sel.innerHTML = `<option value="">(todavía no hay rutas)</option>`;
     sel.disabled = true;
@@ -15340,8 +15361,8 @@ function pintarRutaConfigMaquina() {
   sel.innerHTML = vacia + rutas.map(r =>
     `<option value="${esc(r)}" ${r === rutaPredeterminada ? "selected" : ""}
       >${esc(nombreRuta(r))}</option>`).join("");
-  nota.textContent = "Esta computadora factura una ruta a la vez; puedes cambiarla "
-    + "en la barra del panel cuando termines con ella.";
+  nota.textContent = "Queda como la ruta con la que abre el panel; puedes cambiarla en la "
+    + "barra cuando termines con ella.";
 }
 
 // La carga de pedidos llega después de que el formulario abrió: mientras no se
