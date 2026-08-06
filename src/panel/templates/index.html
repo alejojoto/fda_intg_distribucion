@@ -3655,14 +3655,19 @@
     <p id="acceso-error"></p>
     <div id="acceso-form" style="display:none">
       <label for="acceso-nombre" style="font-size:13px; font-weight:600;
-             display:block; margin-bottom:6px">Nombre de esta computadora</label>
-      <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2">
+             display:block; margin-bottom:6px">Nombre de esta computadora
+        <span class="mut" style="font-weight:400">(obligatorio)</span></label>
+      <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2"
+             oninput="pintarBotonSolicitud()">
       <p class="mut" style="margin:6px 0 0; font-size:12.5px">
         Es el nombre con el que el administrador la reconoce al aprobarla, y
         con el que después aparecen tus llenados en el historial de las demás.</p>
-      <div class="editor-acciones" style="margin-top:16px">
-        <button class="primario" id="acceso-enviar"
+      <div class="editor-acciones" style="margin-top:16px; align-items:center">
+        <button class="primario" id="acceso-enviar" disabled
                 onclick="enviarSolicitudAcceso()">Pedir activación</button>
+        <span class="mut" id="acceso-falta-nombre" style="font-size:12.5px">
+          Escribe primero el nombre: sin él no se puede pedir la
+          activación.</span>
       </div>
     </div>
     <div id="acceso-espera" style="display:none">
@@ -3691,13 +3696,6 @@
       <select id="configmaq-vendedor"></select>
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
         Va en el campo Vendedor de cada factura que salga de aquí.</p>
-    </div>
-    <div class="configmaq-campo" id="configmaq-campo-ruta" style="display:none">
-      <label for="configmaq-ruta">Ruta con la que trabajas</label>
-      <select id="configmaq-ruta"></select>
-      <p class="mut" id="configmaq-ruta-nota" style="margin:4px 0 0; font-size:12.5px">
-        Esta computadora factura una ruta a la vez; puedes cambiarla en la
-        barra del panel cuando termines con ella.</p>
     </div>
     <div class="configmaq-campo">
       <label>Día de despacho de esta computadora</label>
@@ -5176,6 +5174,10 @@ async function api(ruta, cuerpo) {
     if (datos && datos.codigo === "esperando_activacion" && datos.acceso) {
       acceso = {...datos.acceso, sin_conexion: false};
       pintarAcceso();
+      // Y se reconsulta el estado VIVO en el acto (2026-08-06): si este 409
+      // venía viejo (la aprobación llegó mientras viajaba), el sondeo lo
+      // corrige solo; si el bloqueo es real, lo confirma.
+      setTimeout(sondearAcceso, 0);
     }
     // Mismo trato para la desactivación por catálogo (2026-08-06): el 403
     // de "fuera de servicio" tapa el panel entero en el acto.
@@ -6446,7 +6448,12 @@ function pintarRutas(rutas, haySinRuta) {
     if (!rutaFija && rutaSeleccionada
         && !opcionesUna.some(([v]) => v === rutaSeleccionada))
       opcionesUna.push([rutaSeleccionada, etiquetaRutaCorta(rutaSeleccionada)]);
-    $("f-ruta").innerHTML = opcionesUna.map(([valor, texto]) => `
+    // Sin ruta elegida todavía (la configuración inicial ya no la pide,
+    // 2026-08-06) el desplegable abre en un "elige" no re-eligible: la lista
+    // está filtrada a nada hasta que el operador escoja la suya.
+    const vacia = rutaSeleccionada
+      ? "" : `<option value="" disabled selected>— Elige tu ruta —</option>`;
+    $("f-ruta").innerHTML = vacia + opcionesUna.map(([valor, texto]) => `
       <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
         ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
       + (rutaFija ? "" : opcionHacerPredetRuta());
@@ -6560,6 +6567,18 @@ async function cambioRuta(valor) {
     return;
   }
   rutaSeleccionada = valor;
+  // Para quien factura una ruta a la vez el desplegable ES su ruta de
+  // trabajo: se guarda al elegir (2026-08-06), porque el servidor filtra por
+  // la ruta guardada de esta máquina, no por el parámetro del navegador — y
+  // la configuración inicial ya no la pide.
+  if (exigeRuta && valor) {
+    try {
+      const r = await api("/api/ajustes/ruta", {ruta: valor});
+      rutaPredeterminada = r.ruta_predeterminada;
+    } catch (e) {
+      mensaje(e.message, "error");
+    }
+  }
   // La serie se resuelve según la config de ESTA ruta (AJUSTES → Rutas) antes
   // de aplicar el filtro: si la ruta nueva tiene predeterminada, se elige
   // sola; si solo restringe, se limpia lo que quedó fuera (ver pintarSeries).
@@ -6780,18 +6799,22 @@ function supFilaEquipo(equipo, sinDatos) {
   const tRelease = Date.parse(equipo.fecha_release || "");
   const atrasada = !sinDatos && !equipo.modo_admin && Number.isFinite(tRelease)
     && tRelease < supReleaseMasNuevo();
-  // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
-  // lo único que se conseguiría es perderle el nombre y el rol.
+  // Borrar no se ofrece en el equipo propio (volvería en el próximo latido y
+  // lo único que se conseguiría es perderle el nombre y el rol) NI en uno con
+  // el acceso vigente (2026-08-06): borrar esa ficha lo dejaría operando sin
+  // nombre ni rol — para sacarlo está Olvidar o quitarle Activa, y el backend
+  // repite este mismo candado.
   const propio = equipo.dispositivo === supDispositivoPropio;
+  const conAccesoVigente = !!equipo.acceso && equipo.acceso !== "sin_registro";
   const accion =
     (sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
       host}')">Ver detalle</button> `)
-    + (propio ? "" : `<button type="button" class="peligro"
+    + (propio || conAccesoVigente ? "" : `<button type="button" class="peligro"
         title="Lo saca de esta lista. El histórico de lo que llenó se conserva; esas facturas vuelven a mostrar su nombre técnico."
         onclick="borrarEquipoSupervision(this, '${host}')">Borrar</button>`);
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
-    <td>${supEstadoEquipo(equipo, sinDatos)}</td>
+    <td>${supEstadoEquipo(equipo, sinDatos)}${notaAccesoEquipo(equipo)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
       !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}${
       !sinDatos && equipo.fecha_release
@@ -6803,6 +6826,18 @@ function supFilaEquipo(equipo, sinDatos) {
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
+}
+
+// El registro de ACCESO (credencial/autorización) es otra fuente de verdad
+// que el latido: esta nota solo aparece cuando contradice la vida normal del
+// equipo — activa no dice nada, y sin dato (nube caída) tampoco.
+function notaAccesoEquipo(equipo) {
+  const textos = {pendiente: "acceso: esperando activación",
+                  desactivado: "acceso: quitado",
+                  rechazado: "acceso: rechazado",
+                  sin_registro: "acceso: sin registro (debe registrarse)"};
+  const texto = textos[equipo.acceso];
+  return texto ? `<div class="mut">${esc(texto)}</div>` : "";
 }
 
 // Roles y permisos tal como los mandó el servidor (src/roles.py). La pantalla
@@ -7903,7 +7938,6 @@ async function cargar(conservarScroll = false) {
       }
     }
     pintarRutas(d.rutas, d.hay_sin_ruta);
-    refrescarRutasConfigMaquina();
     dispositivoPropio = d.dispositivo_propio || "";
     pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
@@ -9862,6 +9896,14 @@ function pintarPendientes(familias) {
 // el día. El aviso dice qué ruta se quedó sin trabajo, cuánto queda fuera y trae
 // el cambio de ruta resuelto aquí mismo — un botón por ruta con su cuenta.
 function avisoPendientesVacio() {
+  // La bajada inicial de la nube todavía no aterriza (instalación nueva):
+  // no es que no haya trabajo, es que aún no se puede clasificar.
+  if (ultimaLista.catalogos_pendientes)
+    return "Bajando los datos de la nube… la lista aparece sola en un momento.";
+  // Sin ruta elegida no se muestra nada a quien factura una ruta a la vez:
+  // el selector Ruta de la barra es donde se escoge (y queda guardada).
+  if (exigeRuta && !rutaSeleccionada)
+    return "Elige la ruta con la que trabajas en el selector Ruta, arriba.";
   const porRuta = ultimaLista.pendientes_por_ruta || {};
   const otras = Object.entries(porRuta)
     .filter(([r, n]) => r !== rutaSeleccionada && n > 0)
@@ -14634,7 +14676,18 @@ function pintarAcceso() {
     : (nombre ? `Nombre pedido: ${nombre}` : "");
   if (pideNombre && nombre && !$("acceso-nombre").value)
     $("acceso-nombre").value = nombre;
+  if (pideNombre) pintarBotonSolicitud();
   arrancarSondeoAcceso();
+}
+
+// El nombre es OBLIGATORIO para pedir la activación (2026-08-06): sin él el
+// botón queda deshabilitado — antes se podía pulsar y el rechazo se veía tan
+// discreto que parecía que no pasaba nada. El aviso al lado del botón dice
+// POR QUÉ está deshabilitado y desaparece en cuanto hay nombre.
+function pintarBotonSolicitud() {
+  const falta = !$("acceso-nombre").value.trim();
+  $("acceso-enviar").disabled = falta;
+  $("acceso-falta-nombre").style.display = falta ? "" : "none";
 }
 
 function arrancarSondeoAcceso() {
@@ -14648,7 +14701,11 @@ function detenerSondeoAcceso() {
   accesoSondeo = null;
 }
 
+let sondeoAccesoEnVuelo = false;
+
 async function sondearAcceso() {
+  if (sondeoAccesoEnVuelo) return;   // sin ráfagas: un viaje a la vez
+  sondeoAccesoEnVuelo = true;
   try {
     const r = await api("/api/acceso/estado");
     const eraTapado = ACCESO_TAPA.includes(acceso.estado);
@@ -14661,14 +14718,20 @@ async function sondearAcceso() {
       pintarDesactivada();
     }
     // Recién activada: el nombre ya quedó puesto por el servidor, así que se
-    // recarga todo y el formulario pide únicamente lo que falta.
+    // recarga todo y el formulario pide únicamente lo que falta. El mensaje
+    // REEMPLAZA al último banner de error (2026-08-06): el "no se pudo
+    // cargar la lista: esperando activación" del sondeo anterior es pegajoso
+    // y quedaba contradiciendo a la activación ya hecha.
     if (eraTapado && !ACCESO_TAPA.includes(r.estado)) {
       await cargarAjustes();
       cargar();
+      mensaje("Esta computadora quedó activa.", "info");
     }
   } catch (e) {
     $("acceso-datos").textContent =
       "Sin conexión con el servidor; se sigue intentando.";
+  } finally {
+    sondeoAccesoEnVuelo = false;
   }
 }
 
@@ -14841,7 +14904,7 @@ async function enviarSolicitudAcceso() {
   } catch (e) {
     error(e.message);
   } finally {
-    boton.disabled = false;
+    pintarBotonSolicitud();
   }
 }
 
@@ -15326,7 +15389,6 @@ const CONFIGMAQ_TEXTOS = {
   nombre: "el nombre de esta computadora",
   vendedor: "el vendedor con el que facturas",
   dia_despacho: "si facturas para hoy o para mañana",
-  ruta: "la ruta con la que trabajas",
 };
 let resolverConfigMaquina = null;
 // Vista previa (?ver_configuracion=1, 2026-07-31): la misma pantalla, pero
@@ -15335,56 +15397,10 @@ let resolverConfigMaquina = null;
 // dato roto de por medio.
 let vistaPreviaConfigMaquina = false;
 
-// Rutas que puede ofrecer la configuración obligatoria: el catálogo que manda
-// /api/ajustes unido a lo que ya haya traído la lista de pedidos. La unión
-// existe porque esa carga tarda segundos y el formulario abre antes: sin ella
-// el desplegable salía vacío y, como la ruta es obligatoria y esta pantalla no
-// tiene salida, la computadora quedaba trancada (reporte del usuario 2026-08-06).
-function rutasParaConfigMaquina() {
-  return [...new Set([...(rutasOfrecidas || []),
-                      ...(ultimaLista.rutas || []),
-                      ...Object.keys(rutasSeriesConfig || {})])].sort();
-}
-
-// Sin ninguna ruta conocida el campo lo dice y no exige nada (guardarConfigMaquina
-// hace lo mismo): no se puede pedir que se elija entre cero opciones.
-function pintarRutaConfigMaquina() {
-  $("configmaq-campo-ruta").style.display = exigeRuta ? "" : "none";
-  if (!exigeRuta) return;
-  const rutas = rutasParaConfigMaquina();
-  const sel = $("configmaq-ruta");
-  const nota = $("configmaq-ruta-nota");
-  if (rutaFija && rutas.length === 1) {
-    sel.innerHTML = `<option value="${esc(rutas[0])}" selected>${esc(nombreRuta(rutas[0]))}</option>`;
-    sel.disabled = true;
-    nota.textContent = "Es la ruta asignada a tu vendedor: se factura con ella.";
-    return;
-  }
-  if (!rutas.length) {
-    sel.innerHTML = `<option value="">(todavía no hay rutas)</option>`;
-    sel.disabled = true;
-    nota.textContent = "Las rutas todavía no han cargado: esta computadora abre "
-      + "sin ruta fija y la eliges en la barra del panel en cuanto aparezcan.";
-    return;
-  }
-  sel.disabled = false;
-  const vacia = rutaPredeterminada
-    ? "" : `<option value="" selected>— Elige una ruta —</option>`;
-  sel.innerHTML = vacia + rutas.map(r =>
-    `<option value="${esc(r)}" ${r === rutaPredeterminada ? "selected" : ""}
-      >${esc(nombreRuta(r))}</option>`).join("");
-  nota.textContent = "Queda como la ruta con la que abre el panel; puedes cambiarla en la "
-    + "barra cuando termines con ella.";
-}
-
-// La carga de pedidos llega después de que el formulario abrió: mientras no se
-// haya elegido ruta, sus opciones se rehacen con lo que acaba de llegar. Nunca
-// pisa una elección ya hecha.
-function refrescarRutasConfigMaquina() {
-  if (!$("configmaq-overlay").classList.contains("visible")) return;
-  if (!exigeRuta || $("configmaq-ruta").value) return;
-  pintarRutaConfigMaquina();
-}
+// La ruta ya no forma parte de esta pantalla (2026-08-06, regla del usuario):
+// en una instalación nueva el catálogo de rutas llega después de que el
+// formulario abre, así que se elige en la barra del panel — el aviso de la
+// lista vacía manda al selector Ruta hasta que se escoja una.
 
 // Devuelve una promesa que resuelve true cuando quedó configurada. Quien la
 // espera (el llenado) puede seguir sin que el operador repita la acción.
@@ -15410,7 +15426,6 @@ function abrirConfigMaquina(falta, soloVista = false) {
     !puedeEditarIdentidad && !!(nombreMaquina || "").trim();
   $("configmaq-vendedor").disabled =
     !puedeEditarIdentidad && !!vendedorMaquina;
-  pintarRutaConfigMaquina();
   document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
     r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
   });
@@ -15421,7 +15436,6 @@ function abrirConfigMaquina(falta, soloVista = false) {
   const foco = {
     nombre: () => $("configmaq-nombre"),
     vendedor: () => $("configmaq-vendedor"),
-    ruta: () => $("configmaq-ruta"),
     dia_despacho: () => document.querySelector("input[name=configmaq-dia]"),
   };
   setTimeout(() => (foco[pendientes[0]] || foco.nombre)().focus(), 50);
@@ -15461,12 +15475,8 @@ async function guardarConfigMaquina() {
     $("configmaq-error").textContent = texto;
     $("configmaq-error").style.display = "";
   };
-  const ruta = exigeRuta ? $("configmaq-ruta").value : null;
   if (!nombre) return error("Escribe el nombre de esta computadora.");
   if (!codigo) return error("Elige el vendedor con el que factura esta computadora.");
-  // Solo se exige la ruta si hay alguna que ofrecer (ver pintarRutaConfigMaquina).
-  if (exigeRuta && !ruta && rutasParaConfigMaquina().length)
-    return error("Elige la ruta con la que trabaja esta computadora.");
   if (!radioDia) return error("Elige si esta computadora factura para hoy o para mañana.");
   const boton = $("configmaq-guardar");
   boton.disabled = true;
@@ -15479,13 +15489,6 @@ async function guardarConfigMaquina() {
     if (codigo !== (vendedorMaquina || "")) {
       const r = await api("/api/ajustes/vendedor", {codigo});
       vendedorMaquina = codigo;
-      configPendiente = r.configuracion_pendiente || [];
-    }
-    if (ruta && (ruta !== (rutaPredeterminada || "")
-                 || configPendiente.includes("ruta"))) {
-      const r = await api("/api/ajustes/ruta", {ruta});
-      rutaPredeterminada = r.ruta_predeterminada;
-      rutaSeleccionada = r.ruta_predeterminada;
       configPendiente = r.configuracion_pendiente || [];
     }
     const dia = radioDia.value;
