@@ -2782,7 +2782,7 @@
            reciente que 1.0 si un envío nuevo falla. -->
       <div class="ajustes-fila">
         <b class="rotulo">Versión estable:</b>
-        <select id="version-estable-sel" onchange="guardarVersionEstable(this.value)"
+        <select id="version-estable-sel" onchange="onCambioVersionEstable(this)"
                 title="La versión que corren todas las computadoras de producción. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
           <option value="actual">Actual</option>
           <option value="1.1">1.1 — Release estable del 2026-08-05</option>
@@ -15177,6 +15177,21 @@ function pintarVersionEstable(version) {
   $("version-estable-sel").value = versionEstablePintada;
   $("version-estable-nota").style.display =
     versionEstablePintada === VERSION_ACTUAL ? "none" : "";
+}
+
+// Elegir otra versión mueve a TODAS las computadoras de producción, y un
+// selector se corre solo con la rueda del ratón o una flecha del teclado
+// (pedido del usuario 2026-08-06). El selector vuelve enseguida a la versión
+// vigente —no se adelanta a un guardado que todavía no ocurrió— y el cambio se
+// manda recién al confirmar. Como el selector se esconde mientras se pregunta,
+// la etiqueta dice en qué versión van a quedar.
+function onCambioVersionEstable(sel) {
+  const querida = sel.value;
+  if (querida === versionEstablePintada) return;
+  pintarVersionEstable(versionEstablePintada);
+  confirmarSinQuitar(sel, () => guardarVersionEstable(querida),
+    querida === VERSION_ACTUAL ? "Confirmar: todas al día"
+                               : `Confirmar: todas a la ${querida}`);
 }
 
 async function guardarVersionEstable(version) {
