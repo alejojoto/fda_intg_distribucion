@@ -22,7 +22,12 @@
 <link rel="icon" type="image/svg+xml" href="/assets/icono.svg">
 <link rel="alternate icon" href="/assets/icono.ico">
 <style>
+  /* --bor se usaba desde el bloque de activación (2026-08-05) sin estar
+     definida: un `border:1px solid var(--bor)` con la variable vacía no pinta
+     borde ninguno, y por eso la tarjeta de activación y las de AJUSTES →
+     Computadoras salían sin recuadro. */
   :root { --ok:#1a7f37; --err:#b42318; --warn:#b54708; --mut:#667085;
+    --bor:#c3c9d4;
     /* Cursor de "esto no responde" (2026-08-01): la flecha se queda flecha y
        la insignia de prohibido va pegada abajo, como el cursor que muestra
        ChatGPT mientras transcribe un dictado. El círculo tachado nativo del SO
@@ -1764,10 +1769,19 @@
   #acceso-caja h2 { margin:0 0 10px; font-size:16px; }
   #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
+  /* El campo tiene que VERSE campo aunque esté vacío (2026-08-07): el borde
+     salía de una variable --bor que nunca se definió, así que la caja quedaba
+     invisible hasta hacerle clic dentro y no se entendía por qué el botón no
+     dejaba pedir la activación. Vacío va en ámbar —el mismo "aquí falta algo"
+     de los filtros del panel— y se apaga en cuanto hay texto. */
   #acceso-caja input[type=text] { width:100%; box-sizing:border-box;
-      padding:8px 10px; font-size:14px; border:1px solid var(--bor);
-      border-radius:6px; }
-  #acceso-error { color:var(--peligro); font-size:13px; margin:0 0 10px;
+      padding:9px 11px; font-size:14px; border:1px solid var(--bor);
+      border-radius:6px; background:#fff; }
+  #acceso-caja input[type=text]:placeholder-shown { border-color:#f59e0b;
+      background:#fffaf3; }
+  #acceso-caja input[type=text]:focus { border-color:#1d4ed8;
+      outline:2px solid rgba(29,78,216,.35); outline-offset:1px; }
+  #acceso-error { color:var(--err); font-size:13px; margin:0 0 10px;
       display:none; }
   #acceso-espera { display:flex; align-items:center; gap:10px;
       font-size:13.5px; color:var(--mut); }
@@ -2683,7 +2697,7 @@
       <p class="mut" id="solicitudes-vacio" style="margin:0; display:none">
         No hay ninguna computadora esperando activación.</p>
       <p class="mut" id="solicitudes-error"
-         style="margin:0; display:none; color:var(--peligro)"></p>
+         style="margin:0; display:none; color:var(--err)"></p>
       <div style="margin-top:12px">
         <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
                 class="secundario">Ver también las ya activas</button>
@@ -3683,7 +3697,8 @@
              display:block; margin-bottom:6px">Nombre de esta computadora
         <span class="mut" style="font-weight:400">(obligatorio)</span></label>
       <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2"
-             oninput="pintarBotonSolicitud()">
+             oninput="pintarBotonSolicitud()"
+             onkeydown="if(event.key==='Enter')enviarSolicitudAcceso()">
       <p class="mut" style="margin:6px 0 0; font-size:12.5px">
         Es el nombre con el que el administrador la reconoce al aprobarla, y
         con el que después aparecen tus llenados en el historial de las demás.</p>
@@ -6415,7 +6430,10 @@ function filtroBusquedaDinamico() {
 // Nombre corto de una ruta para el dropdown ("Ruta LPG" → "LPG").
 // Esta computadora factura UNA ruta a la vez (sin el permiso ver_todas_rutas,
 // 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
-// así que esto solo decide qué se pinta.
+// así que esto solo decide qué se pinta. Desde el 2026-08-07 llega SIEMPRE en
+// falso —el límite se apagó del lado del servidor, ver `_exige_ruta_propia`—,
+// así que todo lo que cuelga de aquí queda dormido hasta que se decida cómo
+// se limita; se despierta solo, sin tocar el panel.
 let exigeRuta = false;
 // El vendedor tiene una sola ruta asignada, así que no hay entre qué elegir.
 let rutaFija = false;
@@ -8540,7 +8558,12 @@ function preseleccionar(boton) {
 // desincronice. Se vigila la clase "visible" —que es como se muestran los
 // diálogos— en vez de tocar cada apertura: son más de veinte y varias ventanas
 // se abren por dos caminos distintos, así ninguna vía queda sin foco.
-const vigilanteDeDialogos = new MutationObserver((cambios) => {
+// El vigilante solo existe si el entorno trae MutationObserver: los bancos de
+// Mac evalúan este archivo sobre un DOM mínimo (scripts/pruebas/*.mjs) y sin
+// esta guarda el `new` de aquí tumbaba los 35 de un golpe, dejando el panel
+// entero sin red de prueba (2026-08-07). En el navegador no cambia nada.
+const vigilanteDeDialogos = typeof MutationObserver === "undefined" ? null
+  : new MutationObserver((cambios) => {
   for (const cambio of cambios) {
     const dialogo = cambio.target;
     const seAcabaDeAbrir = dialogo.classList.contains("visible")
@@ -8548,13 +8571,15 @@ const vigilanteDeDialogos = new MutationObserver((cambios) => {
     if (seAcabaDeAbrir) preseleccionar(dialogo.querySelector("[data-preseleccionado]"));
   }
 });
-document.querySelectorAll("[data-preseleccionado]").forEach((btn) => {
-  const dialogo = btn.closest("[id$='-overlay']");
-  if (dialogo) {
-    vigilanteDeDialogos.observe(dialogo, {
-      attributes: true, attributeFilter: ["class"], attributeOldValue: true });
-  }
-});
+if (vigilanteDeDialogos) {
+  document.querySelectorAll("[data-preseleccionado]").forEach((btn) => {
+    const dialogo = btn.closest("[id$='-overlay']");
+    if (dialogo) {
+      vigilanteDeDialogos.observe(dialogo, {
+        attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+    }
+  });
+}
 
 async function menuContextoAccion(accion, btn) {
   const campo = menuCampo;
@@ -14913,6 +14938,7 @@ function pintarDesactivada() {
 // vuelve a viajar por esto.
 let acceso = {estado: "activo"};
 let accesoSondeo = null;
+let accesoFocoPuesto = false;
 
 const ACCESO_TAPA = ["sin_credencial", "desconocido", "pendiente",
                      "rechazado", "desactivado", "olvidado"];
@@ -14962,7 +14988,13 @@ function pintarAcceso() {
     : (nombre ? `Nombre pedido: ${nombre}` : "");
   if (pideNombre && nombre && !$("acceso-nombre").value)
     $("acceso-nombre").value = nombre;
-  if (pideNombre) pintarBotonSolicitud();
+  if (pideNombre) {
+    pintarBotonSolicitud();
+    // El cursor arranca dentro del campo: es lo único que hay que hacer en
+    // esta pantalla. UNA sola vez — el sondeo repinta cada 5 s y devolver el
+    // foco ahí le arrancaría el cursor a quien ya se movió al botón.
+    if (!accesoFocoPuesto) { accesoFocoPuesto = true; $("acceso-nombre").focus(); }
+  }
   arrancarSondeoAcceso();
 }
 
