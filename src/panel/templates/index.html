@@ -14703,18 +14703,24 @@ function pintarUnaSolicitud(s) {
     : "";
   const motivo = s.motivo_rechazo || s.motivo_desactivacion;
   const enEspera = estado === "pendiente";
-  const olvidar = `<button class="secundario" title="Su próxima apertura
+  // Olvidar existe solo en la consola central (2026-08-06): devolver una
+  // computadora al estado de recién instalada es control del producto, no
+  // administración diaria. El backend repite el candado.
+  const olvidar = (esMaquinaAdmin && esSupervisionEfectiva())
+    ? `<button class="secundario" title="Su próxima apertura
         vuelve a pedir nombre y aprobación, como una instalación nueva; su
         configuración no se pierde."
-        onclick="olvidarEquipo(this, '${host}')">Olvidar</button>`;
+        onclick="olvidarEquipo(this, '${host}')">Olvidar</button>`
+    : "";
+  // Una computadora activa ya no se saca de servicio desde aquí: eso vive en
+  // el bloque Computadoras, columna "Activa".
   const acciones = enEspera
     ? `<input type="text" id="sol-nombre-${host}" maxlength="40"
               value="${nombre}" placeholder="Nombre de la computadora">
        <button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>
        <button class="secundario" onclick="rechazarEquipo(this, '${host}')">Rechazar</button>`
     : (s.estado === "activo"
-        ? `<button class="secundario"
-                   onclick="desactivarEquipo(this, '${host}')">Quitar acceso</button>${olvidar}`
+        ? olvidar
         : `<button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>${olvidar}`);
   return `<div class="solicitud">
     <div class="solicitud-cab">
@@ -14728,7 +14734,7 @@ function pintarUnaSolicitud(s) {
       Última señal: ${esc(fechaAcceso(s.ultima_verificacion))}
       ${motivo ? `<br>Motivo anotado: ${esc(motivo)}` : ""}${historia}
     </div>
-    <div class="solicitud-acciones">${acciones}</div>
+    ${acciones ? `<div class="solicitud-acciones">${acciones}</div>` : ""}
   </div>`;
 }
 
@@ -14762,19 +14768,6 @@ function rechazarEquipo(btn, host) {
       mensaje("No se pudo rechazar: " + e.message, "error");
     }
   }, "Confirmar rechazo");
-}
-
-function desactivarEquipo(btn, host) {
-  confirmarBorrar(btn, async () => {
-    try {
-      await api("/api/acceso/desactivar", {dispositivo: host});
-      mensaje(`La computadora ${host} quedó sin acceso.`, "ok");
-      await cargarSolicitudesAcceso();
-      cargarAjustes();
-    } catch (e) {
-      mensaje("No se pudo quitar el acceso: " + e.message, "error");
-    }
-  }, "Confirmar quitar acceso");
 }
 
 function olvidarEquipo(btn, host) {
