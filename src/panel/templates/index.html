@@ -2681,19 +2681,12 @@
         ella.</p>
       <div id="equipos-lista"></div>
     </div>
-    <!-- Vista del panel (2026-08-05, solo Admin y supervisión): mirar el
-         panel como lo ve cada rol. Solo baja permisos, nunca los sube, y el
-         backend rechaza igual que la vista esconde — la comprobación es real. -->
-    <div class="ajustes-bloque" id="ver-como-bloque" style="display:none">
-      <h3>Vista del panel</h3>
-      <div class="ajustes-fila">
-        <label for="ver-como-select">Ver el panel como</label>
-        <select id="ver-como-select" onchange="guardarVerComo(this.value)"></select>
-      </div>
-      <p class="mut" style="margin:8px 0 0">Para comprobar qué ve y qué puede
-        hacer cada rol. Este bloque queda visible para volver a la vista
-        completa.</p>
-    </div>
+    <!-- El selector "Vista del panel" que vivía aquí se ELIMINÓ el 2026-08-06
+         (pedido del usuario: nadie debe verlo en AJUSTES). Mirar el panel
+         como otro rol quedó SOLO en la barra rápida de la supervisión
+         (rapida-vista), que además es la vuelta cuando la vista está
+         degradada. El backend acompaña: permisos.fijar_ver_como ya solo
+         acepta a la supervisión. -->
    </div>
   </section>
 
@@ -5183,6 +5176,12 @@ async function api(ruta, cuerpo) {
     if (datos && datos.codigo === "esperando_activacion" && datos.acceso) {
       acceso = {...datos.acceso, sin_conexion: false};
       pintarAcceso();
+    }
+    // Mismo trato para la desactivación por catálogo (2026-08-06): el 403
+    // de "fuera de servicio" tapa el panel entero en el acto.
+    if (datos && datos.codigo === "desactivada") {
+      maquinaDesactivada = true;
+      pintarDesactivada();
     }
     // Dos niveles: en el equipo admin, con el switch "detalle técnico"
     // prendido, se anexa al mensaje del operador el detalle de diagnóstico.
@@ -13347,6 +13346,16 @@ async function vigilarReserva(silencioso = false) {
       r = await api("/api/reserva_lote");
     } catch (_) { continue; }   // sondeo: un fallo puntual no interrumpe nada
     if (!r.listo) continue;
+    // El candado central negó el acceso de esta computadora (2026-08-06): la
+    // corrida se corta ya — cada llenado igual saldría rechazado. La tapa la
+    // pone el 409 del llenado en curso o el sondeo de acceso.
+    if (r.acceso_negado) {
+      const avisoAcceso = "El acceso de esta computadora fue desactivado: el lote se detuvo.";
+      if (secuenciaActiva) detenerSecuencia(avisoAcceso);
+      if (silencioso) return avisoAcceso;
+      mensaje(avisoAcceso, "error");
+      return avisoAcceso;
+    }
     const aviso = avisoDeReserva(r);
     if (!aviso) return "";      // todo quedó apartado: nada que decir
     const fuera = [...(r.ocupadas || []), ...(r.fallidas || [])];
@@ -14545,7 +14554,6 @@ async function cargarAjustes() {
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
     cargarSolicitudesAcceso();
-    pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
     pintarVersionEstable(d.version_estable);
@@ -14646,6 +14654,12 @@ async function sondearAcceso() {
     const eraTapado = ACCESO_TAPA.includes(acceso.estado);
     acceso = r;
     pintarAcceso();
+    // La misma respuesta trae la marca de fuera de servicio del catálogo:
+    // pone Y quita la tapa de desactivada sin esperar una recarga de AJUSTES.
+    if ("maquina_desactivada" in r) {
+      maquinaDesactivada = !!r.maquina_desactivada;
+      pintarDesactivada();
+    }
     // Recién activada: el nombre ya quedó puesto por el servidor, así que se
     // recarga todo y el formulario pide únicamente lo que falta.
     if (eraTapado && !ACCESO_TAPA.includes(r.estado)) {
@@ -15024,36 +15038,18 @@ async function guardarEquipoIdentidad(dispositivo, control) {
   }
 }
 
-// Vista del panel (2026-08-05): mirar el panel como otro rol. El selector
-// sale del rol REAL (es el camino de vuelta, no puede esconderse a sí mismo);
-// el resto de la pantalla se pinta con el rol EFECTIVO. Tras cambiar se
-// recarga la página entera: es la forma segura de que ninguna vista vieja
-// sobreviva al cambio de rol.
-function pintarVerComo() {
-  const bloque = $("ver-como-bloque");
-  const real = permisosUI.rol_real;
-  if (real !== "admin" && real !== "supervisor") {
-    bloque.style.display = "none";
-    return;
-  }
-  bloque.style.display = "";
-  const opciones = real === "supervisor"
-    ? [["", "Completo (supervisión)"], ["admin", "Admin"],
-       ["editor", "Editor"], ["normal", "Usuario general"]]
-    : [["", "Admin (el rol de este equipo)"], ["editor", "Editor"],
-       ["normal", "Usuario general"]];
-  $("ver-como-select").innerHTML = opciones.map(([v, t]) =>
-    `<option value="${v}">${t}</option>`).join("");
-  $("ver-como-select").value = permisosUI.ver_como || "";
-}
-
+// Vista del panel (2026-08-05): mirar el panel como otro rol. Desde el
+// 2026-08-06 el único selector vive en la barra rápida de la supervisión
+// (rapida-vista) — el bloque de AJUSTES se eliminó (nadie debe verlo ahí).
+// Tras cambiar se recarga la página entera: es la forma segura de que
+// ninguna vista vieja sobreviva al cambio de rol.
 async function guardarVerComo(vista) {
   try {
     await api("/api/ajustes/ver-como", {vista});
     location.reload();
   } catch (e) {
     mensaje("No se pudo cambiar la vista: " + e.message, "error");
-    $("ver-como-select").value = permisosUI.ver_como || "";
+    pintarBarraRapida();   // repone el selector de la barra al valor real
   }
 }
 
