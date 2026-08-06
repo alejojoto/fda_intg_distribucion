@@ -781,6 +781,9 @@
   /* Ayuda de una línea al final de un grupo: el detalle completo, en el hover. */
   .prueba-nota { font-size:12.5px; color:var(--mut); border-bottom:1px dotted #c3c9d4;
                  cursor:help; }
+  /* Lo elegido todavía no es lo que corre: el dato deja de ser un apunte gris
+     y avisa que falta reabrir (o que el cambio de rama no llegó a ocurrir). */
+  .prueba-nota.alerta { color:#b54708; border-bottom-color:#b54708; }
   #prueba-recortar-n { width:56px; font:inherit; font-weight:600; padding:3px 6px;
       border:1px solid #c3c9d4; border-radius:6px; text-align:center; }
   #prueba-recortar-n:disabled { opacity:.5; }
@@ -2736,7 +2739,11 @@
           <input type="radio" name="prueba-canal" id="prueba-canal-produccion"
                  onchange="guardarCanal()">
           Producción</label>
-        <span class="prueba-nota"
+        <!-- Lo que de verdad está cargado (2026-08-06): el selector declara de
+             dónde se cargará al reabrir, y hasta ahora nada mostraba si eso
+             llegó a pasar. Elegir "Producción" y quedarse en desarrollo se veía
+             idéntico a estar en producción. -->
+        <span class="prueba-nota" id="carga-en-curso"
               title="El cambio de rama lo hace el lanzador antes de levantar el panel, así que esta sesión sigue con el código que ya cargó.">Se aplica al reabrir el asistente</span>
         <label class="desc-todos admin-modo-label" id="admin-modo-label">
           <input type="checkbox" id="admin-modo-chk"
@@ -4029,6 +4036,10 @@ let esMaquinaAdmin = false;
 // Última copia de las opciones de modo prueba leídas de /api/ajustes: la usa
 // guardarOpcionesPrueba para no pisar los saltos de la 001 al pasar a la 999.
 let opcionesPrueba = null;
+// Qué código corre AHORA (/api/ajustes → carga_en_curso): rama real del clon,
+// commit fuente y fecha. Es el HECHO contra el que se contrasta el selector
+// "Carga", que solo declara de dónde se cargará al reabrir.
+let cargaEnCurso = null;
 // Rol de esta máquina ya resuelto por el backend (/api/ajustes → permisos_ui,
 // src/panel/permisos.py): rol real, efectivo (tras "ver como") y cada permiso
 // en true/false. TODA decisión de qué pintar sale de aquí — el JS no vuelve a
@@ -11802,7 +11813,7 @@ const imprimirEnFila = () =>
 // pendiente de la ruta elegida. Con impresión no aparece (el papel obliga a
 // lotes cortos y de tamaño variable) y sin ruta elegida tampoco: sería "todo lo
 // que haya", que no es lo que se pidió. El gate de la barra (enFilaDisponible)
-// la deja fuera de producción.
+// la deja fuera de las máquinas de operación.
 function rutaCompletaDisponible() {
   return !imprimirEnFila() && rutaSeleccionada !== "" && enFilaDisponible();
 }
@@ -12036,12 +12047,15 @@ function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
 // a `produccion`, pero el panel solo veía el radio de ADMIN sin marcar y daba
 // la corrida por disponible. De ahí que producción viera "Llenar en fila".
 // `esMaquinaAdmin` (capacidad por hostname, /api/ajustes) es la condición que
-// no depende de config alguna; el radio sigue mandando dentro del equipo admin
-// para poder ver la vista de producción sin cambiar de máquina. Arranca en
-// false, así que hasta que carguen los ajustes se ve la barra de producción,
-// que es el lado seguro.
-const enFilaDisponible = () =>
-  esMaquinaAdmin && !$("prueba-canal-produccion").checked;
+// no depende de config alguna. Arranca en false, así que hasta que carguen los
+// ajustes se ve la barra de producción, que es el lado seguro.
+// El radio de Carga SALIÓ de este gate (2026-08-06, pedido del usuario): elegir
+// "Producción" es cargar el código de producción al reabrir, no disfrazar el
+// panel de máquina de operación. Imitar la vista escondiendo herramientas daba
+// justo la falsa certeza que el selector debía dar de verdad — y de paso le
+// quitaba al equipo admin la corrida, que es suya. Quien quiera ver la vista
+// del operador tiene el selector de rol de la barra ("Ver como").
+const enFilaDisponible = () => esMaquinaAdmin;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
@@ -14107,14 +14121,12 @@ function pintarBanderasPrueba() {
     ind.push("sin registro real");
     partes.push("PRUEBA AISLADA — " + ind.join(" · "));
   }
-  // El canal va FUERA del modo admin (2026-07-28): en Producción, la vista
-  // queda igual a la de una máquina de FDA (ver enFilaDisponible) aunque el
-  // modo admin siga prendido — este aviso es lo único que sigue distinguiendo
-  // el equipo admin de una máquina real en esa combinación. Solo se avisa de
-  // Producción: Dev es lo normal en el servidor admin (la opción "Automático"
-  // se retiró el 2026-07-29 y ya no hay nada que distinguir de ella).
-  if ($("prueba-canal-produccion").checked)
-    partes.push("CARGA LA VERSIÓN DE PRODUCCIÓN");
+  // El canal va FUERA del modo admin (2026-07-28) y desde 2026-08-06 el aviso
+  // dice qué código CORRE, no cuál se eligió: quedarse en desarrollo con
+  // "Producción" marcada se veía exactamente igual que estar en producción.
+  // Dev sin nada raro no se avisa: es lo normal en el servidor admin.
+  const avisoCarga = avisoCargaBarra();
+  if (avisoCarga) partes.push(avisoCarga);
   span.textContent = partes.join("   |   ");
   span.style.display = partes.length ? "" : "none";
 }
@@ -14339,6 +14351,84 @@ async function guardarOpcionesPrueba() {
   }
 }
 
+// --- Qué código corre AHORA vs. el que pide "Carga" (2026-08-06) ------------
+// El selector solo declara una intención: de qué rama se cargará al reabrir el
+// asistente. Entre esa intención y el hecho se pueden meter un panel que
+// todavía no se ha reabierto, un cambio de rama que falló (solo deja un AVISO
+// en el log del lanzador, que nadie mira) o un clon con código fuente, donde el
+// lanzador no toca la rama a propósito. Sin esto a la vista, marcar
+// "Producción" se parecía a estar en producción sin ninguna prueba de estarlo.
+const RAMA_DE_CANAL = {produccion: "produccion", estable: "estable",
+                       "estable-1.1": "estable-1.1", desarrollo: "main", "": "main"};
+
+// La rama que el lanzador buscaría hoy en este equipo. El canal vacío es el
+// automático por equipo y NO es el mismo para todos (ver lanzador.rama_del_canal):
+// el servidor admin sigue desarrollo y cualquier otra máquina, producción — que
+// es como nace toda instalación, sin nada guardado.
+function ramaEsperada() {
+  const canal = (opcionesPrueba && opcionesPrueba.canal) || "";
+  if (canal) return RAMA_DE_CANAL[canal] || "main";
+  return esMaquinaAdmin ? "main" : "produccion";
+}
+
+const cargaAlineada = () =>
+  !!cargaEnCurso && !!cargaEnCurso.rama && cargaEnCurso.rama === ramaEsperada();
+
+// "Producción · a1b2c3d · 05-08 22:26" — el commit fuente es el identificador
+// que coincide entre canales (el hash del build no: se recompila en cada
+// publicación).
+function cargaCorriendoTexto() {
+  const rama = (cargaEnCurso && cargaEnCurso.rama) || "";
+  const nombre = rama ? (SUP_CANALES[rama] || rama) : "versión desconocida";
+  const sello = [cargaEnCurso && cargaEnCurso.commit,
+                 cargaEnCurso && cargaEnCurso.fecha
+                   ? supFechaCorta(cargaEnCurso.fecha) : ""].filter(Boolean);
+  return [nombre, ...sello].join(" · ");
+}
+
+function pintarCargaEnCurso() {
+  const span = $("carga-en-curso");
+  if (!span) return;
+  if (!cargaEnCurso || !cargaEnCurso.rama) {
+    span.textContent = "Se aplica al reabrir el asistente";
+    span.title = "El cambio de rama lo hace el lanzador antes de levantar el "
+      + "panel, así que esta sesión sigue con el código que ya cargó.";
+    span.classList.remove("alerta");
+    return;
+  }
+  const alineada = cargaAlineada();
+  const cola = !cargaEnCurso.instalado
+    ? " — clon con código fuente: aquí la rama se cambia a mano"
+    : alineada ? "" : " — cambia al reabrir el asistente";
+  span.textContent = "Corre: " + cargaCorriendoTexto() + cola;
+  span.title = !cargaEnCurso.instalado
+    ? "Este equipo corre desde un clon con código fuente y el asistente no le "
+      + "cambia la rama solo: la elección de arriba queda guardada, pero el "
+      + "código que corre es el que tenga el clon."
+    : alineada
+      ? "Es el código que está cargado ahora mismo, no el que se eligió. "
+        + "Coincide con la carga elegida arriba."
+      : "El código cargado no es todavía el de la carga elegida arriba. El "
+        + "cambio de rama lo hace el lanzador al reabrir el asistente.";
+  span.classList.toggle("alerta", !alineada);
+}
+
+// El aviso de la barra superior: dice qué CORRE, no qué se eligió. Sin commit
+// ni fecha — ese detalle vive en la fila "Carga" de AJUSTES; aquí basta el
+// nombre. Callado en el caso normal del servidor admin (desarrollo, cargado) y
+// callado SIEMPRE en una máquina de operación: de qué rama carga el asistente
+// es asunto del programa, no del operador.
+function avisoCargaBarra() {
+  if (!esMaquinaAdmin) return "";
+  if (!cargaEnCurso || !cargaEnCurso.rama) return "";
+  const nombre = (rama) => (SUP_CANALES[rama] || rama).toUpperCase();
+  if (!cargaAlineada())
+    return "CARGA PEDIDA: " + nombre(ramaEsperada())
+      + " — TODAVÍA CORRE " + nombre(cargaEnCurso.rama);
+  if (cargaEnCurso.rama === "main") return "";
+  return "CORRE " + nombre(cargaEnCurso.rama);
+}
+
 async function guardarCanal() {
   const anterior = (opcionesPrueba && opcionesPrueba.canal) || "";
   const canal = $("prueba-canal-produccion").checked
@@ -14350,12 +14440,12 @@ async function guardarCanal() {
     $("prueba-canal-desarrollo").checked = r.canal !== "produccion";
     pintarBanderasPrueba();
     pintarBarraRapida();
-    pintarBarraEnFila();
+    pintarCargaEnCurso();
   } catch (e) {
     $("prueba-canal-produccion").checked = anterior === "produccion";
     $("prueba-canal-desarrollo").checked = anterior !== "produccion";
     pintarBarraRapida();
-    pintarBarraEnFila();
+    pintarCargaEnCurso();
     mensaje("No se pudo cambiar el canal: " + e.message, "error");
   }
 }
@@ -14427,7 +14517,11 @@ async function cargarAjustes() {
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
     pintarVersionEstable(d.version_estable);
+    cargaEnCurso = d.carga_en_curso || null;
     pintarOpcionesPrueba(d.opciones_prueba);
+    // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
+    // guardado en opcionesPrueba.
+    pintarCargaEnCurso();
     pintarBotonCorte();
     refrescarVistasModoPrueba();
     return true;
