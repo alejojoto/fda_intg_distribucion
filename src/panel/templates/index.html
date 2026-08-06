@@ -22,7 +22,12 @@
 <link rel="icon" type="image/svg+xml" href="/assets/icono.svg">
 <link rel="alternate icon" href="/assets/icono.ico">
 <style>
+  /* --bor se usaba desde el bloque de activación (2026-08-05) sin estar
+     definida: un `border:1px solid var(--bor)` con la variable vacía no pinta
+     borde ninguno, y por eso la tarjeta de activación y las de AJUSTES →
+     Computadoras salían sin recuadro. */
   :root { --ok:#1a7f37; --err:#b42318; --warn:#b54708; --mut:#667085;
+    --bor:#c3c9d4;
     /* Cursor de "esto no responde" (2026-08-01): la flecha se queda flecha y
        la insignia de prohibido va pegada abajo, como el cursor que muestra
        ChatGPT mientras transcribe un dictado. El círculo tachado nativo del SO
@@ -1076,6 +1081,24 @@
                    font-size:11px; font-weight:600; cursor:pointer;
                    color:#4b5563; background:#f3f4f6; border:1px solid #d7dbe2; }
   .copiar-pedido:hover { background:#e8ebf0; }
+  /* Menú de clic derecho de los campos de texto (2026-08-06). La ventana propia
+     corre sobre WebView2 y pywebview le apaga el menú nativo fuera de modo
+     depuración, así que cortar/copiar/pegar los pinta la página. */
+  #menu-contexto { position:fixed; z-index:200; min-width:132px; padding:4px;
+                   background:#fff; border:1px solid #d7dbe2; border-radius:8px;
+                   box-shadow:0 6px 20px rgba(15,23,42,.18); }
+  #menu-contexto button { display:block; width:100%; padding:5px 10px; margin:0;
+                          border:0; border-radius:5px; background:none; font:inherit;
+                          font-size:13px; text-align:left; color:#1f2937; cursor:pointer; }
+  #menu-contexto button:hover { background:#eef2f7; }
+  #menu-contexto button[disabled] { color:#9aa2ad; background:none; cursor:default; }
+  /* Botón preseleccionado de un diálogo y recorrido con Tab (2026-08-07). Son
+     dos reglas y no una porque :focus-visible NO se prende cuando el foco lo
+     pone el código después de un clic del ratón —el motor lo toma por foco de
+     ratón—, y justo ahí es donde más falta hace verlo. Con :focus a secas, en
+     cambio, todo botón pulsado quedaría con anillo. */
+  button.preseleccionado,
+  button:focus-visible { outline:2px solid #1d4ed8; outline-offset:2px; }
   .detalle-parte { display:inline-block; padding:2px 8px; border-radius:6px;
                    font-size:12px; font-weight:700; color:#1d4ed8; background:#e8efff;
                    border:1px solid #c7d7fb; }
@@ -1746,10 +1769,19 @@
   #acceso-caja h2 { margin:0 0 10px; font-size:16px; }
   #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
+  /* El campo tiene que VERSE campo aunque esté vacío (2026-08-07): el borde
+     salía de una variable --bor que nunca se definió, así que la caja quedaba
+     invisible hasta hacerle clic dentro y no se entendía por qué el botón no
+     dejaba pedir la activación. Vacío va en ámbar —el mismo "aquí falta algo"
+     de los filtros del panel— y se apaga en cuanto hay texto. */
   #acceso-caja input[type=text] { width:100%; box-sizing:border-box;
-      padding:8px 10px; font-size:14px; border:1px solid var(--bor);
-      border-radius:6px; }
-  #acceso-error { color:var(--peligro); font-size:13px; margin:0 0 10px;
+      padding:9px 11px; font-size:14px; border:1px solid var(--bor);
+      border-radius:6px; background:#fff; }
+  #acceso-caja input[type=text]:placeholder-shown { border-color:#f59e0b;
+      background:#fffaf3; }
+  #acceso-caja input[type=text]:focus { border-color:#1d4ed8;
+      outline:2px solid rgba(29,78,216,.35); outline-offset:1px; }
+  #acceso-error { color:var(--err); font-size:13px; margin:0 0 10px;
       display:none; }
   #acceso-espera { display:flex; align-items:center; gap:10px;
       font-size:13.5px; color:var(--mut); }
@@ -2665,7 +2697,7 @@
       <p class="mut" id="solicitudes-vacio" style="margin:0; display:none">
         No hay ninguna computadora esperando activación.</p>
       <p class="mut" id="solicitudes-error"
-         style="margin:0; display:none; color:var(--peligro)"></p>
+         style="margin:0; display:none; color:var(--err)"></p>
       <div style="margin-top:12px">
         <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
                 class="secundario">Ver también las ya activas</button>
@@ -3070,7 +3102,7 @@
     <h3>Cambios de catálogo en choque</h3>
     <div id="conflictos-sync-lista"></div>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarConflictosSync()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarConflictosSync()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3084,7 +3116,7 @@
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
       <button type="button" id="diag-sync-copiar" onclick="copiarInformeSync(this)">Copiar informe</button>
       <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
-      <button type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3120,7 +3152,7 @@
     <h3 id="sup-equipo-titulo">Detalle del equipo</h3>
     <div id="sup-equipo-cuerpo"></div>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarDetalleEquipoSupervision()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarDetalleEquipoSupervision()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3131,7 +3163,7 @@
     <h3>Actividad reciente</h3>
     <ul id="sup-actividad-lista"></ul>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarActividadSupervision()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarActividadSupervision()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3171,7 +3203,7 @@
   <div id="catalogo-caja">
     <div id="catalogo-vista"></div>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarCatalogo()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarCatalogo()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3533,7 +3565,7 @@
     </label>
     <div class="editor-acciones">
       <button class="primario" id="hermanas-si" onclick="confirmarHermanas()"></button>
-      <button onclick="cerrarHermanas()">No, dejarlas pendientes</button>
+      <button data-preseleccionado onclick="cerrarHermanas()">No, dejarlas pendientes</button>
     </div>
   </div>
 </div>
@@ -3563,7 +3595,7 @@
     <div id="previo-sacados"></div>
     <div class="editor-acciones">
       <button class="primario" id="previo-llenar" onclick="confirmarPrevioLote()"></button>
-      <button onclick="cerrarPrevioLote()">Cancelar</button>
+      <button data-preseleccionado onclick="cerrarPrevioLote()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3588,7 +3620,7 @@
     <div class="editor-acciones">
       <button class="primario" id="tasa-usar" onclick="llenarConTasaDelAviso()">Llenar con esta tasa</button>
       <button id="tasa-despacho" onclick="llenarParaDespachoDesdeAviso()"></button>
-      <button onclick="pararPorTasa()">Parar</button>
+      <button data-preseleccionado onclick="pararPorTasa()">Parar</button>
     </div>
   </div>
 </div>
@@ -3612,7 +3644,7 @@
     <h3 id="docencurso-titulo">La Ficha tiene un documento sin terminar</h3>
     <div class="editor-acciones">
       <button class="primario" id="docencurso-si" onclick="resolverDocEnCurso(true)">Cancelarlo y continuar el llenado</button>
-      <button id="docencurso-no" onclick="resolverDocEnCurso(false)"
+      <button data-preseleccionado id="docencurso-no" onclick="resolverDocEnCurso(false)"
               title="El llenado se detiene aquí; resuelve el documento en el programa de facturación (Aceptar o Cancelar) y vuelve a darle Llenar.">No tocar nada</button>
     </div>
   </div>
@@ -3629,7 +3661,7 @@
     <div class="editor-acciones">
       <button class="primario" onclick="cerrarPreguntaBabyMix('125')">Llenar con 125 g</button>
       <button class="primario" onclick="cerrarPreguntaBabyMix('150')">Llenar con 150 g</button>
-      <button onclick="cerrarPreguntaBabyMix('')">Cancelar</button>
+      <button data-preseleccionado onclick="cerrarPreguntaBabyMix('')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3665,7 +3697,8 @@
              display:block; margin-bottom:6px">Nombre de esta computadora
         <span class="mut" style="font-weight:400">(obligatorio)</span></label>
       <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2"
-             oninput="pintarBotonSolicitud()">
+             oninput="pintarBotonSolicitud()"
+             onkeydown="if(event.key==='Enter')enviarSolicitudAcceso()">
       <p class="mut" style="margin:6px 0 0; font-size:12.5px">
         Es el nombre con el que el administrador la reconoce al aprobarla, y
         con el que después aparecen tus llenados en el historial de las demás.</p>
@@ -3743,7 +3776,7 @@
        hubiera a medio llenar se pierde y tendrás que iniciar sesión otra vez.</p>
     <div class="editor-acciones">
       <button class="primario" onclick="responderTrancon(true)">Reiniciar el programa</button>
-      <button onclick="responderTrancon(false)"
+      <button data-preseleccionado onclick="responderTrancon(false)"
               title="El llenado se detiene aquí y el programa de facturación queda exactamente como está: revísalo tú.">No tocar nada</button>
     </div>
   </div>
@@ -3763,7 +3796,7 @@
     <div id="lineas-omitidas-lista"></div>
     <p>El documento que está en pantalla no tiene esos renglones.</p>
     <div class="editor-acciones">
-      <button class="primario" id="lineas-omitidas-dejar" onclick="cerrarLineasOmitidas()"
+      <button data-preseleccionado class="primario" id="lineas-omitidas-dejar" onclick="cerrarLineasOmitidas()"
               title="La factura queda marcada por revisar en EN REVISIÓN.">Dejar en revisión</button>
       <button id="lineas-omitidas-procesada" onclick="marcarLineasOmitidasRevisada()"
               title="Quita la marca de revisar: la factura queda como está.">Marcar como procesada</button>
@@ -3779,7 +3812,7 @@
        otra vez genera un segundo documento.</p>
     <div class="editor-acciones">
       <button class="primario" onclick="resolverRepetida(true)">Llenarla otra vez</button>
-      <button onclick="resolverRepetida(false)">Cancelar</button>
+      <button data-preseleccionado onclick="resolverRepetida(false)">Cancelar</button>
     </div>
   </div>
 </div>
@@ -6397,7 +6430,10 @@ function filtroBusquedaDinamico() {
 // Nombre corto de una ruta para el dropdown ("Ruta LPG" → "LPG").
 // Esta computadora factura UNA ruta a la vez (sin el permiso ver_todas_rutas,
 // 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
-// así que esto solo decide qué se pinta.
+// así que esto solo decide qué se pinta. Desde el 2026-08-07 llega SIEMPRE en
+// falso —el límite se apagó del lado del servidor, ver `_exige_ruta_propia`—,
+// así que todo lo que cuelga de aquí queda dormido hasta que se decida cómo
+// se limita; se despierta solo, sin tocar el panel.
 let exigeRuta = false;
 // El vendedor tiene una sola ruta asignada, así que no hay entre qué elegir.
 let rutaFija = false;
@@ -8409,6 +8445,172 @@ function copiarIdTicket(btn) {
 // se busca a mano en la aplicación de pedidos y transcribirlo se presta a error.
 function copiarNumeroPedido(btn) {
   return copiarConAviso(btn, btn.dataset.pedido || "", "Copiar");
+}
+
+// Menú de clic derecho de los campos de texto (2026-08-06, pedido del usuario:
+// el número copiado no se podía pegar con el ratón en el buscador). La ventana
+// propia corre sobre WebView2 y pywebview le apaga el menú nativo salvo en modo
+// depuración, así que sin esto el clic derecho no hace nada. Cortar y copiar van
+// por copiarTextoSoporte —el mismo camino ya probado—; pegar no puede ir por
+// navigator.clipboard, ver leerPortapapeles.
+const CAMPOS_MENU_CONTEXTO =
+  'textarea, input[type="text"], input[type="search"], input:not([type])';
+let menuCampo = null;          // campo sobre el que se abrió el menú
+let menuIni = 0, menuFin = 0;  // su selección al abrirlo: pulsar el menú la pierde
+
+function menuContextoCerrar() {
+  const menu = $("menu-contexto");
+  if (menu) menu.style.display = "none";
+  menuCampo = null;
+}
+
+document.addEventListener("contextmenu", (e) => {
+  const campo = e.target && e.target.closest
+      ? e.target.closest(CAMPOS_MENU_CONTEXTO) : null;
+  const menu = $("menu-contexto");
+  if (!campo || !menu) { menuContextoCerrar(); return; }
+  e.preventDefault();
+  menuCampo = campo;
+  menuIni = campo.selectionStart || 0;
+  menuFin = campo.selectionEnd || 0;
+  // Cortar y copiar solo tienen sentido con algo seleccionado; pegar siempre
+  // (saber si el portapapeles trae texto exigiría leerlo, y leerlo es la acción).
+  const conSeleccion = menuFin > menuIni;
+  const opciones = menu.querySelectorAll("button");
+  opciones[0].disabled = !conSeleccion || campo.readOnly;
+  opciones[1].disabled = !conSeleccion;
+  opciones[2].disabled = campo.readOnly;
+  // Se muestra oculto para medirlo y que no se salga de la ventana: durante el
+  // llenado el panel queda reducido a la barra flotante y hay muy poco sitio.
+  menu.style.visibility = "hidden";
+  menu.style.display = "block";
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  const caja = menu.getBoundingClientRect();
+  menu.style.left = Math.max(4, Math.min(e.clientX, window.innerWidth - caja.width - 4)) + "px";
+  menu.style.top = Math.max(4, Math.min(e.clientY, window.innerHeight - caja.height - 4)) + "px";
+  menu.style.visibility = "";
+});
+
+document.addEventListener("pointerdown", (e) => {
+  const menu = $("menu-contexto");
+  if (menu && menu.style.display !== "none" && !menu.contains(e.target)) menuContextoCerrar();
+}, true);
+
+// En captura y cortando la propagación: con el menú abierto, Escape lo cierra a
+// él y no al modal que haya detrás.
+document.addEventListener("keydown", (e) => {
+  const menu = $("menu-contexto");
+  if (e.key === "Escape" && menu && menu.style.display !== "none") {
+    e.stopPropagation();
+    menuContextoCerrar();
+  }
+}, true);
+document.addEventListener("scroll", menuContextoCerrar, true);
+window.addEventListener("resize", menuContextoCerrar);
+window.addEventListener("blur", menuContextoCerrar);
+
+// El portapapeles solo se puede LEER desde fuera de la página: dentro de la
+// ventana propia WebView2 rechaza navigator.clipboard.readText (el permiso lo
+// concede el anfitrión y pywebview no lo atiende), así que ahí lo lee Python.
+// Devuelve null si no hubo ninguna vía — distinto de "", que es el portapapeles
+// vacío de verdad.
+async function leerPortapapeles() {
+  const api = window.pywebview && window.pywebview.api;
+  if (api && api.leer_portapapeles) {
+    try {
+      const texto = await api.leer_portapapeles();
+      if (texto !== null && texto !== undefined) return String(texto);
+    } catch (_) {}
+  }
+  try { return await navigator.clipboard.readText(); } catch (_) { return null; }
+}
+
+// Botón preseleccionado al abrir un diálogo (2026-08-07, pedido del usuario):
+// el operador ve cuál es la opción principal y la dispara con Enter o con la
+// barra espaciadora sin soltar el teclado, y con Tab recorre las demás, que se
+// activan igual. No hay atajos propios ni captura de teclas: Enter y Espacio ya
+// los atiende de por sí el botón que tiene el foco.
+//
+// CUÁL queda preseleccionado es la regla del usuario: la acción principal si es
+// segura (cerrar un informe, dejar una factura en revisión) y, si toca algo
+// delicado —arrancar un llenado, cancelar un documento del programa de
+// facturación, reiniciarlo—, la opción segura, de modo que la delicada se
+// alcance con un Tab y nunca con un Enter suelto. Los diálogos que se llenan a
+// mano no preseleccionan botón: ahí el foco pertenece al primer campo.
+function preseleccionar(boton) {
+  const btn = typeof boton === "string" ? $(boton) : boton;
+  if (!btn || btn.disabled) return;
+  // Tras el pintado: enfocar dentro de un contenedor que acaba de dejar de
+  // estar oculto no siempre prende en el mismo cuadro.
+  requestAnimationFrame(() => {
+    if (btn.disabled || !btn.isConnected) return;
+    try { btn.focus({ preventScroll: true }); } catch (_) { return; }
+    if (document.activeElement !== btn) return;
+    btn.classList.add("preseleccionado");
+    btn.addEventListener("blur", () => btn.classList.remove("preseleccionado"),
+                         { once: true });
+  });
+}
+
+// El botón elegido se marca con data-preseleccionado en el HTML, pegado a él,
+// para que se vea al leer la botonera y no en una lista aparte que se
+// desincronice. Se vigila la clase "visible" —que es como se muestran los
+// diálogos— en vez de tocar cada apertura: son más de veinte y varias ventanas
+// se abren por dos caminos distintos, así ninguna vía queda sin foco.
+// El vigilante solo existe si el entorno trae MutationObserver: los bancos de
+// Mac evalúan este archivo sobre un DOM mínimo (scripts/pruebas/*.mjs) y sin
+// esta guarda el `new` de aquí tumbaba los 35 de un golpe, dejando el panel
+// entero sin red de prueba (2026-08-07). En el navegador no cambia nada.
+const vigilanteDeDialogos = typeof MutationObserver === "undefined" ? null
+  : new MutationObserver((cambios) => {
+  for (const cambio of cambios) {
+    const dialogo = cambio.target;
+    const seAcabaDeAbrir = dialogo.classList.contains("visible")
+        && !(cambio.oldValue || "").split(" ").includes("visible");
+    if (seAcabaDeAbrir) preseleccionar(dialogo.querySelector("[data-preseleccionado]"));
+  }
+});
+if (vigilanteDeDialogos) {
+  document.querySelectorAll("[data-preseleccionado]").forEach((btn) => {
+    const dialogo = btn.closest("[id$='-overlay']");
+    if (dialogo) {
+      vigilanteDeDialogos.observe(dialogo, {
+        attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+    }
+  });
+}
+
+async function menuContextoAccion(accion, btn) {
+  const campo = menuCampo;
+  if (!campo) { menuContextoCerrar(); return; }
+  const ini = menuIni, fin = menuFin;
+  // El foco y la selección se reponen a mano: setRangeText trabaja con índices,
+  // pero el operador tiene que quedar de vuelta en su campo, con el cursor donde
+  // corresponde y sin que la lista salte.
+  try {
+    campo.focus({ preventScroll: true });
+    campo.setSelectionRange(ini, fin);
+  } catch (_) {}
+  if (accion === "pegar") {
+    const texto = await leerPortapapeles();
+    if (texto === null) {
+      btn.textContent = "No se pudo pegar";
+      setTimeout(() => { btn.textContent = "Pegar"; menuContextoCerrar(); }, 1800);
+      return;
+    }
+    campo.setRangeText(texto, ini, fin, "end");
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+    menuContextoCerrar();
+    return;
+  }
+  const listo = await copiarTextoSoporte(campo.value.slice(ini, fin));
+  if (listo && accion === "cortar") {
+    try { campo.focus({ preventScroll: true }); } catch (_) {}
+    campo.setRangeText("", ini, fin, "end");
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  menuContextoCerrar();
 }
 
 function pintarNube() {
@@ -14736,6 +14938,7 @@ function pintarDesactivada() {
 // vuelve a viajar por esto.
 let acceso = {estado: "activo"};
 let accesoSondeo = null;
+let accesoFocoPuesto = false;
 
 const ACCESO_TAPA = ["sin_credencial", "desconocido", "pendiente",
                      "rechazado", "desactivado", "olvidado"];
@@ -14785,7 +14988,13 @@ function pintarAcceso() {
     : (nombre ? `Nombre pedido: ${nombre}` : "");
   if (pideNombre && nombre && !$("acceso-nombre").value)
     $("acceso-nombre").value = nombre;
-  if (pideNombre) pintarBotonSolicitud();
+  if (pideNombre) {
+    pintarBotonSolicitud();
+    // El cursor arranca dentro del campo: es lo único que hay que hacer en
+    // esta pantalla. UNA sola vez — el sondeo repinta cada 5 s y devolver el
+    // foco ahí le arrancaría el cursor a quien ya se movió al botón.
+    if (!accesoFocoPuesto) { accesoFocoPuesto = true; $("acceso-nombre").focus(); }
+  }
   arrancarSondeoAcceso();
 }
 
@@ -20520,5 +20729,14 @@ if (new URLSearchParams(window.location.search).get("ver_configuracion") === "1"
   Promise.all([cargaInicial, ajustesInicial]).then(() => abrirConfigMaquina([], true));
 }
 </script>
+<!-- Menú de clic derecho de los campos de texto (2026-08-06). Va al final del
+     documento para quedar sobre todo lo demás; el JS lo busca al abrirlo, no
+     al cargar. El preventDefault del mousedown evita que el campo pierda el
+     foco al pulsar una opción. -->
+<div id="menu-contexto" style="display:none" onmousedown="event.preventDefault()">
+  <button type="button" onclick="menuContextoAccion('cortar', this)">Cortar</button>
+  <button type="button" onclick="menuContextoAccion('copiar', this)">Copiar</button>
+  <button type="button" onclick="menuContextoAccion('pegar', this)">Pegar</button>
+</div>
 </body>
 </html>
