@@ -5177,6 +5177,13 @@ async function api(ruta, cuerpo) {
     // campos como `codigo` (p.ej. "sin_login") sin re-parsear el mensaje.
     const err = new Error(datos.error || ("Error HTTP " + r.status));
     err.datos = datos;
+    // Acceso negado (2026-08-06): la tapa sale AQUÍ, con el primer 409 que
+    // llegue de cualquier endpoint — antes solo se pintaba el banner del
+    // error y el panel seguía a la vista con sus datos de caché.
+    if (datos && datos.codigo === "esperando_activacion" && datos.acceso) {
+      acceso = {...datos.acceso, sin_conexion: false};
+      pintarAcceso();
+    }
     // Dos niveles: en el equipo admin, con el switch "detalle técnico"
     // prendido, se anexa al mensaje del operador el detalle de diagnóstico.
     // En producción (no admin) el operador solo ve su mensaje.
@@ -14650,6 +14657,13 @@ async function sondearAcceso() {
       "Sin conexión con el servidor; se sigue intentando.";
   }
 }
+
+// El sondeo de 5 s de arriba solo corre con la tapa puesta. Este, lento y
+// permanente, cierra la ventana ciega (2026-08-06): una desactivación o un
+// olvido hechos desde otra computadora tapan este panel en ≤1 min aunque
+// quede abierto sin que nadie lo toque — antes solo se enteraba al reabrir
+// el asistente o al tropezar con el 409 de la lista.
+setInterval(sondearAcceso, 60000);
 
 // --- Gestión de activaciones (AJUSTES → Computadoras esperando activación) --
 // Solo para la supervisión y los equipos con rol Admin: un Editor sin Admin
