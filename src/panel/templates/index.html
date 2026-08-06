@@ -1070,6 +1070,12 @@
                        display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
   /* Cuadro de "factura X de Y" (2026-08-01): mismo azul que button.acento, para
      que se note que esta ventana está sobre UNA parte del pedido. */
+  .detalle-pedido { display:inline-flex; align-items:center; gap:8px; }
+  /* Ancho fijo para que "Copiado" no corra el título al pulsarlo. */
+  .copiar-pedido { padding:2px 8px; min-width:74px; border-radius:6px;
+                   font-size:11px; font-weight:600; cursor:pointer;
+                   color:#4b5563; background:#f3f4f6; border:1px solid #d7dbe2; }
+  .copiar-pedido:hover { background:#e8ebf0; }
   .detalle-parte { display:inline-block; padding:2px 8px; border-radius:6px;
                    font-size:12px; font-weight:700; color:#1d4ed8; background:#e8efff;
                    border:1px solid #c7d7fb; }
@@ -3076,6 +3082,7 @@
     <pre id="diag-sync-texto"></pre>
     <div class="editor-acciones">
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
+      <button type="button" id="diag-sync-copiar" onclick="copiarInformeSync(this)">Copiar informe</button>
       <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
       <button type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
@@ -6586,6 +6593,34 @@ async function cambioRuta(valor) {
   return aplicarFiltros("Cambiando de ruta…");
 }
 
+// Preselección al abrir (2026-08-06, pedido del usuario): si la computadora
+// factura una ruta a la vez y todavía no tiene ninguna elegida ni guardada,
+// se elige sola la que más pendientes tenga (empate: la primera del catálogo)
+// y se guarda como la suya — igual que si el operador la hubiera elegido en
+// la barra; cambiarla después sigue siendo un clic. Sin esto, una
+// instalación nueva abría con la lista vacía y el aviso de "elige tu ruta",
+// con el trabajo esperando en todas.
+let rutaPreseleccionada = false;
+async function preseleccionarRutaSiFalta() {
+  if (rutaPreseleccionada || !exigeRuta || rutaSeleccionada || rutaPredeterminada)
+    return;
+  if (!rutasOfrecidas.length) return;   // catálogo aún bajando: se reintenta al llegar
+  rutaPreseleccionada = true;
+  const porRuta = ultimaLista.pendientes_por_ruta || {};
+  let elegida = rutasOfrecidas[0];
+  for (const r of rutasOfrecidas)
+    if ((porRuta[r] || 0) > (porRuta[elegida] || 0)) elegida = r;
+  rutaSeleccionada = elegida;
+  try {
+    const r = await api("/api/ajustes/ruta", {ruta: elegida});
+    rutaPredeterminada = r.ruta_predeterminada;
+  } catch (e) {
+    mensaje(e.message, "error");
+  }
+  pintarSeries();
+  aplicarFiltros("Eligiendo tu ruta…");
+}
+
 // --- ADMIN → Supervisión ----------------------------------------------------
 // El overview y la bandeja viajan por endpoints separados: la falta de la
 // clave de servicio de tickets nunca deja sin datos al resto del parque.
@@ -6613,6 +6648,7 @@ const SUP_PROBLEMAS = {
   outbox_acumulado: "cambios sin subir",
   choques: "choques",
   nube: "error de nube",
+  no_actualiza: "no se actualiza",
   sync_degradada: "sync degradada",
   atraso_cursor: "atrasada",
   modo_prueba: "modo prueba",
@@ -7281,6 +7317,8 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         <div style="margin:6px 0">
           <button type="button" id="sup-log-boton" style="display:none"
                   onclick="pedirLogEquipo()">Traer el log</button>
+          <button type="button" id="sup-log-copiar" style="display:none"
+                  onclick="copiarLogEquipo(this)">Copiar el log</button>
         </div>
         <pre class="sup-pre" id="sup-log-texto" style="display:none"></pre>
       </div>
@@ -7341,9 +7379,24 @@ function mostrarBotonLog(texto) {
   btn.textContent = texto;
 }
 
+function mostrarCopiarLog(visible) {
+  const btn = $("sup-log-copiar");
+  if (btn) btn.style.display = visible ? "" : "none";
+}
+
+// El log copiado lleva de qué equipo salió: pegado en un ticket o en un chat,
+// el texto solo no dice a qué máquina pertenece.
+function copiarLogEquipo(btn) {
+  const pre = $("sup-log-texto");
+  const texto = [`Log de ${supLogDispositivo || "?"}`, "",
+                 pre ? pre.textContent : ""].join("\n");
+  return copiarConAviso(btn, texto, "Copiar el log");
+}
+
 function pintarLogEquipo(fila) {
   const est = $("sup-log-estado"), pre = $("sup-log-texto");
   if (!est || !pre) return;
+  mostrarCopiarLog(false);   // solo hay algo que copiar con el log ya recibido
   if (!fila) {
     est.textContent = "El equipo manda el final de su log al pedirlo; tarda "
       + "hasta un minuto en responder.";
@@ -7378,6 +7431,7 @@ function pintarLogEquipo(fila) {
   est.textContent = `Recibido ${supFechaCorta(fila.entregado_en)} · ${
     fila.lineas || 0} líneas (el final del log).`;
   mostrarBotonLog("Actualizar el log");
+  mostrarCopiarLog(true);
   pre.textContent = fila.log || "";
   pre.style.display = "";
   pre.scrollTop = pre.scrollHeight;
@@ -7937,6 +7991,10 @@ async function cargar(conservarScroll = false) {
         return cargar(conservarScroll);   // recarga ya filtrada (el guard evita el bucle)
       }
     }
+    // Sin ruta guardada en una máquina que exige una: se elige sola (ver
+    // preseleccionarRutaSiFalta). Va aquí y en la carga de ajustes porque
+    // exigeRuta y pendientes_por_ruta llegan por respuestas distintas.
+    preseleccionarRutaSiFalta();
     pintarRutas(d.rutas, d.hay_sin_ruta);
     dispositivoPropio = d.dispositivo_propio || "";
     pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
@@ -8278,20 +8336,43 @@ function mostrarTicketCreado(id) {
 
 // Copiado que también funciona sin permiso de portapapeles (http): cae a un
 // campo temporal, que es lo que sí acepta un navegador en contexto inseguro.
+// El respaldo se endurece para la ventana propia (2026-08-06): ahí el permiso
+// de portapapeles lo tiene que conceder el anfitrión WebView2 y pywebview no
+// lo atiende, así que la promesa se rechaza y TODO depende de este camino.
+// execCommand copia la selección del documento, y para eso el campo tiene que
+// estar enfocado de verdad: con solo select() sobre un elemento en opacity 0
+// hay motores que no le dan el foco y la copia sale vacía. Se enfoca explícito,
+// se marca readonly (evita que salte el teclado en pantalla) y se devuelve el
+// foco a donde estaba, para no dejar al operador fuera del control que tocó.
 async function copiarTextoSoporte(texto) {
   try {
     await navigator.clipboard.writeText(texto);
     return true;
   } catch (_) {
+    const previo = document.activeElement;
     const tmp = document.createElement("textarea");
     tmp.value = texto;
+    tmp.setAttribute("readonly", "");
     tmp.style.position = "fixed";
+    tmp.style.top = "0";
+    tmp.style.left = "0";
+    tmp.style.width = "1px";
+    tmp.style.height = "1px";
+    tmp.style.padding = "0";
+    tmp.style.border = "none";
     tmp.style.opacity = "0";
     document.body.appendChild(tmp);
-    tmp.select();
     let listo = false;
-    try { listo = document.execCommand("copy"); } catch (_) { listo = false; }
+    try {
+      tmp.focus({ preventScroll: true });
+      tmp.select();
+      tmp.setSelectionRange(0, String(texto).length);
+      listo = document.execCommand("copy");
+    } catch (_) { listo = false; }
     tmp.remove();
+    if (previo && previo.focus) {
+      try { previo.focus({ preventScroll: true }); } catch (_) {}
+    }
     return listo;
   }
 }
@@ -8314,8 +8395,20 @@ function copiarTicket(btn) {
   return copiarConAviso(btn, texto, "Copiar informe");
 }
 
+// El mismo informe que se ve en pantalla, para pegarlo donde se pueda avisar
+// sin depender de que el ticket llegue a la nube.
+function copiarInformeSync(btn) {
+  return copiarConAviso(btn, $("diag-sync-texto").textContent, "Copiar informe");
+}
+
 function copiarIdTicket(btn) {
   return copiarConAviso(btn, ticketCreado || ticketId || "", "Copiar número");
+}
+
+// El número de pedido del título del detalle (2026-08-06, pedido del usuario):
+// se busca a mano en la aplicación de pedidos y transcribirlo se presta a error.
+function copiarNumeroPedido(btn) {
+  return copiarConAviso(btn, btn.dataset.pedido || "", "Copiar");
 }
 
 function pintarNube() {
@@ -8698,6 +8791,11 @@ let versionAsistente = "";  // commit corto; lo manda /api/facturas (ver cargar)
 // verdad (2026-08-02, pedido del usuario).
 function totalPendientesDeLaRuta() {
   const porRuta = ultimaLista.pendientes_por_ruta || {};
+  // Sin ruta elegida en una máquina que exige una, el servidor entrega la
+  // lista vacía con su aviso: contar aquí todas las rutas pintaba un número
+  // que la pestaña no muestra ("378" arriba, "elige tu ruta" abajo — visto
+  // 2026-08-06 en la primera instalación nueva).
+  if (exigeRuta && !rutaSeleccionada) return 0;
   if (!rutaSeleccionada) return Object.values(porRuta).reduce((a, b) => a + b, 0);
   return porRuta[rutaSeleccionada] || 0;
 }
@@ -9462,8 +9560,12 @@ function pintarVentanaDetalle(clave) {
     ? `<span class="detalle-parte">factura ${d.parte} de ${d.total_partes}</span>` : "";
   // Sin respuesta del panel (buscando, o sin detalle guardado) el pedido sale
   // igual de la clave: la ventana siempre dice de cuál factura habla.
-  $("detalle-titulo").innerHTML = d
-    ? `Pedido ${esc(d.pedido_id)}${partes}` : `Pedido ${esc(partesDeClave(clave)[0])}`;
+  const pedidoId = d ? d.pedido_id : partesDeClave(clave)[0];
+  $("detalle-titulo").innerHTML =
+    `<span class="detalle-pedido">Pedido ${esc(pedidoId)}`
+    + `<button type="button" class="copiar-pedido" data-pedido="${esc(pedidoId)}"
+               title="Copiar el número de pedido"
+               onclick="copiarNumeroPedido(this)">Copiar</button></span>${partes}`;
   $("detalle-fijo").innerHTML = fijoDetalle(clave);
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
   pintarBotonDetalle();
@@ -12716,7 +12818,13 @@ const babyMixControl = (grupo) => {
 // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
 // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
 // De solo lectura: se cambia en ADMIN, no a un clic de llenar.
+// El radio NO alcanza como señal (2026-08-06): su valor por defecto es 999 y el
+// backend manda las opciones de prueba a TODA máquina, así que en una
+// instalación limpia queda marcado aunque la prueba esté apagada — el rótulo
+// decía "999 (prueba)" en un equipo que factura contra la 001. Manda el modo
+// efectivo, que es lo que selectors.aplicar_opciones_prueba usa de verdad.
 const cajitaEmpresa = () => {
+  if (!modoImplantacion) return "";
   const p999 = $("prueba-emp-999");
   return (p999 && p999.checked) ? cajitaFija("Empresa", "999 (prueba)", true) : "";
 };
@@ -14565,6 +14673,7 @@ async function cargarAjustes() {
     exigeRuta = !!d.exige_ruta;
     rutasOfrecidas = d.rutas_ofrecidas || [];
     rutaFija = !!d.ruta_fija;
+    preseleccionarRutaSiFalta();
     accesoGestion = !!d.acceso_gestion;
     acceso = d.acceso || acceso;
     pintarDesactivada();

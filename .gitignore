@@ -8,6 +8,7 @@ logs/*
 !logs/.gitkeep
 reports/*
 !reports/.gitkeep
+build/
 __pycache__/
 *.db
 *.sqlite3
