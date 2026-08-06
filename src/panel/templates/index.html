@@ -9530,6 +9530,18 @@ function fijoDetalle(clave) {
     + `<div id="detalle-avisos">${htmlAvisosDetalle(clave)}</div>`;
 }
 
+// La nota abría siempre con "Descuentos vigentes para el <fecha>", y con todas
+// las líneas en 0 % eso daba a entender que había descuentos cuando no había
+// ninguno (2026-08-06, pedido del usuario): la frase dice si de verdad hay
+// descuentos activos ese día.
+function fraseDescuentosDetalle(d) {
+  const cuando = d.fecha_facturar ? ` para el ${esc(d.fecha_facturar)}` : "";
+  const hay = (d.lineas || []).some(l => Number(l.descuento_pct) > 0);
+  return hay
+    ? `Descuentos activos${cuando}, ya aplicados.`
+    : `Sin descuentos activos${cuando}.`;
+}
+
 // El pedido y su factura van en el título, y el cliente con el contexto en la
 // cabecera fija (fijoDetalle): aquí quedan la nota y la tabla de líneas.
 function contenidoDetalle(clave) {
@@ -9553,14 +9565,14 @@ function contenidoDetalle(clave) {
         un poco. Mientras, estas son las cantidades con que salió el documento.</div>`
     : d.editable
     ? (!d.puede_editar
-      ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+      ? `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento.</div>`
       : !detalleEdicionHabilitada
-      ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+      ? `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento.
           <button type="button" id="detalle-editar-btn"
                   onclick="habilitarEdicionDetalle()">Habilitar edición</button></div>`
-      : `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+      : `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento; puedes editar los números.</div>
          <div class="det-nota alerta">Estos datos normalmente conservan lo
           recibido de la aplicación de pedidos. Edita a mano solo por una
