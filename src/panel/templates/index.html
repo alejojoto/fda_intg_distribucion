@@ -3699,16 +3699,10 @@
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
         Va en el campo Vendedor de cada factura que salga de aquí.</p>
     </div>
-    <div class="configmaq-campo">
-      <label for="configmaq-serie">Serie con la que facturas</label>
-      <select id="configmaq-serie"></select>
-      <p class="mut" style="margin:4px 0 0; font-size:12.5px">
-        Queda como la serie predeterminada de esta computadora.</p>
-    </div>
     <div class="configmaq-campo" id="configmaq-campo-ruta" style="display:none">
       <label for="configmaq-ruta">Ruta con la que trabajas</label>
       <select id="configmaq-ruta"></select>
-      <p class="mut" style="margin:4px 0 0; font-size:12.5px">
+      <p class="mut" id="configmaq-ruta-nota" style="margin:4px 0 0; font-size:12.5px">
         Esta computadora factura una ruta a la vez; puedes cambiarla en la
         barra del panel cuando termines con ella.</p>
     </div>
@@ -6390,6 +6384,8 @@ function filtroBusquedaDinamico() {
 // 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
 // así que esto solo decide qué se pinta.
 let exigeRuta = false;
+// Este catálogo llega sin esperar la carga de pedidos, que tarda segundos.
+let rutasConocidas = [];
 const nombreRuta = (r) => r.replace(/^ruta\s+/i, "");
 
 // Cómo se nombra una ruta en un menú o en un botón: corto, como el dropdown.
@@ -7887,6 +7883,7 @@ async function cargar(conservarScroll = false) {
       }
     }
     pintarRutas(d.rutas, d.hay_sin_ruta);
+    refrescarRutasConfigMaquina();
     dispositivoPropio = d.dispositivo_propio || "";
     pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
@@ -14494,6 +14491,7 @@ async function cargarAjustes() {
     equipos = d.equipos_gestionables || [];
     maquinaDesactivada = !!d.maquina_desactivada;
     exigeRuta = !!d.exige_ruta;
+    rutasConocidas = d.rutas_conocidas || [];
     accesoGestion = !!d.acceso_gestion;
     acceso = d.acceso || acceso;
     pintarDesactivada();
@@ -15300,7 +15298,6 @@ let configPendiente = [];      // códigos de la configuración que falta aquí
 const CONFIGMAQ_TEXTOS = {
   nombre: "el nombre de esta computadora",
   vendedor: "el vendedor con el que facturas",
-  serie: "la serie con la que facturas",
   dia_despacho: "si facturas para hoy o para mañana",
   ruta: "la ruta con la que trabajas",
 };
@@ -15311,13 +15308,58 @@ let resolverConfigMaquina = null;
 // dato roto de por medio.
 let vistaPreviaConfigMaquina = false;
 
+// Rutas que puede ofrecer la configuración obligatoria: el catálogo que manda
+// /api/ajustes unido a lo que ya haya traído la lista de pedidos. La unión
+// existe porque esa carga tarda segundos y el formulario abre antes: sin ella
+// el desplegable salía vacío y, como la ruta es obligatoria y esta pantalla no
+// tiene salida, la computadora quedaba trancada (reporte del usuario 2026-08-06).
+function rutasParaConfigMaquina() {
+  return [...new Set([...(rutasConocidas || []),
+                      ...(ultimaLista.rutas || []),
+                      ...Object.keys(rutasSeriesConfig || {})])].sort();
+}
+
+// Sin ninguna ruta conocida el campo lo dice y no exige nada (guardarConfigMaquina
+// hace lo mismo): no se puede pedir que se elija entre cero opciones.
+function pintarRutaConfigMaquina() {
+  $("configmaq-campo-ruta").style.display = exigeRuta ? "" : "none";
+  if (!exigeRuta) return;
+  const rutas = rutasParaConfigMaquina();
+  const sel = $("configmaq-ruta");
+  const nota = $("configmaq-ruta-nota");
+  if (!rutas.length) {
+    sel.innerHTML = `<option value="">(todavía no hay rutas)</option>`;
+    sel.disabled = true;
+    nota.textContent = "Las rutas todavía no han cargado: esta computadora abre "
+      + "sin ruta fija y la eliges en la barra del panel en cuanto aparezcan.";
+    return;
+  }
+  sel.disabled = false;
+  const vacia = rutaPredeterminada
+    ? "" : `<option value="" selected>— Elige una ruta —</option>`;
+  sel.innerHTML = vacia + rutas.map(r =>
+    `<option value="${esc(r)}" ${r === rutaPredeterminada ? "selected" : ""}
+      >${esc(nombreRuta(r))}</option>`).join("");
+  nota.textContent = "Esta computadora factura una ruta a la vez; puedes cambiarla "
+    + "en la barra del panel cuando termines con ella.";
+}
+
+// La carga de pedidos llega después de que el formulario abrió: mientras no se
+// haya elegido ruta, sus opciones se rehacen con lo que acaba de llegar. Nunca
+// pisa una elección ya hecha.
+function refrescarRutasConfigMaquina() {
+  if (!$("configmaq-overlay").classList.contains("visible")) return;
+  if (!exigeRuta || $("configmaq-ruta").value) return;
+  pintarRutaConfigMaquina();
+}
+
 // Devuelve una promesa que resuelve true cuando quedó configurada. Quien la
 // espera (el llenado) puede seguir sin que el operador repita la acción.
 // soloVista=true: nada falta de verdad, es solo para mirar la pantalla.
 function abrirConfigMaquina(falta, soloVista = false) {
   vistaPreviaConfigMaquina = soloVista;
   const pendientes = soloVista ? [] : (falta && falta.length
-    ? falta : ["nombre", "vendedor", "serie", "dia_despacho"]);
+    ? falta : ["nombre", "vendedor", "dia_despacho"]);
   if (soloVista) {
     $("configmaq-intro").textContent =
       "Vista previa: nada se borró, son los valores ya guardados en esta computadora.";
@@ -15335,22 +15377,7 @@ function abrirConfigMaquina(falta, soloVista = false) {
     !puedeEditarIdentidad && !!(nombreMaquina || "").trim();
   $("configmaq-vendedor").disabled =
     !puedeEditarIdentidad && !!vendedorMaquina;
-  const serieVacia = seriePredeterminada
-    ? "" : `<option value="" selected>— Elige una serie —</option>`;
-  $("configmaq-serie").innerHTML = serieVacia + SERIES.map(s =>
-    `<option value="${s}" ${s === seriePredeterminada ? "selected" : ""}>${s}</option>`
-  ).join("");
-  // La ruta solo se pide a quien factura una a la vez (2026-08-05).
-  $("configmaq-campo-ruta").style.display = exigeRuta ? "" : "none";
-  if (exigeRuta) {
-    const rutas = [...new Set([...(ultimaLista.rutas || []),
-                               ...Object.keys(rutasSeriesConfig || {})])].sort();
-    const vacia = rutaPredeterminada
-      ? "" : `<option value="" selected>— Elige una ruta —</option>`;
-    $("configmaq-ruta").innerHTML = vacia + rutas.map(r =>
-      `<option value="${esc(r)}" ${r === rutaPredeterminada ? "selected" : ""}
-        >${esc(nombreRuta(r))}</option>`).join("");
-  }
+  pintarRutaConfigMaquina();
   document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
     r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
   });
@@ -15361,7 +15388,6 @@ function abrirConfigMaquina(falta, soloVista = false) {
   const foco = {
     nombre: () => $("configmaq-nombre"),
     vendedor: () => $("configmaq-vendedor"),
-    serie: () => $("configmaq-serie"),
     ruta: () => $("configmaq-ruta"),
     dia_despacho: () => document.querySelector("input[name=configmaq-dia]"),
   };
@@ -15397,7 +15423,6 @@ document.addEventListener("keydown", (ev) => {
 async function guardarConfigMaquina() {
   const nombre = $("configmaq-nombre").value.trim();
   const codigo = $("configmaq-vendedor").value;
-  const serie = $("configmaq-serie").value;
   const radioDia = document.querySelector("input[name=configmaq-dia]:checked");
   const error = (texto) => {
     $("configmaq-error").textContent = texto;
@@ -15406,8 +15431,9 @@ async function guardarConfigMaquina() {
   const ruta = exigeRuta ? $("configmaq-ruta").value : null;
   if (!nombre) return error("Escribe el nombre de esta computadora.");
   if (!codigo) return error("Elige el vendedor con el que factura esta computadora.");
-  if (!serie) return error("Elige la serie con la que factura esta computadora.");
-  if (exigeRuta && !ruta) return error("Elige la ruta con la que trabaja esta computadora.");
+  // Solo se exige la ruta si hay alguna que ofrecer (ver pintarRutaConfigMaquina).
+  if (exigeRuta && !ruta && rutasParaConfigMaquina().length)
+    return error("Elige la ruta con la que trabaja esta computadora.");
   if (!radioDia) return error("Elige si esta computadora factura para hoy o para mañana.");
   const boton = $("configmaq-guardar");
   boton.disabled = true;
@@ -15420,13 +15446,6 @@ async function guardarConfigMaquina() {
     if (codigo !== (vendedorMaquina || "")) {
       const r = await api("/api/ajustes/vendedor", {codigo});
       vendedorMaquina = codigo;
-      configPendiente = r.configuracion_pendiente || [];
-    }
-    if (serie !== (seriePredeterminada || "") || configPendiente.includes("serie")) {
-      const r = await api("/api/ajustes/serie", {serie});
-      seriePredeterminada = r.serie_predeterminada;
-      serieSeleccionada = r.serie_predeterminada;
-      pintarSeries();
       configPendiente = r.configuracion_pendiente || [];
     }
     if (ruta && (ruta !== (rutaPredeterminada || "")
