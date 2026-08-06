@@ -766,7 +766,7 @@
   .equipos-tabla .equipos-host { color:var(--mut); font-size:12.5px;
       min-width:110px; }
   .equipos-tabla input[type=text] { width:190px; }
-  .equipos-tabla .equipos-check { text-align:center; }
+  .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
@@ -781,6 +781,9 @@
   /* Ayuda de una línea al final de un grupo: el detalle completo, en el hover. */
   .prueba-nota { font-size:12.5px; color:var(--mut); border-bottom:1px dotted #c3c9d4;
                  cursor:help; }
+  /* Lo elegido todavía no es lo que corre: el dato deja de ser un apunte gris
+     y avisa que falta reabrir (o que el cambio de rama no llegó a ocurrir). */
+  .prueba-nota.alerta { color:#b54708; border-bottom-color:#b54708; }
   #prueba-recortar-n { width:56px; font:inherit; font-weight:600; padding:3px 6px;
       border:1px solid #c3c9d4; border-radius:6px; text-align:center; }
   #prueba-recortar-n:disabled { opacity:.5; }
@@ -1457,6 +1460,7 @@
   .sup-chip.sin-reportar { background:#fdecec; border-color:#f0b4b4; color:#b42318; }
   .sup-chip.sin-datos { background:#f8fafc; border:1px dashed #98a2b3; color:#667085; }
   .sup-estado-nota { margin-top:3px; color:var(--mut); font-size:11px; }
+  .sup-estado-nota.atrasada { color:var(--warn); }
   .sup-nube-lineas { display:flex; gap:4px 8px; flex-wrap:wrap; max-width:210px; }
   .sup-nube-lineas .sup-nube-ok { color:#15803d; font-weight:600; }
   .sup-nube-lineas .sup-nube-mal { color:#b42318; font-weight:600; }
@@ -1723,6 +1727,48 @@
   #desactivada-caja h2 { margin:0 0 10px; font-size:16px; }
   #desactivada-caja p { margin:0; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
+  /* Activación de esta computadora (2026-08-05): mismo tratamiento que el
+     aviso de desactivada — tapa el panel ENTERO mientras la instalación
+     espera aprobación, porque hasta entonces no hay datos que mostrar. Se
+     quita sola en cuanto el administrador la activa (el sondeo la trae). */
+  #acceso-overlay { position:fixed; inset:0; background:#f4f5f7;
+      display:none; z-index:61; align-items:center; justify-content:center; }
+  #acceso-overlay.visible { display:flex; }
+  body.modo-llenado #acceso-overlay { display:none; }
+  #acceso-caja { background:#fff; border-radius:10px; padding:24px 26px;
+      width:min(480px, 92vw); box-shadow:0 6px 30px rgba(0,0,0,.12); }
+  #acceso-caja h2 { margin:0 0 10px; font-size:16px; }
+  #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
+      line-height:1.5; }
+  #acceso-caja input[type=text] { width:100%; box-sizing:border-box;
+      padding:8px 10px; font-size:14px; border:1px solid var(--bor);
+      border-radius:6px; }
+  #acceso-error { color:var(--peligro); font-size:13px; margin:0 0 10px;
+      display:none; }
+  #acceso-espera { display:flex; align-items:center; gap:10px;
+      font-size:13.5px; color:var(--mut); }
+  #acceso-datos { font-size:12.5px; color:var(--mut); margin-top:14px;
+      border-top:1px solid var(--bor); padding-top:10px; }
+  /* Solicitudes de activación (AJUSTES → Computadoras) */
+  .solicitud { border:1px solid var(--bor); border-radius:8px; padding:12px 14px;
+      margin-bottom:10px; }
+  .solicitud-cab { display:flex; align-items:baseline; gap:8px;
+      flex-wrap:wrap; margin-bottom:6px; }
+  .solicitud-cab b { font-size:14px; }
+  .solicitud-datos { font-size:12.5px; color:var(--mut); line-height:1.6;
+      margin-bottom:10px; }
+  .solicitud-acciones { display:flex; gap:8px; align-items:center;
+      flex-wrap:wrap; }
+  .solicitud-acciones input[type=text] { padding:6px 8px; font-size:13px;
+      border:1px solid var(--bor); border-radius:6px; min-width:180px; }
+  .etiqueta-estado { font-size:11.5px; border-radius:10px; padding:2px 8px;
+      border:1px solid var(--bor); color:var(--mut); }
+  .etiqueta-estado.pendiente { border-color:#d79a00; color:#8a6400;
+      background:#fff8e6; }
+  .etiqueta-estado.activo { border-color:#2f8f4e; color:#1f6b39;
+      background:#eefaf1; }
+  .etiqueta-estado.rechazado, .etiqueta-estado.desactivado {
+      border-color:#c0483c; color:#95352b; background:#fdeeec; }
   #tasa-overlay, #docencurso-overlay, #repetida-overlay,
   #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay,
   #babymix-overlay {
@@ -2600,6 +2646,26 @@
          nombre y vendedor con identidad_maquina, Editor con
          gestionar_editores y Activa con activar_maquinas — un editor no ve
          las dos últimas. -->
+    <!-- Solicitudes de activación (2026-08-05). Una instalación nueva no opera
+         hasta que alguien la aprueba aquí; el bloque solo existe para la
+         supervisión y los equipos con rol Admin. -->
+    <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
+      <h3>Computadoras esperando activación</h3>
+      <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
+        entrar con el nombre que le puso quien la instaló. Hasta que se active
+        no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
+        de activarlo — el instalador se descarga por un enlace público.</p>
+      <div id="solicitudes-lista"></div>
+      <p class="mut" id="solicitudes-vacio" style="margin:0; display:none">
+        No hay ninguna computadora esperando activación.</p>
+      <p class="mut" id="solicitudes-error"
+         style="margin:0; display:none; color:var(--peligro)"></p>
+      <div style="margin-top:12px">
+        <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
+                class="secundario">Ver también las ya activas</button>
+      </div>
+    </div>
+
     <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
       <h3>Computadoras</h3>
       <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
@@ -2673,7 +2739,11 @@
           <input type="radio" name="prueba-canal" id="prueba-canal-produccion"
                  onchange="guardarCanal()">
           Producción</label>
-        <span class="prueba-nota"
+        <!-- Lo que de verdad está cargado (2026-08-06): el selector declara de
+             dónde se cargará al reabrir, y hasta ahora nada mostraba si eso
+             llegó a pasar. Elegir "Producción" y quedarse en desarrollo se veía
+             idéntico a estar en producción. -->
+        <span class="prueba-nota" id="carga-en-curso"
               title="El cambio de rama lo hace el lanzador antes de levantar el panel, así que esta sesión sigue con el código que ya cargó.">Se aplica al reabrir el asistente</span>
         <label class="desc-todos admin-modo-label" id="admin-modo-label">
           <input type="checkbox" id="admin-modo-chk"
@@ -2712,7 +2782,7 @@
            reciente que 1.0 si un envío nuevo falla. -->
       <div class="ajustes-fila">
         <b class="rotulo">Versión estable:</b>
-        <select id="version-estable-sel" onchange="guardarVersionEstable(this.value)"
+        <select id="version-estable-sel" onchange="onCambioVersionEstable(this)"
                 title="La versión que corren todas las computadoras de producción. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
           <option value="actual">Actual</option>
           <option value="1.1">1.1 — Release estable del 2026-08-05</option>
@@ -3581,6 +3651,36 @@
   </div>
 </div>
 
+<!-- Activación de esta computadora (2026-08-05). El instalador es público y no
+     trae llaves: la instalación pide un nombre, queda esperando aprobación y
+     hasta entonces no muestra ni un dato. Sin botón de salida a propósito —
+     no hay nada que elegir: o la aprueban, o esta computadora no opera. -->
+<div id="acceso-overlay">
+  <div id="acceso-caja">
+    <h2 id="acceso-titulo">Activa esta computadora</h2>
+    <p id="acceso-texto"></p>
+    <p id="acceso-error"></p>
+    <div id="acceso-form" style="display:none">
+      <label for="acceso-nombre" style="font-size:13px; font-weight:600;
+             display:block; margin-bottom:6px">Nombre de esta computadora</label>
+      <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2">
+      <p class="mut" style="margin:6px 0 0; font-size:12.5px">
+        Es el nombre con el que el administrador la reconoce al aprobarla, y
+        con el que después aparecen tus llenados en el historial de las demás.</p>
+      <div class="editor-acciones" style="margin-top:16px">
+        <button class="primario" id="acceso-enviar"
+                onclick="enviarSolicitudAcceso()">Pedir activación</button>
+      </div>
+    </div>
+    <div id="acceso-espera" style="display:none">
+      <span class="spinner"></span>
+      <span id="acceso-espera-texto">Esperando que un administrador active
+        esta computadora…</span>
+    </div>
+    <div id="acceso-datos"></div>
+  </div>
+</div>
+
 <div id="configmaq-overlay">
   <div id="configmaq-caja">
     <h3>Antes de facturar, configura esta computadora</h3>
@@ -3599,11 +3699,12 @@
       <p class="mut" style="margin:4px 0 0; font-size:12.5px">
         Va en el campo Vendedor de cada factura que salga de aquí.</p>
     </div>
-    <div class="configmaq-campo">
-      <label for="configmaq-serie">Serie con la que facturas</label>
-      <select id="configmaq-serie"></select>
-      <p class="mut" style="margin:4px 0 0; font-size:12.5px">
-        Queda como la serie predeterminada de esta computadora.</p>
+    <div class="configmaq-campo" id="configmaq-campo-ruta" style="display:none">
+      <label for="configmaq-ruta">Ruta con la que trabajas</label>
+      <select id="configmaq-ruta"></select>
+      <p class="mut" id="configmaq-ruta-nota" style="margin:4px 0 0; font-size:12.5px">
+        Esta computadora factura una ruta a la vez; puedes cambiarla en la
+        barra del panel cuando termines con ella.</p>
     </div>
     <div class="configmaq-campo">
       <label>Día de despacho de esta computadora</label>
@@ -3929,6 +4030,10 @@ let esMaquinaAdmin = false;
 // Última copia de las opciones de modo prueba leídas de /api/ajustes: la usa
 // guardarOpcionesPrueba para no pisar los saltos de la 001 al pasar a la 999.
 let opcionesPrueba = null;
+// Qué código corre AHORA (/api/ajustes → carga_en_curso): rama real del clon,
+// commit fuente y fecha. Es el HECHO contra el que se contrasta el selector
+// "Carga", que solo declara de dónde se cargará al reabrir.
+let cargaEnCurso = null;
 // Rol de esta máquina ya resuelto por el backend (/api/ajustes → permisos_ui,
 // src/panel/permisos.py): rol real, efectivo (tras "ver como") y cada permiso
 // en true/false. TODA decisión de qué pintar sale de aquí — el JS no vuelve a
@@ -6275,6 +6380,12 @@ function filtroBusquedaDinamico() {
 }
 
 // Nombre corto de una ruta para el dropdown ("Ruta LPG" → "LPG").
+// Esta computadora factura UNA ruta a la vez (sin el permiso ver_todas_rutas,
+// 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
+// así que esto solo decide qué se pinta.
+let exigeRuta = false;
+// Este catálogo llega sin esperar la carga de pedidos, que tarda segundos.
+let rutasConocidas = [];
 const nombreRuta = (r) => r.replace(/^ruta\s+/i, "");
 
 // Cómo se nombra una ruta en un menú o en un botón: corto, como el dropdown.
@@ -6309,6 +6420,18 @@ function opcionRutaPredet() {
 }
 
 function pintarRutas(rutas, haySinRuta) {
+  // Quien no puede ver todas las rutas trabaja dentro de la suya: el selector
+  // pierde "Todas" y las opciones de predeterminada (2026-08-05). Cambiar de
+  // ruta sigue siendo suyo — lo que no existe es no elegir ninguna.
+  if (exigeRuta) {
+    const opcionesUna = (rutas || []).map(r => [r, nombreRuta(r)]);
+    if (rutaSeleccionada && !opcionesUna.some(([v]) => v === rutaSeleccionada))
+      opcionesUna.push([rutaSeleccionada, etiquetaRutaCorta(rutaSeleccionada)]);
+    $("f-ruta").innerHTML = opcionesUna.map(([valor, texto]) => `
+      <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
+        ${esc(texto)}</option>`).join("");
+    return;
+  }
   const opciones = [["", "Todas"], ...(rutas || []).map(r => [r, nombreRuta(r)])];
   if (haySinRuta) opciones.push(["__sin_ruta__", "(sin ruta)"]);
   // La ruta puesta y la predeterminada tienen su opción aunque ya no les quede
@@ -6616,9 +6739,27 @@ function supCanalEquipo(equipo) {
   return rama ? (SUP_CANALES[rama] || rama) : "";
 }
 
+// El release más nuevo que reporta el parque de OPERACIÓN, en milisegundos. El
+// equipo admin corre desarrollo a propósito, así que no marca el ritmo de nadie.
+function supReleaseMasNuevo() {
+  let masNuevo = 0;
+  for (const e of supEquipos) {
+    if (e.modo_admin) continue;
+    const t = Date.parse(e.fecha_release || "");
+    if (Number.isFinite(t) && t > masNuevo) masNuevo = t;
+  }
+  return masNuevo;
+}
+
 function supFilaEquipo(equipo, sinDatos) {
   const host = esc(equipo.dispositivo || "");
   const canal = supCanalEquipo(equipo);
+  // De cuándo es el código que corre. Se compara por fecha del commit fuente y
+  // no por `version`: esa es el hash del build, que difiere entre canales
+  // aunque el código sea idéntico.
+  const tRelease = Date.parse(equipo.fecha_release || "");
+  const atrasada = !sinDatos && !equipo.modo_admin && Number.isFinite(tRelease)
+    && tRelease < supReleaseMasNuevo();
   // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
   // lo único que se conseguiría es perderle el nombre y el rol.
   const propio = equipo.dispositivo === supDispositivoPropio;
@@ -6632,7 +6773,12 @@ function supFilaEquipo(equipo, sinDatos) {
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
-      !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}</td>
+      !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}${
+      !sinDatos && equipo.fecha_release
+        ? `<div class="sup-estado-nota${atrasada ? " atrasada" : ""}">${
+            esc(supFechaCorta(equipo.fecha_release))}${
+            atrasada ? " · atrasada" : ""}</div>`
+        : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
@@ -7737,6 +7883,7 @@ async function cargar(conservarScroll = false) {
       }
     }
     pintarRutas(d.rutas, d.hay_sin_ruta);
+    refrescarRutasConfigMaquina();
     dispositivoPropio = d.dispositivo_propio || "";
     pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
@@ -9380,6 +9527,18 @@ function fijoDetalle(clave) {
     + `<div id="detalle-avisos">${htmlAvisosDetalle(clave)}</div>`;
 }
 
+// La nota abría siempre con "Descuentos vigentes para el <fecha>", y con todas
+// las líneas en 0 % eso daba a entender que había descuentos cuando no había
+// ninguno (2026-08-06, pedido del usuario): la frase dice si de verdad hay
+// descuentos activos ese día.
+function fraseDescuentosDetalle(d) {
+  const cuando = d.fecha_facturar ? ` para el ${esc(d.fecha_facturar)}` : "";
+  const hay = (d.lineas || []).some(l => Number(l.descuento_pct) > 0);
+  return hay
+    ? `Descuentos activos${cuando}, ya aplicados.`
+    : `Sin descuentos activos${cuando}.`;
+}
+
 // El pedido y su factura van en el título, y el cliente con el contexto en la
 // cabecera fija (fijoDetalle): aquí quedan la nota y la tabla de líneas.
 function contenidoDetalle(clave) {
@@ -9403,14 +9562,14 @@ function contenidoDetalle(clave) {
         un poco. Mientras, estas son las cantidades con que salió el documento.</div>`
     : d.editable
     ? (!d.puede_editar
-      ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+      ? `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento.</div>`
       : !detalleEdicionHabilitada
-      ? `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+      ? `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento.
           <button type="button" id="detalle-editar-btn"
                   onclick="habilitarEdicionDetalle()">Habilitar edición</button></div>`
-      : `<div class="det-nota">Descuentos vigentes para el ${esc(d.fecha_facturar || "")}.
+      : `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento; puedes editar los números.</div>
          <div class="det-nota alerta">Estos datos normalmente conservan lo
           recibido de la aplicación de pedidos. Edita a mano solo por una
@@ -11663,7 +11822,7 @@ const imprimirEnFila = () =>
 // pendiente de la ruta elegida. Con impresión no aparece (el papel obliga a
 // lotes cortos y de tamaño variable) y sin ruta elegida tampoco: sería "todo lo
 // que haya", que no es lo que se pidió. El gate de la barra (enFilaDisponible)
-// la deja fuera de producción.
+// la deja fuera de las máquinas de operación.
 function rutaCompletaDisponible() {
   return !imprimirEnFila() && rutaSeleccionada !== "" && enFilaDisponible();
 }
@@ -11897,12 +12056,15 @@ function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
 // a `produccion`, pero el panel solo veía el radio de ADMIN sin marcar y daba
 // la corrida por disponible. De ahí que producción viera "Llenar en fila".
 // `esMaquinaAdmin` (capacidad por hostname, /api/ajustes) es la condición que
-// no depende de config alguna; el radio sigue mandando dentro del equipo admin
-// para poder ver la vista de producción sin cambiar de máquina. Arranca en
-// false, así que hasta que carguen los ajustes se ve la barra de producción,
-// que es el lado seguro.
-const enFilaDisponible = () =>
-  esMaquinaAdmin && !$("prueba-canal-produccion").checked;
+// no depende de config alguna. Arranca en false, así que hasta que carguen los
+// ajustes se ve la barra de producción, que es el lado seguro.
+// El radio de Carga SALIÓ de este gate (2026-08-06, pedido del usuario): elegir
+// "Producción" es cargar el código de producción al reabrir, no disfrazar el
+// panel de máquina de operación. Imitar la vista escondiendo herramientas daba
+// justo la falsa certeza que el selector debía dar de verdad — y de paso le
+// quitaba al equipo admin la corrida, que es suya. Quien quiera ver la vista
+// del operador tiene el selector de rol de la barra ("Ver como").
+const enFilaDisponible = () => esMaquinaAdmin;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
@@ -13492,7 +13654,7 @@ function rutasQueSiguen() {
 }
 
 function ofrecerContinuarConOtraRuta() {
-  if (!imprimirEnFila() || rutaSeleccionada === "" || completaEnFila) return false;
+  if (rutaSeleccionada === "" || completaEnFila) return false;
   // El cupo se mide contra la cantidad que el OPERADOR eligió (cantidadEnFila):
   // metaPedidaEnFila ya nace recortada a lo que la ruta tenía — con ella la
   // ruta corta jamás dejaría cupo que ofrecer.
@@ -13500,6 +13662,19 @@ function ofrecerContinuarConOtraRuta() {
   const siguiente = rutasQueSiguen()[0];
   if (!siguiente) return false;
   const serie = serieAsignadaDeRuta(siguiente);
+  // SIN papel la corrida sigue sola con la ruta que viene, avisando cuál es
+  // (2026-08-05, regla del usuario): ahí cambiar de ruta no cambia ningún
+  // talonario físico, y parar a preguntar solo hacía esperar al operador.
+  // Con papel se sigue preguntando SIEMPRE — y sin serie asignada también,
+  // porque elegir serie sí es una decisión.
+  if (!imprimirEnFila() && serie) {
+    cambioRutaPendiente = {siguiente, serie};
+    mensaje(`Ruta ${etiquetaRutaCorta(rutaSeleccionada)} terminada: `
+      + `${hechasEnFila} de ${cantidadEnFila} llenadas. Sigue sola con la `
+      + `ruta ${etiquetaRutaCorta(siguiente)}, serie ${serie}.`, "ok", false);
+    confirmarCambioDeRuta();
+    return true;
+  }
   secuenciaActiva = false;
   cambioRutaPendiente = {siguiente, serie};
   $("btn-secuencia").style.display = "none";
@@ -13955,14 +14130,12 @@ function pintarBanderasPrueba() {
     ind.push("sin registro real");
     partes.push("PRUEBA AISLADA — " + ind.join(" · "));
   }
-  // El canal va FUERA del modo admin (2026-07-28): en Producción, la vista
-  // queda igual a la de una máquina de FDA (ver enFilaDisponible) aunque el
-  // modo admin siga prendido — este aviso es lo único que sigue distinguiendo
-  // el equipo admin de una máquina real en esa combinación. Solo se avisa de
-  // Producción: Dev es lo normal en el servidor admin (la opción "Automático"
-  // se retiró el 2026-07-29 y ya no hay nada que distinguir de ella).
-  if ($("prueba-canal-produccion").checked)
-    partes.push("CARGA LA VERSIÓN DE PRODUCCIÓN");
+  // El canal va FUERA del modo admin (2026-07-28) y desde 2026-08-06 el aviso
+  // dice qué código CORRE, no cuál se eligió: quedarse en desarrollo con
+  // "Producción" marcada se veía exactamente igual que estar en producción.
+  // Dev sin nada raro no se avisa: es lo normal en el servidor admin.
+  const avisoCarga = avisoCargaBarra();
+  if (avisoCarga) partes.push(avisoCarga);
   span.textContent = partes.join("   |   ");
   span.style.display = partes.length ? "" : "none";
 }
@@ -14187,6 +14360,84 @@ async function guardarOpcionesPrueba() {
   }
 }
 
+// --- Qué código corre AHORA vs. el que pide "Carga" (2026-08-06) ------------
+// El selector solo declara una intención: de qué rama se cargará al reabrir el
+// asistente. Entre esa intención y el hecho se pueden meter un panel que
+// todavía no se ha reabierto, un cambio de rama que falló (solo deja un AVISO
+// en el log del lanzador, que nadie mira) o un clon con código fuente, donde el
+// lanzador no toca la rama a propósito. Sin esto a la vista, marcar
+// "Producción" se parecía a estar en producción sin ninguna prueba de estarlo.
+const RAMA_DE_CANAL = {produccion: "produccion", estable: "estable",
+                       "estable-1.1": "estable-1.1", desarrollo: "main", "": "main"};
+
+// La rama que el lanzador buscaría hoy en este equipo. El canal vacío es el
+// automático por equipo y NO es el mismo para todos (ver lanzador.rama_del_canal):
+// el servidor admin sigue desarrollo y cualquier otra máquina, producción — que
+// es como nace toda instalación, sin nada guardado.
+function ramaEsperada() {
+  const canal = (opcionesPrueba && opcionesPrueba.canal) || "";
+  if (canal) return RAMA_DE_CANAL[canal] || "main";
+  return esMaquinaAdmin ? "main" : "produccion";
+}
+
+const cargaAlineada = () =>
+  !!cargaEnCurso && !!cargaEnCurso.rama && cargaEnCurso.rama === ramaEsperada();
+
+// "Producción · a1b2c3d · 05-08 22:26" — el commit fuente es el identificador
+// que coincide entre canales (el hash del build no: se recompila en cada
+// publicación).
+function cargaCorriendoTexto() {
+  const rama = (cargaEnCurso && cargaEnCurso.rama) || "";
+  const nombre = rama ? (SUP_CANALES[rama] || rama) : "versión desconocida";
+  const sello = [cargaEnCurso && cargaEnCurso.commit,
+                 cargaEnCurso && cargaEnCurso.fecha
+                   ? supFechaCorta(cargaEnCurso.fecha) : ""].filter(Boolean);
+  return [nombre, ...sello].join(" · ");
+}
+
+function pintarCargaEnCurso() {
+  const span = $("carga-en-curso");
+  if (!span) return;
+  if (!cargaEnCurso || !cargaEnCurso.rama) {
+    span.textContent = "Se aplica al reabrir el asistente";
+    span.title = "El cambio de rama lo hace el lanzador antes de levantar el "
+      + "panel, así que esta sesión sigue con el código que ya cargó.";
+    span.classList.remove("alerta");
+    return;
+  }
+  const alineada = cargaAlineada();
+  const cola = !cargaEnCurso.instalado
+    ? " — clon con código fuente: aquí la rama se cambia a mano"
+    : alineada ? "" : " — cambia al reabrir el asistente";
+  span.textContent = "Corre: " + cargaCorriendoTexto() + cola;
+  span.title = !cargaEnCurso.instalado
+    ? "Este equipo corre desde un clon con código fuente y el asistente no le "
+      + "cambia la rama solo: la elección de arriba queda guardada, pero el "
+      + "código que corre es el que tenga el clon."
+    : alineada
+      ? "Es el código que está cargado ahora mismo, no el que se eligió. "
+        + "Coincide con la carga elegida arriba."
+      : "El código cargado no es todavía el de la carga elegida arriba. El "
+        + "cambio de rama lo hace el lanzador al reabrir el asistente.";
+  span.classList.toggle("alerta", !alineada);
+}
+
+// El aviso de la barra superior: dice qué CORRE, no qué se eligió. Sin commit
+// ni fecha — ese detalle vive en la fila "Carga" de AJUSTES; aquí basta el
+// nombre. Callado en el caso normal del servidor admin (desarrollo, cargado) y
+// callado SIEMPRE en una máquina de operación: de qué rama carga el asistente
+// es asunto del programa, no del operador.
+function avisoCargaBarra() {
+  if (!esMaquinaAdmin) return "";
+  if (!cargaEnCurso || !cargaEnCurso.rama) return "";
+  const nombre = (rama) => (SUP_CANALES[rama] || rama).toUpperCase();
+  if (!cargaAlineada())
+    return "CARGA PEDIDA: " + nombre(ramaEsperada())
+      + " — TODAVÍA CORRE " + nombre(cargaEnCurso.rama);
+  if (cargaEnCurso.rama === "main") return "";
+  return "CORRE " + nombre(cargaEnCurso.rama);
+}
+
 async function guardarCanal() {
   const anterior = (opcionesPrueba && opcionesPrueba.canal) || "";
   const canal = $("prueba-canal-produccion").checked
@@ -14198,12 +14449,12 @@ async function guardarCanal() {
     $("prueba-canal-desarrollo").checked = r.canal !== "produccion";
     pintarBanderasPrueba();
     pintarBarraRapida();
-    pintarBarraEnFila();
+    pintarCargaEnCurso();
   } catch (e) {
     $("prueba-canal-produccion").checked = anterior === "produccion";
     $("prueba-canal-desarrollo").checked = anterior !== "produccion";
     pintarBarraRapida();
-    pintarBarraEnFila();
+    pintarCargaEnCurso();
     mensaje("No se pudo cambiar el canal: " + e.message, "error");
   }
 }
@@ -14239,12 +14490,17 @@ async function cargarAjustes() {
     permisosUI = d.permisos_ui || permisosUI;
     equipos = d.equipos_gestionables || [];
     maquinaDesactivada = !!d.maquina_desactivada;
+    exigeRuta = !!d.exige_ruta;
+    rutasConocidas = d.rutas_conocidas || [];
+    accesoGestion = !!d.acceso_gestion;
+    acceso = d.acceso || acceso;
     pintarDesactivada();
+    pintarAcceso();
     pintarBloqueoMaquina();
-    // Instalación nueva (o configuración borrada para probar): el aviso sale
-    // solo, sin esperar a que el operador intente llenar algo. Se abre después
-    // de leer los permisos porque también protege los datos ya configurados.
-    if ((d.configuracion_pendiente || []).length && !resolverConfigMaquina)
+    // Mientras la computadora espera activación no se pide configurarla: la
+    // pantalla de activación ya la tapa y el nombre lo toma de ahí.
+    if (!ACCESO_TAPA.includes(acceso.estado || "activo")
+        && (d.configuracion_pendiente || []).length && !resolverConfigMaquina)
       abrirConfigMaquina(d.configuracion_pendiente);
     // Los bloques de admin se pintan por la supervisión EFECTIVA: con "ver
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
@@ -14266,11 +14522,16 @@ async function cargarAjustes() {
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
+    cargarSolicitudesAcceso();
     pintarVerComo();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
     pintarVersionEstable(d.version_estable);
+    cargaEnCurso = d.carga_en_curso || null;
     pintarOpcionesPrueba(d.opciones_prueba);
+    // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
+    // guardado en opcionesPrueba.
+    pintarCargaEnCurso();
     pintarBotonCorte();
     refrescarVistasModoPrueba();
     return true;
@@ -14285,6 +14546,260 @@ async function cargarAjustes() {
 // compartido el que trae la reactivación y quita el aviso solo.
 function pintarDesactivada() {
   $("desactivada-overlay").classList.toggle("visible", maquinaDesactivada);
+}
+
+// --- Activación de esta computadora (2026-08-05) --------------------------
+// El instalador es público y no trae llaves: una instalación nueva pide un
+// nombre, queda esperando y no ve ni un dato hasta que la aprueban. El sondeo
+// solo corre mientras el aviso está puesto: en cuanto activan, se quita y no
+// vuelve a viajar por esto.
+let acceso = {estado: "activo"};
+let accesoSondeo = null;
+
+const ACCESO_TAPA = ["sin_credencial", "desconocido", "pendiente",
+                     "rechazado", "desactivado", "olvidado"];
+
+function pintarAcceso() {
+  const estado = acceso.estado || "activo";
+  const tapa = ACCESO_TAPA.includes(estado);
+  $("acceso-overlay").classList.toggle("visible", tapa);
+  if (!tapa) { detenerSondeoAcceso(); return; }
+  const pideNombre = estado === "sin_credencial" || estado === "desconocido"
+    || estado === "olvidado";
+  $("acceso-form").style.display = pideNombre ? "" : "none";
+  $("acceso-espera").style.display = estado === "pendiente" ? "flex" : "none";
+  const titulo = {
+    sin_credencial: "Activa esta computadora",
+    desconocido: "Activa esta computadora",
+    olvidado: "Registra esta computadora de nuevo",
+    pendiente: "Esperando activación",
+    rechazado: "Esta computadora no fue activada",
+    desactivado: "Esta computadora ya no tiene acceso",
+  }[estado];
+  const texto = {
+    sin_credencial: "Es la primera vez que se abre el asistente aquí. Ponle un "
+      + "nombre y pide la activación: un administrador la aprueba y esta "
+      + "computadora queda lista.",
+    desconocido: "Ponle un nombre a esta computadora y pide la activación: un "
+      + "administrador la aprueba y queda lista.",
+    olvidado: "Un administrador olvidó el registro de esta computadora, así "
+      + "que debe registrarse otra vez. Ponle un nombre y pide la "
+      + "activación; su configuración de siempre no se pierde.",
+    pendiente: "Ya se pidió la activación. En cuanto un administrador la "
+      + "apruebe, esta pantalla se quita sola y podrás terminar de "
+      + "configurarla — no hace falta cerrar ni volver a abrir el asistente.",
+    rechazado: "Un administrador rechazó la solicitud, así que desde aquí no "
+      + "se puede facturar. Si fue un error, pídele que la active desde "
+      + "AJUSTES → Computadoras.",
+    desactivado: "Un administrador le quitó el acceso a esta computadora. "
+      + "Para volver a usarla, tiene que activarla desde AJUSTES → "
+      + "Computadoras.",
+  }[estado];
+  $("acceso-titulo").textContent = titulo;
+  $("acceso-texto").textContent = texto
+    + (acceso.motivo ? ` Motivo anotado: ${acceso.motivo}` : "");
+  const nombre = acceso.nombre_solicitado || "";
+  $("acceso-datos").textContent = acceso.sin_conexion
+    ? "Sin conexión con el servidor; se sigue intentando."
+    : (nombre ? `Nombre pedido: ${nombre}` : "");
+  if (pideNombre && nombre && !$("acceso-nombre").value)
+    $("acceso-nombre").value = nombre;
+  arrancarSondeoAcceso();
+}
+
+function arrancarSondeoAcceso() {
+  if (accesoSondeo) return;
+  accesoSondeo = setInterval(sondearAcceso, 5000);
+}
+
+function detenerSondeoAcceso() {
+  if (!accesoSondeo) return;
+  clearInterval(accesoSondeo);
+  accesoSondeo = null;
+}
+
+async function sondearAcceso() {
+  try {
+    const r = await api("/api/acceso/estado");
+    const eraTapado = ACCESO_TAPA.includes(acceso.estado);
+    acceso = r;
+    pintarAcceso();
+    // Recién activada: el nombre ya quedó puesto por el servidor, así que se
+    // recarga todo y el formulario pide únicamente lo que falta.
+    if (eraTapado && !ACCESO_TAPA.includes(r.estado)) {
+      await cargarAjustes();
+      cargar();
+    }
+  } catch (e) {
+    $("acceso-datos").textContent =
+      "Sin conexión con el servidor; se sigue intentando.";
+  }
+}
+
+// --- Gestión de activaciones (AJUSTES → Computadoras esperando activación) --
+// Solo para la supervisión y los equipos con rol Admin: un Editor sin Admin
+// no gestiona activaciones (regla del usuario, 2026-08-05). El backend repite
+// el candado en cada endpoint; esto decide qué se pinta.
+let accesoGestion = false;
+let solicitudes = [];
+let verEquiposActivos = false;
+
+const fechaAcceso = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d) ? "—" : d.toLocaleString("es-VE",
+    {day: "2-digit", month: "2-digit", year: "numeric",
+     hour: "2-digit", minute: "2-digit"});
+};
+
+async function cargarSolicitudesAcceso() {
+  const bloque = $("solicitudes-bloque");
+  if (!accesoGestion) { bloque.style.display = "none"; return; }
+  bloque.style.display = "";
+  try {
+    const r = await api("/api/acceso/equipos");
+    solicitudes = r.equipos || [];
+    $("solicitudes-error").style.display = "none";
+  } catch (e) {
+    solicitudes = [];
+    $("solicitudes-error").textContent = e.message;
+    $("solicitudes-error").style.display = "";
+  }
+  pintarSolicitudes();
+}
+
+function mostrarEquiposActivos() {
+  verEquiposActivos = !verEquiposActivos;
+  pintarSolicitudes();
+}
+
+function pintarSolicitudes() {
+  const espera = solicitudes.filter(
+    s => s.estado === "pendiente" || s.reinstalacion_pendiente);
+  const resto = solicitudes.filter(s => !espera.includes(s));
+  const lista = verEquiposActivos ? [...espera, ...resto] : espera;
+  $("solicitudes-ver-activos").textContent = verEquiposActivos
+    ? "Ver solo las que esperan" : "Ver también las ya activas";
+  $("solicitudes-ver-activos").style.display = resto.length ? "" : "none";
+  $("solicitudes-vacio").style.display =
+    (!lista.length && !$("solicitudes-error").textContent) ? "" : "none";
+  $("solicitudes-lista").innerHTML = lista.map(pintarUnaSolicitud).join("");
+}
+
+function pintarUnaSolicitud(s) {
+  const host = esc(s.dispositivo);
+  const nombre = esc(s.nombre || s.nombre_solicitado || "");
+  const reinstala = s.reinstalacion_pendiente;
+  const estado = reinstala ? "pendiente" : s.estado;
+  const rotulo = reinstala ? "reinstalación por aprobar" : s.estado;
+  const so = s.huella && s.huella.so ? ` · ${esc(s.huella.so)}` : "";
+  const cuando = reinstala ? s.reinstalacion_solicitada_en : s.solicitado_en;
+  const quien = s.activado_por || s.rechazado_por || s.desactivado_por;
+  const cuandoAccion = s.activado_en || s.rechazado_en || s.desactivado_en;
+  const historia = quien
+    ? `<br>Última decisión: ${esc(quien)} el ${esc(fechaAcceso(cuandoAccion))}`
+    : "";
+  const motivo = s.motivo_rechazo || s.motivo_desactivacion;
+  const enEspera = estado === "pendiente";
+  // Olvidar existe solo en la consola central (2026-08-06): devolver una
+  // computadora al estado de recién instalada es control del producto, no
+  // administración diaria. El backend repite el candado.
+  const olvidar = (esMaquinaAdmin && esSupervisionEfectiva())
+    ? `<button class="secundario" title="Su próxima apertura
+        vuelve a pedir nombre y aprobación, como una instalación nueva; su
+        configuración no se pierde."
+        onclick="olvidarEquipo(this, '${host}')">Olvidar</button>`
+    : "";
+  // Una computadora activa ya no se saca de servicio desde aquí: eso vive en
+  // el bloque Computadoras, columna "Activa".
+  const acciones = enEspera
+    ? `<input type="text" id="sol-nombre-${host}" maxlength="40"
+              value="${nombre}" placeholder="Nombre de la computadora">
+       <button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>
+       <button class="secundario" onclick="rechazarEquipo(this, '${host}')">Rechazar</button>`
+    : (s.estado === "activo"
+        ? olvidar
+        : `<button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>${olvidar}`);
+  return `<div class="solicitud">
+    <div class="solicitud-cab">
+      <b>${nombre || host}</b>
+      <span class="etiqueta-estado ${esc(estado)}">${esc(rotulo)}</span>
+    </div>
+    <div class="solicitud-datos">
+      Identificador: ${host}${so}<br>
+      ${reinstala ? "Reinstalada" : "Solicitada"}: ${esc(fechaAcceso(cuando))}
+      · Versión: ${esc(s.version || "—")}<br>
+      Última señal: ${esc(fechaAcceso(s.ultima_verificacion))}
+      ${motivo ? `<br>Motivo anotado: ${esc(motivo)}` : ""}${historia}
+    </div>
+    ${acciones ? `<div class="solicitud-acciones">${acciones}</div>` : ""}
+  </div>`;
+}
+
+// Activar deja entrar a una computadora que todavía no se ha visto y cuyo
+// instalador es público; Rechazar ya exige la misma pausa antes de decidir.
+function confirmarActivarEquipo(btn, host) {
+  confirmarSinQuitar(btn, () => activarEquipo(host), "Confirmar: dar acceso");
+}
+
+async function activarEquipo(host) {
+  const campo = $(`sol-nombre-${host}`);
+  const nombre = campo ? campo.value.trim() : "";
+  try {
+    const r = await api("/api/acceso/activar", {dispositivo: host, nombre});
+    mensaje(r.aviso || `Computadora ${nombre || host} activada.`,
+            r.aviso ? "alerta" : "ok");
+    await cargarSolicitudesAcceso();
+    cargarAjustes();
+  } catch (e) {
+    mensaje("No se pudo activar: " + e.message, "error");
+  }
+}
+
+function rechazarEquipo(btn, host) {
+  confirmarBorrar(btn, async () => {
+    try {
+      await api("/api/acceso/rechazar", {dispositivo: host});
+      mensaje(`Solicitud de ${host} rechazada.`, "ok");
+      await cargarSolicitudesAcceso();
+    } catch (e) {
+      mensaje("No se pudo rechazar: " + e.message, "error");
+    }
+  }, "Confirmar rechazo");
+}
+
+function olvidarEquipo(btn, host) {
+  confirmarBorrar(btn, async () => {
+    try {
+      await api("/api/acceso/olvidar", {dispositivo: host});
+      mensaje(`La computadora ${host} quedó olvidada: en su próxima apertura `
+        + `vuelve a pedir nombre y aprobación.`, "ok");
+      await cargarSolicitudesAcceso();
+    } catch (e) {
+      mensaje("No se pudo olvidar: " + e.message, "error");
+    }
+  }, "Confirmar olvidar");
+}
+
+async function enviarSolicitudAcceso() {
+  const nombre = $("acceso-nombre").value.trim();
+  const error = (texto) => {
+    $("acceso-error").textContent = texto;
+    $("acceso-error").style.display = "";
+  };
+  if (!nombre) return error("Escribe el nombre de esta computadora.");
+  const boton = $("acceso-enviar");
+  boton.disabled = true;
+  $("acceso-error").style.display = "none";
+  try {
+    const r = await api("/api/acceso/solicitar", {nombre});
+    acceso = {...(r.acceso || {}), nombre_solicitado: nombre};
+    pintarAcceso();
+  } catch (e) {
+    error(e.message);
+  } finally {
+    boton.disabled = false;
+  }
 }
 
 // Las demás computadoras, en UNA tabla (2026-08-05; antes eran dos bloques,
@@ -14319,23 +14834,23 @@ function pintarEquipos() {
           ? "Quitarlo lo deja como Editor."
           : "Marca esta computadora como Admin."}">
         <input type="checkbox" ${m.es_admin ? "checked" : ""}
-               onchange="cambiarRolEquipo('${host}', 'admin', this)"> Admin</label>
+               onclick="return onClickRolEquipo(event, '${host}', 'admin')"> Admin</label>
       <label class="sup-rol-check" title="${m.es_admin
           ? "Lo es por ser Admin."
           : "Marca esta computadora como Editor."}">
         <input type="checkbox" ${m.es_editor ? "checked" : ""}
                ${m.es_admin ? "disabled" : ""}
-               onchange="cambiarRolEquipo('${host}', 'editor', this)"> Editor</label></td>`
+               onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></td>`
     : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}
              ${m.es_admin ? "disabled" : ""}
              title="${m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
                                  : "Marca esta computadora como Editor."}"
-             onchange="cambiarEditorEquipo('${host}', this)"></td>`;
+             onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
       <input type="checkbox" ${m.activa ? "checked" : ""}
              title="Al quitarla, esa computadora queda fuera de servicio."
-             onchange="cambiarActivaEquipo('${host}', this)"></td>`;
+             onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
     return `<tr>
       <td class="equipos-host">${host}</td>
       <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
@@ -14360,6 +14875,48 @@ function pintarEquipos() {
     pintarSelectVendedores(fila.querySelector("select"),
                            equipos[indice].vendedor || "");
   });
+}
+
+// Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
+// OTRA máquina; con un interruptor de un clic es fácil moverlos sin querer
+// (pedido del usuario 2026-08-06). Mismo patrón que onClickEsPruebaChk: el
+// valor que el clic iba a dejar se lee ANTES —en un checkbox `checked` ya
+// trae el valor nuevo cuando corre el manejador, y preventDefault lo revierte
+// recién al terminar— y se repone tal cual al confirmar.
+function onClickEditorEquipo(ev, dispositivo) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  confirmarSinQuitar(caja, () => {
+    caja.checked = activando;
+    cambiarEditorEquipo(dispositivo, caja);
+  }, activando ? "Confirmar: puede editar" : "Confirmar: deja de editar");
+  return false;
+}
+
+function onClickRolEquipo(ev, dispositivo, rol) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  const etiqueta = rol === "admin"
+    ? (activando ? "Confirmar: pasa a Admin" : "Confirmar: baja a Editor")
+    : (activando ? "Confirmar: pasa a Editor" : "Confirmar: se queda sin rol");
+  confirmarSinQuitar(caja.closest("label"), () => {
+    caja.checked = activando;
+    cambiarRolEquipo(dispositivo, rol, caja);
+  }, etiqueta);
+  return false;
+}
+
+function onClickActivaEquipo(ev, dispositivo) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  confirmarSinQuitar(caja, () => {
+    caja.checked = activando;
+    cambiarActivaEquipo(dispositivo, caja);
+  }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
+  return false;
 }
 
 async function cambiarEditorEquipo(dispositivo, caja) {
@@ -14613,6 +15170,21 @@ function pintarVersionEstable(version) {
     versionEstablePintada === VERSION_ACTUAL ? "none" : "";
 }
 
+// Elegir otra versión mueve a TODAS las computadoras de producción, y un
+// selector se corre solo con la rueda del ratón o una flecha del teclado
+// (pedido del usuario 2026-08-06). El selector vuelve enseguida a la versión
+// vigente —no se adelanta a un guardado que todavía no ocurrió— y el cambio se
+// manda recién al confirmar. Como el selector se esconde mientras se pregunta,
+// la etiqueta dice en qué versión van a quedar.
+function onCambioVersionEstable(sel) {
+  const querida = sel.value;
+  if (querida === versionEstablePintada) return;
+  pintarVersionEstable(versionEstablePintada);
+  confirmarSinQuitar(sel, () => guardarVersionEstable(querida),
+    querida === VERSION_ACTUAL ? "Confirmar: todas al día"
+                               : `Confirmar: todas a la ${querida}`);
+}
+
 async function guardarVersionEstable(version) {
   const anterior = versionEstablePintada;
   try {
@@ -14726,8 +15298,8 @@ let configPendiente = [];      // códigos de la configuración que falta aquí
 const CONFIGMAQ_TEXTOS = {
   nombre: "el nombre de esta computadora",
   vendedor: "el vendedor con el que facturas",
-  serie: "la serie con la que facturas",
   dia_despacho: "si facturas para hoy o para mañana",
+  ruta: "la ruta con la que trabajas",
 };
 let resolverConfigMaquina = null;
 // Vista previa (?ver_configuracion=1, 2026-07-31): la misma pantalla, pero
@@ -14736,13 +15308,58 @@ let resolverConfigMaquina = null;
 // dato roto de por medio.
 let vistaPreviaConfigMaquina = false;
 
+// Rutas que puede ofrecer la configuración obligatoria: el catálogo que manda
+// /api/ajustes unido a lo que ya haya traído la lista de pedidos. La unión
+// existe porque esa carga tarda segundos y el formulario abre antes: sin ella
+// el desplegable salía vacío y, como la ruta es obligatoria y esta pantalla no
+// tiene salida, la computadora quedaba trancada (reporte del usuario 2026-08-06).
+function rutasParaConfigMaquina() {
+  return [...new Set([...(rutasConocidas || []),
+                      ...(ultimaLista.rutas || []),
+                      ...Object.keys(rutasSeriesConfig || {})])].sort();
+}
+
+// Sin ninguna ruta conocida el campo lo dice y no exige nada (guardarConfigMaquina
+// hace lo mismo): no se puede pedir que se elija entre cero opciones.
+function pintarRutaConfigMaquina() {
+  $("configmaq-campo-ruta").style.display = exigeRuta ? "" : "none";
+  if (!exigeRuta) return;
+  const rutas = rutasParaConfigMaquina();
+  const sel = $("configmaq-ruta");
+  const nota = $("configmaq-ruta-nota");
+  if (!rutas.length) {
+    sel.innerHTML = `<option value="">(todavía no hay rutas)</option>`;
+    sel.disabled = true;
+    nota.textContent = "Las rutas todavía no han cargado: esta computadora abre "
+      + "sin ruta fija y la eliges en la barra del panel en cuanto aparezcan.";
+    return;
+  }
+  sel.disabled = false;
+  const vacia = rutaPredeterminada
+    ? "" : `<option value="" selected>— Elige una ruta —</option>`;
+  sel.innerHTML = vacia + rutas.map(r =>
+    `<option value="${esc(r)}" ${r === rutaPredeterminada ? "selected" : ""}
+      >${esc(nombreRuta(r))}</option>`).join("");
+  nota.textContent = "Esta computadora factura una ruta a la vez; puedes cambiarla "
+    + "en la barra del panel cuando termines con ella.";
+}
+
+// La carga de pedidos llega después de que el formulario abrió: mientras no se
+// haya elegido ruta, sus opciones se rehacen con lo que acaba de llegar. Nunca
+// pisa una elección ya hecha.
+function refrescarRutasConfigMaquina() {
+  if (!$("configmaq-overlay").classList.contains("visible")) return;
+  if (!exigeRuta || $("configmaq-ruta").value) return;
+  pintarRutaConfigMaquina();
+}
+
 // Devuelve una promesa que resuelve true cuando quedó configurada. Quien la
 // espera (el llenado) puede seguir sin que el operador repita la acción.
 // soloVista=true: nada falta de verdad, es solo para mirar la pantalla.
 function abrirConfigMaquina(falta, soloVista = false) {
   vistaPreviaConfigMaquina = soloVista;
   const pendientes = soloVista ? [] : (falta && falta.length
-    ? falta : ["nombre", "vendedor", "serie", "dia_despacho"]);
+    ? falta : ["nombre", "vendedor", "dia_despacho"]);
   if (soloVista) {
     $("configmaq-intro").textContent =
       "Vista previa: nada se borró, son los valores ya guardados en esta computadora.";
@@ -14760,11 +15377,7 @@ function abrirConfigMaquina(falta, soloVista = false) {
     !puedeEditarIdentidad && !!(nombreMaquina || "").trim();
   $("configmaq-vendedor").disabled =
     !puedeEditarIdentidad && !!vendedorMaquina;
-  const serieVacia = seriePredeterminada
-    ? "" : `<option value="" selected>— Elige una serie —</option>`;
-  $("configmaq-serie").innerHTML = serieVacia + SERIES.map(s =>
-    `<option value="${s}" ${s === seriePredeterminada ? "selected" : ""}>${s}</option>`
-  ).join("");
+  pintarRutaConfigMaquina();
   document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
     r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
   });
@@ -14775,7 +15388,7 @@ function abrirConfigMaquina(falta, soloVista = false) {
   const foco = {
     nombre: () => $("configmaq-nombre"),
     vendedor: () => $("configmaq-vendedor"),
-    serie: () => $("configmaq-serie"),
+    ruta: () => $("configmaq-ruta"),
     dia_despacho: () => document.querySelector("input[name=configmaq-dia]"),
   };
   setTimeout(() => (foco[pendientes[0]] || foco.nombre)().focus(), 50);
@@ -14810,15 +15423,17 @@ document.addEventListener("keydown", (ev) => {
 async function guardarConfigMaquina() {
   const nombre = $("configmaq-nombre").value.trim();
   const codigo = $("configmaq-vendedor").value;
-  const serie = $("configmaq-serie").value;
   const radioDia = document.querySelector("input[name=configmaq-dia]:checked");
   const error = (texto) => {
     $("configmaq-error").textContent = texto;
     $("configmaq-error").style.display = "";
   };
+  const ruta = exigeRuta ? $("configmaq-ruta").value : null;
   if (!nombre) return error("Escribe el nombre de esta computadora.");
   if (!codigo) return error("Elige el vendedor con el que factura esta computadora.");
-  if (!serie) return error("Elige la serie con la que factura esta computadora.");
+  // Solo se exige la ruta si hay alguna que ofrecer (ver pintarRutaConfigMaquina).
+  if (exigeRuta && !ruta && rutasParaConfigMaquina().length)
+    return error("Elige la ruta con la que trabaja esta computadora.");
   if (!radioDia) return error("Elige si esta computadora factura para hoy o para mañana.");
   const boton = $("configmaq-guardar");
   boton.disabled = true;
@@ -14833,11 +15448,11 @@ async function guardarConfigMaquina() {
       vendedorMaquina = codigo;
       configPendiente = r.configuracion_pendiente || [];
     }
-    if (serie !== (seriePredeterminada || "") || configPendiente.includes("serie")) {
-      const r = await api("/api/ajustes/serie", {serie});
-      seriePredeterminada = r.serie_predeterminada;
-      serieSeleccionada = r.serie_predeterminada;
-      pintarSeries();
+    if (ruta && (ruta !== (rutaPredeterminada || "")
+                 || configPendiente.includes("ruta"))) {
+      const r = await api("/api/ajustes/ruta", {ruta});
+      rutaPredeterminada = r.ruta_predeterminada;
+      rutaSeleccionada = r.ruta_predeterminada;
       configPendiente = r.configuracion_pendiente || [];
     }
     const dia = radioDia.value;
@@ -15129,6 +15744,8 @@ const CATALOGOS = {
     // Activar/desactivar sin abrir el editor (pedido del usuario 2026-07-29):
     // un vendedor desactivado deja de ofrecerse en "Vendedor de esta máquina".
     toggleActivo: (i) => `alternarVendedor(${i})`,
+    etiquetaToggle: (f) => f.activo
+      ? "Confirmar: sale del selector" : "Confirmar: vuelve al selector",
   },
   feriados: {
     titulo: "Feriados",
@@ -15194,6 +15811,8 @@ const CATALOGOS = {
           `<option value="${v}" ${v === feriadoClase ? "selected" : ""}>${t}</option>`).join("")}
       </select></label>`,
     toggleActivo: (i) => `alternarFeriado(${i})`,
+    etiquetaToggle: (f) => f.activo
+      ? "Confirmar: deja de contar como feriado" : "Confirmar: cuenta como feriado",
     // Eliminar solo para origen "manual": un feriado calculado no se borra.
     // Restaurar solo para las calculadas que alguien tocó (`ajustado`): quita
     // la excepción local y devuelve el nombre y el activo que calcula el
@@ -15596,10 +16215,23 @@ function puntoEstado(activo) {
 // editor — mismo estilo que ya usan el editor de catálogos y la ficha del
 // cliente (.switch). `onclick` es la llamada a la función que guarda el
 // cambio (def.toggleActivo(i) de cada catálogo).
-function switchActivo(activo, onclick) {
+// Con `etiqueta` el cambio pasa antes por una confirmación (2026-08-06): un
+// vendedor apagado desaparece del selector de TODAS las máquinas y un feriado
+// decide qué tasa del BCV se aplica ese día, y aquí no hay editor de por medio
+// que sirva de pausa.
+function switchActivo(activo, onclick, etiqueta) {
+  const accion = etiqueta
+    ? `return onClickSwitchActivo(event, () => { ${onclick} }, '${etiqueta}')`
+    : onclick;
   return `<label style="cursor:pointer; display:inline-flex" title="${
     activo ? "Activo" : "Inactivo"}"><input type="checkbox" class="switch" ${
-    activo ? "checked" : ""} onclick="${onclick}"></label>`;
+    activo ? "checked" : ""} onclick="${accion}"></label>`;
+}
+
+function onClickSwitchActivo(ev, alConfirmar, etiqueta) {
+  ev.preventDefault();
+  confirmarSinQuitar(ev.target.closest("label"), alConfirmar, etiqueta);
+  return false;
 }
 
 // Sistemas de origen presentes en un catálogo, en el orden en que aparecen.
@@ -15758,7 +16390,8 @@ function pintarFilasCatalogo() {
         title="Clic para editar este ${esc(def.singular)}" onclick="abrirEditor(${i})">
       ${columnas.map(c => c.tipo === "checkbox"
           ? `<td${def.toggleActivo ? CELDA_ACCIONES : ""}>${
-              def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i)) : puntoEstado(f[c.campo])}</td>`
+              def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i),
+                def.etiquetaToggle ? def.etiquetaToggle(f) : "") : puntoEstado(f[c.campo])}</td>`
           : `<td>${esc(f[c.campo] ?? "")}</td>`).join("")}
       ${def.acciones ? `<td${acciones ? CELDA_ACCIONES : ""}>${acciones}</td>` : ""}
     </tr>` + ((def.acciones || def.toggleActivo)
