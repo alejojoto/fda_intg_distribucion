@@ -3655,13 +3655,15 @@
     <p id="acceso-error"></p>
     <div id="acceso-form" style="display:none">
       <label for="acceso-nombre" style="font-size:13px; font-weight:600;
-             display:block; margin-bottom:6px">Nombre de esta computadora</label>
-      <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2">
+             display:block; margin-bottom:6px">Nombre de esta computadora
+        <span class="mut" style="font-weight:400">(obligatorio)</span></label>
+      <input type="text" id="acceso-nombre" maxlength="40" placeholder="Ej.: Caja 2"
+             oninput="pintarBotonSolicitud()">
       <p class="mut" style="margin:6px 0 0; font-size:12.5px">
         Es el nombre con el que el administrador la reconoce al aprobarla, y
         con el que después aparecen tus llenados en el historial de las demás.</p>
       <div class="editor-acciones" style="margin-top:16px">
-        <button class="primario" id="acceso-enviar"
+        <button class="primario" id="acceso-enviar" disabled
                 onclick="enviarSolicitudAcceso()">Pedir activación</button>
       </div>
     </div>
@@ -5176,6 +5178,10 @@ async function api(ruta, cuerpo) {
     if (datos && datos.codigo === "esperando_activacion" && datos.acceso) {
       acceso = {...datos.acceso, sin_conexion: false};
       pintarAcceso();
+      // Y se reconsulta el estado VIVO en el acto (2026-08-06): si este 409
+      // venía viejo (la aprobación llegó mientras viajaba), el sondeo lo
+      // corrige solo; si el bloqueo es real, lo confirma.
+      setTimeout(sondearAcceso, 0);
     }
     // Mismo trato para la desactivación por catálogo (2026-08-06): el 403
     // de "fuera de servicio" tapa el panel entero en el acto.
@@ -6780,18 +6786,22 @@ function supFilaEquipo(equipo, sinDatos) {
   const tRelease = Date.parse(equipo.fecha_release || "");
   const atrasada = !sinDatos && !equipo.modo_admin && Number.isFinite(tRelease)
     && tRelease < supReleaseMasNuevo();
-  // Borrar no se ofrece en el equipo propio: volvería en el próximo latido y
-  // lo único que se conseguiría es perderle el nombre y el rol.
+  // Borrar no se ofrece en el equipo propio (volvería en el próximo latido y
+  // lo único que se conseguiría es perderle el nombre y el rol) NI en uno con
+  // el acceso vigente (2026-08-06): borrar esa ficha lo dejaría operando sin
+  // nombre ni rol — para sacarlo está Olvidar o quitarle Activa, y el backend
+  // repite este mismo candado.
   const propio = equipo.dispositivo === supDispositivoPropio;
+  const conAccesoVigente = !!equipo.acceso && equipo.acceso !== "sin_registro";
   const accion =
     (sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
       host}')">Ver detalle</button> `)
-    + (propio ? "" : `<button type="button" class="peligro"
+    + (propio || conAccesoVigente ? "" : `<button type="button" class="peligro"
         title="Lo saca de esta lista. El histórico de lo que llenó se conserva; esas facturas vuelven a mostrar su nombre técnico."
         onclick="borrarEquipoSupervision(this, '${host}')">Borrar</button>`);
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
-    <td>${supEstadoEquipo(equipo, sinDatos)}</td>
+    <td>${supEstadoEquipo(equipo, sinDatos)}${notaAccesoEquipo(equipo)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
       !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}${
       !sinDatos && equipo.fecha_release
@@ -6803,6 +6813,18 @@ function supFilaEquipo(equipo, sinDatos) {
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
+}
+
+// El registro de ACCESO (credencial/autorización) es otra fuente de verdad
+// que el latido: esta nota solo aparece cuando contradice la vida normal del
+// equipo — activa no dice nada, y sin dato (nube caída) tampoco.
+function notaAccesoEquipo(equipo) {
+  const textos = {pendiente: "acceso: esperando activación",
+                  desactivado: "acceso: quitado",
+                  rechazado: "acceso: rechazado",
+                  sin_registro: "acceso: sin registro (debe registrarse)"};
+  const texto = textos[equipo.acceso];
+  return texto ? `<div class="mut">${esc(texto)}</div>` : "";
 }
 
 // Roles y permisos tal como los mandó el servidor (src/roles.py). La pantalla
@@ -14634,7 +14656,15 @@ function pintarAcceso() {
     : (nombre ? `Nombre pedido: ${nombre}` : "");
   if (pideNombre && nombre && !$("acceso-nombre").value)
     $("acceso-nombre").value = nombre;
+  if (pideNombre) pintarBotonSolicitud();
   arrancarSondeoAcceso();
+}
+
+// El nombre es OBLIGATORIO para pedir la activación (2026-08-06): sin él el
+// botón queda deshabilitado — antes se podía pulsar y el rechazo se veía tan
+// discreto que parecía que no pasaba nada.
+function pintarBotonSolicitud() {
+  $("acceso-enviar").disabled = !$("acceso-nombre").value.trim();
 }
 
 function arrancarSondeoAcceso() {
@@ -14648,7 +14678,11 @@ function detenerSondeoAcceso() {
   accesoSondeo = null;
 }
 
+let sondeoAccesoEnVuelo = false;
+
 async function sondearAcceso() {
+  if (sondeoAccesoEnVuelo) return;   // sin ráfagas: un viaje a la vez
+  sondeoAccesoEnVuelo = true;
   try {
     const r = await api("/api/acceso/estado");
     const eraTapado = ACCESO_TAPA.includes(acceso.estado);
@@ -14661,14 +14695,20 @@ async function sondearAcceso() {
       pintarDesactivada();
     }
     // Recién activada: el nombre ya quedó puesto por el servidor, así que se
-    // recarga todo y el formulario pide únicamente lo que falta.
+    // recarga todo y el formulario pide únicamente lo que falta. El mensaje
+    // REEMPLAZA al último banner de error (2026-08-06): el "no se pudo
+    // cargar la lista: esperando activación" del sondeo anterior es pegajoso
+    // y quedaba contradiciendo a la activación ya hecha.
     if (eraTapado && !ACCESO_TAPA.includes(r.estado)) {
       await cargarAjustes();
       cargar();
+      mensaje("Esta computadora quedó activa.", "info");
     }
   } catch (e) {
     $("acceso-datos").textContent =
       "Sin conexión con el servidor; se sigue intentando.";
+  } finally {
+    sondeoAccesoEnVuelo = false;
   }
 }
 
@@ -14841,7 +14881,7 @@ async function enviarSolicitudAcceso() {
   } catch (e) {
     error(e.message);
   } finally {
-    boton.disabled = false;
+    pintarBotonSolicitud();
   }
 }
 
