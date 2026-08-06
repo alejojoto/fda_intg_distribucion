@@ -1087,6 +1087,13 @@
                           font-size:13px; text-align:left; color:#1f2937; cursor:pointer; }
   #menu-contexto button:hover { background:#eef2f7; }
   #menu-contexto button[disabled] { color:#9aa2ad; background:none; cursor:default; }
+  /* Botón preseleccionado de un diálogo y recorrido con Tab (2026-08-07). Son
+     dos reglas y no una porque :focus-visible NO se prende cuando el foco lo
+     pone el código después de un clic del ratón —el motor lo toma por foco de
+     ratón—, y justo ahí es donde más falta hace verlo. Con :focus a secas, en
+     cambio, todo botón pulsado quedaría con anillo. */
+  button.preseleccionado,
+  button:focus-visible { outline:2px solid #1d4ed8; outline-offset:2px; }
   .detalle-parte { display:inline-block; padding:2px 8px; border-radius:6px;
                    font-size:12px; font-weight:700; color:#1d4ed8; background:#e8efff;
                    border:1px solid #c7d7fb; }
@@ -3081,7 +3088,7 @@
     <h3>Cambios de catálogo en choque</h3>
     <div id="conflictos-sync-lista"></div>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarConflictosSync()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarConflictosSync()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3095,7 +3102,7 @@
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
       <button type="button" id="diag-sync-copiar" onclick="copiarInformeSync(this)">Copiar informe</button>
       <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
-      <button type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3131,7 +3138,7 @@
     <h3 id="sup-equipo-titulo">Detalle del equipo</h3>
     <div id="sup-equipo-cuerpo"></div>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarDetalleEquipoSupervision()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarDetalleEquipoSupervision()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3142,7 +3149,7 @@
     <h3>Actividad reciente</h3>
     <ul id="sup-actividad-lista"></ul>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarActividadSupervision()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarActividadSupervision()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3182,7 +3189,7 @@
   <div id="catalogo-caja">
     <div id="catalogo-vista"></div>
     <div class="editor-acciones">
-      <button type="button" onclick="cerrarCatalogo()">Cerrar</button>
+      <button data-preseleccionado type="button" onclick="cerrarCatalogo()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3544,7 +3551,7 @@
     </label>
     <div class="editor-acciones">
       <button class="primario" id="hermanas-si" onclick="confirmarHermanas()"></button>
-      <button onclick="cerrarHermanas()">No, dejarlas pendientes</button>
+      <button data-preseleccionado onclick="cerrarHermanas()">No, dejarlas pendientes</button>
     </div>
   </div>
 </div>
@@ -3574,7 +3581,7 @@
     <div id="previo-sacados"></div>
     <div class="editor-acciones">
       <button class="primario" id="previo-llenar" onclick="confirmarPrevioLote()"></button>
-      <button onclick="cerrarPrevioLote()">Cancelar</button>
+      <button data-preseleccionado onclick="cerrarPrevioLote()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3599,7 +3606,7 @@
     <div class="editor-acciones">
       <button class="primario" id="tasa-usar" onclick="llenarConTasaDelAviso()">Llenar con esta tasa</button>
       <button id="tasa-despacho" onclick="llenarParaDespachoDesdeAviso()"></button>
-      <button onclick="pararPorTasa()">Parar</button>
+      <button data-preseleccionado onclick="pararPorTasa()">Parar</button>
     </div>
   </div>
 </div>
@@ -3623,7 +3630,7 @@
     <h3 id="docencurso-titulo">La Ficha tiene un documento sin terminar</h3>
     <div class="editor-acciones">
       <button class="primario" id="docencurso-si" onclick="resolverDocEnCurso(true)">Cancelarlo y continuar el llenado</button>
-      <button id="docencurso-no" onclick="resolverDocEnCurso(false)"
+      <button data-preseleccionado id="docencurso-no" onclick="resolverDocEnCurso(false)"
               title="El llenado se detiene aquí; resuelve el documento en el programa de facturación (Aceptar o Cancelar) y vuelve a darle Llenar.">No tocar nada</button>
     </div>
   </div>
@@ -3640,7 +3647,7 @@
     <div class="editor-acciones">
       <button class="primario" onclick="cerrarPreguntaBabyMix('125')">Llenar con 125 g</button>
       <button class="primario" onclick="cerrarPreguntaBabyMix('150')">Llenar con 150 g</button>
-      <button onclick="cerrarPreguntaBabyMix('')">Cancelar</button>
+      <button data-preseleccionado onclick="cerrarPreguntaBabyMix('')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3754,7 +3761,7 @@
        hubiera a medio llenar se pierde y tendrás que iniciar sesión otra vez.</p>
     <div class="editor-acciones">
       <button class="primario" onclick="responderTrancon(true)">Reiniciar el programa</button>
-      <button onclick="responderTrancon(false)"
+      <button data-preseleccionado onclick="responderTrancon(false)"
               title="El llenado se detiene aquí y el programa de facturación queda exactamente como está: revísalo tú.">No tocar nada</button>
     </div>
   </div>
@@ -3774,7 +3781,7 @@
     <div id="lineas-omitidas-lista"></div>
     <p>El documento que está en pantalla no tiene esos renglones.</p>
     <div class="editor-acciones">
-      <button class="primario" id="lineas-omitidas-dejar" onclick="cerrarLineasOmitidas()"
+      <button data-preseleccionado class="primario" id="lineas-omitidas-dejar" onclick="cerrarLineasOmitidas()"
               title="La factura queda marcada por revisar en EN REVISIÓN.">Dejar en revisión</button>
       <button id="lineas-omitidas-procesada" onclick="marcarLineasOmitidasRevisada()"
               title="Quita la marca de revisar: la factura queda como está.">Marcar como procesada</button>
@@ -3790,7 +3797,7 @@
        otra vez genera un segundo documento.</p>
     <div class="editor-acciones">
       <button class="primario" onclick="resolverRepetida(true)">Llenarla otra vez</button>
-      <button onclick="resolverRepetida(false)">Cancelar</button>
+      <button data-preseleccionado onclick="resolverRepetida(false)">Cancelar</button>
     </div>
   </div>
 </div>
@@ -8500,6 +8507,54 @@ async function leerPortapapeles() {
   }
   try { return await navigator.clipboard.readText(); } catch (_) { return null; }
 }
+
+// Botón preseleccionado al abrir un diálogo (2026-08-07, pedido del usuario):
+// el operador ve cuál es la opción principal y la dispara con Enter o con la
+// barra espaciadora sin soltar el teclado, y con Tab recorre las demás, que se
+// activan igual. No hay atajos propios ni captura de teclas: Enter y Espacio ya
+// los atiende de por sí el botón que tiene el foco.
+//
+// CUÁL queda preseleccionado es la regla del usuario: la acción principal si es
+// segura (cerrar un informe, dejar una factura en revisión) y, si toca algo
+// delicado —arrancar un llenado, cancelar un documento del programa de
+// facturación, reiniciarlo—, la opción segura, de modo que la delicada se
+// alcance con un Tab y nunca con un Enter suelto. Los diálogos que se llenan a
+// mano no preseleccionan botón: ahí el foco pertenece al primer campo.
+function preseleccionar(boton) {
+  const btn = typeof boton === "string" ? $(boton) : boton;
+  if (!btn || btn.disabled) return;
+  // Tras el pintado: enfocar dentro de un contenedor que acaba de dejar de
+  // estar oculto no siempre prende en el mismo cuadro.
+  requestAnimationFrame(() => {
+    if (btn.disabled || !btn.isConnected) return;
+    try { btn.focus({ preventScroll: true }); } catch (_) { return; }
+    if (document.activeElement !== btn) return;
+    btn.classList.add("preseleccionado");
+    btn.addEventListener("blur", () => btn.classList.remove("preseleccionado"),
+                         { once: true });
+  });
+}
+
+// El botón elegido se marca con data-preseleccionado en el HTML, pegado a él,
+// para que se vea al leer la botonera y no en una lista aparte que se
+// desincronice. Se vigila la clase "visible" —que es como se muestran los
+// diálogos— en vez de tocar cada apertura: son más de veinte y varias ventanas
+// se abren por dos caminos distintos, así ninguna vía queda sin foco.
+const vigilanteDeDialogos = new MutationObserver((cambios) => {
+  for (const cambio of cambios) {
+    const dialogo = cambio.target;
+    const seAcabaDeAbrir = dialogo.classList.contains("visible")
+        && !(cambio.oldValue || "").split(" ").includes("visible");
+    if (seAcabaDeAbrir) preseleccionar(dialogo.querySelector("[data-preseleccionado]"));
+  }
+});
+document.querySelectorAll("[data-preseleccionado]").forEach((btn) => {
+  const dialogo = btn.closest("[id$='-overlay']");
+  if (dialogo) {
+    vigilanteDeDialogos.observe(dialogo, {
+      attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+  }
+});
 
 async function menuContextoAccion(accion, btn) {
   const campo = menuCampo;
