@@ -766,7 +766,7 @@
   .equipos-tabla .equipos-host { color:var(--mut); font-size:12.5px;
       min-width:110px; }
   .equipos-tabla input[type=text] { width:190px; }
-  .equipos-tabla .equipos-check { text-align:center; }
+  .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
@@ -14698,12 +14698,12 @@ function pintarUnaSolicitud(s) {
   const acciones = enEspera
     ? `<input type="text" id="sol-nombre-${host}" maxlength="40"
               value="${nombre}" placeholder="Nombre de la computadora">
-       <button class="primario" onclick="activarEquipo('${host}')">Activar</button>
+       <button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>
        <button class="secundario" onclick="rechazarEquipo(this, '${host}')">Rechazar</button>`
     : (s.estado === "activo"
         ? `<button class="secundario"
                    onclick="desactivarEquipo(this, '${host}')">Quitar acceso</button>${olvidar}`
-        : `<button class="primario" onclick="activarEquipo('${host}')">Activar</button>${olvidar}`);
+        : `<button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>${olvidar}`);
   return `<div class="solicitud">
     <div class="solicitud-cab">
       <b>${nombre || host}</b>
@@ -14718,6 +14718,12 @@ function pintarUnaSolicitud(s) {
     </div>
     <div class="solicitud-acciones">${acciones}</div>
   </div>`;
+}
+
+// Activar deja entrar a una computadora que todavía no se ha visto y cuyo
+// instalador es público; Rechazar ya exige la misma pausa antes de decidir.
+function confirmarActivarEquipo(btn, host) {
+  confirmarSinQuitar(btn, () => activarEquipo(host), "Confirmar: dar acceso");
 }
 
 async function activarEquipo(host) {
@@ -14825,23 +14831,23 @@ function pintarEquipos() {
           ? "Quitarlo lo deja como Editor."
           : "Marca esta computadora como Admin."}">
         <input type="checkbox" ${m.es_admin ? "checked" : ""}
-               onchange="cambiarRolEquipo('${host}', 'admin', this)"> Admin</label>
+               onclick="return onClickRolEquipo(event, '${host}', 'admin')"> Admin</label>
       <label class="sup-rol-check" title="${m.es_admin
           ? "Lo es por ser Admin."
           : "Marca esta computadora como Editor."}">
         <input type="checkbox" ${m.es_editor ? "checked" : ""}
                ${m.es_admin ? "disabled" : ""}
-               onchange="cambiarRolEquipo('${host}', 'editor', this)"> Editor</label></td>`
+               onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></td>`
     : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}
              ${m.es_admin ? "disabled" : ""}
              title="${m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
                                  : "Marca esta computadora como Editor."}"
-             onchange="cambiarEditorEquipo('${host}', this)"></td>`;
+             onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
       <input type="checkbox" ${m.activa ? "checked" : ""}
              title="Al quitarla, esa computadora queda fuera de servicio."
-             onchange="cambiarActivaEquipo('${host}', this)"></td>`;
+             onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
     return `<tr>
       <td class="equipos-host">${host}</td>
       <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
@@ -14866,6 +14872,48 @@ function pintarEquipos() {
     pintarSelectVendedores(fila.querySelector("select"),
                            equipos[indice].vendedor || "");
   });
+}
+
+// Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
+// OTRA máquina; con un interruptor de un clic es fácil moverlos sin querer
+// (pedido del usuario 2026-08-06). Mismo patrón que onClickEsPruebaChk: el
+// valor que el clic iba a dejar se lee ANTES —en un checkbox `checked` ya
+// trae el valor nuevo cuando corre el manejador, y preventDefault lo revierte
+// recién al terminar— y se repone tal cual al confirmar.
+function onClickEditorEquipo(ev, dispositivo) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  confirmarSinQuitar(caja, () => {
+    caja.checked = activando;
+    cambiarEditorEquipo(dispositivo, caja);
+  }, activando ? "Confirmar: puede editar" : "Confirmar: deja de editar");
+  return false;
+}
+
+function onClickRolEquipo(ev, dispositivo, rol) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  const etiqueta = rol === "admin"
+    ? (activando ? "Confirmar: pasa a Admin" : "Confirmar: baja a Editor")
+    : (activando ? "Confirmar: pasa a Editor" : "Confirmar: se queda sin rol");
+  confirmarSinQuitar(caja.closest("label"), () => {
+    caja.checked = activando;
+    cambiarRolEquipo(dispositivo, rol, caja);
+  }, etiqueta);
+  return false;
+}
+
+function onClickActivaEquipo(ev, dispositivo) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  confirmarSinQuitar(caja, () => {
+    caja.checked = activando;
+    cambiarActivaEquipo(dispositivo, caja);
+  }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
+  return false;
 }
 
 async function cambiarEditorEquipo(dispositivo, caja) {
@@ -15657,6 +15705,8 @@ const CATALOGOS = {
     // Activar/desactivar sin abrir el editor (pedido del usuario 2026-07-29):
     // un vendedor desactivado deja de ofrecerse en "Vendedor de esta máquina".
     toggleActivo: (i) => `alternarVendedor(${i})`,
+    etiquetaToggle: (f) => f.activo
+      ? "Confirmar: sale del selector" : "Confirmar: vuelve al selector",
   },
   feriados: {
     titulo: "Feriados",
@@ -15722,6 +15772,8 @@ const CATALOGOS = {
           `<option value="${v}" ${v === feriadoClase ? "selected" : ""}>${t}</option>`).join("")}
       </select></label>`,
     toggleActivo: (i) => `alternarFeriado(${i})`,
+    etiquetaToggle: (f) => f.activo
+      ? "Confirmar: deja de contar como feriado" : "Confirmar: cuenta como feriado",
     // Eliminar solo para origen "manual": un feriado calculado no se borra.
     // Restaurar solo para las calculadas que alguien tocó (`ajustado`): quita
     // la excepción local y devuelve el nombre y el activo que calcula el
@@ -16124,10 +16176,23 @@ function puntoEstado(activo) {
 // editor — mismo estilo que ya usan el editor de catálogos y la ficha del
 // cliente (.switch). `onclick` es la llamada a la función que guarda el
 // cambio (def.toggleActivo(i) de cada catálogo).
-function switchActivo(activo, onclick) {
+// Con `etiqueta` el cambio pasa antes por una confirmación (2026-08-06): un
+// vendedor apagado desaparece del selector de TODAS las máquinas y un feriado
+// decide qué tasa del BCV se aplica ese día, y aquí no hay editor de por medio
+// que sirva de pausa.
+function switchActivo(activo, onclick, etiqueta) {
+  const accion = etiqueta
+    ? `return onClickSwitchActivo(event, () => { ${onclick} }, '${etiqueta}')`
+    : onclick;
   return `<label style="cursor:pointer; display:inline-flex" title="${
     activo ? "Activo" : "Inactivo"}"><input type="checkbox" class="switch" ${
-    activo ? "checked" : ""} onclick="${onclick}"></label>`;
+    activo ? "checked" : ""} onclick="${accion}"></label>`;
+}
+
+function onClickSwitchActivo(ev, alConfirmar, etiqueta) {
+  ev.preventDefault();
+  confirmarSinQuitar(ev.target.closest("label"), alConfirmar, etiqueta);
+  return false;
 }
 
 // Sistemas de origen presentes en un catálogo, en el orden en que aparecen.
@@ -16286,7 +16351,8 @@ function pintarFilasCatalogo() {
         title="Clic para editar este ${esc(def.singular)}" onclick="abrirEditor(${i})">
       ${columnas.map(c => c.tipo === "checkbox"
           ? `<td${def.toggleActivo ? CELDA_ACCIONES : ""}>${
-              def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i)) : puntoEstado(f[c.campo])}</td>`
+              def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i),
+                def.etiquetaToggle ? def.etiquetaToggle(f) : "") : puntoEstado(f[c.campo])}</td>`
           : `<td>${esc(f[c.campo] ?? "")}</td>`).join("")}
       ${def.acciones ? `<td${acciones ? CELDA_ACCIONES : ""}>${acciones}</td>` : ""}
     </tr>` + ((def.acciones || def.toggleActivo)
