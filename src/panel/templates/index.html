@@ -5625,13 +5625,29 @@ const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 let rutasSeriesConfig = {};
 const configSerieDeRuta = () => rutasSeriesConfig[rutaSeleccionada] || null;
 // La serie asignada de CUALQUIER ruta ("" si no tiene): la corrida por bloques
-// la consulta ruta por ruta, no solo para la del filtro.
-const serieAsignadaDeRuta = (ruta) =>
-  (rutasSeriesConfig[ruta] || {}).serie_predeterminada || "";
+// la consulta ruta por ruta, no solo para la del filtro. Una que no esté entre
+// las series de ESTA computadora cuenta como no asignada (2026-08-07): la
+// corrida pide entonces cuál usar, en vez de arrancar con una que el servidor
+// va a rechazar a mitad de camino.
+const serieAsignadaDeRuta = (ruta) => {
+  const asignada = (rutasSeriesConfig[ruta] || {}).serie_predeterminada || "";
+  return seriesElegiblesDeRuta(ruta).includes(asignada) ? asignada : "";
+};
 // Qué series puede usar una ruta: sus permitidas si las tiene, si no las 6.
+// Es el catálogo tal cual — de aquí sale lo que se GUARDA en AJUSTES → Rutas,
+// así que no se recorta por máquina (si no, guardar desde una computadora con
+// pocas series le achicaría la ruta a todas las demás).
 const seriesPermitidasDeRuta = (ruta) => {
   const cfg = rutasSeriesConfig[ruta];
   return (cfg && cfg.series_permitidas.length) ? cfg.series_permitidas : SERIES;
+};
+// Y cuáles puede ELEGIR el operador aquí (2026-08-07, regla del usuario: nada
+// de llenar en una serie que no es la suya): las de la ruta cruzadas con las
+// configuradas de esta computadora. Ofrecer una ajena solo termina en el
+// rechazo del servidor (serie_no_disponible) con el llenado ya pedido.
+const seriesElegiblesDeRuta = (ruta) => {
+  const propias = seriesMaquina.length ? seriesMaquina : SERIES;
+  return seriesPermitidasDeRuta(ruta).filter(s => propias.includes(s));
 };
 
 // Misma regla que la ruta (opcionRutaPredet): la opción solo aparece cuando
@@ -5644,13 +5660,18 @@ function opcionSeriePredet(predetDeRuta) {
 
 function pintarSeries() {
   const cfg = configSerieDeRuta();
-  // Base: las series de ESTA computadora (2026-08-07), o las 6 de siempre
-  // mientras el dato no llega. Con config de ruta: SOLO las permitidas —
-  // colar una serie que la ruta no admite sería facturarla con la serie
-  // equivocada (mismo riesgo que describe reponerLote más abajo).
-  const base = seriesMaquina.length ? seriesMaquina : SERIES;
-  const opciones = (cfg && cfg.series_permitidas.length) ? cfg.series_permitidas : base;
-  const predetDeRuta = cfg ? cfg.serie_predeterminada : "";
+  // Las permitidas de la ruta cruzadas con las series de ESTA computadora
+  // (seriesElegiblesDeRuta); sin config de ruta quedan las suyas a secas, y
+  // mientras el dato de la máquina no llega, las 6 de siempre. Colar una que
+  // la ruta no admite sería facturarla con la serie equivocada (mismo riesgo
+  // que describe reponerLote más abajo); colar una que no es de esta
+  // computadora termina en el rechazo del servidor al llenar.
+  const opciones = seriesElegiblesDeRuta(rutaSeleccionada);
+  // La predeterminada de la ruta manda solo si además es una serie de esta
+  // computadora (2026-08-07): elegirla sola cuando no lo es termina en el
+  // rechazo del servidor con el llenado ya pedido.
+  const predetDeRuta = (cfg && opciones.includes(cfg.serie_predeterminada))
+    ? cfg.serie_predeterminada : "";
   if (predetDeRuta) {
     // La ruta manda: se elige sola, sin preguntar (COMPORTAMIENTO, pedido del
     // usuario — "si tiene serie predeterminada, selecciónala automáticamente").
@@ -13761,8 +13782,7 @@ const htmlAvisosPuestaAPunto = (avisos) =>
 // llegar cada bloque, en la barra.
 function botonesSerieRapidos(porBloques) {
   if (porBloques || saltandoPuestaAPunto("serie") || serieSeleccionada) return "";
-  const series = rutaSeleccionada !== ""
-    ? seriesPermitidasDeRuta(rutaSeleccionada) : SERIES;
+  const series = seriesElegiblesDeRuta(rutaSeleccionada);
   return `<div class="pap-ojo"><div class="previo-acciones">${series.map(s =>
     `<button onclick="cajitaSerieElegida('${esc(s)}')">${esc(s)}</button>`)
     .join("")}</div></div>`;
@@ -14394,7 +14414,7 @@ function pausarPorSerieDeRuta(ruta) {
 
 function pintarBotonesSerieDeRuta(ruta) {
   const caja = $("serie-ruta-botones");
-  const botones = seriesPermitidasDeRuta(ruta).map(s =>
+  const botones = seriesElegiblesDeRuta(ruta).map(s =>
     `<button class="acento" onclick="serieDeRutaElegida('${esc(s)}')">${esc(s)}</button>`
   ).join("");
   const permanente = tienePermiso("ajustes_catalogos")
@@ -14530,7 +14550,7 @@ function pintarBotonesCambioDeRuta(ruta, serie) {
   } else {
     // Sin serie asignada, elegirla ES la confirmación: los mismos botones de
     // serie, con el recordatorio del talonario ya dicho en el mensaje.
-    const botones = seriesPermitidasDeRuta(ruta).map(s =>
+    const botones = seriesElegiblesDeRuta(ruta).map(s =>
       `<button class="acento" onclick="confirmarCambioDeRuta('${esc(s)}')">${esc(s)}</button>`
     ).join("");
     const permanente = tienePermiso("ajustes_catalogos")
