@@ -3325,7 +3325,10 @@
          descuento se lee como que el cambio no quedó, sobre todo llegando desde
          la revisión del lote. Descartar va de último: es el que deshace. -->
     <div class="editor-acciones">
-      <button data-preseleccionado class="acento" id="detalle-llenar" style="display:none"
+      <!-- El data-preseleccionado de este botón lo pone y lo quita
+           pintarBotonLlenarDetalle según de qué llenado se trate: aquí no va
+           fijo porque el mismo botón sirve para reabrir una factura cerrada. -->
+      <button class="acento" id="detalle-llenar" style="display:none"
               onclick="llenarDesdeDetalle()">Llenar</button>
       <button class="primario" id="detalle-guardar" style="display:none"
               onclick="guardarYVolverDetalle()">Guardar cambios</button>
@@ -9938,6 +9941,12 @@ function pintarBotonDetalle() {
 // viaja queda deshabilitado diciendo qué se espera.
 function pintarBotonLlenarDetalle() {
   const boton = $("detalle-llenar");
+  // Preseleccionado solo cuando es un llenado normal (2026-08-07, pedido del
+  // usuario). "Llenar igual" y "Volver a llenar" reabren una factura cerrada o
+  // le quitan el candado a otra máquina: eso no puede salir de un Enter suelto,
+  // así que el foco arranca en Volver y esas se alcanzan con un Tab de por
+  // medio. Se decide aquí porque es aquí donde se sabe cuál de las dos es.
+  boton.toggleAttribute("data-preseleccionado", false);
   if (!detalleAbierto) { boton.style.display = "none"; return; }
   // Sin detalle guardado no hay sobre qué reintentar ni motivo que reabrir
   // (2026-07-31, pedido del usuario): la ventana se queda con Cerrar solo.
@@ -9952,6 +9961,7 @@ function pintarBotonLlenarDetalle() {
   const etiqueta = llenadoDirecto(fila);
   if (etiqueta) {
     boton.style.display = "";
+    boton.toggleAttribute("data-preseleccionado", true);
     // Mismo candado que el lote para el desfase de fecha del pedido (2026-08-05).
     const faltaFecha = faltaDecidirLaFecha("detalle");
     boton.disabled = sinTasaParaLlenar() || faltaFecha;
