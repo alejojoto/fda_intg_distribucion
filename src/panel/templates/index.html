@@ -8462,9 +8462,13 @@ const CAMPOS_MENU_CONTEXTO =
 let menuCampo = null;          // campo sobre el que se abrió el menú
 let menuIni = 0, menuFin = 0;  // su selección al abrirlo: pulsar el menú la pierde
 
+// Que el menú esté abierto se pregunta por menuCampo y no por el display del
+// elemento: los bancos de Mac evalúan este archivo sobre un DOM mínimo donde
+// ese estilo no viene puesto, y leerlo daba el menú por abierto (2026-08-07).
 function menuContextoCerrar() {
+  if (!menuCampo) return;
   const menu = $("menu-contexto");
-  if (menu) menu.style.display = "none";
+  if (menu && menu.style) menu.style.display = "none";
   menuCampo = null;
 }
 
@@ -8497,15 +8501,15 @@ document.addEventListener("contextmenu", (e) => {
 });
 
 document.addEventListener("pointerdown", (e) => {
+  if (!menuCampo) return;
   const menu = $("menu-contexto");
-  if (menu && menu.style.display !== "none" && !menu.contains(e.target)) menuContextoCerrar();
+  if (!menu || !menu.contains || !menu.contains(e.target)) menuContextoCerrar();
 }, true);
 
 // En captura y cortando la propagación: con el menú abierto, Escape lo cierra a
 // él y no al modal que haya detrás.
 document.addEventListener("keydown", (e) => {
-  const menu = $("menu-contexto");
-  if (e.key === "Escape" && menu && menu.style.display !== "none") {
+  if (menuCampo && e.key === "Escape") {
     e.stopPropagation();
     menuContextoCerrar();
   }
