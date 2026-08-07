@@ -841,6 +841,10 @@
                    box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #equipo-config h3 { margin:0 0 14px; font-size:14px; }
   #equipo-config .acceso-check { font-size:13px; }
+  #equipo-config .acceso-campo:first-of-type { margin-top:0; }
+  #equipo-config input[type=text] { width:100%; box-sizing:border-box;
+      padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
+      border-radius:6px; }
   .equipos-config .mut { font-size:12px; display:block; margin-bottom:4px; }
   .equipos-config button { font-size:12px; padding:3px 8px; }
   /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
@@ -3341,30 +3345,65 @@
   </div>
 </div>
 
-<!-- Configurar rutas o series de OTRA computadora (2026-08-07): se abre desde
-     su fila en AJUSTES → Computadoras. Mismas reglas que el registro: "Todas"
-     con un clic, o selección individual; la predeterminada solo se elige
-     cuando hay más de una. El de rutas incluye además el día de despacho. -->
+<!-- Configuración de OTRA computadora (2026-08-07). Una sola ventana para dos
+     casos: la fila de AJUSTES → Computadoras (rutas O series, ya activa) y la
+     solicitud de activación (rutas Y series juntas, más vendedor, nombre y
+     día: ahí el administrador decide la activación completa y no puede
+     quedarse a medias en dos ventanas). Mismas reglas que el registro:
+     "Todas" con un clic, o selección individual; la predeterminada solo se
+     elige cuando hay más de una. Los rótulos nombran a ESA computadora —
+     quien mira no está configurando la suya. -->
 <div id="equipo-config-overlay" onclick="if(event.target===this)cerrarConfigEquipo()">
   <div id="equipo-config">
     <h3 id="equipo-config-titulo"></h3>
-    <div class="editor-campo">
-      <label class="acceso-check"><input type="checkbox" id="equipo-config-todas"
-             onchange="alternarTodasConfigEquipo()"> <span id="equipo-config-todas-rotulo"></span></label>
-      <div id="equipo-config-lista" class="acceso-lista"></div>
+    <p class="mut" id="equipo-config-intro" style="display:none; font-size:12.5px"></p>
+    <div class="acceso-campo" id="equipo-config-nombre-campo" style="display:none">
+      <label for="equipo-config-nombre" id="equipo-config-nombre-rotulo">Nombre</label>
+      <input type="text" id="equipo-config-nombre" maxlength="40"
+             placeholder="Nombre de la computadora">
+      <p class="mut" id="equipo-config-nombre-nota" style="margin:4px 0 0; font-size:12.5px"></p>
+      <p class="acceso-campo-error" id="equipo-config-err-nombre"></p>
     </div>
-    <div class="editor-campo" id="equipo-config-predet-campo">
-      <label for="equipo-config-predet" id="equipo-config-predet-rotulo"></label>
-      <select id="equipo-config-predet"></select>
-      <span class="mut" id="equipo-config-predet-texto" style="display:none"></span>
+    <div class="acceso-campo" id="equipo-config-vendedor-campo" style="display:none">
+      <label for="equipo-config-vendedor" id="equipo-config-vendedor-rotulo">Vendedor</label>
+      <select id="equipo-config-vendedor"></select>
+      <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
+      <p class="acceso-campo-error" id="equipo-config-err-vendedor"></p>
     </div>
-    <div class="editor-campo" id="equipo-config-dia-campo">
-      <label for="equipo-config-dia">Día de despacho</label>
+    <div class="acceso-campo" id="equipo-config-rutas-campo">
+      <label id="equipo-config-rutas-rotulo" style="display:none"></label>
+      <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
+             onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
+      <div id="equipo-config-rutas-lista" class="acceso-lista"></div>
+      <p class="acceso-campo-error" id="equipo-config-err-rutas"></p>
+      <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
+        <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
+        <select id="equipo-config-rutas-predet"></select>
+        <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
+      </div>
+      <p class="acceso-campo-error" id="equipo-config-err-ruta_predeterminada"></p>
+    </div>
+    <div class="acceso-campo" id="equipo-config-series-campo">
+      <label id="equipo-config-series-rotulo" style="display:none"></label>
+      <label class="acceso-check"><input type="checkbox" id="equipo-config-series-todas"
+             onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
+      <div id="equipo-config-series-lista" class="acceso-lista"></div>
+      <p class="acceso-campo-error" id="equipo-config-err-series"></p>
+      <div class="acceso-predet" id="equipo-config-series-predet-campo">
+        <label for="equipo-config-series-predet" id="equipo-config-series-predet-rotulo"></label>
+        <select id="equipo-config-series-predet"></select>
+        <span id="equipo-config-series-predet-texto" style="display:none"></span>
+      </div>
+      <p class="acceso-campo-error" id="equipo-config-err-serie_predeterminada"></p>
+    </div>
+    <div class="acceso-campo" id="equipo-config-dia-campo">
+      <label for="equipo-config-dia" id="equipo-config-dia-rotulo">Día de despacho</label>
       <select id="equipo-config-dia">
         <option value="">— Sin elegir —</option>
         <option value="hoy">Para hoy</option>
         <option value="manana">Para mañana</option>
       </select>
+      <p class="acceso-campo-error" id="equipo-config-err-dia_despacho"></p>
     </div>
     <div id="equipo-config-error" class="desc-error" style="display:none"></div>
     <div class="editor-acciones">
@@ -15571,33 +15610,27 @@ function configDeSolicitud(s) {
   return (cfg && typeof cfg === "object") ? cfg : null;
 }
 
-// "Todas" o los nombres cortos, con ★ en la predeterminada.
-function textoSeleccionSolicitada(sel, predet, corto) {
-  if (sel === "*")
-    return "Todas" + (predet ? ` · predet.: ${corto(predet)} ★` : "");
-  if (Array.isArray(sel) && sel.length)
-    return sel.map(v => corto(v) + (v === predet ? " ★" : "")).join(", ");
-  return "—";
-}
-
-// Las líneas de configuración solicitada que se muestran bajo una solicitud
-// pendiente. Sin configuración, una sola línea discreta que lo diga.
-function lineasConfigSolicitada(s) {
+// Resumen de UNA línea de la configuración pedida (2026-08-07): el detalle
+// completo —y editable— vive en la ventana que abre "Revisar y activar", así
+// que la fila solo adelanta de qué tamaño es lo que se va a aprobar.
+function resumenConfigSolicitada(s) {
   const cfg = configDeSolicitud(s);
-  if (!cfg)
-    return `<br><span class="mut">Sin configuración solicitada.</span>`;
-  const v = vendedoresCatalogo.find(x => x.codigo === cfg.vendedor);
-  const vendedor = cfg.vendedor
-    ? esc(cfg.vendedor) + (v && v.nombre ? ` — ${esc(v.nombre)}` : "")
-    : "—";
-  const dia = {hoy: "para hoy", manana: "para mañana"}[cfg.dia_despacho]
-    || "sin elegir";
-  return `<br>Vendedor: ${vendedor}
-    · Despacho: ${esc(dia)}<br>
-    Rutas: ${esc(textoSeleccionSolicitada(cfg.rutas, cfg.ruta_predeterminada,
-                                          etiquetaRutaCorta))}<br>
-    Series: ${esc(textoSeleccionSolicitada(cfg.series, cfg.serie_predeterminada,
-                                           (x) => x))}`;
+  if (!cfg) return "Sin configuración solicitada";
+  const dia = {hoy: "despacho para hoy", manana: "despacho para mañana"}[
+    cfg.dia_despacho] || "despacho sin elegir";
+  // Como aquí no hay rótulo delante, cada parte se nombra sola ("todas las
+  // rutas", no "Todas"): es una línea suelta dentro de los datos de la fila.
+  const parte = (sel, predet, plural, corto) => {
+    const base = sel === "*" ? `todas las ${plural}`
+      : (Array.isArray(sel) && sel.length)
+        ? (sel.length === 1 ? corto(sel[0]) : `${sel.length} ${plural}`)
+        : `sin ${plural}`;
+    if (!predet) return base;
+    return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
+  };
+  return [parte(cfg.rutas, cfg.ruta_predeterminada, "rutas", etiquetaRutaCorta),
+          parte(cfg.series, cfg.serie_predeterminada, "series", (x) => x),
+          dia].join(" · ");
 }
 
 function pintarUnaSolicitud(s) {
@@ -15626,10 +15659,11 @@ function pintarUnaSolicitud(s) {
     : "";
   // Una computadora activa ya no se saca de servicio desde aquí: eso vive en
   // el bloque Computadoras, columna "Activa".
+  // Una solicitud pendiente se aprueba SIEMPRE desde su ventana (2026-08-07):
+  // ahí se ven y se corrigen nombre, vendedor, rutas, series y día antes de
+  // activar. Un "Activar" suelto en la fila sería el camino a ciegas.
   const acciones = enEspera
-    ? `<input type="text" id="sol-nombre-${host}" maxlength="40"
-              value="${nombre}" placeholder="Nombre de la computadora">
-       <button class="primario" onclick="confirmarActivarEquipo(this, '${host}')">Activar</button>
+    ? `<button class="primario" onclick="abrirConfigSolicitud('${host}')">Revisar y activar</button>
        <button class="secundario" onclick="rechazarEquipo(this, '${host}')">Rechazar</button>`
     : (s.estado === "activo"
         ? olvidar
@@ -15645,7 +15679,8 @@ function pintarUnaSolicitud(s) {
       · Versión: ${esc(s.version || "—")}<br>
       Última señal: ${esc(fechaAcceso(s.ultima_verificacion))}
       ${motivo ? `<br>Motivo anotado: ${esc(motivo)}` : ""}${historia}
-      ${enEspera ? lineasConfigSolicitada(s) : ""}
+      ${enEspera ? `<br>Nombre pedido: ${nombre || "—"}
+        <br>Pidió: ${esc(resumenConfigSolicitada(s))}` : ""}
     </div>
     ${acciones ? `<div class="solicitud-acciones">${acciones}</div>` : ""}
   </div>`;
@@ -15657,15 +15692,18 @@ function confirmarActivarEquipo(btn, host) {
   confirmarSinQuitar(btn, () => activarEquipo(host), "Confirmar: dar acceso");
 }
 
-async function activarEquipo(host) {
-  const campo = $(`sol-nombre-${host}`);
-  const nombre = campo ? campo.value.trim() : "";
-  // La configuración solicitada viaja en este mismo POST (la lista ya la
-  // trae): el servidor la escribe al catálogo al activar, así queda aunque
-  // la computadora nueva esté desconectada.
+// `opciones` llega desde la ventana de configuración: nombre y configuración
+// YA editados por el administrador, más a dónde reportar el error para no
+// cerrarla. Sin opciones (reactivar una rechazada o desactivada) viaja lo que
+// la solicitud tenía pedido, como siempre. La configuración va en este mismo
+// POST: el servidor la escribe al catálogo al activar, así queda aunque la
+// computadora nueva esté desconectada.
+async function activarEquipo(host, opciones = {}) {
+  const nombre = (opciones.nombre || "").trim();
   const cuerpo = {dispositivo: host, nombre};
-  const cfg = configDeSolicitud(
-    solicitudes.find(x => x.dispositivo === host));
+  const cfg = opciones.configuracion !== undefined
+    ? opciones.configuracion
+    : configDeSolicitud(solicitudes.find(x => x.dispositivo === host));
   if (cfg) cuerpo.configuracion = cfg;
   try {
     const r = await api("/api/acceso/activar", cuerpo);
@@ -15673,8 +15711,11 @@ async function activarEquipo(host) {
             r.aviso ? "alerta" : "ok");
     await cargarSolicitudesAcceso();
     cargarAjustes();
+    return true;
   } catch (e) {
-    mensaje("No se pudo activar: " + e.message, "error");
+    if (opciones.alError) opciones.alError((e.datos || {}).campo || "", e.message);
+    else mensaje("No se pudo activar: " + e.message, "error");
+    return false;
   }
 }
 
@@ -15958,7 +15999,12 @@ function resumenAsignacion(sel, predet, plural, corto) {
   return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
 }
 
-let configEquipo = null;   // {dispositivo, modo: "rutas" | "series"} abierto
+// La ventana sirve a dos orígenes con los mismos selectores (2026-08-07):
+//   {origen:"equipo",    modo:"rutas"|"series"}  → fila de Computadoras
+//   {origen:"solicitud", modo:"ambas"}           → solicitud de activación
+// `datos` es la configuración de partida (la fila del catálogo, o la que pidió
+// la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
+let configEquipo = null;
 
 // Rutas que este panel conoce para ofrecer en el editor: el catálogo que ya
 // viajó con la lista, más las que el propio equipo tenga asignadas (para que
@@ -15970,55 +16016,156 @@ function rutasConocidasParaEquipo(m) {
     .sort((a, b) => nombreRuta(a).localeCompare(nombreRuta(b), "es"));
 }
 
+// Las series que se ofrecen: las del sistema más las que el equipo ya tenga
+// asignadas, por el mismo motivo que las rutas.
+function seriesConocidasParaEquipo(m) {
+  return [...new Set([...SERIES, ...(Array.isArray(m.series) ? m.series : [])])];
+}
+
+const opcionesConfigEquipo = (tipo, m) => tipo === "rutas"
+  ? rutasConocidasParaEquipo(m) : seriesConocidasParaEquipo(m);
+const cortoConfigEquipo = (tipo) => tipo === "rutas" ? etiquetaRutaCorta : (x) => x;
+
 function abrirConfigEquipo(dispositivo, modo) {
   const m = equipos.find(e => e.dispositivo === dispositivo);
   if (!m) return;
-  configEquipo = {dispositivo, modo};
-  const esRutas = modo === "rutas";
-  const nombre = m.nombre || dispositivo;
-  $("equipo-config-titulo").textContent =
-    esRutas ? `Rutas de ${nombre}` : `Series de ${nombre}`;
-  $("equipo-config-todas-rotulo").textContent =
-    esRutas ? "Todas las rutas" : "Todas las series";
-  $("equipo-config-predet-rotulo").textContent =
-    esRutas ? "Ruta predeterminada" : "Serie predeterminada";
-  const sel = esRutas ? m.rutas : m.series;
-  const todas = sel === "*" || sel === null || sel === undefined;
-  $("equipo-config-todas").checked = todas;
-  const opciones = esRutas ? rutasConocidasParaEquipo(m) : SERIES;
-  const corto = esRutas ? etiquetaRutaCorta : (x) => x;
-  const marcadas = Array.isArray(sel) ? sel : [];
-  $("equipo-config-lista").innerHTML = opciones.length
-    ? opciones.map(v => `<label><input type="checkbox" value="${esc(v)}"
-          ${marcadas.includes(v) ? "checked" : ""} ${todas ? "disabled" : ""}
-          onchange="configEquipoRecalcular()"> ${esc(corto(v))}</label>`).join("")
-    : `<span class="mut">Todavía no hay rutas registradas.</span>`;
-  // El día de despacho solo va con las rutas: es parte de la misma
-  // configuración y así el administrador puede corregirlo desde aquí.
-  $("equipo-config-dia-campo").style.display = esRutas ? "" : "none";
-  $("equipo-config-dia").value = m.dia_despacho || "";
-  $("equipo-config-error").style.display = "none";
-  configEquipoRecalcular(
-    esRutas ? (m.ruta_predeterminada || "") : (m.serie_predeterminada || ""));
+  abrirVentanaConfigEquipo({origen: "equipo", dispositivo, modo, datos: m,
+                            nombreVisible: m.nombre || dispositivo});
+}
+
+// La misma ventana para decidir una activación: además de rutas y series
+// juntas, el nombre y el vendedor con que va a quedar la computadora.
+function abrirConfigSolicitud(dispositivo) {
+  const s = solicitudes.find(x => x.dispositivo === dispositivo);
+  if (!s) return;
+  const nombrePedido = s.nombre || s.nombre_solicitado || "";
+  abrirVentanaConfigEquipo({
+    origen: "solicitud", dispositivo, modo: "ambas",
+    datos: configDeSolicitud(s) || {},
+    sinConfigPedida: !configDeSolicitud(s),
+    nombrePedido,
+    nombreVisible: nombrePedido || dispositivo,
+  });
+}
+
+function abrirVentanaConfigEquipo(ctx) {
+  configEquipo = ctx;
+  const {origen, modo, datos, nombreVisible} = ctx;
+  const esSolicitud = origen === "solicitud";
+  const verRutas = modo === "rutas" || modo === "ambas";
+  const verSeries = modo === "series" || modo === "ambas";
+  $("equipo-config-titulo").textContent = esSolicitud
+    ? `Configuración de ${nombreVisible}`
+    : (modo === "rutas" ? `Rutas de ${nombreVisible}`
+                        : `Series de ${nombreVisible}`);
+  $("equipo-config-intro").textContent = esSolicitud
+    ? (ctx.sinConfigPedida
+       ? "La solicitud llegó sin configuración: lo que se elija aquí es con lo "
+         + "que queda esa computadora al activarla."
+       : "Es la configuración que pidió esa computadora. Corrígela si hace "
+         + "falta: queda tal como se vea aquí al activarla.")
+    : "";
+  $("equipo-config-intro").style.display = esSolicitud ? "" : "none";
+  // Nombre y vendedor solo al activar: en una computadora ya activa esos dos
+  // se editan en su fila de Computadoras.
+  $("equipo-config-nombre-campo").style.display = esSolicitud ? "" : "none";
+  $("equipo-config-vendedor-campo").style.display = esSolicitud ? "" : "none";
+  if (esSolicitud) {
+    $("equipo-config-nombre-rotulo").textContent =
+      "Nombre con el que queda esa computadora";
+    $("equipo-config-nombre").value = ctx.nombrePedido || "";
+    $("equipo-config-nombre-nota").textContent = ctx.nombrePedido
+      ? `Lo pidió así al registrarse: ${ctx.nombrePedido}`
+      : "No mandó ningún nombre al registrarse.";
+    $("equipo-config-vendedor-rotulo").textContent =
+      "Vendedor con el que factura esa computadora";
+    pintarVendedorConfigEquipo(datos.vendedor || "");
+  }
+  for (const tipo of ["rutas", "series"]) {
+    const visible = tipo === "rutas" ? verRutas : verSeries;
+    $(`equipo-config-${tipo}-campo`).style.display = visible ? "" : "none";
+    if (!visible) continue;
+    const rotulo = $(`equipo-config-${tipo}-rotulo`);
+    // Con las dos secciones a la vista hace falta decir cuál es cuál; con una
+    // sola el título ya lo dice y repetirlo sería ruido.
+    rotulo.style.display = modo === "ambas" ? "" : "none";
+    rotulo.textContent = tipo === "rutas"
+      ? `Rutas que atiende ${nombreVisible}`
+      : `Series con las que factura ${nombreVisible}`;
+    $(`equipo-config-${tipo}-todas-rotulo`).textContent =
+      tipo === "rutas" ? "Todas las rutas" : "Todas las series";
+    $(`equipo-config-${tipo}-predet-rotulo`).textContent =
+      tipo === "rutas" ? "Ruta predeterminada" : "Serie predeterminada";
+    const sel = tipo === "rutas" ? datos.rutas : datos.series;
+    // Una computadora del catálogo sin configurar (null) equivale a todas
+    // (legado); una solicitud sin configuración pedida abre en blanco, igual
+    // que el formulario de registro.
+    const todas = sel === "*"
+      || (!esSolicitud && (sel === null || sel === undefined));
+    $(`equipo-config-${tipo}-todas`).checked = todas;
+    const opciones = opcionesConfigEquipo(tipo, datos);
+    const corto = cortoConfigEquipo(tipo);
+    const marcadas = Array.isArray(sel) ? sel : [];
+    $(`equipo-config-${tipo}-lista`).innerHTML = opciones.length
+      ? opciones.map(v => `<label><input type="checkbox" value="${esc(v)}"
+            ${marcadas.includes(v) ? "checked" : ""} ${todas ? "disabled" : ""}
+            onchange="configEquipoRecalcular('${tipo}')"> ${esc(corto(v))}</label>`).join("")
+      : `<span class="mut">Todavía no hay rutas registradas.</span>`;
+    configEquipoRecalcular(tipo, tipo === "rutas"
+      ? (datos.ruta_predeterminada || "") : (datos.serie_predeterminada || ""));
+  }
+  // El día de despacho va con las rutas: es parte de la misma configuración y
+  // así el administrador puede corregirlo desde aquí.
+  $("equipo-config-dia-campo").style.display = verRutas ? "" : "none";
+  $("equipo-config-dia-rotulo").textContent = `Día de despacho de ${nombreVisible}`;
+  $("equipo-config-dia").value = datos.dia_despacho || "";
+  $("equipo-config-guardar").textContent = esSolicitud
+    ? "Activar con esta configuración" : "Guardar";
+  $("equipo-config-guardar").disabled = false;
+  limpiarErroresConfigEquipo();
   $("equipo-config-overlay").classList.add("visible");
 }
+
+// Con el catálogo de vendedores cargado va el selector de siempre (código y
+// nombre juntos). Sin catálogo —o con un código que ya no está en él— se
+// muestra el pedido como texto y se conserva al activar: perderlo dejaría a
+// esa computadora facturando con un vendedor que nadie eligió.
+function pintarVendedorConfigEquipo(pedido) {
+  const select = $("equipo-config-vendedor");
+  const texto = $("equipo-config-vendedor-texto");
+  const conocido = !pedido
+    || vendedoresCatalogo.some(v => v.codigo === pedido);
+  if (vendedoresCatalogo.length && conocido) {
+    select.style.display = "";
+    texto.style.display = "none";
+    pintarSelectVendedores(select, pedido);
+    return;
+  }
+  select.style.display = "none";
+  texto.style.display = "";
+  texto.textContent = pedido
+    ? `${pedido} (pedido por esa computadora; la lista de vendedores no está a mano)`
+    : "No pidió vendedor.";
+}
+
+const vendedorConfigEquipo = () =>
+  $("equipo-config-vendedor").style.display === "none"
+    ? (configEquipo.datos.vendedor || "") : $("equipo-config-vendedor").value;
 
 // Mismas reglas del registro: "Todas" deshabilita las individuales SIN
 // desmarcarlas; la predeterminada solo se elige cuando la selección efectiva
 // tiene más de una (con una sola, es esa y se muestra como texto).
-function configEquipoRecalcular(preseleccionar) {
-  const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo) || {};
-  const esRutas = configEquipo.modo === "rutas";
-  const todas = $("equipo-config-todas").checked;
-  const cajas = [...$("equipo-config-lista").querySelectorAll("input")];
+function configEquipoRecalcular(tipo, preseleccionar) {
+  const datos = (configEquipo || {}).datos || {};
+  const todas = $(`equipo-config-${tipo}-todas`).checked;
+  const cajas = [...$(`equipo-config-${tipo}-lista`).querySelectorAll("input")];
   cajas.forEach(c => { c.disabled = todas; });
   const marcadas = cajas.filter(c => c.checked).map(c => c.value);
-  const conocidas = esRutas ? rutasConocidasParaEquipo(m) : SERIES;
-  const efectivas = todas ? conocidas : marcadas;
-  const corto = esRutas ? etiquetaRutaCorta : (x) => x;
-  const campo = $("equipo-config-predet-campo");
-  const texto = $("equipo-config-predet-texto");
-  const select = $("equipo-config-predet");
+  const efectivas = todas ? opcionesConfigEquipo(tipo, datos) : marcadas;
+  const corto = cortoConfigEquipo(tipo);
+  const campo = $(`equipo-config-${tipo}-predet-campo`);
+  const texto = $(`equipo-config-${tipo}-predet-texto`);
+  const select = $(`equipo-config-${tipo}-predet`);
   if (!todas && marcadas.length === 1) {
     campo.style.display = "";
     select.style.display = "none";
@@ -16037,8 +16184,58 @@ function configEquipoRecalcular(preseleccionar) {
   if (!efectivas.includes(previa)) select.value = "";
 }
 
-function alternarTodasConfigEquipo() {
-  configEquipoRecalcular();
+// Lo elegido en la ventana: "*" con "Todas", si no la lista canónica.
+function seleccionConfigEquipo(tipo) {
+  if ($(`equipo-config-${tipo}-todas`).checked) return "*";
+  return [...$(`equipo-config-${tipo}-lista`).querySelectorAll("input:checked")]
+    .map(c => c.value);
+}
+
+function predetConfigEquipo(tipo) {
+  const sel = seleccionConfigEquipo(tipo);
+  if (sel !== "*" && sel.length === 1) return sel[0];
+  return $(`equipo-config-${tipo}-predet`).value || "";
+}
+
+const CAMPOS_ERROR_CONFIG_EQUIPO = ["nombre", "vendedor", "rutas", "series",
+  "ruta_predeterminada", "serie_predeterminada", "dia_despacho"];
+
+function limpiarErroresConfigEquipo() {
+  for (const campo of CAMPOS_ERROR_CONFIG_EQUIPO) {
+    const el = $(`equipo-config-err-${campo}`);
+    el.textContent = "";
+    el.style.display = "none";
+  }
+  $("equipo-config-error").textContent = "";
+  $("equipo-config-error").style.display = "none";
+}
+
+// Dónde vive cada campo: un error de la mitad que esta ventana NO está
+// mostrando (la que viaja tal cual) quedaría escondido, así que ese va al
+// aviso general.
+const SECCION_DE_CAMPO_CONFIG_EQUIPO = {
+  nombre: "nombre", vendedor: "vendedor",
+  rutas: "rutas", ruta_predeterminada: "rutas",
+  series: "series", serie_predeterminada: "series",
+  dia_despacho: "dia",
+};
+
+// Un 400 con {campo} marca el campo culpable dentro de la ventana; lo que no
+// tenga campo va al aviso general. En los dos casos la ventana NO se cierra:
+// cerrarla botaría lo que el administrador acaba de corregir.
+function marcarErrorConfigEquipo(campo, texto) {
+  const seccion = SECCION_DE_CAMPO_CONFIG_EQUIPO[campo];
+  const visible = seccion
+    && $(`equipo-config-${seccion}-campo`).style.display !== "none";
+  const el = (visible && CAMPOS_ERROR_CONFIG_EQUIPO.includes(campo))
+    ? $(`equipo-config-err-${campo}`) : null;
+  if (!el) {
+    $("equipo-config-error").textContent = texto;
+    $("equipo-config-error").style.display = "";
+    return;
+  }
+  el.textContent = texto;
+  el.style.display = "";
 }
 
 function cerrarConfigEquipo() {
@@ -16046,19 +16243,22 @@ function cerrarConfigEquipo() {
   $("equipo-config-overlay").classList.remove("visible");
 }
 
+function guardarConfigEquipo() {
+  if (!configEquipo) return;
+  if (configEquipo.origen === "solicitud") { activarDesdeConfigEquipo(); return; }
+  guardarConfigEquipoDelCatalogo();
+}
+
 // El endpoint pide el conjunto COMPLETO (rutas Y series): la mitad que no se
 // está editando viaja tal como estaba en la fila; sin configurar (null) viaja
 // como "*", que es su equivalente.
-function guardarConfigEquipo() {
+function guardarConfigEquipoDelCatalogo() {
   const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
   if (!m) { cerrarConfigEquipo(); return; }
   const esRutas = configEquipo.modo === "rutas";
-  const todas = $("equipo-config-todas").checked;
-  const marcadas = [...$("equipo-config-lista").querySelectorAll("input:checked")]
-    .map(c => c.value);
-  const editada = todas ? "*" : marcadas;
-  const predetEditada = (!todas && marcadas.length === 1)
-    ? marcadas[0] : $("equipo-config-predet").value || "";
+  const tipo = esRutas ? "rutas" : "series";
+  const editada = seleccionConfigEquipo(tipo);
+  const predetEditada = predetConfigEquipo(tipo);
   const talCual = (v) => (v === "*" || v === null || v === undefined) ? "*" : v;
   const cuerpo = {
     dispositivo: configEquipo.dispositivo,
@@ -16077,9 +16277,30 @@ function guardarConfigEquipo() {
     mensaje(`Configuración de ${m.nombre || m.dispositivo} guardada; `
       + "la toma en su próximo refresco.", "info");
   }).catch((e) => {
-    $("equipo-config-error").textContent = e.message;
-    $("equipo-config-error").style.display = "";
+    marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
   }).finally(() => { boton.disabled = false; });
+}
+
+// La activación sale de esta ventana con lo que el administrador dejó a la
+// vista, no con lo que la computadora había pedido.
+async function activarDesdeConfigEquipo() {
+  const boton = $("equipo-config-guardar");
+  boton.disabled = true;
+  limpiarErroresConfigEquipo();
+  const hecho = await activarEquipo(configEquipo.dispositivo, {
+    nombre: $("equipo-config-nombre").value.trim(),
+    configuracion: {
+      vendedor: vendedorConfigEquipo(),
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+      dia_despacho: $("equipo-config-dia").value,
+    },
+    alError: marcarErrorConfigEquipo,
+  });
+  boton.disabled = false;
+  if (hecho) cerrarConfigEquipo();
 }
 
 // Vista del panel (2026-08-05): mirar el panel como otro rol. Desde el
