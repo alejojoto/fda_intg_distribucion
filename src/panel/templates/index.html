@@ -2693,8 +2693,6 @@
           <span class="ajustes-ok" id="maquina-guardado" style="display:none">Guardado</span>
           <span class="mut" id="vendedor-info"></span>
         </div>
-        <p class="mut" id="maquina-bloqueo" style="display:none;margin:8px 0 0">
-          Ya está configurado. Para cambiarlo hace falta un equipo con permiso de editor.</p>
         <p class="mut" style="margin:8px 0 0">
           El <b>nombre</b> es con el que las demás computadoras ven tus llenados
           en el historial; no puede repetirse con el de otra. El
@@ -2707,12 +2705,11 @@
            quedó pendiente y sale ese mismo día — así que el día de entrega no
            es una regla del negocio sino de la máquina. Se guarda local
            (config_dispositivo), como el vendedor.
-           Desde 2026-08-07 el bloque es de Editor/Admin (permiso
-           identidad_maquina, igual que nombre y vendedor): un usuario general
-           no lo ve — pintarBloqueoMaquina lo esconde. Elegirlo la primera vez
-           sigue siendo de quien instala, y eso pasa por el aviso de
-           configuración obligatoria, no por aquí. -->
-      <div class="ajustes-bloque" id="dia-despacho-bloque">
+           Cambiarlo es de Editor/Admin (permiso identidad_maquina, igual que
+           nombre y vendedor): el usuario general no ve la pestaña AJUSTES.
+           Elegirlo la primera vez sigue siendo de quien instala, y eso pasa
+           por el aviso de configuración obligatoria, no por aquí. -->
+      <div class="ajustes-bloque">
         <h3>Día de despacho de esta máquina</h3>
         <div class="ajustes-fila" style="gap:24px">
           <label class="desc-todos">
@@ -15372,7 +15369,6 @@ async function cargarAjustes() {
     acceso = d.acceso || acceso;
     pintarDesactivada();
     pintarAcceso();
-    pintarBloqueoMaquina();
     // Mientras la computadora espera activación no se pide configurarla: la
     // pantalla de activación ya la tapa y el nombre lo toma de ahí.
     if (resolverConfigMaquina && !configPendiente.length
@@ -15394,6 +15390,15 @@ async function cargarAjustes() {
     // El corte vive en AJUSTES desde 2026-08-05: lo ven supervisión y Admin.
     $("corte-bloque").style.display =
       tienePermiso("corte_produccion") ? "" : "none";
+    // AJUSTES entera es de Editor/Admin (2026-08-07, pedido del usuario): al
+    // usuario general no le queda nada que tocar ahí —nombre, vendedor y día
+    // de facturación son fijos para él, se los pone quien instala el equipo—
+    // así que no ve la pestaña. Esconderla entera es lo que permite que los
+    // bloques de adentro no tengan que degradarse uno por uno.
+    const hayAjustes = !!(permisosUI.rol_efectivo || "");
+    $("tab-ajustes").style.display = hayAjustes ? "" : "none";
+    if (!hayAjustes && $("tab-ajustes").classList.contains("activa"))
+      cambiarTab("pendientes");
     // La pestaña ADMIN solo existe (Jinja) en equipos con capacidad admin;
     // aquí solo se esconde/enseña según la vista elegida.
     const tabAdmin = $("tab-admin");
@@ -16682,23 +16687,10 @@ async function guardarVersionEstable(version) {
 // los dos campos, para que un "Guardado" viejo no quede confirmando otra cosa.
 let maquinaGuardadoTimer = null;
 
-function pintarBloqueoMaquina() {
-  const puedeEditar = tienePermiso("identidad_maquina");
-  const nombreBloqueado = !puedeEditar && !!(nombreMaquina || "").trim();
-  const vendedorBloqueado = !puedeEditar && !!vendedorMaquina;
-  $("maquina-nombre").disabled = nombreBloqueado;
-  $("vendedor-select").disabled = vendedorBloqueado;
-  $("maquina-guardar").style.display =
-    nombreBloqueado && vendedorBloqueado ? "none" : "";
-  $("maquina-bloqueo").style.display =
-    nombreBloqueado || vendedorBloqueado ? "" : "none";
-  // El día de facturación se ESCONDE entero en vez de deshabilitarse
-  // (2026-08-07, pedido del usuario): un usuario general no lo cambia ni ve
-  // la sección. Mientras todavía falta elegirlo sí se muestra — esa primera
-  // vez es de quien instala la computadora, igual que nombre y vendedor.
-  $("dia-despacho-bloque").style.display =
-    puedeEditar || configPendiente.includes("dia_despacho") ? "" : "none";
-}
+// Los bloques de "Esta máquina" ya no se degradan por rol (2026-08-07): la
+// pestaña AJUSTES completa es de Editor/Admin, así que quien la ve puede
+// cambiarlo todo. Los candados de verdad siguen en el servidor, que rechaza
+// cada POST sin el permiso `identidad_maquina`.
 
 function ocultarMaquinaGuardado() {
   clearTimeout(maquinaGuardadoTimer);
