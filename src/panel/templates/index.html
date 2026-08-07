@@ -845,8 +845,13 @@
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
       border-radius:6px; }
+  .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
   .equipos-config .mut { font-size:12px; display:block; margin-bottom:4px; }
   .equipos-config button { font-size:12px; padding:3px 8px; }
+  /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
+     columna es angosta, así que el texto va sobre el botón y no al lado. */
+  .sup-config-celda .mut { font-size:12px; display:block; margin-bottom:4px; }
+  .sup-config-celda button { font-size:12px; padding:3px 8px; }
   /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
      visible SOLO cuando la ruta elegida tiene configuración — dice a las
      claras por qué el selector cambió de opciones o de valor solo. */
@@ -3009,6 +3014,9 @@
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
+              <!-- Lo mismo que AJUSTES → Computadoras (2026-08-07, pedido del
+                   usuario): con qué trabaja cada PC, editable desde aquí. -->
+              <th>Series, rutas y día</th>
               <th>Atención</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -3370,21 +3378,14 @@
       <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
       <p class="acceso-campo-error" id="equipo-config-err-vendedor"></p>
     </div>
-    <div class="acceso-campo" id="equipo-config-rutas-campo">
-      <label id="equipo-config-rutas-rotulo" style="display:none"></label>
-      <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
-             onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
-      <div id="equipo-config-rutas-lista" class="acceso-lista"></div>
-      <p class="acceso-campo-error" id="equipo-config-err-rutas"></p>
-      <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
-        <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
-        <select id="equipo-config-rutas-predet"></select>
-        <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
-      </div>
-      <p class="acceso-campo-error" id="equipo-config-err-ruta_predeterminada"></p>
-    </div>
+    <!-- Series, rutas y día en ese orden (2026-08-07, pedido del usuario):
+         el mismo con el que se resumen en la línea de cada computadora, para
+         que la ventana se lea como la fila que se acaba de pulsar. -->
     <div class="acceso-campo" id="equipo-config-series-campo">
       <label id="equipo-config-series-rotulo" style="display:none"></label>
+      <p class="mut equipo-config-ayuda">Son las series que esa computadora
+        tiene cargadas en el programa de facturación. La predeterminada es con
+        la que arranca cada factura suya.</p>
       <label class="acceso-check"><input type="checkbox" id="equipo-config-series-todas"
              onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
       <div id="equipo-config-series-lista" class="acceso-lista"></div>
@@ -3396,8 +3397,27 @@
       </div>
       <p class="acceso-campo-error" id="equipo-config-err-serie_predeterminada"></p>
     </div>
+    <div class="acceso-campo" id="equipo-config-rutas-campo">
+      <label id="equipo-config-rutas-rotulo" style="display:none"></label>
+      <p class="mut equipo-config-ayuda">Solo verá pedidos de esas rutas; con
+        la predeterminada arranca ya filtrada al abrir.</p>
+      <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
+             onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
+      <div id="equipo-config-rutas-lista" class="acceso-lista"></div>
+      <p class="acceso-campo-error" id="equipo-config-err-rutas"></p>
+      <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
+        <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
+        <select id="equipo-config-rutas-predet"></select>
+        <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
+      </div>
+      <p class="acceso-campo-error" id="equipo-config-err-ruta_predeterminada"></p>
+    </div>
     <div class="acceso-campo" id="equipo-config-dia-campo">
-      <label for="equipo-config-dia" id="equipo-config-dia-rotulo">Día de despacho</label>
+      <label for="equipo-config-dia" id="equipo-config-dia-rotulo">Día a facturar</label>
+      <p class="mut equipo-config-ayuda">Con qué día arranca la Fecha a
+        facturar de esa computadora: <b>Para mañana</b> es el día siguiente
+        (lo normal: de tarde se factura lo que sale al otro día) y <b>Para
+        hoy</b> es el mismo día. En cada factura se puede cambiar a mano.</p>
       <select id="equipo-config-dia">
         <option value="">— Sin elegir —</option>
         <option value="hoy">Para hoy</option>
@@ -4253,6 +4273,11 @@ const esSupervisionEfectiva = () => permisosUI.rol_efectivo === "supervisor";
 // Las demás computadoras, tal como llegan de /api/ajustes: nombre, vendedor,
 // rol Editor y si siguen en servicio. Solo viaja a quien puede tocarlas.
 let equipos = [];
+// Series, rutas y día de ESTA computadora (2026-08-07): la fila propia queda
+// fuera de `equipos` —se configura en otra parte— y sin esto el overview de
+// ADMIN → Equipos no podría ni mostrar con qué trabaja el equipo desde el que
+// se está mirando.
+let configPropia = null;
 // Si a ESTA computadora la sacaron de servicio desde otra: el panel se tapa
 // entero con el aviso hasta que la vuelvan a activar.
 let maquinaDesactivada = false;
@@ -7081,9 +7106,31 @@ function supFilaEquipo(equipo, sinDatos) {
             atrasada ? " · atrasada" : ""}</div>`
         : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
+    <td class="sup-config-celda">${supConfigEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
+}
+
+// Series, rutas y día en el overview (2026-08-07, pedido del usuario): la
+// misma línea y la misma ventana que en AJUSTES → Computadoras. Los equipos
+// que no se gestionan desde aquí (esta misma computadora y los de
+// supervisión) muestran el resumen sin botón: el backend rechaza editarlos
+// por otra vía, así que ofrecer el botón sería mentir.
+function supConfigEquipo(equipo) {
+  const host = esc(equipo.dispositivo || "");
+  const m = equipos.find(e => e.dispositivo === equipo.dispositivo);
+  if (m)
+    return `<span class="mut">${esc(resumenConfigEquipo(m))}</span>`
+      // Con el permiso de identidad se edita; sin él, la línea se ve igual
+      // pero sin botón — es el mismo permiso que exige el endpoint.
+      + (tienePermiso("identidad_maquina")
+         ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Detalles</button>`
+         : "");
+  if (equipo.dispositivo === supDispositivoPropio && configPropia)
+    return `<span class="mut">${esc(resumenConfigEquipo(configPropia))}</span>
+      <span class="mut">Es esta computadora</span>`;
+  return `<span class="mut">—</span>`;
 }
 
 // El registro de ACCESO (credencial/autorización) es otra fuente de verdad
@@ -15213,6 +15260,7 @@ async function cargarAjustes() {
     esMaquinaAdmin = !!d.es_maquina_admin;
     permisosUI = d.permisos_ui || permisosUI;
     equipos = d.equipos_gestionables || [];
+    configPropia = d.config_rutas_series || configPropia;
     maquinaDesactivada = !!d.maquina_desactivada;
     exigeRuta = !!d.exige_ruta;
     rutasOfrecidas = d.rutas_ofrecidas || [];
@@ -15249,6 +15297,10 @@ async function cargarAjustes() {
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
+    // El overview de ADMIN → Equipos pinta su columna de series/rutas/día de
+    // `equipos`, que llega aquí: si ese panel ya estaba cargado (o resolvió
+    // primero, al entrar a la pestaña), se repinta con lo recién traído.
+    if (supOverviewCargado) pintarEquiposSupervision();
     cargarSolicitudesAcceso();
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
@@ -15828,15 +15880,12 @@ function pintarEquipos() {
       <input type="checkbox" ${m.activa ? "checked" : ""}
              title="Al quitarla, esa computadora queda fuera de servicio."
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
-    // Rutas y series del equipo (2026-08-07): resumen corto + sus dos
-    // editores, con el mismo permiso que Nombre/Vendedor.
+    // Series, rutas y día de despacho del equipo (2026-08-07): la línea
+    // resume con qué trabaja y "Detalles" abre la ventana donde se cambian
+    // los tres juntos. Mismo permiso que Nombre/Vendedor.
     const config = `<td class="equipos-config">
-      <span class="mut">Rutas: ${esc(resumenAsignacion(m.rutas,
-        m.ruta_predeterminada, "rutas", etiquetaRutaCorta))}
-        · Series: ${esc(resumenAsignacion(m.series,
-        m.serie_predeterminada, "series", (x) => x))}</span>
-      <button type="button" onclick="abrirConfigEquipo('${host}', 'rutas')">Configurar rutas</button>
-      <button type="button" onclick="abrirConfigEquipo('${host}', 'series')">Configurar series</button>
+      <span class="mut">${esc(resumenConfigEquipo(m))}</span>
+      <button type="button" onclick="abrirConfigEquipo('${host}')">Detalles</button>
     </td>`;
     return `<tr>
       <td class="equipos-host">${host}</td>
@@ -15853,7 +15902,7 @@ function pintarEquipos() {
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
       <th>Computadora</th><th>Nombre</th><th>Vendedor</th>
-      ${puedeIdentidad ? "<th>Rutas y series</th>" : ""}
+      ${puedeIdentidad ? "<th>Series, rutas y día</th>" : ""}
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
@@ -15999,9 +16048,22 @@ function resumenAsignacion(sel, predet, plural, corto) {
   return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
 }
 
+const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
+
+// La línea de cada computadora, en el orden que pidió el usuario
+// (2026-08-07): con qué series factura, qué rutas atiende y con qué día
+// arranca su Fecha a facturar. Es lo mismo que se cambia en "Detalles".
+function resumenConfigEquipo(m) {
+  return `Series: ${resumenAsignacion(m.series, m.serie_predeterminada,
+                                      "series", (x) => x)}`
+    + ` · Rutas: ${resumenAsignacion(m.rutas, m.ruta_predeterminada,
+                                     "rutas", etiquetaRutaCorta)}`
+    + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
+}
+
 // La ventana sirve a dos orígenes con los mismos selectores (2026-08-07):
-//   {origen:"equipo",    modo:"rutas"|"series"}  → fila de Computadoras
-//   {origen:"solicitud", modo:"ambas"}           → solicitud de activación
+//   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
+//   {origen:"solicitud"}  → solicitud de activación (suma nombre y vendedor)
 // `datos` es la configuración de partida (la fila del catálogo, o la que pidió
 // la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
 let configEquipo = null;
@@ -16026,21 +16088,26 @@ const opcionesConfigEquipo = (tipo, m) => tipo === "rutas"
   ? rutasConocidasParaEquipo(m) : seriesConocidasParaEquipo(m);
 const cortoConfigEquipo = (tipo) => tipo === "rutas" ? etiquetaRutaCorta : (x) => x;
 
-function abrirConfigEquipo(dispositivo, modo) {
+// Una sola ventana con todo lo que se elige por computadora (2026-08-07,
+// pedido del usuario): antes eran dos botones sueltos, "Configurar rutas" y
+// "Configurar series", y el día de despacho vivía escondido dentro del de
+// rutas. Se abre igual desde AJUSTES → Computadoras y desde el overview de
+// ADMIN → Equipos.
+function abrirConfigEquipo(dispositivo) {
   const m = equipos.find(e => e.dispositivo === dispositivo);
   if (!m) return;
-  abrirVentanaConfigEquipo({origen: "equipo", dispositivo, modo, datos: m,
+  abrirVentanaConfigEquipo({origen: "equipo", dispositivo, datos: m,
                             nombreVisible: m.nombre || dispositivo});
 }
 
-// La misma ventana para decidir una activación: además de rutas y series
-// juntas, el nombre y el vendedor con que va a quedar la computadora.
+// La misma ventana para decidir una activación: además de series, rutas y
+// día, el nombre y el vendedor con que va a quedar la computadora.
 function abrirConfigSolicitud(dispositivo) {
   const s = solicitudes.find(x => x.dispositivo === dispositivo);
   if (!s) return;
   const nombrePedido = s.nombre || s.nombre_solicitado || "";
   abrirVentanaConfigEquipo({
-    origen: "solicitud", dispositivo, modo: "ambas",
+    origen: "solicitud", dispositivo,
     datos: configDeSolicitud(s) || {},
     sinConfigPedida: !configDeSolicitud(s),
     nombrePedido,
@@ -16050,22 +16117,18 @@ function abrirConfigSolicitud(dispositivo) {
 
 function abrirVentanaConfigEquipo(ctx) {
   configEquipo = ctx;
-  const {origen, modo, datos, nombreVisible} = ctx;
+  const {origen, datos, nombreVisible} = ctx;
   const esSolicitud = origen === "solicitud";
-  const verRutas = modo === "rutas" || modo === "ambas";
-  const verSeries = modo === "series" || modo === "ambas";
-  $("equipo-config-titulo").textContent = esSolicitud
-    ? `Configuración de ${nombreVisible}`
-    : (modo === "rutas" ? `Rutas de ${nombreVisible}`
-                        : `Series de ${nombreVisible}`);
+  $("equipo-config-titulo").textContent = `Configuración de ${nombreVisible}`;
   $("equipo-config-intro").textContent = esSolicitud
     ? (ctx.sinConfigPedida
        ? "La solicitud llegó sin configuración: lo que se elija aquí es con lo "
          + "que queda esa computadora al activarla."
        : "Es la configuración que pidió esa computadora. Corrígela si hace "
          + "falta: queda tal como se vea aquí al activarla.")
-    : "";
-  $("equipo-config-intro").style.display = esSolicitud ? "" : "none";
+    : "Es la configuración con la que trabaja esa computadora. La toma en su "
+      + "próximo refresco, sin que nadie tenga que ir hasta ella.";
+  $("equipo-config-intro").style.display = "";
   // Nombre y vendedor solo al activar: en una computadora ya activa esos dos
   // se editan en su fila de Computadoras.
   $("equipo-config-nombre-campo").style.display = esSolicitud ? "" : "none";
@@ -16082,13 +16145,8 @@ function abrirVentanaConfigEquipo(ctx) {
     pintarVendedorConfigEquipo(datos.vendedor || "");
   }
   for (const tipo of ["rutas", "series"]) {
-    const visible = tipo === "rutas" ? verRutas : verSeries;
-    $(`equipo-config-${tipo}-campo`).style.display = visible ? "" : "none";
-    if (!visible) continue;
     const rotulo = $(`equipo-config-${tipo}-rotulo`);
-    // Con las dos secciones a la vista hace falta decir cuál es cuál; con una
-    // sola el título ya lo dice y repetirlo sería ruido.
-    rotulo.style.display = modo === "ambas" ? "" : "none";
+    rotulo.style.display = "";
     rotulo.textContent = tipo === "rutas"
       ? `Rutas que atiende ${nombreVisible}`
       : `Series con las que factura ${nombreVisible}`;
@@ -16114,10 +16172,8 @@ function abrirVentanaConfigEquipo(ctx) {
     configEquipoRecalcular(tipo, tipo === "rutas"
       ? (datos.ruta_predeterminada || "") : (datos.serie_predeterminada || ""));
   }
-  // El día de despacho va con las rutas: es parte de la misma configuración y
-  // así el administrador puede corregirlo desde aquí.
-  $("equipo-config-dia-campo").style.display = verRutas ? "" : "none";
-  $("equipo-config-dia-rotulo").textContent = `Día de despacho de ${nombreVisible}`;
+  $("equipo-config-dia-rotulo").textContent =
+    `Día a facturar de ${nombreVisible}`;
   $("equipo-config-dia").value = datos.dia_despacho || "";
   $("equipo-config-guardar").textContent = esSolicitud
     ? "Activar con esta configuración" : "Guardar";
@@ -16249,30 +16305,27 @@ function guardarConfigEquipo() {
   guardarConfigEquipoDelCatalogo();
 }
 
-// El endpoint pide el conjunto COMPLETO (rutas Y series): la mitad que no se
-// está editando viaja tal como estaba en la fila; sin configurar (null) viaja
-// como "*", que es su equivalente.
+// La ventana edita el conjunto COMPLETO, que es justo lo que pide el
+// endpoint: series, rutas, sus predeterminadas y el día de despacho.
 function guardarConfigEquipoDelCatalogo() {
   const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
   if (!m) { cerrarConfigEquipo(); return; }
-  const esRutas = configEquipo.modo === "rutas";
-  const tipo = esRutas ? "rutas" : "series";
-  const editada = seleccionConfigEquipo(tipo);
-  const predetEditada = predetConfigEquipo(tipo);
-  const talCual = (v) => (v === "*" || v === null || v === undefined) ? "*" : v;
   const cuerpo = {
     dispositivo: configEquipo.dispositivo,
-    rutas: esRutas ? editada : talCual(m.rutas),
-    series: esRutas ? talCual(m.series) : editada,
-    ruta_predeterminada: esRutas ? predetEditada : (m.ruta_predeterminada || ""),
-    serie_predeterminada: esRutas ? (m.serie_predeterminada || "") : predetEditada,
-    dia_despacho: esRutas ? $("equipo-config-dia").value : (m.dia_despacho || ""),
+    rutas: seleccionConfigEquipo("rutas"),
+    series: seleccionConfigEquipo("series"),
+    ruta_predeterminada: predetConfigEquipo("rutas"),
+    serie_predeterminada: predetConfigEquipo("series"),
+    dia_despacho: $("equipo-config-dia").value,
   };
   const boton = $("equipo-config-guardar");
   boton.disabled = true;
   api("/api/ajustes/equipo-rutas-series", cuerpo).then((r) => {
     equipos = r.equipos_gestionables || equipos;
     pintarEquipos();
+    // El overview de ADMIN → Equipos muestra el mismo resumen: si está
+    // cargado, se repinta para que no quede mostrando lo anterior.
+    if (supOverviewCargado) pintarEquiposSupervision();
     cerrarConfigEquipo();
     mensaje(`Configuración de ${m.nombre || m.dispositivo} guardada; `
       + "la toma en su próximo refresco.", "info");
