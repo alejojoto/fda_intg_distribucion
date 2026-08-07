@@ -879,8 +879,11 @@
   .dia-opciones label { display:flex; align-items:center; gap:5px;
       cursor:pointer; }
   /* La celda de la fila reparte en una línea: series, rutas, el día y el
-     botón, sin apilarse (2026-08-07, pedido del usuario). */
-  .equipos-config { display:flex; align-items:center; gap:16px;
+     botón, sin apilarse (2026-08-07, pedido del usuario). El flex va en un
+     div INTERIOR: un td con display:flex deja de ser celda de tabla —el
+     navegador lo envuelve en una celda anónima— y esa columna se corre
+     verticalmente respecto al nombre del equipo (2026-08-08). */
+  .equipos-config > div { display:flex; align-items:center; gap:16px;
       flex-wrap:wrap; }
   .equipos-config .dia-opciones { font-size:12px; gap:12px; }
   .equipos-config .mut { font-size:12px; }
@@ -16180,17 +16183,19 @@ function pintarEquipos() {
     // mueve de un día para otro— y "Configurar" abre la ventana con todo,
     // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
     const config = `<td class="equipos-config">
-      <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
-      <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
-      <div class="dia-opciones">
-        <label><input type="radio" name="dia-equipo-${host}" value="manana"
-               ${m.dia_despacho === "manana" ? "checked" : ""}
-               onclick="return onClickDiaEquipo(event, '${host}')"> Mañana</label>
-        <label><input type="radio" name="dia-equipo-${host}" value="hoy"
-               ${m.dia_despacho === "hoy" ? "checked" : ""}
-               onclick="return onClickDiaEquipo(event, '${host}')"> Hoy</label>
+      <div>
+        <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
+        <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
+        <div class="dia-opciones">
+          <label><input type="radio" name="dia-equipo-${host}" value="manana"
+                 ${m.dia_despacho === "manana" ? "checked" : ""}
+                 onclick="return onClickDiaEquipo(event, '${host}')"> Mañana</label>
+          <label><input type="radio" name="dia-equipo-${host}" value="hoy"
+                 ${m.dia_despacho === "hoy" ? "checked" : ""}
+                 onclick="return onClickDiaEquipo(event, '${host}')"> Hoy</label>
+        </div>
+        <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
       </div>
-      <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
     // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
     // pedido del usuario): aquí se leen, junto al identificador de la
