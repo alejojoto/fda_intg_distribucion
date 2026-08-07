@@ -338,8 +338,8 @@
   .tab-panel { border-top-left-radius:0; flex:1; min-height:0;
                display:flex; flex-direction:column; margin-bottom:0; }
   .tabla-scroll { flex:1; min-height:0; overflow:auto; }
-  /* EN REVISIÓN junta dos listas como subtabs (2026-07-31), con el mismo
-     estilo píldora de .desc-subtabs (ver arriba). La barra de botones solo
+  /* EN REVISIÓN junta dos listas como subtabs (2026-07-31), con el mismo riel
+     de .desc-subtabs (ver arriba). La barra de botones solo
      aparece cuando AMBAS listas tienen algo — con una sola, su panel ocupa
      toda la vista sin selector de por medio (pedido del usuario: "si no hay
      tareas llenadas por revisar, solo se ve los que no se pueden facturar y
@@ -1392,62 +1392,52 @@
      alguien puede querer una campaña que no salga de esta computadora. */
   .desc-nota-prueba { color:#5b6472; font-size:12px; margin:-4px 0 10px; }
   .desc-fecha-mal { outline:2px solid #dc2626; outline-offset:1px; border-radius:3px; }
-  /* Pestañas de la lista (En curso / Futuras / Archivadas): píldoras livianas,
-     más discretas que las folder-tabs de arriba para no competir con ellas. Cada
-     estado lleva SU color (2026-07-25) para leerse de un vistazo: verde = campañas
-     operando hoy, azul = por empezar, gris = ya archivadas. En reposo la píldora
-     muestra su color en tinte suave; la activa lo lleva sólido. La cuenta al lado
-     ayuda a ubicar sin abrir cada pestaña. */
-  .desc-subtabs { display:flex; gap:6px; flex-wrap:wrap; margin:12px 14px 4px; }
-  .desc-subtab { border:1px solid transparent; border-radius:999px; padding:6px 15px;
-                 font-weight:600; font-size:13px; cursor:pointer; }
-  .desc-subtab .cuenta { margin-left:6px; font-weight:700; opacity:.8; }
-  /* Color por estado en reposo (tinte suave) */
-  .desc-subtab.st-vigentes  { background:#eaf7ef; border-color:#cdeadb; color:#15803d; }
-  .desc-subtab.st-proximas  { background:#e8f1fd; border-color:#c3dbf7; color:#1d4ed8; }
-  .desc-subtab.st-historico { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
-  .desc-subtab.st-revisar   { background:#fdf3e3; border-color:#f3ddb0; color:#b45309; }
+  /* Pestañas de la lista (En curso / Futuras / Archivadas): más discretas que
+     las folder-tabs de arriba para no competir con ellas. Cada estado lleva SU
+     color (2026-07-25) para leerse de un vistazo: verde = campañas operando hoy,
+     azul = por empezar, gris = ya archivadas. La cuenta al lado ayuda a ubicar
+     sin abrir cada pestaña.
+     Van dentro de un RIEL gris (2026-08-07, pedido del usuario): sueltas como
+     píldoras quedaban contra el filo del panel y chocaban con la pestaña
+     carpeta de arriba. El riel las agrupa como un solo control y las despega
+     del borde; en reposo la opción es solo texto en su color y la activa sigue
+     sólida, que es lo que la hace legible de lejos.
+     Cada estado define sus dos colores como variables (--st-fg en reposo,
+     --st-bg cuando está activa) y las reglas genéricas de abajo las usan: así
+     una pestaña nueva es una línea, y los ids que se estilan aparte (admin,
+     filtros de tickets) entran por el mismo camino sin duplicar reglas. */
+  .desc-subtabs { display:inline-flex; gap:3px; flex-wrap:wrap; margin:12px 14px 8px;
+                  background:#eef0f4; border:1px solid #e2e6ec; border-radius:11px;
+                  padding:3px; }
+  .desc-subtab { border:none; background:none; border-radius:8px; padding:6px 14px;
+                 font-weight:600; font-size:13px; cursor:pointer;
+                 color:var(--st-fg, #667085); }
+  .desc-subtab .cuenta { margin-left:6px; font-weight:700; opacity:.75; }
+  .desc-subtab:hover { background:rgba(255,255,255,.75); }
+  .desc-subtab.activa { background:var(--st-bg, #64748b); color:#fff; }
+  /* Color por estado: letra en reposo / fondo sólido cuando está activa */
+  .desc-subtab.st-vigentes  { --st-fg:#15803d; --st-bg:#16a34a; }
+  .desc-subtab.st-proximas  { --st-fg:#1d4ed8; --st-bg:#2563eb; }
+  .desc-subtab.st-historico { --st-fg:#64748b; --st-bg:#64748b; }
+  .desc-subtab.st-revisar   { --st-fg:#b45309; --st-bg:#d97706; }
   /* Prueba: mismo morado de .card-prueba — pestaña propia, solo visible en modo admin */
-  .desc-subtab.st-prueba    { background:#f3e8ff; border-color:#d8b4fe; color:#6b21a8; }
-  .desc-subtab.st-vigentes:hover  { background:#dcf0e5; }
-  .desc-subtab.st-proximas:hover  { background:#dbe9fb; }
-  .desc-subtab.st-historico:hover { background:#e4e8ee; }
-  .desc-subtab.st-revisar:hover   { background:#faeacf; }
-  .desc-subtab.st-prueba:hover    { background:#ead9fd; }
-  /* Estado activo: el mismo color, ahora sólido */
-  .desc-subtab.activa.st-vigentes  { background:#16a34a; border-color:#16a34a; color:#fff; }
-  .desc-subtab.activa.st-proximas  { background:#2563eb; border-color:#2563eb; color:#fff; }
-  .desc-subtab.activa.st-historico { background:#64748b; border-color:#64748b; color:#fff; }
-  .desc-subtab.activa.st-revisar   { background:#d97706; border-color:#d97706; color:#fff; }
-  .desc-subtab.activa.st-prueba    { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  .desc-subtab.st-prueba    { --st-fg:#6b21a8; --st-bg:#7e22ce; }
   /* Subtabs de EN REVISIÓN (2026-07-31): rojo para los llenados que no
      terminaron perfectos (se actúa ya), verde azulado para los pedidos sin
      datos (esperan, no urgen). */
-  .desc-subtab.st-fallidos  { background:#fdecec; border-color:#f3c6c6; color:#b42318; }
-  .desc-subtab.st-faltantes { background:#e6f6f4; border-color:#bfe8e2; color:#0f766e; }
-  .desc-subtab.st-fallidos:hover  { background:#fcdcdc; }
-  .desc-subtab.st-faltantes:hover { background:#d7f0ec; }
-  .desc-subtab.activa.st-fallidos  { background:#dc2626; border-color:#dc2626; color:#fff; }
-  .desc-subtab.activa.st-faltantes { background:#0d9488; border-color:#0d9488; color:#fff; }
+  .desc-subtab.st-fallidos  { --st-fg:#b42318; --st-bg:#dc2626; }
+  .desc-subtab.st-faltantes { --st-fg:#0f766e; --st-bg:#0d9488; }
   /* ADMIN conserva una sola pestaña principal y separa sus dos vistas con las
      mismas subtabs livianas del resto del panel. Supervisión usa el morado de
      ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
   #sup-subtabs { margin-bottom:12px; }
-  #ajustes-subtabs { margin:0 0 12px; }
-  #admin-subtab-ajustes { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
-  #admin-subtab-ajustes:hover { background:#e4e8ee; }
-  #admin-subtab-ajustes.activa { background:#64748b; border-color:#64748b; color:#fff; }
-  #admin-subtab-supervision { background:#f3e8ff; border-color:#d8b4fe; color:#6b21a8; }
-  #admin-subtab-supervision:hover { background:#ead9fd; }
-  #admin-subtab-supervision.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  #ajustes-subtabs { margin-top:0; }
+  #admin-subtab-ajustes { --st-fg:#64748b; --st-bg:#64748b; }
+  #admin-subtab-supervision { --st-fg:#6b21a8; --st-bg:#7e22ce; }
   #admin-panel-supervision { padding:0 14px 18px; }
-  #admin-subtab-tickets { background:#ffedd5; border-color:#fdba74; color:#9a3412; }
-  #admin-subtab-tickets:hover { background:#fed9ae; }
-  #admin-subtab-tickets.activa { background:#ea580c; border-color:#ea580c; color:#fff; }
+  #admin-subtab-tickets { --st-fg:#9a3412; --st-bg:#ea580c; }
   #admin-panel-tickets { padding:0 14px 18px; }
-  #admin-subtab-despliegue { background:#ccfbf1; border-color:#5eead4; color:#0f766e; }
-  #admin-subtab-despliegue:hover { background:#b9efe2; }
-  #admin-subtab-despliegue.activa { background:#0d9488; border-color:#0d9488; color:#fff; }
+  #admin-subtab-despliegue { --st-fg:#0f766e; --st-bg:#0d9488; }
   #admin-panel-despliegue { padding:0 14px 18px; }
   .desp-semaforo { display:flex; align-items:center; gap:10px; margin:10px 0 14px;
                    padding:10px 14px; border-radius:8px; font-weight:600; }
@@ -1537,10 +1527,10 @@
   .sup-doble { display:inline-block; margin-left:5px; background:#fdecec;
                border:1px solid #f0b4b4; color:#b42318; border-radius:999px;
                padding:1px 6px; font-size:10.5px; font-weight:600; }
-  #sup-ticket-filtros { margin:0; padding:10px 12px 4px; }
-  .sup-ticket-filtro { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
-  .sup-ticket-filtro:hover { background:#e4e8ee; }
-  .sup-ticket-filtro.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  /* El riel ya trae su propio relleno: lo que antes era padding del contenedor
+     pasa a margen para no engordar la caja gris (2026-08-07). */
+  #sup-ticket-filtros { margin:10px 12px 8px; }
+  .sup-ticket-filtro { --st-fg:#64748b; --st-bg:#7e22ce; }
   #sup-tickets-cargando { padding:12px; color:var(--mut); font-size:12.5px; }
   #sup-tickets-aviso { background:#fffaeb; border:1px solid #fde68a;
                        color:#92400e; border-radius:7px; padding:10px 12px;
@@ -11056,8 +11046,9 @@ function pintarLlenadosPorRevisar(lista) {
 }
 
 // --- Subtabs de EN REVISIÓN (2026-07-31) ------------------------------------
-// Mismo estilo píldora que el resto del panel (.desc-subtabs, ver AJUSTES →
-// Clientes y DESCUENTOS). Los botones solo se pintan si AMBAS listas tienen
+// Mismo riel que el resto del panel (.desc-subtabs, ver AJUSTES →
+// Clientes y DESCUENTOS); por eso los botones van envueltos en ese div y no
+// sueltos: sin él quedaban contra el filo del panel. Solo se pintan si AMBAS listas tienen
 // algo: con una sola, su panel ocupa toda la vista y no hace falta elegir
 // (pedido del usuario: "si no hay tareas llenadas por revisar, solo se ve
 // los que no se pueden facturar y viceversa"). Con una sola lista tampoco
@@ -11077,8 +11068,9 @@ function actualizarSubtabsRevision(nLlenados, nDatos) {
     onclick="irASubtabRevision('${id}')">${txt}<span class="cuenta">${n}</span></button>`;
   $("rev-subtabs").style.display = (nLlenados || nDatos) ? "" : "none";
   $("rev-subtabs").innerHTML = ambas
-    ? subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
-      + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")
+    ? `<div class="desc-subtabs">${
+        subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
+        + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")}</div>`
     : (nLlenados || nDatos)
       ? `<h4 class="rev-titulo-solo">${TITULO_SUBTAB_REVISION[subtabRevisionActiva]}</h4>`
       : "";
