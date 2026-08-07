@@ -42,10 +42,14 @@ echo Instalacion encontrada: %APP%
 for /f "delims=" %%u in ('"%GIT%" -C "%APP%" remote get-url origin 2^>nul') do set "ACTUAL=%%u"
 echo Remoto actual: %ACTUAL%
 
-echo %ACTUAL% | findstr /b /c:"https://" >nul
-if not errorlevel 1 (
+rem Se compara contra la URL EXACTA, no contra "empieza por https://"
+rem (2026-08-07): una maquina quedo con
+rem "…/fda_intg_distribucion.git}/" — https, pero con una llave suelta pegada
+rem al final — y este reparador la daba por buena mientras cada fetch moria
+rem con "Repository not found".
+if /i "%ACTUAL%"=="%REPO%" (
     echo.
-    echo El remoto ya es HTTPS: no hay nada que reparar.
+    echo El remoto ya es el correcto: no hay nada que reparar.
     echo Cierra el asistente desde la bandeja y vuelve a abrirlo para que
     echo busque actualizaciones.
     pause
