@@ -2782,19 +2782,20 @@
 
   <section id="sec-admin" class="tab-panel" style="display:none">
     <div id="sup-subtabs" class="desc-subtabs">
-      <button type="button" id="admin-subtab-ajustes" class="desc-subtab activa"
-              onclick="irASubtabAdmin('ajustes')">Ajustes</button>
       <!-- "Equipos" hacia el usuario; el id interno sigue siendo
            "supervision" (endpoints, funciones y estilos ya viven con ese
-           nombre y renombrarlos no cambia nada visible). -->
-      <button type="button" id="admin-subtab-supervision" class="desc-subtab"
+           nombre y renombrarlos no cambia nada visible). Va primero y arranca
+           activa (2026-08-07, pedido del usuario: es la que siempre revisa). -->
+      <button type="button" id="admin-subtab-supervision" class="desc-subtab activa"
               onclick="irASubtabAdmin('supervision')">Equipos</button>
+      <button type="button" id="admin-subtab-ajustes" class="desc-subtab"
+              onclick="irASubtabAdmin('ajustes')">Ajustes</button>
       <button type="button" id="admin-subtab-tickets" class="desc-subtab"
               onclick="irASubtabAdmin('tickets')">Tickets<span id="admin-subtab-tickets-badge"></span></button>
       <button type="button" id="admin-subtab-despliegue" class="desc-subtab"
               onclick="irASubtabAdmin('despliegue')">Despliegue</button>
     </div>
-    <div id="admin-panel-ajustes">
+    <div id="admin-panel-ajustes" style="display:none">
     <!-- Ajustes de admin: tiene su propia pestaña, visible solo en equipos con
          capacidad admin (ver ui_bridge.es_maquina_admin) — el
          botón de la pestaña ya no se renderiza en ningún otro equipo, y
@@ -2998,7 +2999,7 @@
         pegada durante un llenado.</p>
     </div>
     </div>
-    <div id="admin-panel-supervision" style="display:none">
+    <div id="admin-panel-supervision">
       <div id="sup-cargando" style="display:none">
         <span class="spinner"></span> Cargando supervisión…
       </div>
@@ -6871,7 +6872,7 @@ async function preseleccionarRutaSiFalta() {
 // --- ADMIN → Supervisión ----------------------------------------------------
 // El overview y la bandeja viajan por endpoints separados: la falta de la
 // clave de servicio de tickets nunca deja sin datos al resto del parque.
-let subtabAdminActiva = "ajustes";
+let subtabAdminActiva = "supervision";
 let supRefrescoInterval = null;
 let supOverviewCargado = false;
 let supOverviewEnVuelo = false;
@@ -7091,7 +7092,7 @@ function supFilaEquipo(equipo, sinDatos) {
   const conAccesoVigente = !!equipo.acceso && equipo.acceso !== "sin_registro";
   const accion =
     (sinDatos ? "" : `<button type="button" onclick="abrirDetalleEquipoSupervision('${
-      host}')">Ver detalle</button> `)
+      host}')">Ver log</button> `)
     + (propio || conAccesoVigente ? "" : `<button type="button" class="peligro"
         title="Lo saca de esta lista. El histórico de lo que llenó se conserva; esas facturas vuelven a mostrar su nombre técnico."
         onclick="borrarEquipoSupervision(this, '${host}')">Borrar</button>`);
@@ -7125,7 +7126,7 @@ function supConfigEquipo(equipo) {
       // Con el permiso de identidad se edita; sin él, la línea se ve igual
       // pero sin botón — es el mismo permiso que exige el endpoint.
       + (tienePermiso("identidad_maquina")
-         ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Detalles</button>`
+         ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>`
          : "");
   if (equipo.dispositivo === supDispositivoPropio && configPropia)
     return `<span class="mut">${esc(resumenConfigEquipo(configPropia))}</span>
@@ -15885,7 +15886,7 @@ function pintarEquipos() {
     // los tres juntos. Mismo permiso que Nombre/Vendedor.
     const config = `<td class="equipos-config">
       <span class="mut">${esc(resumenConfigEquipo(m))}</span>
-      <button type="button" onclick="abrirConfigEquipo('${host}')">Detalles</button>
+      <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
     return `<tr>
       <td class="equipos-host">${host}</td>
