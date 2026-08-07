@@ -1794,18 +1794,18 @@
   #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
   /* El campo tiene que VERSE campo, con o sin texto adentro (2026-08-07,
-     corregido 2026-08-07b): el borde gris de --bor es casi invisible sobre
-     blanco, y encima el ámbar de "aquí falta algo" solo se pintaba con
-     :placeholder-shown — al escribir un nombre el campo volvía a ese gris
-     apenas visible y parecía texto suelto, no una caja. Ahora el borde
-     siempre es oscuro y grueso (se nota esté vacío o lleno); el ámbar queda
+     corregido 2026-08-07b): sobre la caja blanca, un borde fino y claro se
+     pierde y el nombre escrito parece texto suelto — la gente ve CAJAS, no
+     lee. Por eso el campo va relleno gris con borde oscuro y sombra interior:
+     se lee como hueco donde se escribe aunque ya tenga texto. El ámbar queda
      solo como aviso de "falta este dato". */
   #acceso-caja input[type=text] { width:100%; box-sizing:border-box;
-      padding:9px 11px; font-size:14px; border:2px solid #64748b;
-      border-radius:6px; background:#fff; }
+      padding:10px 12px; font-size:14px; border:2px solid #475569;
+      border-radius:6px; background:#f1f5f9;
+      box-shadow:inset 0 2px 3px rgba(15,23,42,.12); }
   #acceso-caja input[type=text]:placeholder-shown { border-color:#f59e0b;
       background:#fffaf3; }
-  #acceso-caja input[type=text]:focus { border-color:#1d4ed8;
+  #acceso-caja input[type=text]:focus { border-color:#1d4ed8; background:#fff;
       outline:2px solid rgba(29,78,216,.35); outline-offset:1px; }
   #acceso-error { color:var(--err); font-size:13px; margin:0 0 10px;
       display:none; }
