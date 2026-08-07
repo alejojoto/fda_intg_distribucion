@@ -9454,6 +9454,7 @@ const TITULO_FASE = {
   esperando_impresion: "esperando tu «Continuar»",
   pausado: "en pausa",
   esperando_popup: "cierra el aviso del programa",
+  pide_maximizar: "maximiza el programa",
 };
 let faseActual = null;      // última fase que devolvió /api/fase_llenado
 let tituloPuesto = null;    // lo último escrito: cambiarlo es un viaje a la ventana
@@ -11641,6 +11642,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // arriba tiene la decisión y esto es lo que queda en la barra detrás.
     pregunta_trancon: `Parece que el programa de facturación se trancó: responde el aviso.`,
     reiniciando: `Reiniciando el programa de facturación: se cierra y se abre de nuevo…`,
+    // Falta pantalla (2026-08-08): el botón que el llenado necesita quedó fuera
+    // de la vista. El asistente ya no acomoda la ventana solo — la pide y
+    // arranca de nuevo apenas el botón se vea.
+    pide_maximizar: `Maximiza el programa de facturación: el botón Aceptar queda fuera de la pantalla y el llenado sigue solo en cuanto se vea.`,
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
@@ -11648,7 +11653,8 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // aquí por lo mismo (aún no se toca Winledger), pero es el programa quien
   // trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
-                              "pregunta_trancon", "preparando_datos"];
+                              "pregunta_trancon", "preparando_datos",
+                              "pide_maximizar"];
   const pollFase = setInterval(async () => {
     try {
       const f = await api("/api/fase_llenado");
@@ -11676,6 +11682,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // también actúa el operador, no el programa).
         mensaje(`Van ${f.papel.impresas} impresiones seguidas: revisa que el papel siga alineado antes de continuar.`,
                 "alerta", false);
+      else if (llenando && !$("btn-stop").disabled && f.fase === "pide_maximizar")
+        // Ámbar y sin punto giratorio: falta pantalla y el llenado está parado
+        // esperando al operador, no trabajando.
+        mensaje(TEXTO_FASE.pide_maximizar, "alerta", false);
       else if (llenando && !$("btn-stop").disabled && TEXTO_FASE[f.fase])
         // Sin punto giratorio cuando quien tiene que actuar es el operador
         // (espera de la impresión, pausa), no el programa. Con la pausa PEDIDA
@@ -11707,14 +11717,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       btnContinuar.title = tocaPapel
         ? "Confirma que revisaste el papel: la cuenta vuelve a cero y la corrida sigue."
         : "Sigue con la siguiente factura de la corrida.";
-      // ⏸ no aplica en la espera de la impresión ni en la pregunta del
-      // trancón: ahí el llenado YA está parado esperando al operador, así que
-      // pausar no adelantaría nada (queja del usuario 2026-07-27). Tampoco con
-      // un stop ya pedido.
+      // ⏸ no aplica en la espera de la impresión, en la pregunta del trancón ni
+      // mientras se pide maximizar: ahí el llenado YA está parado esperando al
+      // operador, así que pausar no adelantaría nada (queja del usuario
+      // 2026-07-27). Tampoco con un stop ya pedido.
       $("btn-pausa").style.display =
         (llenando && !$("btn-stop").disabled
          && f.fase !== "esperando_impresion"
-         && f.fase !== "pregunta_trancon") ? "" : "none";
+         && f.fase !== "pregunta_trancon"
+         && f.fase !== "pide_maximizar") ? "" : "none";
       // El interruptor de la pausa vive en el servidor: si el llenado está
       // pausado, el botón lo dice aunque esta pestaña no haya sido la que lo
       // pulsó (o se haya recargado en medio).
