@@ -3404,7 +3404,7 @@
      "Todas" con un clic, o selección individual; la predeterminada solo se
      elige cuando hay más de una. Los rótulos nombran a ESA computadora —
      quien mira no está configurando la suya. -->
-<div id="equipo-config-overlay" onclick="if(event.target===this)cerrarConfigEquipo()">
+<div id="equipo-config-overlay" onclick="if(event.target===this)intentarCerrarConfigEquipo()">
   <div id="equipo-config">
     <h3 id="equipo-config-titulo"></h3>
     <p class="mut" id="equipo-config-intro" style="display:none; font-size:12.5px"></p>
@@ -3470,7 +3470,7 @@
     <div id="equipo-config-error" class="desc-error" style="display:none"></div>
     <div class="editor-acciones">
       <button id="equipo-config-guardar" class="primario" onclick="guardarConfigEquipo()">Guardar</button>
-      <button onclick="cerrarConfigEquipo()">Cancelar</button>
+      <button onclick="intentarCerrarConfigEquipo()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -16462,7 +16462,44 @@ function abrirVentanaConfigEquipo(ctx) {
     ? "Activar con esta configuración" : "Guardar";
   $("equipo-config-guardar").disabled = false;
   limpiarErroresConfigEquipo();
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
+  ctx.firma = firmaConfigEquipo();
   $("equipo-config-overlay").classList.add("visible");
+}
+
+// Firma de lo editable de la ventana (lo mismo que se mandaría al guardar). Se
+// compara contra la del momento de abrir para saber si hay cambios sin guardar.
+function firmaConfigEquipo() {
+  try {
+    return JSON.stringify({
+      nombre: $("equipo-config-nombre").value.trim(),
+      vendedor: vendedorConfigEquipo(),
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+      dia_despacho: diaConfigEquipo(),
+    });
+  } catch (_) { return null; }
+}
+
+function configEquipoHayCambios() {
+  if (!configEquipo || configEquipo.firma === undefined) return false;
+  return firmaConfigEquipo() !== configEquipo.firma;
+}
+
+// Intento de cierre (clic afuera o Cancelar): con cambios sin guardar,
+// pregunta antes de descartar; sin cambios, cierra directo. En una solicitud
+// el "Guardar" es la activación, así que el botón de la pregunta lo dice.
+function intentarCerrarConfigEquipo() {
+  if (!configEquipoHayCambios()) { cerrarConfigEquipo(); return; }
+  const esSolicitud = (configEquipo || {}).origen === "solicitud";
+  pedirConfirmSalida({
+    acciones: $("equipo-config").querySelector(".editor-acciones"),
+    guardarTxt: esSolicitud ? "Activar con esta configuración" : "Guardar",
+    guardar: guardarConfigEquipo,
+    cerrar: cerrarConfigEquipo,
+  });
 }
 
 // Con el catálogo de vendedores cargado va el selector de siempre (código y
