@@ -781,6 +781,25 @@
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
+  /* Interruptor de "Activa" (2026-08-07, pedido del usuario): en una columna
+     de una sola marca, encendido y apagado se distinguen mejor con un
+     interruptor que con una casilla. La casilla real queda invisible encima,
+     así conserva teclado y estado. */
+  .switch { position:relative; display:inline-block; width:38px; height:22px;
+      vertical-align:middle; }
+  .switch input { position:absolute; inset:0; width:100%; height:100%;
+      margin:0; opacity:0; cursor:pointer; z-index:1; }
+  .switch-pista { position:absolute; inset:0; background:#cbd2dc;
+      border-radius:999px; transition:background .15s; }
+  .switch-pista::after { content:""; position:absolute; top:2px; left:2px;
+      width:18px; height:18px; background:#fff; border-radius:50%;
+      box-shadow:0 1px 2px rgba(16,24,40,.35); transition:transform .15s; }
+  .switch input:checked + .switch-pista { background:var(--ok); }
+  .switch input:checked + .switch-pista::after { transform:translateX(16px); }
+  .switch input:focus-visible + .switch-pista {
+      outline:2px solid rgba(29,78,216,.45); outline-offset:2px; }
+  .switch input:disabled { cursor:not-allowed; }
+  .switch input:disabled + .switch-pista { opacity:.55; }
   /* Opciones del modo prueba agrupadas por tema (2026-07-27, pedido del
      usuario): antes eran una columna de líneas sueltas con un párrafo de
      explicación debajo de cada una. Ahora cada grupo lleva un rótulo y sus
@@ -3498,7 +3517,7 @@
     <div id="equipo-config-error" class="desc-error" style="display:none"></div>
     <div class="editor-acciones">
       <button id="equipo-config-guardar" class="primario" onclick="guardarConfigEquipo()">Guardar</button>
-      <button onclick="intentarCerrarConfigEquipo()">Cancelar</button>
+      <button id="equipo-config-cancelar" onclick="intentarCerrarConfigEquipo()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -4454,7 +4473,10 @@ function confirmarBorrar(btn, alConfirmar, etiqueta) {
 // detached y esas funciones reventarían al buscarlo) y en VERDE en vez de
 // rojo: es para confirmar acciones normales (ej. "Llenar en fila"), no
 // destructivas — el rojo de confirmarBorrar quedaba fuera de lugar ahí.
-function confirmarSinQuitar(btn, alConfirmar, etiqueta) {
+// `alReponer` (2026-08-07) corre siempre que la pregunta se deshace —al
+// confirmar, al cancelar o al vencer—: sirve para reponer lo que el llamador
+// haya escondido mientras duraba (la botonera de un modal, por ejemplo).
+function confirmarSinQuitar(btn, alConfirmar, etiqueta, alReponer) {
   const cont = document.createElement("span");
   cont.className = "confirmar-borrar";
   const si = document.createElement("button");
@@ -4464,7 +4486,11 @@ function confirmarSinQuitar(btn, alConfirmar, etiqueta) {
   cont.append(si, no);                 // Confirmar primero, Cancelar de último
   btn.style.display = "none";
   btn.after(cont);
-  const reponer = () => { cont.remove(); btn.style.display = ""; };
+  const reponer = () => {
+    cont.remove();
+    btn.style.display = "";
+    if (alReponer) alReponer();
+  };
   const t = setTimeout(() => { si.disabled = false; }, 400);   // retardo anti doble-clic
   const tVuelta = setTimeout(reponer, 7000);   // confirmación olvidada = clic accidental esperando
   const limpiar = () => { clearTimeout(t); clearTimeout(tVuelta); };
@@ -16137,9 +16163,12 @@ function pintarEquipos() {
                                  : "Marca esta computadora como Editor."}"
              onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
-      <input type="checkbox" ${m.activa ? "checked" : ""}
-             title="Al quitarla, esa computadora queda fuera de servicio."
-             onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
+      <label class="switch"
+             title="Al apagarlo, esa computadora queda fuera de servicio.">
+        <input type="checkbox" ${m.activa ? "checked" : ""}
+               onclick="return onClickActivaEquipo(event, '${host}')">
+        <span class="switch-pista"></span>
+      </label></td>`;
     // Series, rutas y día del equipo (2026-08-07), repartidos en la fila:
     // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
     // mueve de un día para otro— y "Configurar" abre la ventana con todo,
@@ -16150,10 +16179,10 @@ function pintarEquipos() {
       <div class="dia-opciones">
         <label><input type="radio" name="dia-equipo-${host}" value="manana"
                ${m.dia_despacho === "manana" ? "checked" : ""}
-               onchange="cambiarDiaEquipo('${host}', this)"> Mañana</label>
+               onclick="return onClickDiaEquipo(event, '${host}')"> Mañana</label>
         <label><input type="radio" name="dia-equipo-${host}" value="hoy"
                ${m.dia_despacho === "hoy" ? "checked" : ""}
-               onchange="cambiarDiaEquipo('${host}', this)"> Hoy</label>
+               onclick="return onClickDiaEquipo(event, '${host}')"> Hoy</label>
       </div>
       <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
@@ -16221,11 +16250,30 @@ function onClickRolEquipo(ev, dispositivo, rol) {
   return false;
 }
 
+// El día a facturar de OTRA computadora también se confirma (2026-08-07,
+// pedido del usuario): cambiarlo altera cómo trabaja esa máquina mañana
+// temprano, y un clic al pasar no puede decidir eso. Se esconden las dos
+// opciones mientras dura la pregunta, para no dejar la otra invitando a un
+// segundo clic.
+function onClickDiaEquipo(ev, dispositivo) {
+  const caja = ev.target;
+  const dia = caja.value;
+  ev.preventDefault();
+  confirmarSinQuitar(caja.closest(".dia-opciones"), () => {
+    caja.checked = true;
+    cambiarDiaEquipo(dispositivo, caja);
+  }, `Confirmar: factura para ${ETIQUETA_DIA_DESPACHO[dia]}`);
+  return false;
+}
+
 function onClickActivaEquipo(ev, dispositivo) {
   const caja = ev.target;
   const activando = caja.checked;
   ev.preventDefault();
-  confirmarSinQuitar(caja, () => {
+  // Se esconde el interruptor entero, no solo la casilla: el input del
+  // interruptor va invisible encima de su pista, y ocultarlo solo dejaría la
+  // pista pintada sin nada que la mueva.
+  confirmarSinQuitar(caja.closest(".switch") || caja, () => {
     caja.checked = activando;
     cambiarActivaEquipo(dispositivo, caja);
   }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
@@ -16632,10 +16680,20 @@ function cerrarConfigEquipo() {
   $("equipo-config-overlay").classList.remove("visible");
 }
 
+// Guardar se confirma (2026-08-07, pedido del usuario): lo que sale de aquí
+// cambia cómo trabaja OTRA computadora en su próximo refresco, y quien lo
+// pulsa no está delante de ella para deshacerlo. El Cancelar de la ventana se
+// esconde mientras dura la pregunta, para no tener dos Cancelar seguidos.
 function guardarConfigEquipo() {
   if (!configEquipo) return;
-  if (configEquipo.origen === "solicitud") { activarDesdeConfigEquipo(); return; }
-  guardarConfigEquipoDelCatalogo();
+  const esSolicitud = configEquipo.origen === "solicitud";
+  const cancelar = $("equipo-config-cancelar");
+  cancelar.style.display = "none";
+  confirmarSinQuitar($("equipo-config-guardar"),
+    () => { if (esSolicitud) activarDesdeConfigEquipo();
+            else guardarConfigEquipoDelCatalogo(); },
+    esSolicitud ? "Confirmar activación" : "Confirmar cambios",
+    () => { cancelar.style.display = ""; });
 }
 
 // La ventana edita TODO lo de esa computadora: nombre y vendedor por
