@@ -8555,30 +8555,71 @@ function preseleccionar(boton) {
 
 // El botón elegido se marca con data-preseleccionado en el HTML, pegado a él,
 // para que se vea al leer la botonera y no en una lista aparte que se
-// desincronice. Se vigila la clase "visible" —que es como se muestran los
-// diálogos— en vez de tocar cada apertura: son más de veinte y varias ventanas
-// se abren por dos caminos distintos, así ninguna vía queda sin foco.
-// El vigilante solo existe si el entorno trae MutationObserver: los bancos de
-// Mac evalúan este archivo sobre un DOM mínimo (scripts/pruebas/*.mjs) y sin
+// desincronice. Se vigila cuándo se muestra cada diálogo en vez de tocar cada
+// apertura: son más de veinte y varias ventanas se abren por dos caminos
+// distintos, así ninguna vía queda sin foco.
+const dialogosAbiertos = [];   // en orden de apertura: el último es el de encima
+
+// Mientras hay un diálogo abierto, Tab se queda dentro de él. Antes recorría
+// también el fondo —los Llenar y Descartar de la lista entera— y el ciclo se
+// hacía larguísimo (2026-08-07, pedido del usuario). inert saca del recorrido y
+// del ratón el subárbol completo; donde el motor no lo soporte, la propiedad se
+// ignora y el Tab queda como estaba, sin romper nada.
+function aplicarInerciaDeFondo() {
+  const encima = dialogosAbiertos[dialogosAbiertos.length - 1] || null;
+  for (const hijo of document.body.children) {
+    if (hijo.tagName === "SCRIPT" || hijo.id === "menu-contexto") continue;
+    hijo.inert = !!encima && hijo !== encima;
+  }
+}
+
+// Durante un llenado el foreground lo tiene el programa de facturación, así que
+// el foco del documento no basta: sin activar la ventana el operador tenía que
+// pulsarla antes de poder usar Tab o Enter (2026-08-07).
+function activarVentanaDelPanel() {
+  const api = window.pywebview && window.pywebview.api;
+  if (!api || !api.traer_al_frente) return;   // el panel abierto en el navegador
+  try { api.traer_al_frente(); } catch (_) {}
+}
+
+function revisarDialogo(dialogo) {
+  const visible = getComputedStyle(dialogo).display !== "none";
+  const donde = dialogosAbiertos.indexOf(dialogo);
+  if (visible && donde === -1) {
+    dialogosAbiertos.push(dialogo);
+    aplicarInerciaDeFondo();   // antes del foco: en un subárbol inerte no prende
+    const boton = dialogo.querySelector("[data-preseleccionado]");
+    if (boton) { preseleccionar(boton); activarVentanaDelPanel(); }
+  } else if (!visible && donde !== -1) {
+    dialogosAbiertos.splice(donde, 1);
+    aplicarInerciaDeFondo();
+    // Al cerrarse el de encima, el que queda debajo recupera su preselección:
+    // se le fue el foco cuando el otro lo tapó.
+    const previo = dialogosAbiertos[dialogosAbiertos.length - 1];
+    if (previo) preseleccionar(previo.querySelector("[data-preseleccionado]"));
+  }
+}
+
+// Los vigilantes solo se arman si el entorno trae MutationObserver: los bancos
+// de Mac evalúan este archivo sobre un DOM mínimo (scripts/pruebas/*.mjs) y sin
 // esta guarda el `new` de aquí tumbaba los 35 de un golpe, dejando el panel
 // entero sin red de prueba (2026-08-07). En el navegador no cambia nada.
-const vigilanteDeDialogos = typeof MutationObserver === "undefined" ? null
-  : new MutationObserver((cambios) => {
-  for (const cambio of cambios) {
-    const dialogo = cambio.target;
-    const seAcabaDeAbrir = dialogo.classList.contains("visible")
-        && !(cambio.oldValue || "").split(" ").includes("visible");
-    if (seAcabaDeAbrir) preseleccionar(dialogo.querySelector("[data-preseleccionado]"));
-  }
-});
-if (vigilanteDeDialogos) {
-  document.querySelectorAll("[data-preseleccionado]").forEach((btn) => {
-    const dialogo = btn.closest("[id$='-overlay']");
-    if (dialogo) {
-      vigilanteDeDialogos.observe(dialogo, {
-        attributes: true, attributeFilter: ["class"], attributeOldValue: true });
-    }
+if (typeof MutationObserver !== "undefined") {
+  // Por display calculado y no por la clase "visible": unos diálogos se muestran
+  // con esa clase y otros escribiendo el style, y así los dos caminos entran.
+  const dialogosDelPanel = document.querySelectorAll("[id$='-overlay']");
+  const vigilanteDeDialogos = new MutationObserver((cambios) => {
+    for (const cambio of cambios) revisarDialogo(cambio.target);
   });
+  dialogosDelPanel.forEach((dialogo) => {
+    vigilanteDeDialogos.observe(dialogo, {
+      attributes: true, attributeFilter: ["class", "style"] });
+  });
+  // Hay diálogos que el CSS oculta por una clase del body (modo-llenado), sin
+  // que cambie nada en el diálogo mismo: sin repasarlos aquí, uno de esos
+  // quedaría en la pila como abierto y el fondo, inerte para siempre.
+  new MutationObserver(() => dialogosDelPanel.forEach(revisarDialogo))
+      .observe(document.body, { attributes: true, attributeFilter: ["class"] });
 }
 
 async function menuContextoAccion(accion, btn) {
