@@ -3466,9 +3466,9 @@
          que la ventana se lea como la fila que se acaba de pulsar. -->
     <div class="acceso-campo" id="equipo-config-series-campo">
       <label id="equipo-config-series-rotulo" style="display:none"></label>
-      <p class="mut equipo-config-ayuda">Son las series que esa computadora
-        tiene cargadas en el programa de facturación. La predeterminada es con
-        la que arranca cada factura suya.</p>
+      <p class="mut equipo-config-ayuda">Una computadora tiene todas las series
+        cargadas en el programa de facturación, o una sola. Con todas, la
+        predeterminada es con la que arranca cada factura suya.</p>
       <!-- "Todas" y la predeterminada comparten línea (2026-08-07, pedido del
            usuario): son las dos decisiones de la sección y leerlas juntas
            ahorra una franja entera. -->
@@ -3477,7 +3477,8 @@
                onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
         <div class="acceso-predet" id="equipo-config-series-predet-campo">
           <label for="equipo-config-series-predet" id="equipo-config-series-predet-rotulo"></label>
-          <select id="equipo-config-series-predet"></select>
+          <select id="equipo-config-series-predet"
+                  onchange="configEquipoRecalcular('series')"></select>
           <span id="equipo-config-series-predet-texto" style="display:none"></span>
         </div>
       </div>
@@ -3966,14 +3967,17 @@
       </div>
       <div class="acceso-campo">
         <label>Series con las que factura</label>
+        <!-- Una computadora tiene TODAS las series o UNA sola (regla
+             confirmada con FDA, 2026-08-07): por eso aquí no hay reja de
+             casillas. El mismo desplegable elige la predeterminada cuando
+             están todas, y la serie única cuando no. -->
         <label class="acceso-check"><input type="checkbox" id="acceso-series-todas"
                onchange="alternarTodasRegistro('series')"> Todas las series</label>
-        <div id="acceso-series-lista" class="acceso-lista">
-          <span class="mut">Cargando las series…</span></div>
         <p class="acceso-campo-error" id="acceso-err-series"></p>
         <div class="acceso-predet" id="acceso-series-predet-campo" style="display:none">
-          <label for="acceso-series-predet">Serie predeterminada</label>
-          <select id="acceso-series-predet"></select>
+          <label for="acceso-series-predet" id="acceso-series-predet-rotulo">Serie predeterminada</label>
+          <select id="acceso-series-predet"
+                  onchange="cambioSeleccionRegistro('series')"></select>
           <span id="acceso-series-predet-texto" style="display:none"></span>
         </div>
         <p class="acceso-campo-error" id="acceso-err-serie_predeterminada"></p>
@@ -15635,9 +15639,6 @@ function pintarConfigRegistro() {
       ? catalogoRegistro.rutas.map(r => `<label><input type="checkbox" value="${esc(r)}"
              onchange="cambioSeleccionRegistro('rutas')"> ${esc(nombreRuta(r))}</label>`).join("")
       : `<span class="mut">Todavía no hay rutas registradas.</span>`;
-    $("acceso-series-lista").innerHTML = (catalogoRegistro.series || []).map(s =>
-      `<label><input type="checkbox" value="${esc(s)}"
-             onchange="cambioSeleccionRegistro('series')"> ${esc(s)}</label>`).join("");
     $("acceso-vendedor").innerHTML = `<option value="" selected>— Elegir… —</option>`
       + (catalogoRegistro.vendedores || []).map(v =>
         `<option value="${esc(v.codigo)}">${esc(v.codigo)} — ${esc(v.nombre || "")}</option>`).join("");
@@ -15647,19 +15648,28 @@ function pintarConfigRegistro() {
   pintarBotonSolicitud();
 }
 
-// "*" con "Todas" marcada; si no, la lista de valores canónicos marcados.
+// "*" con "Todas" marcada; si no, la lista de valores canónicos marcados. Las
+// series no tienen casillas: sin "Todas" su selección es la ÚNICA del
+// desplegable (todas o una sola, regla del 2026-08-07).
 function seleccionRegistro(tipo) {
   if ($(`acceso-${tipo}-todas`).checked) return "*";
+  if (tipo === "series") {
+    const elegida = $("acceso-series-predet").value;
+    return elegida ? [elegida] : [];
+  }
   return [...$(`acceso-${tipo}-lista`).querySelectorAll("input:checked")]
     .map(c => c.value);
 }
 
 // Marcar "Todas" deshabilita las individuales SIN desmarcarlas: al quitarla
-// vuelven tal como estaban (explorar un toggle no borra lo elegido).
+// vuelven tal como estaban (explorar un toggle no borra lo elegido). En
+// series el desplegable conserva su valor por lo mismo.
 function alternarTodasRegistro(tipo) {
   const todas = $(`acceso-${tipo}-todas`).checked;
-  [...$(`acceso-${tipo}-lista`).querySelectorAll("input")]
-    .forEach(c => { c.disabled = todas; });
+  const lista = $(`acceso-${tipo}-lista`);
+  if (lista) {
+    [...lista.querySelectorAll("input")].forEach(c => { c.disabled = todas; });
+  }
   cambioSeleccionRegistro(tipo);
 }
 
@@ -15674,6 +15684,7 @@ function cambioSeleccionRegistro(tipo) {
 function pintarPredetRegistro(tipo) {
   const sel = seleccionRegistro(tipo);
   const conocidas = (catalogoRegistro || {})[tipo] || [];
+  if (tipo === "series") { pintarSerieRegistro(conocidas); return; }
   const efectivas = sel === "*" ? conocidas : sel;
   const campo = $(`acceso-${tipo}-predet-campo`);
   const texto = $(`acceso-${tipo}-predet-texto`);
@@ -15695,6 +15706,28 @@ function pintarPredetRegistro(tipo) {
     + efectivas.map(v => `<option value="${esc(v)}" ${v === previa ? "selected" : ""}>
         ${esc(corto(v))}</option>`).join("");
   if (!efectivas.includes(previa)) select.value = "";
+}
+
+// El desplegable de series hace los DOS trabajos (2026-08-07): con "Todas"
+// marcada elige la predeterminada entre todas; sin ella, ES la única serie con
+// la que factura esa computadora. El valor elegido se conserva al alternar,
+// que es lo mismo en los dos modos.
+function pintarSerieRegistro(conocidas) {
+  const todas = $("acceso-series-todas").checked;
+  const campo = $("acceso-series-predet-campo");
+  const select = $("acceso-series-predet");
+  $("acceso-series-predet-texto").style.display = "none";
+  if (!conocidas.length) { campo.style.display = "none"; return; }
+  campo.style.display = "";
+  select.style.display = "";
+  $("acceso-series-predet-rotulo").textContent =
+    todas ? "Serie predeterminada" : "Serie con la que factura";
+  const previa = select.value;
+  select.innerHTML =
+    `<option value="">${todas ? "— Ninguna —" : "— Elegir… —"}</option>`
+    + conocidas.map(s => `<option value="${esc(s)}"
+        ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
+  select.value = conocidas.includes(previa) ? previa : "";
 }
 
 // La predeterminada que viaja en la solicitud ('' = ninguna). Con una sola
@@ -15740,7 +15773,8 @@ function pintarBotonSolicitud() {
   const rutas = seleccionRegistro("rutas");
   if (rutas !== "*" && !rutas.length) faltas.push("al menos una ruta (o todas)");
   const series = seleccionRegistro("series");
-  if (series !== "*" && !series.length) faltas.push("al menos una serie (o todas)");
+  if (series !== "*" && !series.length)
+    faltas.push("la serie con la que factura (o todas)");
   const texto = faltas.length
     ? (faltas.length > 1 ? "Faltan " : "Falta ")
       + (faltas.length > 1
@@ -16484,13 +16518,21 @@ function abrirVentanaConfigEquipo(ctx) {
     const opciones = opcionesConfigEquipo(tipo, datos);
     const corto = cortoConfigEquipo(tipo);
     const marcadas = Array.isArray(sel) ? sel : [];
-    $(`equipo-config-${tipo}-lista`).innerHTML = opciones.length
-      ? opciones.map(v => `<label><input type="checkbox" value="${esc(v)}"
-            ${marcadas.includes(v) ? "checked" : ""} ${todas ? "disabled" : ""}
-            onchange="configEquipoRecalcular('${tipo}')"> ${esc(corto(v))}</label>`).join("")
-      : `<span class="mut">Todavía no hay rutas registradas.</span>`;
+    // Las series no tienen reja de casillas: todas o una sola, y esa una la
+    // elige el mismo desplegable de la predeterminada (2026-08-07).
+    if (tipo === "series") {
+      $("equipo-config-series-lista").innerHTML = "";
+    } else {
+      $(`equipo-config-${tipo}-lista`).innerHTML = opciones.length
+        ? opciones.map(v => `<label><input type="checkbox" value="${esc(v)}"
+              ${marcadas.includes(v) ? "checked" : ""} ${todas ? "disabled" : ""}
+              onchange="configEquipoRecalcular('${tipo}')"> ${esc(corto(v))}</label>`).join("")
+        : `<span class="mut">Todavía no hay rutas registradas.</span>`;
+    }
     configEquipoRecalcular(tipo, tipo === "rutas"
-      ? (datos.ruta_predeterminada || "") : (datos.serie_predeterminada || ""));
+      ? (datos.ruta_predeterminada || "")
+      : (datos.serie_predeterminada
+         || (marcadas.length === 1 ? marcadas[0] : "")));
   }
   $("equipo-config-dia-rotulo").textContent =
     `Día a facturar de ${nombreVisible}`;
@@ -16500,6 +16542,19 @@ function abrirVentanaConfigEquipo(ctx) {
     ? "Activar con esta configuración" : "Guardar";
   $("equipo-config-guardar").disabled = false;
   limpiarErroresConfigEquipo();
+  // Configuración vieja con varias series: eso rompe el llenado. El aviso la
+  // enuncia y deja YA elegida la mejor conocida (su predeterminada), editable
+  // ahí mismo — nadie tiene que ir a resolverlo a otra parte.
+  const seriesGuardadas = Array.isArray(datos.series) ? datos.series : [];
+  if (seriesGuardadas.length > 1) {
+    const queda = $("equipo-config-series-predet").value;
+    const aviso = $("equipo-config-err-series");
+    aviso.textContent = `Quedó configurada con varias series `
+      + `(${seriesGuardadas.join(", ")}) y con eso el llenado falla: se `
+      + `factura con todas o con una sola.`
+      + (queda ? ` Queda ${queda}; cámbiala si no es esa.` : ` Elige cuál.`);
+    aviso.style.display = "";
+  }
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   ctx.firma = firmaConfigEquipo();
   $("equipo-config-overlay").classList.add("visible");
@@ -16580,6 +16635,11 @@ function configEquipoRecalcular(tipo, preseleccionar) {
   const datos = (configEquipo || {}).datos || {};
   const todas = $(`equipo-config-${tipo}-todas`).checked;
   const lista = $(`equipo-config-${tipo}-lista`);
+  if (tipo === "series") {
+    lista.style.display = "none";
+    configEquipoPintarSerie(opcionesConfigEquipo(tipo, datos), preseleccionar);
+    return;
+  }
   lista.style.display = todas ? "none" : "";
   const cajas = [...lista.querySelectorAll("input")];
   cajas.forEach(c => { c.disabled = todas; });
@@ -16607,9 +16667,34 @@ function configEquipoRecalcular(tipo, preseleccionar) {
   if (!efectivas.includes(previa)) select.value = "";
 }
 
-// Lo elegido en la ventana: "*" con "Todas", si no la lista canónica.
+// Gemelo de pintarSerieRegistro para esta ventana: un solo desplegable que es
+// la predeterminada con "Todas" marcada y la serie única sin ella.
+function configEquipoPintarSerie(conocidas, preseleccionar) {
+  const todas = $("equipo-config-series-todas").checked;
+  const campo = $("equipo-config-series-predet-campo");
+  const select = $("equipo-config-series-predet");
+  $("equipo-config-series-predet-texto").style.display = "none";
+  $("equipo-config-series-predet-rotulo").textContent =
+    todas ? "Serie predeterminada" : "Serie con la que factura";
+  if (!conocidas.length) { campo.style.display = "none"; return; }
+  campo.style.display = "";
+  select.style.display = "";
+  const previa = preseleccionar !== undefined ? preseleccionar : select.value;
+  select.innerHTML =
+    `<option value="">${todas ? "— Ninguna —" : "— Elegir… —"}</option>`
+    + conocidas.map(s => `<option value="${esc(s)}"
+        ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
+  select.value = conocidas.includes(previa) ? previa : "";
+}
+
+// Lo elegido en la ventana: "*" con "Todas", si no la lista canónica. En
+// series es la del desplegable, que ahí hace de selección.
 function seleccionConfigEquipo(tipo) {
   if ($(`equipo-config-${tipo}-todas`).checked) return "*";
+  if (tipo === "series") {
+    const elegida = $("equipo-config-series-predet").value;
+    return elegida ? [elegida] : [];
+  }
   return [...$(`equipo-config-${tipo}-lista`).querySelectorAll("input:checked")]
     .map(c => c.value);
 }
