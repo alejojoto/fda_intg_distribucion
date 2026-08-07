@@ -338,8 +338,8 @@
   .tab-panel { border-top-left-radius:0; flex:1; min-height:0;
                display:flex; flex-direction:column; margin-bottom:0; }
   .tabla-scroll { flex:1; min-height:0; overflow:auto; }
-  /* EN REVISIÓN junta dos listas como subtabs (2026-07-31), con el mismo
-     estilo píldora de .desc-subtabs (ver arriba). La barra de botones solo
+  /* EN REVISIÓN junta dos listas como subtabs (2026-07-31), con el mismo riel
+     de .desc-subtabs (ver arriba). La barra de botones solo
      aparece cuando AMBAS listas tienen algo — con una sola, su panel ocupa
      toda la vista sin selector de por medio (pedido del usuario: "si no hay
      tareas llenadas por revisar, solo se ve los que no se pueden facturar y
@@ -773,7 +773,8 @@
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
       padding:0 10px 6px 0; white-space:nowrap; }
   .equipos-tabla td { padding:4px 10px 4px 0; vertical-align:middle; }
-  .equipos-tabla .equipos-host { color:var(--mut); font-size:12.5px;
+  .equipos-tabla .equipos-nombre { font-weight:600; font-size:13px; }
+  .equipos-tabla .equipos-host { color:var(--mut); font-size:12px;
       min-width:110px; }
   .equipos-tabla input[type=text] { width:190px; }
   .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
@@ -841,18 +842,48 @@
                            display:none; z-index:20; align-items:flex-start;
                            justify-content:center; }
   #equipo-config-overlay.visible { display:flex; }
+  /* Ventana ancha a propósito (2026-08-07, pedido del usuario): con 480px las
+     rutas caían en dos columnas con scroll propio y el botón Guardar quedaba
+     fuera de pantalla. Con más ancho entran 3-4 columnas y la lista no
+     necesita scroll interno. */
   #equipo-config { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
-                   width:min(480px, 92vw); max-height:85vh; overflow:auto;
+                   width:min(820px, 94vw); max-height:88vh; overflow:auto;
                    box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #equipo-config h3 { margin:0 0 14px; font-size:14px; }
+  #equipo-config .acceso-lista {
+      grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+      max-height:none; }
   #equipo-config .acceso-check { font-size:13px; }
   #equipo-config .acceso-campo:first-of-type { margin-top:0; }
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
       border-radius:6px; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
-  .equipos-config .mut { font-size:12px; display:block; margin-bottom:4px; }
-  .equipos-config button { font-size:12px; padding:3px 8px; }
+  /* Nombre y vendedor a la par, y "Todas" con su predeterminada en la misma
+     línea (2026-08-07, pedido del usuario): la ventana se lee en menos
+     franjas y entra completa sin scroll. */
+  .equipo-config-par { display:flex; gap:16px; align-items:flex-start; }
+  .equipo-config-par > .acceso-campo { flex:1 1 0; min-width:0; margin-top:0; }
+  .equipo-config-linea { display:flex; align-items:center; gap:16px;
+      flex-wrap:wrap; margin-bottom:6px; }
+  .equipo-config-linea > .acceso-check { margin:0; }
+  .equipo-config-linea > .acceso-predet { margin:0; flex:1 1 auto;
+      justify-content:flex-end; }
+  .equipo-config-linea > .acceso-predet select { flex:0 1 240px; }
+  /* Día a facturar: son dos opciones, hoy o mañana. Un desplegable obliga a
+     abrirlo para ver qué hay (2026-08-07, pedido del usuario), así que van a
+     la vista tanto en la ventana como en la fila de cada computadora. */
+  .dia-opciones { display:flex; align-items:center; gap:18px; font-size:13px; }
+  .dia-opciones label { display:flex; align-items:center; gap:5px;
+      cursor:pointer; }
+  /* La celda de la fila reparte en una línea: series, rutas, el día y el
+     botón, sin apilarse (2026-08-07, pedido del usuario). */
+  .equipos-config { display:flex; align-items:center; gap:16px;
+      flex-wrap:wrap; }
+  .equipos-config .dia-opciones { font-size:12px; gap:12px; }
+  .equipos-config .mut { font-size:12px; }
+  .equipos-config button { font-size:12px; padding:3px 8px;
+      margin-left:auto; }
   /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
      columna es angosta, así que el texto va sobre el botón y no al lado. */
   .sup-config-celda .mut { font-size:12px; display:block; margin-bottom:4px; }
@@ -1392,61 +1423,51 @@
      alguien puede querer una campaña que no salga de esta computadora. */
   .desc-nota-prueba { color:#5b6472; font-size:12px; margin:-4px 0 10px; }
   .desc-fecha-mal { outline:2px solid #dc2626; outline-offset:1px; border-radius:3px; }
-  /* Pestañas de la lista (En curso / Futuras / Archivadas): píldoras livianas,
-     más discretas que las folder-tabs de arriba para no competir con ellas. Cada
-     estado lleva SU color (2026-07-25) para leerse de un vistazo: verde = campañas
-     operando hoy, azul = por empezar, gris = ya archivadas. En reposo la píldora
-     muestra su color en tinte suave; la activa lo lleva sólido. La cuenta al lado
-     ayuda a ubicar sin abrir cada pestaña. */
-  .desc-subtabs { display:flex; gap:6px; flex-wrap:wrap; margin:12px 14px 4px; }
-  .desc-subtab { border:1px solid transparent; border-radius:999px; padding:6px 15px;
-                 font-weight:600; font-size:13px; cursor:pointer; }
-  .desc-subtab .cuenta { margin-left:6px; font-weight:700; opacity:.8; }
-  /* Color por estado en reposo (tinte suave) */
-  .desc-subtab.st-vigentes  { background:#eaf7ef; border-color:#cdeadb; color:#15803d; }
-  .desc-subtab.st-proximas  { background:#e8f1fd; border-color:#c3dbf7; color:#1d4ed8; }
-  .desc-subtab.st-historico { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
-  .desc-subtab.st-revisar   { background:#fdf3e3; border-color:#f3ddb0; color:#b45309; }
+  /* Pestañas de la lista (En curso / Futuras / Archivadas): más discretas que
+     las folder-tabs de arriba para no competir con ellas. Cada estado lleva SU
+     color (2026-07-25) para leerse de un vistazo: verde = campañas operando hoy,
+     azul = por empezar, gris = ya archivadas. La cuenta al lado ayuda a ubicar
+     sin abrir cada pestaña.
+     Van dentro de un RIEL gris (2026-08-07, pedido del usuario): sueltas como
+     píldoras quedaban contra el filo del panel y chocaban con la pestaña
+     carpeta de arriba. El riel las agrupa como un solo control y las despega
+     del borde; en reposo la opción es solo texto en su color y la activa sigue
+     sólida, que es lo que la hace legible de lejos.
+     Cada estado define sus dos colores como variables (--st-fg en reposo,
+     --st-bg cuando está activa) y las reglas genéricas de abajo las usan: así
+     una pestaña nueva es una línea, y los ids que se estilan aparte (admin,
+     filtros de tickets) entran por el mismo camino sin duplicar reglas. */
+  .desc-subtabs { display:inline-flex; gap:3px; flex-wrap:wrap; margin:12px 14px 8px;
+                  background:#eef0f4; border:1px solid #e2e6ec; border-radius:11px;
+                  padding:3px; }
+  .desc-subtab { border:none; background:none; border-radius:8px; padding:6px 14px;
+                 font-weight:600; font-size:13px; cursor:pointer;
+                 color:var(--st-fg, #667085); }
+  .desc-subtab .cuenta { margin-left:6px; font-weight:700; opacity:.75; }
+  .desc-subtab:hover { background:rgba(255,255,255,.75); }
+  .desc-subtab.activa { background:var(--st-bg, #64748b); color:#fff; }
+  /* Color por estado: letra en reposo / fondo sólido cuando está activa */
+  .desc-subtab.st-vigentes  { --st-fg:#15803d; --st-bg:#16a34a; }
+  .desc-subtab.st-proximas  { --st-fg:#1d4ed8; --st-bg:#2563eb; }
+  .desc-subtab.st-historico { --st-fg:#64748b; --st-bg:#64748b; }
+  .desc-subtab.st-revisar   { --st-fg:#b45309; --st-bg:#d97706; }
   /* Prueba: mismo morado de .card-prueba — pestaña propia, solo visible en modo admin */
-  .desc-subtab.st-prueba    { background:#f3e8ff; border-color:#d8b4fe; color:#6b21a8; }
-  .desc-subtab.st-vigentes:hover  { background:#dcf0e5; }
-  .desc-subtab.st-proximas:hover  { background:#dbe9fb; }
-  .desc-subtab.st-historico:hover { background:#e4e8ee; }
-  .desc-subtab.st-revisar:hover   { background:#faeacf; }
-  .desc-subtab.st-prueba:hover    { background:#ead9fd; }
-  /* Estado activo: el mismo color, ahora sólido */
-  .desc-subtab.activa.st-vigentes  { background:#16a34a; border-color:#16a34a; color:#fff; }
-  .desc-subtab.activa.st-proximas  { background:#2563eb; border-color:#2563eb; color:#fff; }
-  .desc-subtab.activa.st-historico { background:#64748b; border-color:#64748b; color:#fff; }
-  .desc-subtab.activa.st-revisar   { background:#d97706; border-color:#d97706; color:#fff; }
-  .desc-subtab.activa.st-prueba    { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  .desc-subtab.st-prueba    { --st-fg:#6b21a8; --st-bg:#7e22ce; }
   /* Subtabs de EN REVISIÓN (2026-07-31): rojo para los llenados que no
      terminaron perfectos (se actúa ya), verde azulado para los pedidos sin
      datos (esperan, no urgen). */
-  .desc-subtab.st-fallidos  { background:#fdecec; border-color:#f3c6c6; color:#b42318; }
-  .desc-subtab.st-faltantes { background:#e6f6f4; border-color:#bfe8e2; color:#0f766e; }
-  .desc-subtab.st-fallidos:hover  { background:#fcdcdc; }
-  .desc-subtab.st-faltantes:hover { background:#d7f0ec; }
-  .desc-subtab.activa.st-fallidos  { background:#dc2626; border-color:#dc2626; color:#fff; }
-  .desc-subtab.activa.st-faltantes { background:#0d9488; border-color:#0d9488; color:#fff; }
+  .desc-subtab.st-fallidos  { --st-fg:#b42318; --st-bg:#dc2626; }
+  .desc-subtab.st-faltantes { --st-fg:#0f766e; --st-bg:#0d9488; }
   /* ADMIN conserva una sola pestaña principal y separa sus dos vistas con las
      mismas subtabs livianas del resto del panel. Supervisión usa el morado de
      ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
   #sup-subtabs { margin-bottom:12px; }
-  #admin-subtab-ajustes { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
-  #admin-subtab-ajustes:hover { background:#e4e8ee; }
-  #admin-subtab-ajustes.activa { background:#64748b; border-color:#64748b; color:#fff; }
-  #admin-subtab-supervision { background:#f3e8ff; border-color:#d8b4fe; color:#6b21a8; }
-  #admin-subtab-supervision:hover { background:#ead9fd; }
-  #admin-subtab-supervision.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  #admin-subtab-ajustes { --st-fg:#64748b; --st-bg:#64748b; }
+  #admin-subtab-supervision { --st-fg:#6b21a8; --st-bg:#7e22ce; }
   #admin-panel-supervision { padding:0 14px 18px; }
-  #admin-subtab-tickets { background:#ffedd5; border-color:#fdba74; color:#9a3412; }
-  #admin-subtab-tickets:hover { background:#fed9ae; }
-  #admin-subtab-tickets.activa { background:#ea580c; border-color:#ea580c; color:#fff; }
+  #admin-subtab-tickets { --st-fg:#9a3412; --st-bg:#ea580c; }
   #admin-panel-tickets { padding:0 14px 18px; }
-  #admin-subtab-despliegue { background:#ccfbf1; border-color:#5eead4; color:#0f766e; }
-  #admin-subtab-despliegue:hover { background:#b9efe2; }
-  #admin-subtab-despliegue.activa { background:#0d9488; border-color:#0d9488; color:#fff; }
+  #admin-subtab-despliegue { --st-fg:#0f766e; --st-bg:#0d9488; }
   #admin-panel-despliegue { padding:0 14px 18px; }
   .desp-semaforo { display:flex; align-items:center; gap:10px; margin:10px 0 14px;
                    padding:10px 14px; border-radius:8px; font-weight:600; }
@@ -1536,10 +1557,10 @@
   .sup-doble { display:inline-block; margin-left:5px; background:#fdecec;
                border:1px solid #f0b4b4; color:#b42318; border-radius:999px;
                padding:1px 6px; font-size:10.5px; font-weight:600; }
-  #sup-ticket-filtros { margin:0; padding:10px 12px 4px; }
-  .sup-ticket-filtro { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
-  .sup-ticket-filtro:hover { background:#e4e8ee; }
-  .sup-ticket-filtro.activa { background:#7e22ce; border-color:#7e22ce; color:#fff; }
+  /* El riel ya trae su propio relleno: lo que antes era padding del contenedor
+     pasa a margen para no engordar la caja gris (2026-08-07). */
+  #sup-ticket-filtros { margin:10px 12px 8px; }
+  .sup-ticket-filtro { --st-fg:#64748b; --st-bg:#7e22ce; }
   #sup-tickets-cargando { padding:12px; color:var(--mut); font-size:12.5px; }
   #sup-tickets-aviso { background:#fffaeb; border:1px solid #fde68a;
                        color:#92400e; border-radius:7px; padding:10px 12px;
@@ -2343,7 +2364,8 @@
        SERIE también viaja siempre y es obligatoria: se elige en
        'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título. -->
   <div class="rutas-barra" id="rutas-barra">
-    <div class="campo"><span class="rotulo">Ruta</span><select id="f-ruta" onchange="cambioRuta(this.value)">
+    <div class="campo"><span class="rotulo">Ruta</span><select id="f-ruta" onchange="cambioRuta(this.value)"
+        title="Filtra la lista por ruta. La ★ marca con cuál abre el panel esta computadora.">
       <option value="">Todas</option></select></div>
     <div class="campo"><span class="rotulo">Serie</span>
       <!-- Automático por ruta (2026-08-02, AJUSTES → Rutas): visible SOLO
@@ -2355,7 +2377,7 @@
            descuadra contra el de Ruta, que no tiene aviso debajo. -->
       <span class="mut" id="serie-auto-nota" style="display:none"
             title="Esta ruta tiene una serie predeterminada configurada en AJUSTES → Rutas: se elige sola al elegir la ruta."></span><select id="f-serie"
-        title="Serie con la que sale cada factura de esta computadora. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
+        title="Serie con la que sale cada factura de esta computadora; la ★ marca con cuál arranca. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
         onchange="cambioSerie(this.value)"></select></div>
     <!-- data-atajo="despacho" (2026-07-21): el botón del medio del calendario
          de ESTE campo pone el día de despacho — se factura para el día de
@@ -2644,145 +2666,186 @@
 
   <section id="sec-ajustes" class="tab-panel" style="display:none">
    <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
-        #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
-        que los abren. -->
-   <div id="ajustes-home">
-    <!-- Catálogos primero en Ajustes (2026-08-05, pedido del usuario): mismo
-         bloque de siempre, solo que ahora abre la vista en vez de ir al
-         final — sigue oculto salvo permiso ajustes_catalogos (Editor/Admin). -->
-    <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
-         #catalogo-overlay / #rutas-overlay) — ver
-         pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
-    <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
-      <h3>Catálogos</h3>
-      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
-        códigos usados por programa de facturación.</p>
-      <div class="cat-btns" id="cat-btns"></div>
+         #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
+         que los abren. -->
+    <div id="ajustes-home">
+     <!-- Subpestañas de AJUSTES (2026-08-07, pedido del usuario): tres temas que
+          no se mezclan — los datos del negocio (iguales en todas las máquinas),
+          las computadoras del parque (solo editor/admin) y lo que cada quien
+          configura en SU equipo. Cada botón aparece solo si su vista tiene algo
+          que mostrar con los permisos del rol; con una sola vista no hay entre
+          qué alternar y la barra entera se esconde (ver pintarSubtabsAjustes). -->
+    <div id="ajustes-subtabs" class="desc-subtabs" style="display:none">
+      <button type="button" id="ajustes-subtab-catalogos"
+              class="desc-subtab st-vigentes"
+              onclick="mostrarSubtabAjustes('catalogos')">Catálogos</button>
+      <button type="button" id="ajustes-subtab-equipos"
+              class="desc-subtab st-proximas activa"
+              onclick="mostrarSubtabAjustes('equipos')">Otras computadoras<span
+              class="cuenta" id="ajustes-subtab-equipos-cuenta"></span></button>
+      <button type="button" id="ajustes-subtab-general"
+              class="desc-subtab st-historico"
+              onclick="mostrarSubtabAjustes('general')">Esta máquina</button>
     </div>
-    <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
-         computadora, juntas porque son obligatorias juntas — sin las dos no se
-         llena nada (ver el aviso #configmaq-overlay). El nombre salió del
-         catálogo de Máquinas de ADMIN: lo pone quien usa el equipo, no el
-         administrador. -->
-    <div class="ajustes-bloque">
-      <h3>Esta máquina</h3>
-      <div class="ajustes-fila">
-        <label for="maquina-nombre">Nombre</label>
-        <input type="text" id="maquina-nombre" maxlength="40" style="width:190px"
-               placeholder="Ej.: Caja 2" oninput="ocultarMaquinaGuardado()"
-               title="Con este nombre aparecen tus llenados en el historial de las demás computadoras. Puede ser el tuyo o el del puesto.">
-        <label for="vendedor-select" style="margin-left:12px">Vendedor</label>
-        <select id="vendedor-select" onchange="ocultarMaquinaGuardado()"
-                title="Con este código se llena el campo Vendedor de cada factura que salga de esta computadora."></select>
-        <button class="primario" id="maquina-guardar" onclick="guardarMaquina()">Guardar</button>
-        <span class="ajustes-ok" id="maquina-guardado" style="display:none">Guardado</span>
-        <span class="mut" id="vendedor-info"></span>
+    <!-- Lo que NO es de esta máquina ni del parque: los datos del negocio, que
+         son iguales en todas las computadoras (2026-08-07, pedido del usuario
+         de partir AJUSTES en tres). Cada bloque sigue apareciendo según su
+         permiso; si no queda ninguno, cargarAjustes esconde la subpestaña. -->
+    <div id="ajustes-vista-catalogos" style="display:none">
+      <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
+           #catalogo-overlay / #rutas-overlay) — ver
+           pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
+      <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
+        <h3>Catálogos</h3>
+        <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
+          códigos usados por programa de facturación.</p>
+        <div class="cat-btns" id="cat-btns"></div>
       </div>
-      <p class="mut" id="maquina-bloqueo" style="display:none;margin:8px 0 0">
-        Ya está configurado. Para cambiarlo hace falta un equipo con permiso de editor.</p>
-      <p class="mut" style="margin:8px 0 0">
-        El <b>nombre</b> es con el que las demás computadoras ven tus llenados
-        en el historial; no puede repetirse con el de otra. El
-        <b>vendedor</b> es el campo que se llena en la ficha de cada factura
-        que se cargue desde aquí; solo aparecen los activos.
-        Las dos cosas hacen falta para poder facturar.</p>
-    </div>
-    <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
-         distinto — de tarde lo que sale al día siguiente, o de mañana lo que
-         quedó pendiente y sale ese mismo día — así que el día de entrega no
-         es una regla del negocio sino de la máquina. Se guarda local
-         (config_dispositivo), como el vendedor. -->
-    <div class="ajustes-bloque">
-      <h3>Día de despacho de esta máquina</h3>
-      <div class="ajustes-fila" style="gap:24px">
-        <label class="desc-todos">
-          <input type="radio" name="dia-despacho" value="manana"
-                 onchange="guardarDiaDespacho(this.value)">
-          Mañana
-        </label>
-        <label class="desc-todos">
-          <input type="radio" name="dia-despacho" value="hoy"
-                 onchange="guardarDiaDespacho(this.value)">
-          Hoy
-        </label>
+      <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
+           ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
+      <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
+        <h3>Series por ruta</h3>
+        <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
+          seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
+        <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
       </div>
-      <p class="mut" style="margin:8px 0 0">
-        <b>Mañana:</b> la Fecha a facturar arranca en el día siguiente a hoy.<br>
-        <b>Hoy:</b> la Fecha a facturar arranca en el día de hoy.<br>
-        Esa es la fecha estándar con la que se factura y se trae la tasa; el
-        botón del calendario la repone con un clic, y en cualquier factura se
-        puede cambiar a mano.</p>
-    </div>
-    <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
-         ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
-    <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
-      <h3>Series por ruta</h3>
-      <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
-        seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
-      <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
-    </div>
-    <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
-         el 2026-08-05, pedido del usuario): la cambian la supervisión y los
-         equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
-         el mundo — cambiar el corte es operación real, no opción de prueba. -->
-    <div class="ajustes-bloque" id="corte-bloque" style="display:none">
-      <h3>Fecha de corte de producción</h3>
-      <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
-        ofrecen en ninguna parte: son los que se facturaron a mano antes de
-        arrancar con el asistente. Muévela hacia adelante a medida que avance
-        la implantación, para que los días viejos que ya no se van a llenar
-        dejen de estorbar en pendientes y en revisión. Vale para todos los
-        equipos: cada uno la toma en su próximo refresco.</p>
-      <div class="ajustes-fila">
-        <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
-        <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
-      </div>
-      <div id="corte-confirma" style="display:none"></div>
-    </div>
-    <!-- Las demás computadoras, en UNA sola tabla (2026-08-05, pedido del
-         usuario: antes eran dos bloques sueltos, "Editores" y "Nombre y
-         vendedor de cada computadora"). Cada columna la habilita su permiso:
-         nombre y vendedor con identidad_maquina, Editor con
-         gestionar_editores y Activa con activar_maquinas — un editor no ve la
-         columna Editor (desde el 2026-08-07 sí ve Activa). -->
-    <!-- Solicitudes de activación (2026-08-05). Una instalación nueva no opera
-         hasta que alguien la aprueba aquí; el bloque existe para la
-         supervisión y los equipos con rol Editor o Admin (2026-08-07). -->
-    <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
-      <!-- El título cambia con el botón de abajo: mientras se listan solo las
-           que esperan es "Solicitudes de activación"; al sumar las ya activas
-           pasa a "Computadoras registradas", porque el título viejo quedaba
-           mintiendo sobre lo que se estaba viendo. -->
-      <h3 id="solicitudes-titulo">Solicitudes de activación</h3>
-      <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
-        entrar con el nombre que le puso quien la instaló. Hasta que se active
-        no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
-        de activarlo — el instalador se descarga por un enlace público.</p>
-      <div id="solicitudes-lista"></div>
-      <p class="mut" id="solicitudes-vacio" style="margin:0; display:none">
-        No hay ninguna computadora esperando activación.</p>
-      <p class="mut" id="solicitudes-error"
-         style="margin:0; display:none; color:var(--err)"></p>
-      <div style="margin-top:12px">
-        <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
-                class="secundario">Ver las computadoras registradas</button>
+      <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
+           el 2026-08-05, pedido del usuario): la cambian la supervisión y los
+           equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
+           el mundo — cambiar el corte es operación real, no opción de prueba. -->
+      <div class="ajustes-bloque" id="corte-bloque" style="display:none">
+        <h3>Fecha de corte de producción</h3>
+        <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
+          ofrecen en ninguna parte: son los que se facturaron a mano antes de
+          arrancar con el asistente. Muévela hacia adelante a medida que avance
+          la implantación, para que los días viejos que ya no se van a llenar
+          dejen de estorbar en pendientes y en revisión. Vale para todos los
+          equipos: cada uno la toma en su próximo refresco.</p>
+        <div class="ajustes-fila">
+          <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
+          <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
+        </div>
+        <div id="corte-confirma" style="display:none"></div>
       </div>
     </div>
+    <div id="ajustes-vista-general">
+      <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
+           computadora, juntas porque son obligatorias juntas — sin las dos no se
+           llena nada (ver el aviso #configmaq-overlay). El nombre salió del
+           catálogo de Máquinas de ADMIN: lo pone quien usa el equipo, no el
+           administrador. -->
+      <div class="ajustes-bloque">
+        <h3>Esta máquina</h3>
+        <div class="ajustes-fila">
+          <label for="maquina-nombre">Nombre</label>
+          <input type="text" id="maquina-nombre" maxlength="40" style="width:190px"
+                 placeholder="Ej.: Caja 2" oninput="ocultarMaquinaGuardado()"
+                 title="Con este nombre aparecen tus llenados en el historial de las demás computadoras. Puede ser el tuyo o el del puesto.">
+          <label for="vendedor-select" style="margin-left:12px">Vendedor</label>
+          <select id="vendedor-select" onchange="ocultarMaquinaGuardado()"
+                  title="Con este código se llena el campo Vendedor de cada factura que salga de esta computadora."></select>
+          <button class="primario" id="maquina-guardar" onclick="guardarMaquina()">Guardar</button>
+          <span class="ajustes-ok" id="maquina-guardado" style="display:none">Guardado</span>
+          <span class="mut" id="vendedor-info"></span>
+        </div>
+        <p class="mut" style="margin:8px 0 0">
+          El <b>nombre</b> es con el que las demás computadoras ven tus llenados
+          en el historial; no puede repetirse con el de otra. El
+          <b>vendedor</b> es el campo que se llena en la ficha de cada factura
+          que se cargue desde aquí; solo aparecen los activos.
+          Las dos cosas hacen falta para poder facturar.</p>
+      </div>
+      <!-- Rutas y series de esta computadora (2026-08-07, pedido del usuario):
+           antes la ruta y la serie predeterminadas se fijaban desde los
+           desplegables de la barra, con la opción "★ Hacer predeterminada".
+           Ahora se eligen aquí —junto con las rutas que atiende y las series
+           que tiene cargadas— con la misma ventana que se usa para las demás
+           computadoras. -->
+      <div class="ajustes-bloque" id="mi-config-bloque">
+        <h3>Rutas y series de esta máquina</h3>
+        <p class="mut" style="margin:4px 0 10px">Con qué series factura esta
+          computadora y qué rutas atiende. Las predeterminadas son con las que
+          arranca el panel al abrir.</p>
+        <div class="ajustes-fila">
+          <span class="mut" id="mi-config-resumen"></span>
+          <button class="primario" onclick="abrirConfigPropia()">Configurar rutas y series</button>
+        </div>
+      </div>
+      <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
+           distinto — de tarde lo que sale al día siguiente, o de mañana lo que
+           quedó pendiente y sale ese mismo día — así que el día de entrega no
+           es una regla del negocio sino de la máquina. Se guarda local
+           (config_dispositivo), como el vendedor.
+           Cambiarlo es de Editor/Admin (permiso identidad_maquina, igual que
+           nombre y vendedor): el usuario general no ve la pestaña AJUSTES.
+           Elegirlo la primera vez sigue siendo de quien instala, y eso pasa
+           por el aviso de configuración obligatoria, no por aquí. -->
+      <div class="ajustes-bloque">
+        <h3>Día de despacho de esta máquina</h3>
+        <div class="ajustes-fila" style="gap:24px">
+          <label class="desc-todos">
+            <input type="radio" name="dia-despacho" value="manana"
+                   onchange="guardarDiaDespacho(this.value)">
+            Mañana
+          </label>
+          <label class="desc-todos">
+            <input type="radio" name="dia-despacho" value="hoy"
+                   onchange="guardarDiaDespacho(this.value)">
+            Hoy
+          </label>
+        </div>
+        <p class="mut" style="margin:8px 0 0">
+          <b>Mañana:</b> la Fecha a facturar arranca en el día siguiente a hoy.<br>
+          <b>Hoy:</b> la Fecha a facturar arranca en el día de hoy.<br>
+          Esa es la fecha estándar con la que se factura y se trae la tasa; el
+          botón del calendario la repone con un clic, y en cualquier factura se
+          puede cambiar a mano.</p>
+      </div>
+    </div>
+    <div id="ajustes-vista-equipos" style="display:none">
+      <!-- Las demás computadoras, en UNA sola tabla (2026-08-05, pedido del
+           usuario: antes eran dos bloques sueltos, "Editores" y "Nombre y
+           vendedor de cada computadora"). Cada columna la habilita su permiso:
+           nombre y vendedor con identidad_maquina, Editor con
+           gestionar_editores y Activa con activar_maquinas — un editor no ve la
+           columna Editor (desde el 2026-08-07 sí ve Activa). -->
+      <!-- Solicitudes de activación (2026-08-05). Una instalación nueva no opera
+           hasta que alguien la aprueba aquí; el bloque solo aparece cuando hay
+           solicitudes esperando decisión. -->
+      <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
+        <h3>Solicitudes de activación</h3>
+        <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
+          entrar con el nombre que le puso quien la instaló. Hasta que se active
+          no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
+          de activarlo — el instalador se descarga por un enlace público.</p>
+        <div id="solicitudes-lista"></div>
+        <p class="mut" id="solicitudes-error"
+           style="margin:0; display:none; color:var(--err)"></p>
+      </div>
 
-    <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
-      <h3>Computadoras</h3>
-      <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
-        datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
-        próximo refresco. Los de esta computadora se cambian arriba, en
-        "Esta máquina".</p>
-      <p class="mut" id="equipos-nota-editor" style="margin:4px 0 10px; display:none">
-        Los equipos marcados como <b>Editor</b> pueden editar campañas de
-        descuento, catálogos, y los datos de los pedidos y las facturas.</p>
-      <p class="mut" id="equipos-nota-activa" style="margin:4px 0 10px; display:none">
-        Al quitarle <b>Activa</b> a una computadora, esa queda fuera de
-        servicio: quien la abra solo ve un aviso y no puede facturar desde
-        ella.</p>
-      <div id="equipos-lista"></div>
+      <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
+        <h3>Otras computadoras</h3>
+        <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
+          datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
+          próximo refresco. Los de esta computadora se cambian en
+          "Esta máquina".</p>
+        <p class="mut" id="equipos-nota-editor" style="margin:4px 0 10px; display:none">
+          Los equipos marcados como <b>Editor</b> pueden editar campañas de
+          descuento, catálogos, y los datos de los pedidos y las facturas.</p>
+        <p class="mut" id="equipos-nota-activa" style="margin:4px 0 10px; display:none">
+          Al quitarle <b>Activa</b> a una computadora, esa queda fuera de
+          servicio: quien la abra solo ve un aviso y no puede facturar desde
+          ella.</p>
+        <div id="equipos-lista"></div>
+      </div>
+      <!-- Las registradas que hoy no tienen acceso (rechazadas, desactivadas u
+           olvidadas): no son solicitudes que esperen decisión, pero tampoco están en
+           la tabla de arriba, que solo lista el parque en servicio. Sin ninguna, el
+           bloque no aparece. -->
+      <div class="ajustes-bloque" id="equipos-sin-acceso-bloque" style="display:none">
+        <h3>Computadoras sin acceso</h3>
+        <div id="equipos-sin-acceso-lista"></div>
+      </div>
     </div>
     <!-- El selector "Vista del panel" que vivía aquí se ELIMINÓ el 2026-08-06
          (pedido del usuario: nadie debe verlo en AJUSTES). Mirar el panel
@@ -2790,7 +2853,7 @@
          (rapida-vista), que además es la vuelta cuando la vista está
          degradada. El backend acompaña: permisos.fijar_ver_como ya solo
          acepta a la supervisión. -->
-   </div>
+    </div>
   </section>
 
   <section id="sec-admin" class="tab-panel" style="display:none">
@@ -3375,22 +3438,26 @@
      "Todas" con un clic, o selección individual; la predeterminada solo se
      elige cuando hay más de una. Los rótulos nombran a ESA computadora —
      quien mira no está configurando la suya. -->
-<div id="equipo-config-overlay" onclick="if(event.target===this)cerrarConfigEquipo()">
+<div id="equipo-config-overlay" onclick="if(event.target===this)intentarCerrarConfigEquipo()">
   <div id="equipo-config">
     <h3 id="equipo-config-titulo"></h3>
     <p class="mut" id="equipo-config-intro" style="display:none; font-size:12.5px"></p>
-    <div class="acceso-campo" id="equipo-config-nombre-campo" style="display:none">
-      <label for="equipo-config-nombre" id="equipo-config-nombre-rotulo">Nombre</label>
-      <input type="text" id="equipo-config-nombre" maxlength="40"
-             placeholder="Nombre de la computadora">
-      <p class="mut" id="equipo-config-nombre-nota" style="margin:4px 0 0; font-size:12.5px"></p>
-      <p class="acceso-campo-error" id="equipo-config-err-nombre"></p>
-    </div>
-    <div class="acceso-campo" id="equipo-config-vendedor-campo" style="display:none">
-      <label for="equipo-config-vendedor" id="equipo-config-vendedor-rotulo">Vendedor</label>
-      <select id="equipo-config-vendedor"></select>
-      <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
-      <p class="acceso-campo-error" id="equipo-config-err-vendedor"></p>
+    <!-- Nombre y vendedor lado a lado (2026-08-07, pedido del usuario): son
+         dos datos cortos y juntos ocupan una sola franja de la ventana. -->
+    <div class="equipo-config-par">
+      <div class="acceso-campo" id="equipo-config-nombre-campo">
+        <label for="equipo-config-nombre" id="equipo-config-nombre-rotulo">Nombre</label>
+        <input type="text" id="equipo-config-nombre" maxlength="40"
+               placeholder="Nombre de la computadora">
+        <p class="mut" id="equipo-config-nombre-nota" style="margin:4px 0 0; font-size:12.5px"></p>
+        <p class="acceso-campo-error" id="equipo-config-err-nombre"></p>
+      </div>
+      <div class="acceso-campo" id="equipo-config-vendedor-campo">
+        <label for="equipo-config-vendedor" id="equipo-config-vendedor-rotulo">Vendedor</label>
+        <select id="equipo-config-vendedor"></select>
+        <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
+        <p class="acceso-campo-error" id="equipo-config-err-vendedor"></p>
+      </div>
     </div>
     <!-- Series, rutas y día en ese orden (2026-08-07, pedido del usuario):
          el mismo con el que se resumen en la línea de cada computadora, para
@@ -3400,49 +3467,55 @@
       <p class="mut equipo-config-ayuda">Son las series que esa computadora
         tiene cargadas en el programa de facturación. La predeterminada es con
         la que arranca cada factura suya.</p>
-      <label class="acceso-check"><input type="checkbox" id="equipo-config-series-todas"
-             onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
+      <!-- "Todas" y la predeterminada comparten línea (2026-08-07, pedido del
+           usuario): son las dos decisiones de la sección y leerlas juntas
+           ahorra una franja entera. -->
+      <div class="equipo-config-linea">
+        <label class="acceso-check"><input type="checkbox" id="equipo-config-series-todas"
+               onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
+        <div class="acceso-predet" id="equipo-config-series-predet-campo">
+          <label for="equipo-config-series-predet" id="equipo-config-series-predet-rotulo"></label>
+          <select id="equipo-config-series-predet"></select>
+          <span id="equipo-config-series-predet-texto" style="display:none"></span>
+        </div>
+      </div>
       <div id="equipo-config-series-lista" class="acceso-lista"></div>
       <p class="acceso-campo-error" id="equipo-config-err-series"></p>
-      <div class="acceso-predet" id="equipo-config-series-predet-campo">
-        <label for="equipo-config-series-predet" id="equipo-config-series-predet-rotulo"></label>
-        <select id="equipo-config-series-predet"></select>
-        <span id="equipo-config-series-predet-texto" style="display:none"></span>
-      </div>
       <p class="acceso-campo-error" id="equipo-config-err-serie_predeterminada"></p>
     </div>
     <div class="acceso-campo" id="equipo-config-rutas-campo">
       <label id="equipo-config-rutas-rotulo" style="display:none"></label>
       <p class="mut equipo-config-ayuda">Solo verá pedidos de esas rutas; con
         la predeterminada arranca ya filtrada al abrir.</p>
-      <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
-             onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
+      <div class="equipo-config-linea">
+        <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
+               onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
+        <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
+          <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
+          <select id="equipo-config-rutas-predet"></select>
+          <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
+        </div>
+      </div>
       <div id="equipo-config-rutas-lista" class="acceso-lista"></div>
       <p class="acceso-campo-error" id="equipo-config-err-rutas"></p>
-      <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
-        <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
-        <select id="equipo-config-rutas-predet"></select>
-        <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
-      </div>
       <p class="acceso-campo-error" id="equipo-config-err-ruta_predeterminada"></p>
     </div>
     <div class="acceso-campo" id="equipo-config-dia-campo">
-      <label for="equipo-config-dia" id="equipo-config-dia-rotulo">Día a facturar</label>
+      <label id="equipo-config-dia-rotulo">Día a facturar</label>
       <p class="mut equipo-config-ayuda">Con qué día arranca la Fecha a
         facturar de esa computadora: <b>Para mañana</b> es el día siguiente
         (lo normal: de tarde se factura lo que sale al otro día) y <b>Para
         hoy</b> es el mismo día. En cada factura se puede cambiar a mano.</p>
-      <select id="equipo-config-dia">
-        <option value="">— Sin elegir —</option>
-        <option value="hoy">Para hoy</option>
-        <option value="manana">Para mañana</option>
-      </select>
+      <div class="dia-opciones">
+        <label><input type="radio" name="equipo-config-dia" value="manana"> Para mañana</label>
+        <label><input type="radio" name="equipo-config-dia" value="hoy"> Para hoy</label>
+      </div>
       <p class="acceso-campo-error" id="equipo-config-err-dia_despacho"></p>
     </div>
     <div id="equipo-config-error" class="desc-error" style="display:none"></div>
     <div class="editor-acciones">
       <button id="equipo-config-guardar" class="primario" onclick="guardarConfigEquipo()">Guardar</button>
-      <button onclick="cerrarConfigEquipo()">Cancelar</button>
+      <button id="equipo-config-cancelar" onclick="intentarCerrarConfigEquipo()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -4398,7 +4471,10 @@ function confirmarBorrar(btn, alConfirmar, etiqueta) {
 // detached y esas funciones reventarían al buscarlo) y en VERDE en vez de
 // rojo: es para confirmar acciones normales (ej. "Llenar en fila"), no
 // destructivas — el rojo de confirmarBorrar quedaba fuera de lugar ahí.
-function confirmarSinQuitar(btn, alConfirmar, etiqueta) {
+// `alReponer` (2026-08-07) corre siempre que la pregunta se deshace —al
+// confirmar, al cancelar o al vencer—: sirve para reponer lo que el llamador
+// haya escondido mientras duraba (la botonera de un modal, por ejemplo).
+function confirmarSinQuitar(btn, alConfirmar, etiqueta, alReponer) {
   const cont = document.createElement("span");
   cont.className = "confirmar-borrar";
   const si = document.createElement("button");
@@ -4408,7 +4484,11 @@ function confirmarSinQuitar(btn, alConfirmar, etiqueta) {
   cont.append(si, no);                 // Confirmar primero, Cancelar de último
   btn.style.display = "none";
   btn.after(cont);
-  const reponer = () => { cont.remove(); btn.style.display = ""; };
+  const reponer = () => {
+    cont.remove();
+    btn.style.display = "";
+    if (alReponer) alReponer();
+  };
   const t = setTimeout(() => { si.disabled = false; }, 400);   // retardo anti doble-clic
   const tVuelta = setTimeout(reponer, 7000);   // confirmación olvidada = clic accidental esperando
   const limpiar = () => { clearTimeout(t); clearTimeout(tVuelta); };
@@ -5600,8 +5680,6 @@ async function resolverConflictoSync(id, decision, card) {
 let rutaSeleccionada = "";           // "" = todas; "__sin_ruta__" = sin Ruta Nombre
 let rutaPredeterminada = "";         // por máquina (config_dispositivo)
 let rutaPredetAplicada = false;      // la predeterminada se aplica solo al abrir
-const HACER_PREDET = "__hacer_predet__";
-const QUITAR_PREDET = "__quitar_predet__";
 
 // Series de pedidos vistas en Winledger (imagen del usuario 2026-07-19).
 // Solo el CAMPO por ahora: la lógica de series se define parte por parte;
@@ -5615,7 +5693,6 @@ let serieSeleccionada = "";
 let seriePredeterminada = "";
 let seriePredetAplicada = false;
 let babyPredetAplicado = false;      // el gramaje guardado se aplica solo al abrir
-const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 
 // Config de serie de la ruta elegida (AJUSTES → Rutas, 2026-08-02), o null si
 // esa ruta no tiene fila en asistente_rutas_series — ahí sigue la selección
@@ -5650,14 +5727,9 @@ const seriesElegiblesDeRuta = (ruta) => {
   return seriesPermitidasDeRuta(ruta).filter(s => propias.includes(s));
 };
 
-// Misma regla que la ruta (opcionRutaPredet): la opción solo aparece cuando
-// de verdad va a cambiar algo. Con la predeterminada ya puesta no hay nada que
-// hacer, y sin serie elegida "hacerla predeterminada" borraría la guardada.
-function opcionSeriePredet(predetDeRuta) {
-  if (predetDeRuta || !serieSeleccionada || serieSeleccionada === seriePredeterminada) return "";
-  return `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`;
-}
-
+// Como la ruta (ver pintarRutas): fijar la serie predeterminada de esta
+// computadora dejó de hacerse desde este menú (2026-08-07, pedido del
+// usuario) y vive en AJUSTES → Esta máquina. Aquí queda la ★ que marca cuál es.
 function pintarSeries() {
   const cfg = configSerieDeRuta();
   // Las permitidas de la ruta cruzadas con las series de ESTA computadora
@@ -5692,25 +5764,14 @@ function pintarSeries() {
     ? "" : `<option value="" selected>— Elige una serie —</option>`;
   $("f-serie").innerHTML = vacia
     + pintadas.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
-        ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("")
-    + opcionSeriePredet(predetDeRuta);
+        ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("");
   const nota = $("serie-auto-nota");
   nota.style.display = predetDeRuta ? "" : "none";
   nota.textContent = predetDeRuta ? "automático por ruta" : "";
 }
 
-async function cambioSerie(valor) {
-  if (valor === HACER_PREDET_SERIE) {
-    try {
-      const r = await api("/api/ajustes/serie", {serie: serieSeleccionada});
-      seriePredeterminada = r.serie_predeterminada;
-      mensaje(`Serie predeterminada de esta máquina: ${seriePredeterminada || "—"}.`, "info");
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-  } else {
-    serieSeleccionada = valor;
-  }
+function cambioSerie(valor) {
+  serieSeleccionada = valor;
   pintarSeries();   // restaura la selección y los marcadores ★
 }
 
@@ -6705,35 +6766,16 @@ function pendientesFueraDeLaRuta() {
     .reduce((total, [, n]) => total + n, 0);
 }
 
-// La última opción del menú dice SIEMPRE lo que va a pasar (2026-07-31): la
-// misma "Hacer predeterminada la ruta actual", elegida con "Todas" puesto,
-// BORRABA la ruta guardada sin avisar — pasó el 19-jul, 16 segundos después de
-// fijarla, y desde entonces el panel abría sin filtro.
-function opcionHacerPredetRuta() {
-  return (rutaSeleccionada && rutaSeleccionada !== rutaPredeterminada)
-    ? `<option value="${HACER_PREDET}">★ Hacer predeterminada la ruta actual</option>`
-    : "";
-}
-
-function opcionRutaPredet() {
-  const hacer = opcionHacerPredetRuta();
-  if (hacer) return hacer;
-  // Quitarla es de quien la eligió (2026-08-07, regla del usuario): en una
-  // computadora sujeta a rutas la predeterminada la fija un Editor desde
-  // AJUSTES → Computadoras, así que el operador no la borra. El servidor ya
-  // lo rechaza; esta guarda evita ofrecer la opción que va a dar error.
-  if (exigeRuta) return "";
-  if (rutaPredeterminada)
-    return `<option value="${QUITAR_PREDET}">Quitar la ruta predeterminada (${
-      esc(etiquetaRutaCorta(rutaPredeterminada))})</option>`;
-  return "";
-}
-
+// Fijar o quitar la ruta predeterminada dejó de hacerse desde este menú
+// (2026-08-07, pedido del usuario): vive en AJUSTES → Esta máquina, junto con
+// las rutas que atiende la computadora. Aquí queda solo la ★ que marca cuál
+// es. El desplegable sigue cambiando la ruta del filtro, y en una computadora
+// sujeta a rutas sigue guardando la elegida como su ruta de trabajo.
 function pintarRutas(rutas, haySinRuta) {
   // Cambiar de ruta sigue siendo suyo y, desde el 2026-08-06, también cuál
-  // abre el panel: la que eligió al instalar no queda clavada. Nunca se ofrece
-  // QUITAR la predeterminada porque sin ruta no puede trabajar y el servidor
-  // rechaza la ruta vacía. Con una sola asignada, el desplegable se bloquea.
+  // abre el panel: la que eligió al instalar no queda clavada (en una
+  // computadora sujeta a rutas, elegirla aquí la guarda). Con una sola
+  // asignada, el desplegable se bloquea.
   $("f-ruta").disabled = exigeRuta && rutaFija;
   if (exigeRuta) {
     // Aquí NO se cuela la ruta que estuviera puesta (2026-08-07, regla del
@@ -6750,8 +6792,7 @@ function pintarRutas(rutas, haySinRuta) {
       ? "" : `<option value="" disabled selected>— Elige tu ruta —</option>`;
     $("f-ruta").innerHTML = vacia + opcionesUna.map(([valor, texto]) => `
       <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
-        ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
-      + (rutaFija ? "" : opcionHacerPredetRuta());
+        ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("");
     return;
   }
   const opciones = [["", "Todas"], ...(rutas || []).map(r => [r, nombreRuta(r)])];
@@ -6765,8 +6806,7 @@ function pintarRutas(rutas, haySinRuta) {
   const sel = $("f-ruta");
   sel.innerHTML = opciones.map(([valor, texto]) => `
     <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
-      ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
-    + opcionRutaPredet();
+      ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("");
 }
 
 // Equipos que ofrece el dropdown de máquina (hostname + nombre visible) y si
@@ -6828,39 +6868,6 @@ function pintarMaquinasFiltro(puede, equipos) {
 }
 
 async function cambioRuta(valor) {
-  if (valor === QUITAR_PREDET) {
-    avisarTrabajando("Quitando la ruta predeterminada…");
-    try {
-      await api("/api/ajustes/ruta", {ruta: ""});
-      rutaPredeterminada = "";
-      mensaje("Esta máquina ya no tiene ruta predeterminada: el panel abre sin filtro de ruta.", "info");
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
-    // Sin predeterminada, la ruta que esté puesta pasa a contar como filtro:
-    // la barra y el conteo se tiñen en el acto (la lista no cambia).
-    repintar();
-    return;
-  }
-  if (valor === HACER_PREDET) {
-    // Fija la ruta seleccionada como predeterminada de ESTA máquina y la
-    // deja seleccionada (se reajusta y selecciona a la vez).
-    avisarTrabajando("Fijando la ruta predeterminada…");
-    try {
-      const r = await api("/api/ajustes/ruta", {ruta: rutaSeleccionada});
-      rutaPredeterminada = r.ruta_predeterminada;
-      mensaje(`Ruta predeterminada de esta máquina: ${rutaPredeterminada ? nombreRuta(rutaPredeterminada) : "Todas"}.`, "info");
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
-    // Hacerla predeterminada la saca de los filtros que se denuncian, así que
-    // la barra y el conteo se destiñen en el acto (la lista es la misma: no se
-    // reconsulta).
-    repintar();
-    return;
-  }
   rutaSeleccionada = valor;
   // Para quien factura una ruta a la vez el desplegable ES su ruta de
   // trabajo: se guarda al elegir (2026-08-06), porque el servidor filtra por
@@ -10996,9 +11003,16 @@ function pintarLlenadosPorRevisar(lista) {
     // pedido del usuario): los mismos botones que su fila de PENDIENTES —
     // "Llenar igual" quita el candado con motivo y "Descartar" la cierra. La
     // nota de dónde pasó se queda: el documento a medias sigue en esa
-    // pantalla y alguien debe atenderlo allá. La de líneas omitidas sí se
-    // queda solo informativa: su documento salió en ese equipo y darlo por
-    // bueno o reemitirlo se decide donde está el papel.
+    // pantalla y alguien debe atenderlo allá.
+    // Y la ajena con LÍNEAS DE MENOS también (2026-08-07, regla del usuario:
+    // quien ve una revisión tiene que poder cerrarla, venga del equipo que
+    // venga). Era la única fila de esta lista sin ninguna salida —decía
+    // "se resuelve en tal equipo" y ahí se quedaba, aunque quien la mirara
+    // fuera un admin—, así que una revisión abierta dependía de que alguien
+    // se sentara en esa otra máquina. Ahora trae las tres salidas de la
+    // propia, y la delicada —reemitir el documento que salió allá— pasa por
+    // el mismo cuadro de motivo de "Volver a llenar", que ya advierte de qué
+    // equipo venía. La nota del equipo se queda: el papel está allá.
     // "Editar cliente" abre el editor del catálogo de Clientes: es edición de
     // catálogo, así que solo lo ve quien puede editarlo (permiso
     // ajustes_catalogos, src/roles.py) — el mismo criterio que esconde el
@@ -11023,6 +11037,14 @@ function pintarLlenadosPorRevisar(lista) {
       ? `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
            onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
       : "";
+    // El mismo botón para la ajena, con UNA diferencia: pregunta el motivo
+    // (volverAFacturar). El documento que se anula salió en otro equipo y el
+    // papel lo tiene alguien más, así que aquí sí hace falta decir por qué —
+    // en la propia el renglón ya lo dice (qué línea no entró).
+    const botonReemitirOmitidasAjena = tienePermiso("reabrir_factura")
+      ? `<button class="acento" title="Emite aquí un documento nuevo con todas las líneas; el que salió incompleto en ese equipo queda anulado en papel."
+           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
+      : "";
     const notaReemitir = tienePermiso("reabrir_factura") ? ""
       : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`;
     // El conflicto ignora la rama remota a propósito: resolverlo es cosa del
@@ -11039,7 +11061,11 @@ function pintarLlenadosPorRevisar(lista) {
              ${botonEditarCliente}
              <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
              <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>${notaEditor}`
-          : `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`)
+          : `${botonReemitirOmitidasAjena}
+             <button title="El documento queda como salió: sale de esta lista en todos los equipos y se queda entre las procesadas, con el rastro de qué faltó."
+               onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
+             <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
+             <div class="mut">El documento salió en '${esc(f.maquina || "otra máquina")}'</div>${notaReemitir}`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          ${botonEditarCliente}
@@ -11063,8 +11089,9 @@ function pintarLlenadosPorRevisar(lista) {
 }
 
 // --- Subtabs de EN REVISIÓN (2026-07-31) ------------------------------------
-// Mismo estilo píldora que el resto del panel (.desc-subtabs, ver AJUSTES →
-// Clientes y DESCUENTOS). Los botones solo se pintan si AMBAS listas tienen
+// Mismo riel que el resto del panel (.desc-subtabs, ver AJUSTES →
+// Clientes y DESCUENTOS); por eso los botones van envueltos en ese div y no
+// sueltos: sin él quedaban contra el filo del panel. Solo se pintan si AMBAS listas tienen
 // algo: con una sola, su panel ocupa toda la vista y no hace falta elegir
 // (pedido del usuario: "si no hay tareas llenadas por revisar, solo se ve
 // los que no se pueden facturar y viceversa"). Con una sola lista tampoco
@@ -11084,8 +11111,9 @@ function actualizarSubtabsRevision(nLlenados, nDatos) {
     onclick="irASubtabRevision('${id}')">${txt}<span class="cuenta">${n}</span></button>`;
   $("rev-subtabs").style.display = (nLlenados || nDatos) ? "" : "none";
   $("rev-subtabs").innerHTML = ambas
-    ? subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
-      + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")
+    ? `<div class="desc-subtabs">${
+        subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
+        + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")}</div>`
     : (nLlenados || nDatos)
       ? `<h4 class="rev-titulo-solo">${TITULO_SUBTAB_REVISION[subtabRevisionActiva]}</h4>`
       : "";
@@ -12069,19 +12097,27 @@ const ACCIONES_MOTIVO = {
     // llenando 2026-07-31): descartarla aquí la cierra en todas. Con un error
     // de allá puede haber quedado un documento a medias que este panel no
     // puede resolver; apartada o llenando todavía no tiene documento firme.
+    // Y desde 2026-08-07 también puede ser una que allá CERRÓ con líneas de
+    // menos: ahí el documento existe y está impreso en ese equipo, así que el
+    // aviso lo dice con todas sus letras — descartarla no lo borra.
     nota: (id, partes) => {
       const f = filaDeFactura(id, partes[0]);
       if (!f || !f.remota) return "";
       const maquina = f.maquina || "otra máquina";
+      const cerrada = f.estado === "completada";
       const situacion = f.estado === "error_llenado"
         ? `El llenado falló en '${maquina}'.`
         : f.estado === "llenando"
           ? `'${maquina}' la está llenando ahora mismo.`
-          : `'${maquina}' la tiene apartada.`;
+          : cerrada
+            ? `El documento ya salió en '${maquina}', con líneas de menos.`
+            : `'${maquina}' la tiene apartada.`;
       return `${situacion} Descartarla aquí la cierra para todas las máquinas`
            + (f.estado === "error_llenado"
               ? "; si allá quedó un documento a medias, hay que cancelarlo en ese equipo."
-              : ".");
+              : cerrada
+                ? "; el documento que ya salió hay que anularlo en papel en ese equipo."
+                : ".");
     },
     opciones: ["Ya se facturó a mano",
                "El cliente anuló el pedido",
@@ -12161,8 +12197,13 @@ function remotaDeFactura(pedido_id, parte) {
 
 // La fila tal como está pintada, en cualquiera de las dos listas. La usa la
 // nota del diálogo de reapertura, que aplica sobre todo a PROCESADAS.
+// `por_revisar` va de última (2026-08-07): esa lista se arma sin ventana de
+// fechas ni filtro de ruta, así que una revisión puede estar ahí y no en
+// PROCESADAS — y sin este respaldo el cuadro de motivo de esa factura salía
+// sin su advertencia ("la cerró tal equipo"), justo donde más importa.
 function filaDeFactura(pedido_id, parte) {
-  return [...ultimaLista.pendientes, ...(ultimaLista.procesadas || [])]
+  return [...ultimaLista.pendientes, ...(ultimaLista.procesadas || []),
+          ...(ultimaLista.por_revisar || [])]
     .find(x => x.pedido_id === pedido_id && x.parte === parte);
 }
 
@@ -12441,9 +12482,13 @@ async function confirmarMotivo() {
     // la nube que el estado compartido quedó libre — si no responde, no se
     // descarta nada y allá sigue su reintento, en vez de un descarte que solo
     // existe en esta máquina.
+    // Una que ese equipo ya CERRÓ no pasa por aquí (2026-08-07): no tiene
+    // candado que soltar y /api/tomar_factura la rechaza a propósito (tomar
+    // una cerrada sería reemitirla). Su descarte va derecho.
     for (const parte of partes) {
       const fila = filaDeFactura(pedido_id, parte);
       if (!fila || !fila.remota) continue;
+      if (["completada", "descartada", "facturada_a_mano"].includes(fila.estado)) continue;
       try {
         await api("/api/tomar_factura", {pedido_id, parte, motivo});
       } catch (e) {
@@ -15403,7 +15448,6 @@ async function cargarAjustes() {
     acceso = d.acceso || acceso;
     pintarDesactivada();
     pintarAcceso();
-    pintarBloqueoMaquina();
     // Mientras la computadora espera activación no se pide configurarla: la
     // pantalla de activación ya la tapa y el nombre lo toma de ahí.
     if (resolverConfigMaquina && !configPendiente.length
@@ -15425,6 +15469,15 @@ async function cargarAjustes() {
     // El corte vive en AJUSTES desde 2026-08-05: lo ven supervisión y Admin.
     $("corte-bloque").style.display =
       tienePermiso("corte_produccion") ? "" : "none";
+    // AJUSTES entera es de Editor/Admin (2026-08-07, pedido del usuario): al
+    // usuario general no le queda nada que tocar ahí —nombre, vendedor y día
+    // de facturación son fijos para él, se los pone quien instala el equipo—
+    // así que no ve la pestaña. Esconderla entera es lo que permite que los
+    // bloques de adentro no tengan que degradarse uno por uno.
+    const hayAjustes = !!(permisosUI.rol_efectivo || "");
+    $("tab-ajustes").style.display = hayAjustes ? "" : "none";
+    if (!hayAjustes && $("tab-ajustes").classList.contains("activa"))
+      cambiarTab("pendientes");
     // La pestaña ADMIN solo existe (Jinja) en equipos con capacidad admin;
     // aquí solo se esconde/enseña según la vista elegida.
     const tabAdmin = $("tab-admin");
@@ -15432,11 +15485,17 @@ async function cargarAjustes() {
       tabAdmin.style.display = supervision ? "" : "none";
       if (!supervision && tabActiva() === "admin") irATab("ajustes");
     }
+    // Rutas y series propias: el mismo permiso que exige su endpoint y que
+    // gobierna el nombre y el vendedor de al lado.
+    $("mi-config-bloque").style.display =
+      tienePermiso("identidad_maquina") ? "" : "none";
+    pintarMiConfigRutasSeries();
     $("catalogos-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
+    pintarSubtabsAjustes();
     // El overview de ADMIN → Equipos pinta su columna de series/rutas/día de
     // `equipos`, que llega aquí: si ese panel ya estaba cargado (o resolvió
     // primero, al entrar a la pestaña), se repinta con lo recién traído.
@@ -15750,8 +15809,11 @@ setInterval(sondearAcceso, 60000);
 // no gestiona activaciones (regla del usuario, 2026-08-05). El backend repite
 // el candado en cada endpoint; esto decide qué se pinta.
 let accesoGestion = false;
+// AJUSTES abre en Computadoras cuando el permiso la habilita (2026-08-07,
+// pedido del usuario: es la que más se usa de las tres). Sin ese permiso,
+// pintarSubtabsAjustes cae a la primera que el rol sí tenga.
+let subtabAjustes = "equipos";
 let solicitudes = [];
-let verEquiposActivos = false;
 
 const fechaAcceso = (iso) => {
   if (!iso) return "—";
@@ -15762,9 +15824,12 @@ const fechaAcceso = (iso) => {
 };
 
 async function cargarSolicitudesAcceso() {
-  const bloque = $("solicitudes-bloque");
-  if (!accesoGestion) { bloque.style.display = "none"; return; }
-  bloque.style.display = "";
+  if (!accesoGestion) {
+    solicitudes = [];
+    $("solicitudes-error").textContent = "";
+    pintarSolicitudes();
+    return;
+  }
   try {
     const r = await api("/api/acceso/equipos");
     solicitudes = r.equipos || [];
@@ -15777,24 +15842,62 @@ async function cargarSolicitudesAcceso() {
   pintarSolicitudes();
 }
 
-function mostrarEquiposActivos() {
-  verEquiposActivos = !verEquiposActivos;
-  pintarSolicitudes();
+const VISTAS_AJUSTES = {
+  catalogos: ["ajustes-vista-catalogos", "ajustes-subtab-catalogos"],
+  equipos:   ["ajustes-vista-equipos",   "ajustes-subtab-equipos"],
+  general:   ["ajustes-vista-general",   "ajustes-subtab-general"],
+};
+
+function mostrarSubtabAjustes(cual) {
+  subtabAjustes = VISTAS_AJUSTES[cual] ? cual : "general";
+  for (const [id, [vista, boton]] of Object.entries(VISTAS_AJUSTES)) {
+    $(vista).style.display = id === subtabAjustes ? "" : "none";
+    $(boton).classList.toggle("activa", id === subtabAjustes);
+  }
+}
+
+// La subpestaña de computadoras es de editores/admin: el mismo permiso que
+// ya habilita cada control de adentro. Sin ninguno, su botón no se pinta.
+function puedeVerComputadoras() {
+  return accesoGestion || tienePermiso("identidad_maquina")
+      || tienePermiso("gestionar_editores") || tienePermiso("activar_maquinas");
+}
+
+// Qué subpestañas tienen algo que mostrar con los permisos de este rol. La de
+// esta máquina siempre está (nombre, vendedor y día de despacho no se degradan
+// por rol); la de catálogos, solo si alguno de sus tres bloques quedó visible
+// —cargarAjustes ya los decidió antes de llamar aquí—.
+function subtabsAjustesDisponibles() {
+  const hayCatalogos = ["catalogos-bloque", "rutas-series-bloque", "corte-bloque"]
+    .some(id => $(id).style.display !== "none");
+  return {catalogos: hayCatalogos, equipos: puedeVerComputadoras(), general: true};
+}
+
+function pintarSubtabsAjustes() {
+  const hay = subtabsAjustesDisponibles();
+  for (const [id, [, boton]] of Object.entries(VISTAS_AJUSTES))
+    $(boton).style.display = hay[id] ? "" : "none";
+  // Con una sola vista no hay entre qué alternar: sobra la barra entera.
+  const cuantas = Object.values(hay).filter(Boolean).length;
+  $("ajustes-subtabs").style.display = cuantas > 1 ? "" : "none";
+  mostrarSubtabAjustes(hay[subtabAjustes] ? subtabAjustes
+    : hay.equipos ? "equipos" : hay.catalogos ? "catalogos" : "general");
+  const espera = solicitudes.filter(
+    s => s.estado === "pendiente" || s.reinstalacion_pendiente).length;
+  $("ajustes-subtab-equipos-cuenta").textContent = espera ? `(${espera})` : "";
 }
 
 function pintarSolicitudes() {
   const espera = solicitudes.filter(
     s => s.estado === "pendiente" || s.reinstalacion_pendiente);
-  const resto = solicitudes.filter(s => !espera.includes(s));
-  const lista = verEquiposActivos ? [...espera, ...resto] : espera;
-  $("solicitudes-titulo").textContent = verEquiposActivos
-    ? "Computadoras registradas" : "Solicitudes de activación";
-  $("solicitudes-ver-activos").textContent = verEquiposActivos
-    ? "Ver solo las solicitudes" : "Ver las computadoras registradas";
-  $("solicitudes-ver-activos").style.display = resto.length ? "" : "none";
-  $("solicitudes-vacio").style.display =
-    (!lista.length && !$("solicitudes-error").textContent) ? "" : "none";
-  $("solicitudes-lista").innerHTML = lista.map(pintarUnaSolicitud).join("");
+  const sinAcceso = solicitudes.filter(
+    s => !espera.includes(s) && s.estado !== "activo");
+  const hayError = !!$("solicitudes-error").textContent;
+  $("solicitudes-bloque").style.display = (espera.length || hayError) ? "" : "none";
+  $("solicitudes-lista").innerHTML = espera.map(pintarUnaSolicitud).join("");
+  $("equipos-sin-acceso-bloque").style.display = sinAcceso.length ? "" : "none";
+  $("equipos-sin-acceso-lista").innerHTML = sinAcceso.map(pintarUnaSolicitud).join("");
+  pintarSubtabsAjustes();
 }
 
 // La configuración que la computadora pidió al registrarse (jsonb en la fila
@@ -16022,23 +16125,35 @@ function pintarEquipos() {
                                  : "Marca esta computadora como Editor."}"
              onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
-      <input type="checkbox" ${m.activa ? "checked" : ""}
-             title="Al quitarla, esa computadora queda fuera de servicio."
+      <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
+             title="Al apagarlo, esa computadora queda fuera de servicio."
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
-    // Series, rutas y día de despacho del equipo (2026-08-07): la línea
-    // resume con qué trabaja y "Detalles" abre la ventana donde se cambian
-    // los tres juntos. Mismo permiso que Nombre/Vendedor.
+    // Series, rutas y día del equipo (2026-08-07), repartidos en la fila:
+    // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
+    // mueve de un día para otro— y "Configurar" abre la ventana con todo,
+    // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
     const config = `<td class="equipos-config">
-      <span class="mut">${esc(resumenConfigEquipo(m))}</span>
+      <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
+      <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
+      <div class="dia-opciones">
+        <label><input type="radio" name="dia-equipo-${host}" value="manana"
+               ${m.dia_despacho === "manana" ? "checked" : ""}
+               onclick="return onClickDiaEquipo(event, '${host}')"> Mañana</label>
+        <label><input type="radio" name="dia-equipo-${host}" value="hoy"
+               ${m.dia_despacho === "hoy" ? "checked" : ""}
+               onclick="return onClickDiaEquipo(event, '${host}')"> Hoy</label>
+      </div>
       <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
+    // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
+    // pedido del usuario): aquí se leen, junto al identificador de la
+    // computadora, para saber de cuál es la fila.
     return `<tr>
-      <td class="equipos-host">${host}</td>
-      <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
-                 placeholder="Sin nombre" ${puedeIdentidad
-                   ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></td>
-      <td><select ${puedeIdentidad
-                   ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></select></td>
+      <td>
+        <div class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</div>
+        <div class="equipos-host">${host}</div>
+        <div class="equipos-host">${esc(etiquetaVendedorEquipo(m.vendedor))}</div>
+      </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
       ${puedeActivar ? activa : ""}
@@ -16046,17 +16161,21 @@ function pintarEquipos() {
   }).join("");
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
-      <th>Computadora</th><th>Nombre</th><th>Vendedor</th>
+      <th>Computadora</th>
       ${puedeIdentidad ? "<th>Series, rutas y día</th>" : ""}
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
     </tr></thead>
     <tbody>${filas}</tbody></table>`;
-  $("equipos-lista").querySelectorAll("tbody tr").forEach((fila, indice) => {
-    pintarSelectVendedores(fila.querySelector("select"),
-                           equipos[indice].vendedor || "");
-  });
+}
+
+// El vendedor de esa computadora, con código y nombre juntos; sin catálogo a
+// mano queda el código solo, que es lo que se sabe.
+function etiquetaVendedorEquipo(codigo) {
+  if (!codigo) return "Sin vendedor";
+  const v = vendedoresCatalogo.find(x => x.codigo === codigo);
+  return v && v.nombre ? `${codigo} — ${v.nombre}` : codigo;
 }
 
 // Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
@@ -16087,6 +16206,22 @@ function onClickRolEquipo(ev, dispositivo, rol) {
     caja.checked = activando;
     cambiarRolEquipo(dispositivo, rol, caja);
   }, etiqueta);
+  return false;
+}
+
+// El día a facturar de OTRA computadora también se confirma (2026-08-07,
+// pedido del usuario): cambiarlo altera cómo trabaja esa máquina mañana
+// temprano, y un clic al pasar no puede decidir eso. Se esconden las dos
+// opciones mientras dura la pregunta, para no dejar la otra invitando a un
+// segundo clic.
+function onClickDiaEquipo(ev, dispositivo) {
+  const caja = ev.target;
+  const dia = caja.value;
+  ev.preventDefault();
+  confirmarSinQuitar(caja.closest(".dia-opciones"), () => {
+    caja.checked = true;
+    cambiarDiaEquipo(dispositivo, caja);
+  }, `Confirmar: factura para ${ETIQUETA_DIA_DESPACHO[dia]}`);
   return false;
 }
 
@@ -16151,30 +16286,35 @@ async function cambiarActivaEquipo(dispositivo, caja) {
   }
 }
 
-// Sin botón Guardar (2026-08-06, pedido del usuario): nombre y vendedor
-// guardan al salir del campo o elegir en el selector. Tras un error NO se
-// repinta: lo tecleado queda a la vista para corregirlo.
-async function guardarEquipoIdentidad(dispositivo, control) {
-  const fila = control.closest("tr");
-  const nombre = fila.querySelector('input[type="text"]').value.trim();
-  const vendedor = fila.querySelector("select").value;
-  if (!nombre) {
-    mensaje("Escribe el nombre de la computadora.", "error");
-    return;
-  }
+// El día a facturar desde la fila, sin abrir la ventana (2026-08-07). Viaja
+// por el mismo endpoint que la configuración completa, así que se reponen las
+// rutas y series que esa computadora ya tiene; null (sin configurar) equivale
+// a todas, igual que en el resto del panel.
+async function cambiarDiaEquipo(dispositivo, control) {
+  const m = equipos.find(e => e.dispositivo === dispositivo);
+  if (!m) return;
+  const anterior = m.dia_despacho || "";
   control.disabled = true;
   try {
-    const r = await api("/api/ajustes/equipo-identidad",
-                        {dispositivo, nombre, vendedor});
-    equipos = r.equipos_gestionables || [];
+    const r = await api("/api/ajustes/equipo-rutas-series", {
+      dispositivo,
+      rutas: m.rutas === null || m.rutas === undefined ? "*" : m.rutas,
+      series: m.series === null || m.series === undefined ? "*" : m.series,
+      ruta_predeterminada: m.ruta_predeterminada || "",
+      serie_predeterminada: m.serie_predeterminada || "",
+      dia_despacho: control.value,
+    });
+    equipos = r.equipos_gestionables || equipos;
     pintarEquipos();
-    mensaje(r.aviso ? `Datos guardados. ${r.aviso}`
-                    : "Datos de la computadora guardados.",
-            r.aviso ? "alerta" : "info");
+    if (supOverviewCargado) pintarEquiposSupervision();
+    mensaje(`${m.nombre || dispositivo} factura para `
+      + `${ETIQUETA_DIA_DESPACHO[control.value]}; lo toma en su próximo refresco.`,
+      "info");
   } catch (e) {
-    mensaje(e.message, "error");
-  } finally {
     control.disabled = false;
+    document.querySelectorAll(`input[name="dia-equipo-${dispositivo}"]`)
+            .forEach(r => { r.checked = r.value === anterior; });
+    mensaje("No se pudo cambiar el día a facturar: " + e.message, "error");
   }
 }
 
@@ -16199,16 +16339,24 @@ const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
 // (2026-08-07): con qué series factura, qué rutas atiende y con qué día
 // arranca su Fecha a facturar. Es lo mismo que se cambia en "Detalles".
 function resumenConfigEquipo(m) {
-  return `Series: ${resumenAsignacion(m.series, m.serie_predeterminada,
-                                      "series", (x) => x)}`
-    + ` · Rutas: ${resumenAsignacion(m.rutas, m.ruta_predeterminada,
-                                     "rutas", etiquetaRutaCorta)}`
+  return `Series: ${resumenSeriesEquipo(m)} · Rutas: ${resumenRutasEquipo(m)}`
     + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
 }
 
-// La ventana sirve a dos orígenes con los mismos selectores (2026-08-07):
+// En la fila de Computadoras cada dato va en su propio bloque, repartido a lo
+// ancho de la celda; el día no se resume ahí porque está como par de opciones
+// a la vista, y repetirlo sería el mismo dato dos veces.
+const resumenSeriesEquipo = (m) =>
+  resumenAsignacion(m.series, m.serie_predeterminada, "series", (x) => x);
+const resumenRutasEquipo = (m) =>
+  resumenAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
+
+// La ventana sirve a tres orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
 //   {origen:"solicitud"}  → solicitud de activación (suma nombre y vendedor)
+//   {origen:"propia"}     → AJUSTES → Esta máquina (solo rutas y series: el
+//                           nombre, el vendedor y el día ya tienen su control
+//                           en ese mismo bloque)
 // `datos` es la configuración de partida (la fila del catálogo, o la que pidió
 // la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
 let configEquipo = null;
@@ -16260,35 +16408,60 @@ function abrirConfigSolicitud(dispositivo) {
   });
 }
 
+// Rutas y series de ESTA computadora, desde AJUSTES → Esta máquina. Reusa la
+// ventana de las demás con las secciones que aquí sobran escondidas: nombre,
+// vendedor y día ya se cambian en el mismo bloque, y dos controles para el
+// mismo dato se desincronizan.
+function abrirConfigPropia() {
+  abrirVentanaConfigEquipo({origen: "propia", datos: configPropia || {},
+                            nombreVisible: "esta computadora"});
+}
+
 function abrirVentanaConfigEquipo(ctx) {
   configEquipo = ctx;
   const {origen, datos, nombreVisible} = ctx;
   const esSolicitud = origen === "solicitud";
-  $("equipo-config-titulo").textContent = `Configuración de ${nombreVisible}`;
+  const esPropia = origen === "propia";
+  $("equipo-config-titulo").textContent = esPropia
+    ? "Rutas y series de esta computadora"
+    : `Configuración de ${nombreVisible}`;
   $("equipo-config-intro").textContent = esSolicitud
     ? (ctx.sinConfigPedida
        ? "La solicitud llegó sin configuración: lo que se elija aquí es con lo "
          + "que queda esa computadora al activarla."
        : "Es la configuración que pidió esa computadora. Corrígela si hace "
          + "falta: queda tal como se vea aquí al activarla.")
+    : esPropia
+    ? "Las series con las que factura esta computadora y las rutas que "
+      + "atiende. Cada predeterminada es con la que arranca el panel al abrir."
     : "Es la configuración con la que trabaja esa computadora. La toma en su "
       + "próximo refresco, sin que nadie tenga que ir hasta ella.";
   $("equipo-config-intro").style.display = "";
-  // Nombre y vendedor solo al activar: en una computadora ya activa esos dos
-  // se editan en su fila de Computadoras.
-  $("equipo-config-nombre-campo").style.display = esSolicitud ? "" : "none";
-  $("equipo-config-vendedor-campo").style.display = esSolicitud ? "" : "none";
-  if (esSolicitud) {
-    $("equipo-config-nombre-rotulo").textContent =
-      "Nombre con el que queda esa computadora";
-    $("equipo-config-nombre").value = ctx.nombrePedido || "";
-    $("equipo-config-nombre-nota").textContent = ctx.nombrePedido
-      ? `Lo pidió así al registrarse: ${ctx.nombrePedido}`
-      : "No mandó ningún nombre al registrarse.";
-    $("equipo-config-vendedor-rotulo").textContent =
-      "Vendedor con el que factura esa computadora";
-    pintarVendedorConfigEquipo(datos.vendedor || "");
-  }
+  // Lo que la ventana propia no edita se esconde entero, y el vendedor además
+  // por su select: vendedorConfigEquipo() lee de ahí si está a la vista.
+  for (const id of ["equipo-config-nombre-campo", "equipo-config-vendedor-campo",
+                    "equipo-config-dia-campo"])
+    $(id).style.display = esPropia ? "none" : "";
+  $("equipo-config").querySelector(".equipo-config-par").style.display =
+    esPropia ? "none" : "";
+  $("equipo-config-vendedor").style.display = esPropia ? "none" : "";
+  // Nombre y vendedor también en una computadora ya activa (2026-08-07,
+  // pedido del usuario): esta ventana es TODO lo que se decide de esa
+  // máquina, sin volver a la fila por dos campos sueltos.
+  $("equipo-config-nombre-rotulo").textContent = esSolicitud
+    ? "Nombre con el que queda esa computadora" : "Nombre de esa computadora";
+  $("equipo-config-nombre").value =
+    (esSolicitud ? ctx.nombrePedido : datos.nombre) || "";
+  $("equipo-config-nombre-nota").textContent = esSolicitud
+    ? (ctx.nombrePedido ? `Lo pidió así al registrarse: ${ctx.nombrePedido}`
+                        : "No mandó ningún nombre al registrarse.")
+    : "";
+  $("equipo-config-nombre-nota").style.display = esSolicitud ? "" : "none";
+  $("equipo-config-vendedor-rotulo").textContent =
+    "Vendedor con el que factura esa computadora";
+  // El pintado del selector lo vuelve a mostrar, así que en la propia no
+  // corre: ahí el vendedor se cambia arriba, en el bloque "Esta máquina".
+  if (!esPropia) pintarVendedorConfigEquipo(datos.vendedor || "");
   for (const tipo of ["rutas", "series"]) {
     const rotulo = $(`equipo-config-${tipo}-rotulo`);
     rotulo.style.display = "";
@@ -16319,12 +16492,50 @@ function abrirVentanaConfigEquipo(ctx) {
   }
   $("equipo-config-dia-rotulo").textContent =
     `Día a facturar de ${nombreVisible}`;
-  $("equipo-config-dia").value = datos.dia_despacho || "";
+  document.querySelectorAll("input[name=equipo-config-dia]")
+          .forEach(r => { r.checked = r.value === datos.dia_despacho; });
   $("equipo-config-guardar").textContent = esSolicitud
     ? "Activar con esta configuración" : "Guardar";
   $("equipo-config-guardar").disabled = false;
   limpiarErroresConfigEquipo();
+  if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
+  ctx.firma = firmaConfigEquipo();
   $("equipo-config-overlay").classList.add("visible");
+}
+
+// Firma de lo editable de la ventana (lo mismo que se mandaría al guardar). Se
+// compara contra la del momento de abrir para saber si hay cambios sin guardar.
+function firmaConfigEquipo() {
+  try {
+    return JSON.stringify({
+      nombre: $("equipo-config-nombre").value.trim(),
+      vendedor: vendedorConfigEquipo(),
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+      dia_despacho: diaConfigEquipo(),
+    });
+  } catch (_) { return null; }
+}
+
+function configEquipoHayCambios() {
+  if (!configEquipo || configEquipo.firma === undefined) return false;
+  return firmaConfigEquipo() !== configEquipo.firma;
+}
+
+// Intento de cierre (clic afuera o Cancelar): con cambios sin guardar,
+// pregunta antes de descartar; sin cambios, cierra directo. En una solicitud
+// el "Guardar" es la activación, así que el botón de la pregunta lo dice.
+function intentarCerrarConfigEquipo() {
+  if (!configEquipoHayCambios()) { cerrarConfigEquipo(); return; }
+  const esSolicitud = (configEquipo || {}).origen === "solicitud";
+  pedirConfirmSalida({
+    acciones: $("equipo-config").querySelector(".editor-acciones"),
+    guardarTxt: esSolicitud ? "Activar con esta configuración" : "Guardar",
+    guardar: guardarConfigEquipo,
+    cerrar: cerrarConfigEquipo,
+  });
 }
 
 // Con el catálogo de vendedores cargado va el selector de siempre (código y
@@ -16344,10 +16555,14 @@ function pintarVendedorConfigEquipo(pedido) {
   }
   select.style.display = "none";
   texto.style.display = "";
+  const esSolicitud = (configEquipo || {}).origen === "solicitud";
   texto.textContent = pedido
-    ? `${pedido} (pedido por esa computadora; la lista de vendedores no está a mano)`
-    : "No pidió vendedor.";
+    ? `${pedido} (la lista de vendedores no está a mano para cambiarlo)`
+    : (esSolicitud ? "No pidió vendedor." : "Sin vendedor asignado.");
 }
+
+const diaConfigEquipo = () =>
+  (document.querySelector("input[name=equipo-config-dia]:checked") || {}).value || "";
 
 const vendedorConfigEquipo = () =>
   $("equipo-config-vendedor").style.display === "none"
@@ -16355,11 +16570,16 @@ const vendedorConfigEquipo = () =>
 
 // Mismas reglas del registro: "Todas" deshabilita las individuales SIN
 // desmarcarlas; la predeterminada solo se elige cuando la selección efectiva
-// tiene más de una (con una sola, es esa y se muestra como texto).
+// tiene más de una (con una sola, es esa y se muestra como texto). Con
+// "Todas" la lista se ESCONDE (2026-08-07, pedido del usuario): una lista
+// larga y apagada solo alarga la ventana, y lo marcado sigue ahí para cuando
+// se desmarque.
 function configEquipoRecalcular(tipo, preseleccionar) {
   const datos = (configEquipo || {}).datos || {};
   const todas = $(`equipo-config-${tipo}-todas`).checked;
-  const cajas = [...$(`equipo-config-${tipo}-lista`).querySelectorAll("input")];
+  const lista = $(`equipo-config-${tipo}-lista`);
+  lista.style.display = todas ? "none" : "";
+  const cajas = [...lista.querySelectorAll("input")];
   cajas.forEach(c => { c.disabled = todas; });
   const marcadas = cajas.filter(c => c.checked).map(c => c.value);
   const efectivas = todas ? opcionesConfigEquipo(tipo, datos) : marcadas;
@@ -16444,39 +16664,119 @@ function cerrarConfigEquipo() {
   $("equipo-config-overlay").classList.remove("visible");
 }
 
+// Guardar se confirma (2026-08-07, pedido del usuario): lo que sale de aquí
+// cambia cómo trabaja OTRA computadora en su próximo refresco, y quien lo
+// pulsa no está delante de ella para deshacerlo. El Cancelar de la ventana se
+// esconde mientras dura la pregunta, para no tener dos Cancelar seguidos.
 function guardarConfigEquipo() {
   if (!configEquipo) return;
-  if (configEquipo.origen === "solicitud") { activarDesdeConfigEquipo(); return; }
-  guardarConfigEquipoDelCatalogo();
+  // La propia NO se confirma: el motivo de la pregunta es que el cambio le
+  // cae a una computadora ajena en su refresco y quien la pulsa no está
+  // delante para deshacerlo. Aquí es esta misma máquina y el efecto se ve en
+  // el acto, igual que el resto de AJUSTES → Esta máquina.
+  if (configEquipo.origen === "propia") { guardarConfigPropia(); return; }
+  const esSolicitud = configEquipo.origen === "solicitud";
+  const cancelar = $("equipo-config-cancelar");
+  cancelar.style.display = "none";
+  confirmarSinQuitar($("equipo-config-guardar"),
+    () => { if (esSolicitud) activarDesdeConfigEquipo();
+            else guardarConfigEquipoDelCatalogo(); },
+    esSolicitud ? "Confirmar activación" : "Confirmar cambios",
+    () => { cancelar.style.display = ""; });
 }
 
-// La ventana edita el conjunto COMPLETO, que es justo lo que pide el
-// endpoint: series, rutas, sus predeterminadas y el día de despacho.
-function guardarConfigEquipoDelCatalogo() {
-  const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
-  if (!m) { cerrarConfigEquipo(); return; }
-  const cuerpo = {
-    dispositivo: configEquipo.dispositivo,
-    rutas: seleccionConfigEquipo("rutas"),
-    series: seleccionConfigEquipo("series"),
-    ruta_predeterminada: predetConfigEquipo("rutas"),
-    serie_predeterminada: predetConfigEquipo("series"),
-    dia_despacho: $("equipo-config-dia").value,
-  };
+// Lo elegido para ESTA computadora entra de una: el servidor devuelve lo que
+// quedó (con una sola opción, la predeterminada se fuerza a esa) y con eso se
+// repintan la barra y el resumen del bloque, sin esperar al próximo refresco.
+async function guardarConfigPropia() {
   const boton = $("equipo-config-guardar");
   boton.disabled = true;
-  api("/api/ajustes/equipo-rutas-series", cuerpo).then((r) => {
+  limpiarErroresConfigEquipo();
+  try {
+    const r = await api("/api/ajustes/mi-rutas-series", {
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+    });
+    configPropia = r.config_rutas_series || configPropia;
+    configPendiente = r.configuracion_pendiente || configPendiente;
+    seriesMaquina = r.series_maquina || seriesMaquina;
+    rutasOfrecidas = r.rutas_ofrecidas || rutasOfrecidas;
+    exigeRuta = !!r.exige_ruta;
+    rutaFija = !!r.ruta_fija;
+    rutaPredeterminada = r.ruta_predeterminada || "";
+    seriePredeterminada = r.serie_predeterminada || "";
+    pintarMiConfigRutasSeries();
+    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
+    pintarSeries();
+    if (supOverviewCargado) pintarEquiposSupervision();
+    cerrarConfigEquipo();
+    mensaje("Rutas y series de esta computadora guardadas.", "info");
+  } catch (e) {
+    marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+// Resumen del bloque de AJUSTES → Esta máquina: la misma línea con la que se
+// describen las demás computadoras, sin el día (está justo abajo, con sus dos
+// opciones a la vista).
+function pintarMiConfigRutasSeries() {
+  const el = $("mi-config-resumen");
+  if (!el) return;
+  const m = configPropia || {};
+  el.textContent = `Series: ${resumenSeriesEquipo(m)}`
+    + ` · Rutas: ${resumenRutasEquipo(m)}`;
+}
+
+// La ventana edita TODO lo de esa computadora: nombre y vendedor por
+// equipo-identidad, y series, rutas, predeterminadas y día por
+// equipo-rutas-series. Van en dos llamadas porque son dos endpoints; la
+// identidad primero, para que un nombre repetido corte antes de tocar la
+// configuración.
+async function guardarConfigEquipoDelCatalogo() {
+  const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
+  if (!m) { cerrarConfigEquipo(); return; }
+  const nombre = $("equipo-config-nombre").value.trim();
+  limpiarErroresConfigEquipo();
+  if (!nombre) {
+    marcarErrorConfigEquipo("nombre", "Escribe el nombre de la computadora.");
+    return;
+  }
+  const boton = $("equipo-config-guardar");
+  boton.disabled = true;
+  try {
+    const ident = await api("/api/ajustes/equipo-identidad", {
+      dispositivo: configEquipo.dispositivo,
+      nombre, vendedor: vendedorConfigEquipo(),
+    });
+    equipos = ident.equipos_gestionables || equipos;
+    const r = await api("/api/ajustes/equipo-rutas-series", {
+      dispositivo: configEquipo.dispositivo,
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+      dia_despacho: diaConfigEquipo(),
+    });
     equipos = r.equipos_gestionables || equipos;
     pintarEquipos();
     // El overview de ADMIN → Equipos muestra el mismo resumen: si está
     // cargado, se repinta para que no quede mostrando lo anterior.
     if (supOverviewCargado) pintarEquiposSupervision();
     cerrarConfigEquipo();
-    mensaje(`Configuración de ${m.nombre || m.dispositivo} guardada; `
+    mensaje(`Configuración de ${nombre || m.dispositivo} guardada; `
       + "la toma en su próximo refresco.", "info");
-  }).catch((e) => {
+  } catch (e) {
+    // Si falló la segunda llamada, la identidad ya quedó guardada: se repinta
+    // para que la fila muestre lo que de verdad hay.
+    pintarEquipos();
     marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
-  }).finally(() => { boton.disabled = false; });
+  } finally {
+    boton.disabled = false;
+  }
 }
 
 // La activación sale de esta ventana con lo que el administrador dejó a la
@@ -16493,7 +16793,7 @@ async function activarDesdeConfigEquipo() {
       series: seleccionConfigEquipo("series"),
       ruta_predeterminada: predetConfigEquipo("rutas"),
       serie_predeterminada: predetConfigEquipo("series"),
-      dia_despacho: $("equipo-config-dia").value,
+      dia_despacho: diaConfigEquipo(),
     },
     alError: marcarErrorConfigEquipo,
   });
@@ -16695,17 +16995,10 @@ async function guardarVersionEstable(version) {
 // los dos campos, para que un "Guardado" viejo no quede confirmando otra cosa.
 let maquinaGuardadoTimer = null;
 
-function pintarBloqueoMaquina() {
-  const puedeEditar = tienePermiso("identidad_maquina");
-  const nombreBloqueado = !puedeEditar && !!(nombreMaquina || "").trim();
-  const vendedorBloqueado = !puedeEditar && !!vendedorMaquina;
-  $("maquina-nombre").disabled = nombreBloqueado;
-  $("vendedor-select").disabled = vendedorBloqueado;
-  $("maquina-guardar").style.display =
-    nombreBloqueado && vendedorBloqueado ? "none" : "";
-  $("maquina-bloqueo").style.display =
-    nombreBloqueado || vendedorBloqueado ? "" : "none";
-}
+// Los bloques de "Esta máquina" ya no se degradan por rol (2026-08-07): la
+// pestaña AJUSTES completa es de Editor/Admin, así que quien la ve puede
+// cambiarlo todo. Los candados de verdad siguen en el servidor, que rechaza
+// cada POST sin el permiso `identidad_maquina`.
 
 function ocultarMaquinaGuardado() {
   clearTimeout(maquinaGuardadoTimer);
@@ -16844,8 +17137,14 @@ function abrirConfigMaquina(falta, soloVista = false) {
     !puedeEditarIdentidad && !!(nombreMaquina || "").trim();
   $("configmaq-vendedor").disabled =
     !puedeEditarIdentidad && !!vendedorMaquina;
+  // Ya elegido, cambiarlo es de un editor (2026-08-07): los radios quedan a la
+  // vista con lo que hay puesto, pero sin tocar. Mientras falte elegirlo se
+  // habilitan — esa primera vez es de quien instala la computadora.
+  const diaBloqueado =
+    !puedeEditarIdentidad && !pendientes.includes("dia_despacho");
   document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
     r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
+    r.disabled = diaBloqueado;
   });
   $("configmaq-error").style.display = "none";
   $("configmaq-overlay").classList.add("visible");
