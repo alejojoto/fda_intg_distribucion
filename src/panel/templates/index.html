@@ -1433,6 +1433,7 @@
      mismas subtabs livianas del resto del panel. Supervisión usa el morado de
      ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
   #sup-subtabs { margin-bottom:12px; }
+  #ajustes-subtabs { margin:0 0 12px; }
   #admin-subtab-ajustes { background:#eef1f5; border-color:#dce1e8; color:#64748b; }
   #admin-subtab-ajustes:hover { background:#e4e8ee; }
   #admin-subtab-ajustes.activa { background:#64748b; border-color:#64748b; color:#fff; }
@@ -2644,145 +2645,160 @@
 
   <section id="sec-ajustes" class="tab-panel" style="display:none">
    <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
-        #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
-        que los abren. -->
-   <div id="ajustes-home">
-    <!-- Catálogos primero en Ajustes (2026-08-05, pedido del usuario): mismo
-         bloque de siempre, solo que ahora abre la vista en vez de ir al
-         final — sigue oculto salvo permiso ajustes_catalogos (Editor/Admin). -->
-    <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
-         #catalogo-overlay / #rutas-overlay) — ver
-         pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
-    <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
-      <h3>Catálogos</h3>
-      <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
-        códigos usados por programa de facturación.</p>
-      <div class="cat-btns" id="cat-btns"></div>
+         #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
+         que los abren. -->
+    <div id="ajustes-home">
+     <!-- Subpestañas de AJUSTES (2026-08-07, pedido del usuario): las computadoras
+          del parque son un tema aparte de los ajustes de esta máquina y solo las
+          gestiona un editor/admin. La barra aparece solo cuando esa subpestaña está
+          disponible: con una sola vista no hay entre qué alternar. -->
+    <div id="ajustes-subtabs" class="desc-subtabs" style="display:none">
+      <button type="button" id="ajustes-subtab-general"
+              class="desc-subtab st-historico activa"
+              onclick="mostrarSubtabAjustes('general')">Ajustes</button>
+      <button type="button" id="ajustes-subtab-equipos"
+              class="desc-subtab st-proximas"
+              onclick="mostrarSubtabAjustes('equipos')">Computadoras<span
+              class="cuenta" id="ajustes-subtab-equipos-cuenta"></span></button>
     </div>
-    <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
-         computadora, juntas porque son obligatorias juntas — sin las dos no se
-         llena nada (ver el aviso #configmaq-overlay). El nombre salió del
-         catálogo de Máquinas de ADMIN: lo pone quien usa el equipo, no el
-         administrador. -->
-    <div class="ajustes-bloque">
-      <h3>Esta máquina</h3>
-      <div class="ajustes-fila">
-        <label for="maquina-nombre">Nombre</label>
-        <input type="text" id="maquina-nombre" maxlength="40" style="width:190px"
-               placeholder="Ej.: Caja 2" oninput="ocultarMaquinaGuardado()"
-               title="Con este nombre aparecen tus llenados en el historial de las demás computadoras. Puede ser el tuyo o el del puesto.">
-        <label for="vendedor-select" style="margin-left:12px">Vendedor</label>
-        <select id="vendedor-select" onchange="ocultarMaquinaGuardado()"
-                title="Con este código se llena el campo Vendedor de cada factura que salga de esta computadora."></select>
-        <button class="primario" id="maquina-guardar" onclick="guardarMaquina()">Guardar</button>
-        <span class="ajustes-ok" id="maquina-guardado" style="display:none">Guardado</span>
-        <span class="mut" id="vendedor-info"></span>
+    <div id="ajustes-vista-general">
+      <!-- Catálogos primero en Ajustes (2026-08-05, pedido del usuario): mismo
+           bloque de siempre, solo que ahora abre la vista en vez de ir al
+           final — sigue oculto salvo permiso ajustes_catalogos (Editor/Admin). -->
+      <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
+           #catalogo-overlay / #rutas-overlay) — ver
+           pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
+      <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
+        <h3>Catálogos</h3>
+        <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
+          códigos usados por programa de facturación.</p>
+        <div class="cat-btns" id="cat-btns"></div>
       </div>
-      <p class="mut" id="maquina-bloqueo" style="display:none;margin:8px 0 0">
-        Ya está configurado. Para cambiarlo hace falta un equipo con permiso de editor.</p>
-      <p class="mut" style="margin:8px 0 0">
-        El <b>nombre</b> es con el que las demás computadoras ven tus llenados
-        en el historial; no puede repetirse con el de otra. El
-        <b>vendedor</b> es el campo que se llena en la ficha de cada factura
-        que se cargue desde aquí; solo aparecen los activos.
-        Las dos cosas hacen falta para poder facturar.</p>
-    </div>
-    <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
-         distinto — de tarde lo que sale al día siguiente, o de mañana lo que
-         quedó pendiente y sale ese mismo día — así que el día de entrega no
-         es una regla del negocio sino de la máquina. Se guarda local
-         (config_dispositivo), como el vendedor. -->
-    <div class="ajustes-bloque">
-      <h3>Día de despacho de esta máquina</h3>
-      <div class="ajustes-fila" style="gap:24px">
-        <label class="desc-todos">
-          <input type="radio" name="dia-despacho" value="manana"
-                 onchange="guardarDiaDespacho(this.value)">
-          Mañana
-        </label>
-        <label class="desc-todos">
-          <input type="radio" name="dia-despacho" value="hoy"
-                 onchange="guardarDiaDespacho(this.value)">
-          Hoy
-        </label>
+      <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
+           computadora, juntas porque son obligatorias juntas — sin las dos no se
+           llena nada (ver el aviso #configmaq-overlay). El nombre salió del
+           catálogo de Máquinas de ADMIN: lo pone quien usa el equipo, no el
+           administrador. -->
+      <div class="ajustes-bloque">
+        <h3>Esta máquina</h3>
+        <div class="ajustes-fila">
+          <label for="maquina-nombre">Nombre</label>
+          <input type="text" id="maquina-nombre" maxlength="40" style="width:190px"
+                 placeholder="Ej.: Caja 2" oninput="ocultarMaquinaGuardado()"
+                 title="Con este nombre aparecen tus llenados en el historial de las demás computadoras. Puede ser el tuyo o el del puesto.">
+          <label for="vendedor-select" style="margin-left:12px">Vendedor</label>
+          <select id="vendedor-select" onchange="ocultarMaquinaGuardado()"
+                  title="Con este código se llena el campo Vendedor de cada factura que salga de esta computadora."></select>
+          <button class="primario" id="maquina-guardar" onclick="guardarMaquina()">Guardar</button>
+          <span class="ajustes-ok" id="maquina-guardado" style="display:none">Guardado</span>
+          <span class="mut" id="vendedor-info"></span>
+        </div>
+        <p class="mut" id="maquina-bloqueo" style="display:none;margin:8px 0 0">
+          Ya está configurado. Para cambiarlo hace falta un equipo con permiso de editor.</p>
+        <p class="mut" style="margin:8px 0 0">
+          El <b>nombre</b> es con el que las demás computadoras ven tus llenados
+          en el historial; no puede repetirse con el de otra. El
+          <b>vendedor</b> es el campo que se llena en la ficha de cada factura
+          que se cargue desde aquí; solo aparecen los activos.
+          Las dos cosas hacen falta para poder facturar.</p>
       </div>
-      <p class="mut" style="margin:8px 0 0">
-        <b>Mañana:</b> la Fecha a facturar arranca en el día siguiente a hoy.<br>
-        <b>Hoy:</b> la Fecha a facturar arranca en el día de hoy.<br>
-        Esa es la fecha estándar con la que se factura y se trae la tasa; el
-        botón del calendario la repone con un clic, y en cualquier factura se
-        puede cambiar a mano.</p>
-    </div>
-    <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
-         ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
-    <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
-      <h3>Series por ruta</h3>
-      <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
-        seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
-      <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
-    </div>
-    <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
-         el 2026-08-05, pedido del usuario): la cambian la supervisión y los
-         equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
-         el mundo — cambiar el corte es operación real, no opción de prueba. -->
-    <div class="ajustes-bloque" id="corte-bloque" style="display:none">
-      <h3>Fecha de corte de producción</h3>
-      <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
-        ofrecen en ninguna parte: son los que se facturaron a mano antes de
-        arrancar con el asistente. Muévela hacia adelante a medida que avance
-        la implantación, para que los días viejos que ya no se van a llenar
-        dejen de estorbar en pendientes y en revisión. Vale para todos los
-        equipos: cada uno la toma en su próximo refresco.</p>
-      <div class="ajustes-fila">
-        <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
-        <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
+      <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
+           distinto — de tarde lo que sale al día siguiente, o de mañana lo que
+           quedó pendiente y sale ese mismo día — así que el día de entrega no
+           es una regla del negocio sino de la máquina. Se guarda local
+           (config_dispositivo), como el vendedor. -->
+      <div class="ajustes-bloque">
+        <h3>Día de despacho de esta máquina</h3>
+        <div class="ajustes-fila" style="gap:24px">
+          <label class="desc-todos">
+            <input type="radio" name="dia-despacho" value="manana"
+                   onchange="guardarDiaDespacho(this.value)">
+            Mañana
+          </label>
+          <label class="desc-todos">
+            <input type="radio" name="dia-despacho" value="hoy"
+                   onchange="guardarDiaDespacho(this.value)">
+            Hoy
+          </label>
+        </div>
+        <p class="mut" style="margin:8px 0 0">
+          <b>Mañana:</b> la Fecha a facturar arranca en el día siguiente a hoy.<br>
+          <b>Hoy:</b> la Fecha a facturar arranca en el día de hoy.<br>
+          Esa es la fecha estándar con la que se factura y se trae la tasa; el
+          botón del calendario la repone con un clic, y en cualquier factura se
+          puede cambiar a mano.</p>
       </div>
-      <div id="corte-confirma" style="display:none"></div>
-    </div>
-    <!-- Las demás computadoras, en UNA sola tabla (2026-08-05, pedido del
-         usuario: antes eran dos bloques sueltos, "Editores" y "Nombre y
-         vendedor de cada computadora"). Cada columna la habilita su permiso:
-         nombre y vendedor con identidad_maquina, Editor con
-         gestionar_editores y Activa con activar_maquinas — un editor no ve la
-         columna Editor (desde el 2026-08-07 sí ve Activa). -->
-    <!-- Solicitudes de activación (2026-08-05). Una instalación nueva no opera
-         hasta que alguien la aprueba aquí; el bloque existe para la
-         supervisión y los equipos con rol Editor o Admin (2026-08-07). -->
-    <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
-      <!-- El título cambia con el botón de abajo: mientras se listan solo las
-           que esperan es "Solicitudes de activación"; al sumar las ya activas
-           pasa a "Computadoras registradas", porque el título viejo quedaba
-           mintiendo sobre lo que se estaba viendo. -->
-      <h3 id="solicitudes-titulo">Solicitudes de activación</h3>
-      <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
-        entrar con el nombre que le puso quien la instaló. Hasta que se active
-        no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
-        de activarlo — el instalador se descarga por un enlace público.</p>
-      <div id="solicitudes-lista"></div>
-      <p class="mut" id="solicitudes-vacio" style="margin:0; display:none">
-        No hay ninguna computadora esperando activación.</p>
-      <p class="mut" id="solicitudes-error"
-         style="margin:0; display:none; color:var(--err)"></p>
-      <div style="margin-top:12px">
-        <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
-                class="secundario">Ver las computadoras registradas</button>
+      <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
+           ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
+      <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
+        <h3>Series por ruta</h3>
+        <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
+          seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
+        <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
+      </div>
+      <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
+           el 2026-08-05, pedido del usuario): la cambian la supervisión y los
+           equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
+           el mundo — cambiar el corte es operación real, no opción de prueba. -->
+      <div class="ajustes-bloque" id="corte-bloque" style="display:none">
+        <h3>Fecha de corte de producción</h3>
+        <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
+          ofrecen en ninguna parte: son los que se facturaron a mano antes de
+          arrancar con el asistente. Muévela hacia adelante a medida que avance
+          la implantación, para que los días viejos que ya no se van a llenar
+          dejen de estorbar en pendientes y en revisión. Vale para todos los
+          equipos: cada uno la toma en su próximo refresco.</p>
+        <div class="ajustes-fila">
+          <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
+          <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
+        </div>
+        <div id="corte-confirma" style="display:none"></div>
       </div>
     </div>
+    <div id="ajustes-vista-equipos" style="display:none">
+      <!-- Las demás computadoras, en UNA sola tabla (2026-08-05, pedido del
+           usuario: antes eran dos bloques sueltos, "Editores" y "Nombre y
+           vendedor de cada computadora"). Cada columna la habilita su permiso:
+           nombre y vendedor con identidad_maquina, Editor con
+           gestionar_editores y Activa con activar_maquinas — un editor no ve la
+           columna Editor (desde el 2026-08-07 sí ve Activa). -->
+      <!-- Solicitudes de activación (2026-08-05). Una instalación nueva no opera
+           hasta que alguien la aprueba aquí; el bloque solo aparece cuando hay
+           solicitudes esperando decisión. -->
+      <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
+        <h3>Solicitudes de activación</h3>
+        <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
+          entrar con el nombre que le puso quien la instaló. Hasta que se active
+          no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
+          de activarlo — el instalador se descarga por un enlace público.</p>
+        <div id="solicitudes-lista"></div>
+        <p class="mut" id="solicitudes-error"
+           style="margin:0; display:none; color:var(--err)"></p>
+      </div>
 
-    <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
-      <h3>Computadoras</h3>
-      <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
-        datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
-        próximo refresco. Los de esta computadora se cambian arriba, en
-        "Esta máquina".</p>
-      <p class="mut" id="equipos-nota-editor" style="margin:4px 0 10px; display:none">
-        Los equipos marcados como <b>Editor</b> pueden editar campañas de
-        descuento, catálogos, y los datos de los pedidos y las facturas.</p>
-      <p class="mut" id="equipos-nota-activa" style="margin:4px 0 10px; display:none">
-        Al quitarle <b>Activa</b> a una computadora, esa queda fuera de
-        servicio: quien la abra solo ve un aviso y no puede facturar desde
-        ella.</p>
-      <div id="equipos-lista"></div>
+      <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
+        <h3>Computadoras</h3>
+        <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
+          datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
+          próximo refresco. Los de esta computadora se cambian arriba, en
+          "Esta máquina".</p>
+        <p class="mut" id="equipos-nota-editor" style="margin:4px 0 10px; display:none">
+          Los equipos marcados como <b>Editor</b> pueden editar campañas de
+          descuento, catálogos, y los datos de los pedidos y las facturas.</p>
+        <p class="mut" id="equipos-nota-activa" style="margin:4px 0 10px; display:none">
+          Al quitarle <b>Activa</b> a una computadora, esa queda fuera de
+          servicio: quien la abra solo ve un aviso y no puede facturar desde
+          ella.</p>
+        <div id="equipos-lista"></div>
+      </div>
+      <!-- Las registradas que hoy no tienen acceso (rechazadas, desactivadas u
+           olvidadas): no son solicitudes que esperen decisión, pero tampoco están en
+           la tabla de arriba, que solo lista el parque en servicio. Sin ninguna, el
+           bloque no aparece. -->
+      <div class="ajustes-bloque" id="equipos-sin-acceso-bloque" style="display:none">
+        <h3>Computadoras sin acceso</h3>
+        <div id="equipos-sin-acceso-lista"></div>
+      </div>
     </div>
     <!-- El selector "Vista del panel" que vivía aquí se ELIMINÓ el 2026-08-06
          (pedido del usuario: nadie debe verlo en AJUSTES). Mirar el panel
@@ -2790,7 +2806,7 @@
          (rapida-vista), que además es la vuelta cuando la vista está
          degradada. El backend acompaña: permisos.fijar_ver_como ya solo
          acepta a la supervisión. -->
-   </div>
+    </div>
   </section>
 
   <section id="sec-admin" class="tab-panel" style="display:none">
@@ -15385,6 +15401,7 @@ async function cargarAjustes() {
     $("rutas-series-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
+    pintarSubtabsAjustes();
     // El overview de ADMIN → Equipos pinta su columna de series/rutas/día de
     // `equipos`, que llega aquí: si ese panel ya estaba cargado (o resolvió
     // primero, al entrar a la pestaña), se repinta con lo recién traído.
@@ -15693,8 +15710,8 @@ setInterval(sondearAcceso, 60000);
 // no gestiona activaciones (regla del usuario, 2026-08-05). El backend repite
 // el candado en cada endpoint; esto decide qué se pinta.
 let accesoGestion = false;
+let subtabAjustes = "general";
 let solicitudes = [];
-let verEquiposActivos = false;
 
 const fechaAcceso = (iso) => {
   if (!iso) return "—";
@@ -15705,9 +15722,12 @@ const fechaAcceso = (iso) => {
 };
 
 async function cargarSolicitudesAcceso() {
-  const bloque = $("solicitudes-bloque");
-  if (!accesoGestion) { bloque.style.display = "none"; return; }
-  bloque.style.display = "";
+  if (!accesoGestion) {
+    solicitudes = [];
+    $("solicitudes-error").textContent = "";
+    pintarSolicitudes();
+    return;
+  }
   try {
     const r = await api("/api/acceso/equipos");
     solicitudes = r.equipos || [];
@@ -15720,24 +15740,43 @@ async function cargarSolicitudesAcceso() {
   pintarSolicitudes();
 }
 
-function mostrarEquiposActivos() {
-  verEquiposActivos = !verEquiposActivos;
-  pintarSolicitudes();
+function mostrarSubtabAjustes(cual) {
+  subtabAjustes = cual === "equipos" ? "equipos" : "general";
+  const esEquipos = subtabAjustes === "equipos";
+  $("ajustes-vista-general").style.display = esEquipos ? "none" : "";
+  $("ajustes-vista-equipos").style.display = esEquipos ? "" : "none";
+  $("ajustes-subtab-general").classList.toggle("activa", !esEquipos);
+  $("ajustes-subtab-equipos").classList.toggle("activa", esEquipos);
+}
+
+// La subpestaña de computadoras es de editores/admin: el mismo permiso que
+// ya habilita cada control de adentro. Sin ninguno, la barra no se pinta y
+// AJUSTES se ve igual que siempre.
+function puedeVerComputadoras() {
+  return accesoGestion || tienePermiso("identidad_maquina")
+      || tienePermiso("gestionar_editores") || tienePermiso("activar_maquinas");
+}
+
+function pintarSubtabsAjustes() {
+  const disponible = puedeVerComputadoras();
+  $("ajustes-subtabs").style.display = disponible ? "" : "none";
+  mostrarSubtabAjustes(disponible ? subtabAjustes : "general");
+  const espera = solicitudes.filter(
+    s => s.estado === "pendiente" || s.reinstalacion_pendiente).length;
+  $("ajustes-subtab-equipos-cuenta").textContent = espera ? `(${espera})` : "";
 }
 
 function pintarSolicitudes() {
   const espera = solicitudes.filter(
     s => s.estado === "pendiente" || s.reinstalacion_pendiente);
-  const resto = solicitudes.filter(s => !espera.includes(s));
-  const lista = verEquiposActivos ? [...espera, ...resto] : espera;
-  $("solicitudes-titulo").textContent = verEquiposActivos
-    ? "Computadoras registradas" : "Solicitudes de activación";
-  $("solicitudes-ver-activos").textContent = verEquiposActivos
-    ? "Ver solo las solicitudes" : "Ver las computadoras registradas";
-  $("solicitudes-ver-activos").style.display = resto.length ? "" : "none";
-  $("solicitudes-vacio").style.display =
-    (!lista.length && !$("solicitudes-error").textContent) ? "" : "none";
-  $("solicitudes-lista").innerHTML = lista.map(pintarUnaSolicitud).join("");
+  const sinAcceso = solicitudes.filter(
+    s => !espera.includes(s) && s.estado !== "activo");
+  const hayError = !!$("solicitudes-error").textContent;
+  $("solicitudes-bloque").style.display = (espera.length || hayError) ? "" : "none";
+  $("solicitudes-lista").innerHTML = espera.map(pintarUnaSolicitud).join("");
+  $("equipos-sin-acceso-bloque").style.display = sinAcceso.length ? "" : "none";
+  $("equipos-sin-acceso-lista").innerHTML = sinAcceso.map(pintarUnaSolicitud).join("");
+  pintarSubtabsAjustes();
 }
 
 // La configuración que la computadora pidió al registrarse (jsonb en la fila
