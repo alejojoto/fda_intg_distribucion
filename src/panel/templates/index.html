@@ -445,6 +445,11 @@
   #aviso-conflictos { background:#c62828; color:#fff; border-radius:8px;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; cursor:pointer; }
+  /* Misma franja que la de conflictos pero informativa, no de emergencia: no
+     hay nada que resolver ni a dónde ir, así que ni rojo ni clickeable. */
+  #aviso-version-nueva { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
+                     padding:10px 14px; margin-bottom:10px; font-size:13.5px;
+                     font-weight:600; }
   /* Misma idea que fila-aviso-error pero inline, para la ★ de favorito
      (cabecera de cliente): sin caja, pegado al símbolo que lo disparó. */
   .obj-aviso-inline { color:#a12a2a; font-size:12px; font-weight:600; margin-left:4px; }
@@ -2461,6 +2466,12 @@
       </div>
     </div>
   </div>
+
+  <!-- Versión nueva ya descargada (2026-08-07): el vigía del panel la bajó en
+       segundo plano; aplicarla es del arranque, así que esto solo informa. Va
+       antes que la de conflictos a propósito: si las dos están, la que pide
+       acción tiene que quedar pegada a la lista. -->
+  <div id="aviso-version-nueva" style="display:none"></div>
 
   <!-- Doble llenado sin resolver (2026-07-28): franja roja fija hasta que
        alguien lo cierre. No es un mensaje que se desvanece — son dos
@@ -9270,6 +9281,7 @@ async function latido() {
   fallosLatido = 0;
   msPrimerSilencio = null;
   if (!salud || salud.app !== "asistente-fda") return;   // otro programa tomó el puerto
+  pintarAvisoVersionNueva(salud.version_nueva);
   if (pidPanel === null) {
     pidPanel = salud.pid;
     return;
@@ -9288,6 +9300,18 @@ async function latido() {
     pintarSinConexion();
     cargar();
   }
+}
+
+// Cuántos commits trae la versión nueva no le dice nada a quien opera: solo
+// importa que hay una y qué tiene que hacer para tenerla.
+function pintarAvisoVersionNueva(info) {
+  const caja = $("aviso-version-nueva");
+  if (!caja) return;
+  const hay = !!(info && info.hay);
+  caja.style.display = hay ? "" : "none";
+  if (hay) caja.textContent =
+    "Hay una versión nueva del asistente, ya descargada. Se aplica cuando "
+    + "cierres y vuelvas a abrir el programa.";
 }
 
 latido();
