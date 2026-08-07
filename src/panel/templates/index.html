@@ -8546,6 +8546,12 @@ async function leerPortapapeles() {
 // facturación, reiniciarlo—, la opción segura, de modo que la delicada se
 // alcance con un Tab y nunca con un Enter suelto. Los diálogos que se llenan a
 // mano no preseleccionan botón: ahí el foco pertenece al primer campo.
+// Cuál botón enfocamos nosotros. Es lo que distingue "el operador no ha tocado
+// el foco" de "ya tabuló": preguntar si el foco está en un botón marcado no
+// sirve, porque los de respaldo también lo están y entonces tabular hacia uno
+// devolvía el foco al preferido, dejándolo pegado (2026-08-07).
+let focoPuestoPorElPanel = null;
+
 function preseleccionar(dialogo) {
   if (!dialogo) return;
   // La elección va dentro del cuadro siguiente y no aquí: enfocar en un
@@ -8556,6 +8562,7 @@ function preseleccionar(dialogo) {
     if (!btn || !btn.isConnected || document.activeElement === btn) return;
     try { btn.focus({ preventScroll: true }); } catch (_) { return; }
     if (document.activeElement !== btn) return;
+    focoPuestoPorElPanel = btn;
     btn.classList.add("preseleccionado");
     btn.addEventListener("blur", () => btn.classList.remove("preseleccionado"),
                          { once: true });
@@ -8623,6 +8630,7 @@ function revisarDialogo(dialogo) {
   if (visible && donde === -1) {
     dialogosAbiertos.push(dialogo);
     aplicarInerciaDeFondo();   // antes del foco: en un subárbol inerte no prende
+    focoPuestoPorElPanel = null;   // el botón del diálogo anterior ya no cuenta
     preseleccionar(dialogo);
     if (dialogo.querySelector("[data-preseleccionado]")) activarVentanaDelPanel();
     seguirContenido(dialogo);
@@ -8632,6 +8640,7 @@ function revisarDialogo(dialogo) {
     // Al cerrarse el de encima, el que queda debajo recupera su preselección:
     // se le fue el foco cuando el otro lo tapó.
     const previo = dialogosAbiertos[dialogosAbiertos.length - 1] || null;
+    focoPuestoPorElPanel = null;
     preseleccionar(previo);
     seguirContenido(previo);
   }
@@ -8656,9 +8665,9 @@ if (typeof MutationObserver !== "undefined") {
     const dialogo = dialogosAbiertos[dialogosAbiertos.length - 1];
     if (!dialogo) return;
     const foco = document.activeElement;
-    const sinTocar = !foco || foco === document.body
-        || (foco.hasAttribute && foco.hasAttribute("data-preseleccionado"));
-    if (sinTocar) preseleccionar(dialogo);
+    if (!foco || foco === document.body || foco === focoPuestoPorElPanel) {
+      preseleccionar(dialogo);
+    }
   });
   dialogosDelPanel.forEach((dialogo) => {
     vigilanteDeDialogos.observe(dialogo, {
