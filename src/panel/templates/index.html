@@ -15491,9 +15491,14 @@ function pintarAcceso() {
   $("acceso-texto").textContent = texto
     + (acceso.motivo ? ` Motivo anotado: ${acceso.motivo}` : "");
   const nombre = acceso.nombre_solicitado || "";
+  // El nombre pedido solo tiene sentido mientras la solicitud está en juego.
+  // A una computadora desactivada no se le muestra el nombre que tenía: no
+  // aporta nada y además titilaba, porque no todas las respuestas del sondeo
+  // traen ese dato y la línea aparecía y desaparecía sola cada 5 s.
+  const mostrarNombre = estado !== "desactivado";
   $("acceso-datos").textContent = acceso.sin_conexion
     ? "Sin conexión con el servidor; se sigue intentando."
-    : (nombre ? `Nombre pedido: ${nombre}` : "");
+    : (nombre && mostrarNombre ? `Nombre pedido: ${nombre}` : "");
   if (pideNombre && nombre && !$("acceso-nombre").value)
     $("acceso-nombre").value = nombre;
   if (pideNombre) {
