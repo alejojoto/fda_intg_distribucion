@@ -12569,9 +12569,23 @@ async function esperarPrellenadoEditable(pedido_id, parte) {
   }
   if (detalleReabriendo !== clave) return;
   detalleReabriendo = null;
+  // La LISTA también, no solo el detalle: el botón del pie y la cabecera de
+  // puesta a punto salen de la fila (llenadoDirecto), y la única carga previa
+  // ocurrió ANTES de que el rearmado aterrizara. Sin esto la ventana quedaba
+  // con sus líneas ya editables pero sin botón — el "Trayendo la factura…"
+  // se iba y no aparecía nada en su lugar (2026-08-07). El sondeo compartido
+  // no la despierta: la firma central no cambia por un rearmado de aquí.
+  await cargar();
   // Un repintado más con la marca ya suelta: el botón pasa de "Reabriendo…"
   // a su acción real.
-  if (detalleAbierto === clave) pintarVentanaDetalle(clave);
+  if (detalleAbierto !== clave) return;
+  pintarVentanaDetalle(clave);
+  // Si aun así la ventana quedó sin acción, el log dice con qué fila se quedó:
+  // sin esto un "no me deja llenarla" no se puede diagnosticar a distancia.
+  const fila = filaDeLista(pedido_id, parte);
+  if (!llenadoDirecto(fila))
+    reportarAlPanel({tipo: "prellenado-sin-accion", pedido_id, parte,
+                     fila: fila || "no está en la lista"});
 }
 
 // Aviso "en el objeto" para una fila de factura (Descartar / Volver a
