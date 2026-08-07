@@ -2655,15 +2655,17 @@
      <!-- Subpestañas de AJUSTES (2026-08-07, pedido del usuario): las computadoras
           del parque son un tema aparte de los ajustes de esta máquina y solo las
           gestiona un editor/admin. La barra aparece solo cuando esa subpestaña está
-          disponible: con una sola vista no hay entre qué alternar. -->
+          disponible: con una sola vista no hay entre qué alternar.
+          Computadoras va primero (2026-08-07, pedido del usuario: es la que se
+          usa mucho más de las dos). -->
     <div id="ajustes-subtabs" class="desc-subtabs" style="display:none">
-      <button type="button" id="ajustes-subtab-general"
-              class="desc-subtab st-historico activa"
-              onclick="mostrarSubtabAjustes('general')">Ajustes</button>
       <button type="button" id="ajustes-subtab-equipos"
               class="desc-subtab st-proximas"
-              onclick="mostrarSubtabAjustes('equipos')">Computadoras<span
+              onclick="mostrarSubtabAjustes('equipos')">Otras computadoras<span
               class="cuenta" id="ajustes-subtab-equipos-cuenta"></span></button>
+      <button type="button" id="ajustes-subtab-general"
+              class="desc-subtab st-historico activa"
+              onclick="mostrarSubtabAjustes('general')">Esta máquina</button>
     </div>
     <div id="ajustes-vista-general">
       <!-- Catálogos primero en Ajustes (2026-08-05, pedido del usuario): mismo
@@ -2783,10 +2785,10 @@
       </div>
 
       <div class="ajustes-bloque" id="equipos-bloque" style="display:none">
-        <h3>Computadoras</h3>
+        <h3>Otras computadoras</h3>
         <p class="mut" style="margin:4px 0 10px">Desde aquí puedes corregir los
           datos de los demás equipos sin ir hasta ellos; cada uno los toma en su
-          próximo refresco. Los de esta computadora se cambian arriba, en
+          próximo refresco. Los de esta computadora se cambian en
           "Esta máquina".</p>
         <p class="mut" id="equipos-nota-editor" style="margin:4px 0 10px; display:none">
           Los equipos marcados como <b>Editor</b> pueden editar campañas de
