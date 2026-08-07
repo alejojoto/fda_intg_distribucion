@@ -461,15 +461,15 @@
   tr.sep-fecha td { background:#eef1f6; color:var(--mut); font-weight:700;
                     font-size:12px; padding:5px 10px; border-bottom:1px solid #dde2ea; }
   tr.sep-fecha:hover td { background:#eef1f6; }
-  tr.sep-fecha.sep-fecha-antigua td { background:#fef0c7; color:#b54708; }
-  tr.sep-fecha.sep-fecha-antigua:hover td { background:#fef0c7; }
-  /* Filas de un grupo atrasado: matiz apenas visible, para que se note en
-     cualquier punto del scroll sin competir con los avisos de verdad
-     (fila-aviso, fila-conflicto) que ya usan ámbar/rojo más fuertes. */
-  tr.fila-atrasada td { background:#fffdf6; }
-  tr.fila-atrasada:hover td { background:#fef8e8; }
-  tr.fam-cabecera.fila-atrasada td { background:#fdf6e3; }
-  tr.fam-cabecera.fila-atrasada:hover td { background:#fdf6e3; }
+  tr.sep-fecha.sep-fecha-antigua td { background:#fcd34d; color:#7c2d12; }
+  tr.sep-fecha.sep-fecha-antigua:hover td { background:#fcd34d; }
+  /* Filas de un grupo atrasado: ámbar franco (2026-08-07, pedido del usuario:
+     el matiz anterior casi no se distinguía del blanco). El separador de fecha
+     va un escalón más fuerte para que siga mandando sobre sus filas. */
+  tr.fila-atrasada td { background:#fef3c7; }
+  tr.fila-atrasada:hover td { background:#fde9a9; }
+  tr.fam-cabecera.fila-atrasada td { background:#fde9a9; }
+  tr.fam-cabecera.fila-atrasada:hover td { background:#fbdf93; }
   /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
@@ -781,25 +781,6 @@
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
-  /* Interruptor de "Activa" (2026-08-07, pedido del usuario): en una columna
-     de una sola marca, encendido y apagado se distinguen mejor con un
-     interruptor que con una casilla. La casilla real queda invisible encima,
-     así conserva teclado y estado. */
-  .switch { position:relative; display:inline-block; width:38px; height:22px;
-      vertical-align:middle; }
-  .switch input { position:absolute; inset:0; width:100%; height:100%;
-      margin:0; opacity:0; cursor:pointer; z-index:1; }
-  .switch-pista { position:absolute; inset:0; background:#cbd2dc;
-      border-radius:999px; transition:background .15s; }
-  .switch-pista::after { content:""; position:absolute; top:2px; left:2px;
-      width:18px; height:18px; background:#fff; border-radius:50%;
-      box-shadow:0 1px 2px rgba(16,24,40,.35); transition:transform .15s; }
-  .switch input:checked + .switch-pista { background:var(--ok); }
-  .switch input:checked + .switch-pista::after { transform:translateX(16px); }
-  .switch input:focus-visible + .switch-pista {
-      outline:2px solid rgba(29,78,216,.45); outline-offset:2px; }
-  .switch input:disabled { cursor:not-allowed; }
-  .switch input:disabled + .switch-pista { opacity:.55; }
   /* Opciones del modo prueba agrupadas por tema (2026-07-27, pedido del
      usuario): antes eran una columna de líneas sueltas con un párrafo de
      explicación debajo de cada una. Ahora cada grupo lleva un rótulo y sus
@@ -16163,12 +16144,9 @@ function pintarEquipos() {
                                  : "Marca esta computadora como Editor."}"
              onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
-      <label class="switch"
-             title="Al apagarlo, esa computadora queda fuera de servicio.">
-        <input type="checkbox" ${m.activa ? "checked" : ""}
-               onclick="return onClickActivaEquipo(event, '${host}')">
-        <span class="switch-pista"></span>
-      </label></td>`;
+      <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
+             title="Al apagarlo, esa computadora queda fuera de servicio."
+             onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
     // Series, rutas y día del equipo (2026-08-07), repartidos en la fila:
     // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
     // mueve de un día para otro— y "Configurar" abre la ventana con todo,
@@ -16270,10 +16248,7 @@ function onClickActivaEquipo(ev, dispositivo) {
   const caja = ev.target;
   const activando = caja.checked;
   ev.preventDefault();
-  // Se esconde el interruptor entero, no solo la casilla: el input del
-  // interruptor va invisible encima de su pista, y ocultarlo solo dejaría la
-  // pista pintada sin nada que la mueva.
-  confirmarSinQuitar(caja.closest(".switch") || caja, () => {
+  confirmarSinQuitar(caja, () => {
     caja.checked = activando;
     cambiarActivaEquipo(dispositivo, caja);
   }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
