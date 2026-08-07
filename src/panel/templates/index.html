@@ -9849,6 +9849,20 @@ const detalleDatos = {};              // "pedido|parte" → respuesta del panel
 const detalleFallos = {};             // "pedido|parte" → por qué no se pudo traer
 const detalleReq = {};                // "pedido|parte" → nº de la última consulta
 let detalleReabriendo = null;         // clave con /api/refacturar en vuelo (nota "Reabriendo…")
+// Qué dicen el pie y la nota mientras esa espera dura. "Llenar igual" usa la
+// misma espera (2026-08-07) pero no reabre nada: toma la factura y trae su
+// prellenado, así que lo dice con sus palabras.
+const ESPERA_REABRIR = {
+  boton: "Reabriendo la factura…",
+  nota: `Reabriendo la factura para editarla — puede tardar un poco. Mientras,
+         estas son las cantidades con que salió el documento.`,
+};
+const ESPERA_TOMAR = {
+  boton: "Trayendo la factura…",
+  nota: `Trayendo la factura que tenía la otra computadora — puede tardar un
+         poco. Mientras, estas son las cantidades con que quedó allá.`,
+};
+let detalleEspera = ESPERA_REABRIR;
 // Cómo estaban los ajustes al ABRIR la ventana: es a lo que vuelve "Descartar
 // cambios" (2026-07-31, pedido del usuario). Los ajustes se guardan al
 // teclearlos —así no se pierde nada si el panel se cierra—, así que deshacerlos
@@ -10263,7 +10277,7 @@ function pintarBotonLlenarDetalle() {
   if (detalleReabriendo === detalleAbierto) {
     boton.style.display = "";
     boton.disabled = true;
-    boton.textContent = "Reabriendo la factura…";
+    boton.textContent = detalleEspera.boton;
     return;
   }
   const fila = filaDeLista(...partesDeClave(detalleAbierto));
@@ -10377,8 +10391,7 @@ function contenidoDetalle(clave) {
   // bloqueados hasta pulsar "Habilitar edición" — y ya habilitada, la
   // advertencia recuerda que editar a mano es la excepción.
   const nota = (!d.editable && detalleReabriendo === clave)
-    ? `<div class="det-nota">Reabriendo la factura para editarla — puede tardar
-        un poco. Mientras, estas son las cantidades con que salió el documento.</div>`
+    ? `<div class="det-nota">${detalleEspera.nota}</div>`
     : d.editable
     ? (!d.puede_editar
       ? `<div class="det-nota">${fraseDescuentosDetalle(d)}
@@ -12449,16 +12462,27 @@ async function confirmarMotivo() {
   // reapertura de abajo: que la lista no quede descubierta mientras viaja.
   if (accion === "tomar") {
     abrirDetalleCargando(pedido_id, parte);
+    let r;
     try {
-      const r = await api("/api/tomar_factura", {pedido_id, parte, motivo});
+      r = await api("/api/tomar_factura", {pedido_id, parte, motivo});
       mensaje(r.aviso, "alerta");
     } catch (e) {
       cerrarDetalle();
       avisoFactura(pedido_id, parte, e.message);
       return;
     }
+    // El pedido ya no estaba armado (un refresco lo había excluido del lote):
+    // el servidor lo rearma en fondo y aquí se espera el prellenado, igual que
+    // en la reapertura. Sin esto la factura quedaba tomada pero sin líneas que
+    // llenar, y la ventana se abría sin botón (2026-08-07).
+    if (r.en_cache === false) {
+      detalleEspera = ESPERA_TOMAR;
+      detalleReabriendo = claveDetalle(pedido_id, parte);
+      if (detalleAbierto === detalleReabriendo) pintarVentanaDetalle(detalleAbierto);
+    }
     await cargar();
     await cargarDetalle(pedido_id, parte);
+    if (r.en_cache === false) await esperarPrellenadoEditable(pedido_id, parte);
     return;
   }
   // A diferencia de "Llenar igual" (accion "tomar"), esto reabre un documento
@@ -12484,6 +12508,7 @@ async function reabrirYPrellenar(pedido_id, parte, motivo) {
   // ventana sale de una como pantalla de prellenado (cajitas y avisos de la
   // puesta a punto, pie en "Reabriendo…"), no como la foto pelada de un
   // documento cerrado (pedido del usuario 2026-07-31).
+  detalleEspera = ESPERA_REABRIR;
   detalleReabriendo = claveDetalle(pedido_id, parte);
   abrirDetalleCargando(pedido_id, parte);
   // Reabrir tarda de verdad cuando el pedido ya salió de la caché — la
