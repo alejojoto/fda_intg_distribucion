@@ -3325,11 +3325,11 @@
          descuento se lee como que el cambio no quedó, sobre todo llegando desde
          la revisión del lote. Descartar va de último: es el que deshace. -->
     <div class="editor-acciones">
-      <button class="acento" id="detalle-llenar" style="display:none"
+      <button data-preseleccionado class="acento" id="detalle-llenar" style="display:none"
               onclick="llenarDesdeDetalle()">Llenar</button>
       <button class="primario" id="detalle-guardar" style="display:none"
               onclick="guardarYVolverDetalle()">Guardar cambios</button>
-      <button id="detalle-volver" onclick="cerrarDetalle()">Volver</button>
+      <button data-preseleccionado id="detalle-volver" onclick="cerrarDetalle()">Volver</button>
       <button id="detalle-descartar" style="display:none"
               onclick="descartarCambiosDetalle()">Descartar cambios</button>
     </div>
@@ -8546,13 +8546,14 @@ async function leerPortapapeles() {
 // facturación, reiniciarlo—, la opción segura, de modo que la delicada se
 // alcance con un Tab y nunca con un Enter suelto. Los diálogos que se llenan a
 // mano no preseleccionan botón: ahí el foco pertenece al primer campo.
-function preseleccionar(boton) {
-  const btn = typeof boton === "string" ? $(boton) : boton;
-  if (!btn || btn.disabled) return;
-  // Tras el pintado: enfocar dentro de un contenedor que acaba de dejar de
-  // estar oculto no siempre prende en el mismo cuadro.
+function preseleccionar(dialogo) {
+  if (!dialogo) return;
+  // La elección va dentro del cuadro siguiente y no aquí: enfocar en un
+  // contenedor que acaba de dejar de estar oculto no siempre prende, y para
+  // entonces el diálogo ya terminó de pintarse.
   requestAnimationFrame(() => {
-    if (btn.disabled || !btn.isConnected) return;
+    const btn = botonPreseleccionado(dialogo);
+    if (!btn || !btn.isConnected || document.activeElement === btn) return;
     try { btn.focus({ preventScroll: true }); } catch (_) { return; }
     if (document.activeElement !== btn) return;
     btn.classList.add("preseleccionado");
@@ -8590,21 +8591,49 @@ function activarVentanaDelPanel() {
   try { api.traer_al_frente(); } catch (_) {}
 }
 
+// Un diálogo puede traer más de un botón marcado, en orden de preferencia: el
+// detalle de un pedido esconde su botón de llenar cuando ese pedido no se puede
+// llenar, y entonces el foco tiene que caer en el siguiente marcado.
+function botonPreseleccionado(dialogo) {
+  for (const boton of dialogo.querySelectorAll("[data-preseleccionado]")) {
+    if (!boton.disabled && boton.offsetParent !== null) return boton;
+  }
+  return null;
+}
+
+// El contenido de un diálogo puede llegar DESPUÉS de abrirse: el detalle de un
+// pedido se muestra con "Buscando el detalle…" y su botón de llenar aparece
+// recién cuando responde el servidor. Mientras el operador no haya movido el
+// foco él mismo, se vuelve a elegir el mejor botón marcado.
+let vigilanteDeContenido = null;   // se arma abajo, con el resto de los vigilantes
+
+function seguirContenido(dialogo) {
+  if (!vigilanteDeContenido) return;
+  vigilanteDeContenido.disconnect();
+  if (dialogo) {
+    vigilanteDeContenido.observe(dialogo, {
+      childList: true, subtree: true, attributes: true,
+      attributeFilter: ["style", "class", "disabled"] });
+  }
+}
+
 function revisarDialogo(dialogo) {
   const visible = getComputedStyle(dialogo).display !== "none";
   const donde = dialogosAbiertos.indexOf(dialogo);
   if (visible && donde === -1) {
     dialogosAbiertos.push(dialogo);
     aplicarInerciaDeFondo();   // antes del foco: en un subárbol inerte no prende
-    const boton = dialogo.querySelector("[data-preseleccionado]");
-    if (boton) { preseleccionar(boton); activarVentanaDelPanel(); }
+    preseleccionar(dialogo);
+    if (dialogo.querySelector("[data-preseleccionado]")) activarVentanaDelPanel();
+    seguirContenido(dialogo);
   } else if (!visible && donde !== -1) {
     dialogosAbiertos.splice(donde, 1);
     aplicarInerciaDeFondo();
     // Al cerrarse el de encima, el que queda debajo recupera su preselección:
     // se le fue el foco cuando el otro lo tapó.
-    const previo = dialogosAbiertos[dialogosAbiertos.length - 1];
-    if (previo) preseleccionar(previo.querySelector("[data-preseleccionado]"));
+    const previo = dialogosAbiertos[dialogosAbiertos.length - 1] || null;
+    preseleccionar(previo);
+    seguirContenido(previo);
   }
 }
 
@@ -8618,6 +8647,18 @@ if (typeof MutationObserver !== "undefined") {
   const dialogosDelPanel = document.querySelectorAll("[id$='-overlay']");
   const vigilanteDeDialogos = new MutationObserver((cambios) => {
     for (const cambio of cambios) revisarDialogo(cambio.target);
+  });
+  // Repintados del diálogo de encima: se rehace la elección solo si el foco
+  // sigue donde lo dejamos —el operador que ya tabuló manda— y preseleccionar()
+  // se corta solo cuando el botón elegido no cambió, así el anillo que él mismo
+  // pone no vuelve a disparar esto.
+  vigilanteDeContenido = new MutationObserver(() => {
+    const dialogo = dialogosAbiertos[dialogosAbiertos.length - 1];
+    if (!dialogo) return;
+    const foco = document.activeElement;
+    const sinTocar = !foco || foco === document.body
+        || (foco.hasAttribute && foco.hasAttribute("data-preseleccionado"));
+    if (sinTocar) preseleccionar(dialogo);
   });
   dialogosDelPanel.forEach((dialogo) => {
     vigilanteDeDialogos.observe(dialogo, {
