@@ -841,16 +841,30 @@
                            display:none; z-index:20; align-items:flex-start;
                            justify-content:center; }
   #equipo-config-overlay.visible { display:flex; }
+  /* Ventana ancha a propósito (2026-08-07, pedido del usuario): con 480px las
+     rutas caían en dos columnas con scroll propio y el botón Guardar quedaba
+     fuera de pantalla. Con más ancho entran 3-4 columnas y la lista no
+     necesita scroll interno. */
   #equipo-config { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
-                   width:min(480px, 92vw); max-height:85vh; overflow:auto;
+                   width:min(820px, 94vw); max-height:88vh; overflow:auto;
                    box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #equipo-config h3 { margin:0 0 14px; font-size:14px; }
+  #equipo-config .acceso-lista {
+      grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+      max-height:none; }
   #equipo-config .acceso-check { font-size:13px; }
   #equipo-config .acceso-campo:first-of-type { margin-top:0; }
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
       border-radius:6px; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
+  /* Día a facturar: son dos opciones, hoy o mañana. Un desplegable obliga a
+     abrirlo para ver qué hay (2026-08-07, pedido del usuario), así que van a
+     la vista tanto en la ventana como en la fila de cada computadora. */
+  .dia-opciones { display:flex; align-items:center; gap:18px; font-size:13px; }
+  .dia-opciones label { display:flex; align-items:center; gap:5px;
+      cursor:pointer; }
+  .equipos-config .dia-opciones { font-size:12px; gap:12px; margin-top:4px; }
   .equipos-config .mut { font-size:12px; display:block; margin-bottom:4px; }
   .equipos-config button { font-size:12px; padding:3px 8px; }
   /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
@@ -3387,14 +3401,14 @@
   <div id="equipo-config">
     <h3 id="equipo-config-titulo"></h3>
     <p class="mut" id="equipo-config-intro" style="display:none; font-size:12.5px"></p>
-    <div class="acceso-campo" id="equipo-config-nombre-campo" style="display:none">
+    <div class="acceso-campo" id="equipo-config-nombre-campo">
       <label for="equipo-config-nombre" id="equipo-config-nombre-rotulo">Nombre</label>
       <input type="text" id="equipo-config-nombre" maxlength="40"
              placeholder="Nombre de la computadora">
       <p class="mut" id="equipo-config-nombre-nota" style="margin:4px 0 0; font-size:12.5px"></p>
       <p class="acceso-campo-error" id="equipo-config-err-nombre"></p>
     </div>
-    <div class="acceso-campo" id="equipo-config-vendedor-campo" style="display:none">
+    <div class="acceso-campo" id="equipo-config-vendedor-campo">
       <label for="equipo-config-vendedor" id="equipo-config-vendedor-rotulo">Vendedor</label>
       <select id="equipo-config-vendedor"></select>
       <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
@@ -3435,16 +3449,15 @@
       <p class="acceso-campo-error" id="equipo-config-err-ruta_predeterminada"></p>
     </div>
     <div class="acceso-campo" id="equipo-config-dia-campo">
-      <label for="equipo-config-dia" id="equipo-config-dia-rotulo">Día a facturar</label>
+      <label id="equipo-config-dia-rotulo">Día a facturar</label>
       <p class="mut equipo-config-ayuda">Con qué día arranca la Fecha a
         facturar de esa computadora: <b>Para mañana</b> es el día siguiente
         (lo normal: de tarde se factura lo que sale al otro día) y <b>Para
         hoy</b> es el mismo día. En cada factura se puede cambiar a mano.</p>
-      <select id="equipo-config-dia">
-        <option value="">— Sin elegir —</option>
-        <option value="hoy">Para hoy</option>
-        <option value="manana">Para mañana</option>
-      </select>
+      <div class="dia-opciones">
+        <label><input type="radio" name="equipo-config-dia" value="manana"> Para mañana</label>
+        <label><input type="radio" name="equipo-config-dia" value="hoy"> Para hoy</label>
+      </div>
       <p class="acceso-campo-error" id="equipo-config-err-dia_despacho"></p>
     </div>
     <div id="equipo-config-error" class="desc-error" style="display:none"></div>
@@ -16012,8 +16025,19 @@ function pintarEquipos() {
     // Series, rutas y día de despacho del equipo (2026-08-07): la línea
     // resume con qué trabaja y "Detalles" abre la ventana donde se cambian
     // los tres juntos. Mismo permiso que Nombre/Vendedor.
+    // El día a facturar se cambia también desde la fila (2026-08-07, pedido
+    // del usuario): es lo que más se mueve de un día para otro y no amerita
+    // abrir la ventana.
     const config = `<td class="equipos-config">
-      <span class="mut">${esc(resumenConfigEquipo(m))}</span>
+      <span class="mut">${esc(resumenSeriesRutasEquipo(m))}</span>
+      <div class="dia-opciones">
+        <label><input type="radio" name="dia-equipo-${host}" value="manana"
+               ${m.dia_despacho === "manana" ? "checked" : ""}
+               onchange="cambiarDiaEquipo('${host}', this)"> Mañana</label>
+        <label><input type="radio" name="dia-equipo-${host}" value="hoy"
+               ${m.dia_despacho === "hoy" ? "checked" : ""}
+               onchange="cambiarDiaEquipo('${host}', this)"> Hoy</label>
+      </div>
       <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
     return `<tr>
@@ -16162,6 +16186,38 @@ async function guardarEquipoIdentidad(dispositivo, control) {
   }
 }
 
+// El día a facturar desde la fila, sin abrir la ventana (2026-08-07). Viaja
+// por el mismo endpoint que la configuración completa, así que se reponen las
+// rutas y series que esa computadora ya tiene; null (sin configurar) equivale
+// a todas, igual que en el resto del panel.
+async function cambiarDiaEquipo(dispositivo, control) {
+  const m = equipos.find(e => e.dispositivo === dispositivo);
+  if (!m) return;
+  const anterior = m.dia_despacho || "";
+  control.disabled = true;
+  try {
+    const r = await api("/api/ajustes/equipo-rutas-series", {
+      dispositivo,
+      rutas: m.rutas === null || m.rutas === undefined ? "*" : m.rutas,
+      series: m.series === null || m.series === undefined ? "*" : m.series,
+      ruta_predeterminada: m.ruta_predeterminada || "",
+      serie_predeterminada: m.serie_predeterminada || "",
+      dia_despacho: control.value,
+    });
+    equipos = r.equipos_gestionables || equipos;
+    pintarEquipos();
+    if (supOverviewCargado) pintarEquiposSupervision();
+    mensaje(`${m.nombre || dispositivo} factura para `
+      + `${ETIQUETA_DIA_DESPACHO[control.value]}; lo toma en su próximo refresco.`,
+      "info");
+  } catch (e) {
+    control.disabled = false;
+    document.querySelectorAll(`input[name="dia-equipo-${dispositivo}"]`)
+            .forEach(r => { r.checked = r.value === anterior; });
+    mensaje("No se pudo cambiar el día a facturar: " + e.message, "error");
+  }
+}
+
 // --- Rutas y series de OTRA computadora (2026-08-07) ------------------------
 // La asignación de rutas solo limita filtros y selectores de esa máquina; las
 // series son las que su instalación del programa de facturación de verdad
@@ -16183,11 +16239,18 @@ const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
 // (2026-08-07): con qué series factura, qué rutas atiende y con qué día
 // arranca su Fecha a facturar. Es lo mismo que se cambia en "Detalles".
 function resumenConfigEquipo(m) {
+  return `${resumenSeriesRutasEquipo(m)}`
+    + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
+}
+
+// Sin el día: en la fila de Computadoras el día es un par de opciones a la
+// vista justo debajo, y repetirlo también como texto sería el mismo dato dos
+// veces.
+function resumenSeriesRutasEquipo(m) {
   return `Series: ${resumenAsignacion(m.series, m.serie_predeterminada,
                                       "series", (x) => x)}`
     + ` · Rutas: ${resumenAsignacion(m.rutas, m.ruta_predeterminada,
-                                     "rutas", etiquetaRutaCorta)}`
-    + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
+                                     "rutas", etiquetaRutaCorta)}`;
 }
 
 // La ventana sirve a dos orígenes con los mismos selectores (2026-08-07):
@@ -16258,21 +16321,21 @@ function abrirVentanaConfigEquipo(ctx) {
     : "Es la configuración con la que trabaja esa computadora. La toma en su "
       + "próximo refresco, sin que nadie tenga que ir hasta ella.";
   $("equipo-config-intro").style.display = "";
-  // Nombre y vendedor solo al activar: en una computadora ya activa esos dos
-  // se editan en su fila de Computadoras.
-  $("equipo-config-nombre-campo").style.display = esSolicitud ? "" : "none";
-  $("equipo-config-vendedor-campo").style.display = esSolicitud ? "" : "none";
-  if (esSolicitud) {
-    $("equipo-config-nombre-rotulo").textContent =
-      "Nombre con el que queda esa computadora";
-    $("equipo-config-nombre").value = ctx.nombrePedido || "";
-    $("equipo-config-nombre-nota").textContent = ctx.nombrePedido
-      ? `Lo pidió así al registrarse: ${ctx.nombrePedido}`
-      : "No mandó ningún nombre al registrarse.";
-    $("equipo-config-vendedor-rotulo").textContent =
-      "Vendedor con el que factura esa computadora";
-    pintarVendedorConfigEquipo(datos.vendedor || "");
-  }
+  // Nombre y vendedor también en una computadora ya activa (2026-08-07,
+  // pedido del usuario): esta ventana es TODO lo que se decide de esa
+  // máquina, sin volver a la fila por dos campos sueltos.
+  $("equipo-config-nombre-rotulo").textContent = esSolicitud
+    ? "Nombre con el que queda esa computadora" : "Nombre de esa computadora";
+  $("equipo-config-nombre").value =
+    (esSolicitud ? ctx.nombrePedido : datos.nombre) || "";
+  $("equipo-config-nombre-nota").textContent = esSolicitud
+    ? (ctx.nombrePedido ? `Lo pidió así al registrarse: ${ctx.nombrePedido}`
+                        : "No mandó ningún nombre al registrarse.")
+    : "";
+  $("equipo-config-nombre-nota").style.display = esSolicitud ? "" : "none";
+  $("equipo-config-vendedor-rotulo").textContent =
+    "Vendedor con el que factura esa computadora";
+  pintarVendedorConfigEquipo(datos.vendedor || "");
   for (const tipo of ["rutas", "series"]) {
     const rotulo = $(`equipo-config-${tipo}-rotulo`);
     rotulo.style.display = "";
@@ -16303,7 +16366,8 @@ function abrirVentanaConfigEquipo(ctx) {
   }
   $("equipo-config-dia-rotulo").textContent =
     `Día a facturar de ${nombreVisible}`;
-  $("equipo-config-dia").value = datos.dia_despacho || "";
+  document.querySelectorAll("input[name=equipo-config-dia]")
+          .forEach(r => { r.checked = r.value === datos.dia_despacho; });
   $("equipo-config-guardar").textContent = esSolicitud
     ? "Activar con esta configuración" : "Guardar";
   $("equipo-config-guardar").disabled = false;
@@ -16328,10 +16392,14 @@ function pintarVendedorConfigEquipo(pedido) {
   }
   select.style.display = "none";
   texto.style.display = "";
+  const esSolicitud = (configEquipo || {}).origen === "solicitud";
   texto.textContent = pedido
-    ? `${pedido} (pedido por esa computadora; la lista de vendedores no está a mano)`
-    : "No pidió vendedor.";
+    ? `${pedido} (la lista de vendedores no está a mano para cambiarlo)`
+    : (esSolicitud ? "No pidió vendedor." : "Sin vendedor asignado.");
 }
+
+const diaConfigEquipo = () =>
+  (document.querySelector("input[name=equipo-config-dia]:checked") || {}).value || "";
 
 const vendedorConfigEquipo = () =>
   $("equipo-config-vendedor").style.display === "none"
@@ -16339,11 +16407,16 @@ const vendedorConfigEquipo = () =>
 
 // Mismas reglas del registro: "Todas" deshabilita las individuales SIN
 // desmarcarlas; la predeterminada solo se elige cuando la selección efectiva
-// tiene más de una (con una sola, es esa y se muestra como texto).
+// tiene más de una (con una sola, es esa y se muestra como texto). Con
+// "Todas" la lista se ESCONDE (2026-08-07, pedido del usuario): una lista
+// larga y apagada solo alarga la ventana, y lo marcado sigue ahí para cuando
+// se desmarque.
 function configEquipoRecalcular(tipo, preseleccionar) {
   const datos = (configEquipo || {}).datos || {};
   const todas = $(`equipo-config-${tipo}-todas`).checked;
-  const cajas = [...$(`equipo-config-${tipo}-lista`).querySelectorAll("input")];
+  const lista = $(`equipo-config-${tipo}-lista`);
+  lista.style.display = todas ? "none" : "";
+  const cajas = [...lista.querySelectorAll("input")];
   cajas.forEach(c => { c.disabled = todas; });
   const marcadas = cajas.filter(c => c.checked).map(c => c.value);
   const efectivas = todas ? opcionesConfigEquipo(tipo, datos) : marcadas;
@@ -16434,33 +16507,52 @@ function guardarConfigEquipo() {
   guardarConfigEquipoDelCatalogo();
 }
 
-// La ventana edita el conjunto COMPLETO, que es justo lo que pide el
-// endpoint: series, rutas, sus predeterminadas y el día de despacho.
-function guardarConfigEquipoDelCatalogo() {
+// La ventana edita TODO lo de esa computadora: nombre y vendedor por
+// equipo-identidad, y series, rutas, predeterminadas y día por
+// equipo-rutas-series. Van en dos llamadas porque son dos endpoints; la
+// identidad primero, para que un nombre repetido corte antes de tocar la
+// configuración.
+async function guardarConfigEquipoDelCatalogo() {
   const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
   if (!m) { cerrarConfigEquipo(); return; }
-  const cuerpo = {
-    dispositivo: configEquipo.dispositivo,
-    rutas: seleccionConfigEquipo("rutas"),
-    series: seleccionConfigEquipo("series"),
-    ruta_predeterminada: predetConfigEquipo("rutas"),
-    serie_predeterminada: predetConfigEquipo("series"),
-    dia_despacho: $("equipo-config-dia").value,
-  };
+  const nombre = $("equipo-config-nombre").value.trim();
+  limpiarErroresConfigEquipo();
+  if (!nombre) {
+    marcarErrorConfigEquipo("nombre", "Escribe el nombre de la computadora.");
+    return;
+  }
   const boton = $("equipo-config-guardar");
   boton.disabled = true;
-  api("/api/ajustes/equipo-rutas-series", cuerpo).then((r) => {
+  try {
+    const ident = await api("/api/ajustes/equipo-identidad", {
+      dispositivo: configEquipo.dispositivo,
+      nombre, vendedor: vendedorConfigEquipo(),
+    });
+    equipos = ident.equipos_gestionables || equipos;
+    const r = await api("/api/ajustes/equipo-rutas-series", {
+      dispositivo: configEquipo.dispositivo,
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+      dia_despacho: diaConfigEquipo(),
+    });
     equipos = r.equipos_gestionables || equipos;
     pintarEquipos();
     // El overview de ADMIN → Equipos muestra el mismo resumen: si está
     // cargado, se repinta para que no quede mostrando lo anterior.
     if (supOverviewCargado) pintarEquiposSupervision();
     cerrarConfigEquipo();
-    mensaje(`Configuración de ${m.nombre || m.dispositivo} guardada; `
+    mensaje(`Configuración de ${nombre || m.dispositivo} guardada; `
       + "la toma en su próximo refresco.", "info");
-  }).catch((e) => {
+  } catch (e) {
+    // Si falló la segunda llamada, la identidad ya quedó guardada: se repinta
+    // para que la fila muestre lo que de verdad hay.
+    pintarEquipos();
     marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
-  }).finally(() => { boton.disabled = false; });
+  } finally {
+    boton.disabled = false;
+  }
 }
 
 // La activación sale de esta ventana con lo que el administrador dejó a la
@@ -16477,7 +16569,7 @@ async function activarDesdeConfigEquipo() {
       series: seleccionConfigEquipo("series"),
       ruta_predeterminada: predetConfigEquipo("rutas"),
       serie_predeterminada: predetConfigEquipo("series"),
-      dia_despacho: $("equipo-config-dia").value,
+      dia_despacho: diaConfigEquipo(),
     },
     alError: marcarErrorConfigEquipo,
   });
