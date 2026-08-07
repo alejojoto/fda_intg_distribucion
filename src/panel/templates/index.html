@@ -16140,12 +16140,10 @@ function pintarEquipos() {
       <input type="checkbox" ${m.activa ? "checked" : ""}
              title="Al quitarla, esa computadora queda fuera de servicio."
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
-    // Series, rutas y día de despacho del equipo (2026-08-07): la línea
-    // resume con qué trabaja y "Detalles" abre la ventana donde se cambian
-    // los tres juntos. Mismo permiso que Nombre/Vendedor.
-    // El día a facturar se cambia también desde la fila (2026-08-07, pedido
-    // del usuario): es lo que más se mueve de un día para otro y no amerita
-    // abrir la ventana.
+    // Series, rutas y día del equipo (2026-08-07), repartidos en la fila:
+    // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
+    // mueve de un día para otro— y "Configurar" abre la ventana con todo,
+    // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
     const config = `<td class="equipos-config">
       <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
       <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
