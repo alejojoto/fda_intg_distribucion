@@ -136,12 +136,6 @@ Filename: "{app}\runtime\python\pythonw.exe"; Parameters: "-m src.lanzador"; Wor
 
 [Code]
 var
-  // Migracion opcional desde una instalacion anterior en esta misma
-  // maquina: una casilla (desmarcada por defecto) y, solo si se marca, la
-  // pagina de eleccion de carpeta. Se crean en InitializeWizard() y se
-  // leen en CurStepChanged(ssPostInstall).
-  PaginaPreguntaMigracion: TInputOptionWizardPage;
-  PaginaMigracion: TInputDirWizardPage;
   // Ruta al zip de llaves a instalar (llaves_fda.zip). Vacio si el
   // operador confirmo explicitamente que quiere continuar sin llaves.
   ZipLlavesPath: String;
@@ -188,59 +182,13 @@ end;
 
 procedure InitializeWizard();
 begin
-  // Dos paginas y no una: TInputDirWizardPage EXIGE una ruta no vacia al
-  // dar Siguiente (validacion propia de Inno), asi que "dejar en blanco
-  // para omitir" atascaria al operador justo en el caso comun (laptop
-  // nueva, sin nada que migrar). La casilla, desmarcada por defecto, deja
-  // pasar de largo; la pagina de carpeta solo aparece si se marca.
-  PaginaPreguntaMigracion := CreateInputOptionPage(wpSelectDir,
-    '¿Migrar de una instalación anterior?',
-    'Solo aplica si esta máquina ya usaba el asistente.',
-    'Si en esta máquina ya usabas el asistente (la carpeta con git de antes) y quieres traer sus llaves y su estado, marca la casilla. Si es tu primera instalación, continúa sin marcar nada.',
-    False, False);
-  PaginaPreguntaMigracion.Add('Traer llaves y estado de una instalación anterior');
-  PaginaPreguntaMigracion.Values[0] := False;
-
-  PaginaMigracion := CreateInputDirPage(PaginaPreguntaMigracion.ID,
-    'Carpeta de la instalación anterior',
-    'Elige la carpeta donde vivía el asistente.',
-    'Selecciona la carpeta de la instalación anterior (la que tiene el archivo .env y la carpeta credenciales).',
-    False, '');
-  PaginaMigracion.Add('Carpeta de la instalación anterior:');
-  // Preseleccion editable (pedido del usuario 2026-07-30, hecho 2026-08-05):
-  // en blanco, el operador tenia que ubicar a mano una carpeta que casi
-  // siempre es la misma (el destino por defecto de todas las instalaciones)
-  // — el propio usuario se topo con esa friccion y no la encontro. Se
-  // precarga la ruta normal y queda editable para quien de verdad migre
-  // desde otro lugar. Es \app y no la carpeta padre porque ahi es donde
-  // viven .env y credenciales\, que es lo que migrar_instalacion.py busca.
-  PaginaMigracion.Values[0] := ExpandConstant('{localappdata}\FDA\Asistente\app');
-
+  // La migracion desde una instalacion anterior (casilla + pagina de
+  // carpeta) se RETIRO el 2026-08-07 por pedido del usuario: solo servia
+  // para las carpetas de git armadas a mano antes de que existiera el
+  // instalador, ya no queda ninguna, y reinstalar encima conserva .env,
+  // credenciales\, data\estado.db y logs\ sin que el operador marque nada
+  // (ver [Files] y [InstallDelete]).
   BuscarZipLlaves();
-end;
-
-// La pagina de carpeta solo aparece si el operador marco la casilla.
-function ShouldSkipPage(PageID: Integer): Boolean;
-begin
-  Result := (PaginaMigracion <> nil) and (PageID = PaginaMigracion.ID)
-    and not PaginaPreguntaMigracion.Values[0];
-end;
-
-// Unica validacion propia: si el operador escribio/eligio una carpeta de
-// migracion, que exista de verdad. Vacio es valido (se omite la
-// migracion) — el resto de las paginas estandar de Inno se validan solas,
-// esta funcion no las toca.
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if (PaginaMigracion <> nil) and (CurPageID = PaginaMigracion.ID) then
-  begin
-    if (PaginaMigracion.Values[0] <> '') and not DirExists(PaginaMigracion.Values[0]) then
-    begin
-      MsgBox('La carpeta elegida no existe:' + #13#10 + PaginaMigracion.Values[0] + #13#10#13#10 + 'Elige una carpeta válida, o vuelve atrás y desmarca la migración.', mbError, MB_OK);
-      Result := False;
-    end;
-  end;
 end;
 
 // Remate por RUTA: mata todo proceso cuyo ejecutable viva bajo la carpeta de
@@ -373,7 +321,6 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   RutaPython: String;
   RutaLog: String;
-  RutaOrigenMigracion: String;
   Parametros: String;
 begin
   if CurStep <> ssPostInstall then
@@ -382,31 +329,7 @@ begin
   RutaPython := ExpandConstant('{app}\runtime\python\python.exe');
   RutaLog := ExpandConstant('{app}\app\logs\instalacion.log');
 
-  // 1) Migracion de una instalacion anterior, si el operador la marco y
-  // eligio carpeta.
-  RutaOrigenMigracion := '';
-  if PaginaPreguntaMigracion.Values[0] then
-    RutaOrigenMigracion := PaginaMigracion.Values[0];
-  // Origen = destino: pasa cuando se reinstala sobre la carpeta de siempre y
-  // el operador deja la preseleccion marcada. No hay nada que migrar (esos
-  // archivos ya estan donde deben, y [InstallDelete] no los toca) y copiarlos
-  // sobre si mismos abortaria el paso con un error que no significa nada.
-  if (RutaOrigenMigracion <> '')
-     and (CompareText(RemoveBackslashUnlessRoot(RutaOrigenMigracion),
-                      RemoveBackslashUnlessRoot(ExpandConstant('{app}\app'))) = 0) then
-  begin
-    Log('Post-instalacion: la carpeta de migracion es la misma que se acaba de instalar — no hay nada que traer, se omite.');
-    RutaOrigenMigracion := '';
-  end;
-  if RutaOrigenMigracion <> '' then
-  begin
-    Parametros := 'scripts\build\migrar_instalacion.pyc --origen "' + RutaOrigenMigracion + '" --app "' + ExpandConstant('{app}\app') + '"';
-    CorrerPasoPostInstalacion(RutaPython, Parametros, 'migrar instalación anterior', RutaLog);
-  end
-  else
-    Log('Post-instalacion: sin carpeta de migracion elegida — se omite ese paso.');
-
-  // 2) Llaves, si hubo zip (encontrado junto al instalador, elegido a
+  // Llaves, si hubo zip (encontrado junto al instalador, elegido a
   // mano, o ninguno si el operador confirmo continuar sin llaves).
   if ZipLlavesPath <> '' then
   begin
