@@ -8563,6 +8563,7 @@ function preseleccionar(dialogo) {
     try { btn.focus({ preventScroll: true }); } catch (_) { return; }
     if (document.activeElement !== btn) return;
     focoPuestoPorElPanel = btn;
+    notaFoco("el panel preselecciona " + (btn.id || btn.textContent.trim()));
     btn.classList.add("preseleccionado");
     btn.addEventListener("blur", () => btn.classList.remove("preseleccionado"),
                          { once: true });
@@ -8584,7 +8585,8 @@ const dialogosAbiertos = [];   // en orden de apertura: el último es el de enci
 function aplicarInerciaDeFondo() {
   const encima = dialogosAbiertos[dialogosAbiertos.length - 1] || null;
   for (const hijo of document.body.children) {
-    if (hijo.tagName === "SCRIPT" || hijo.id === "menu-contexto") continue;
+    if (hijo.tagName === "SCRIPT" || hijo.id === "menu-contexto"
+        || hijo.id === "debug-foco") continue;
     hijo.inert = !!encima && hijo !== encima;
   }
 }
@@ -8622,6 +8624,46 @@ function seguirContenido(dialogo) {
       childList: true, subtree: true, attributes: true,
       attributeFilter: ["style", "class", "disabled"] });
   }
+}
+
+// Diagnóstico del foco (?debug_foco=1, TEMPORAL 2026-08-07): pinta en pantalla
+// quién mueve el foco y por qué. Se retira cuando el pegado quede confirmado.
+const DEBUG_FOCO = new URLSearchParams(window.location.search).get("debug_foco") === "1";
+function notaFoco(texto) {
+  if (!DEBUG_FOCO) return;
+  let caja = $("debug-foco");
+  if (!caja) {
+    caja = document.createElement("div");
+    caja.id = "debug-foco";
+    caja.style.cssText = "position:fixed; right:8px; bottom:8px; z-index:9999;"
+      + " width:340px; max-height:45vh; overflow:auto; background:#111; color:#5f5;"
+      + " font:11px/1.35 monospace; padding:6px 8px; border-radius:6px;"
+      + " white-space:pre-wrap; pointer-events:none;";
+    document.body.appendChild(caja);
+  }
+  const quien = document.activeElement;
+  const donde = quien ? (quien.id || quien.tagName) : "nada";
+  caja.textContent = (`${texto}  [foco: ${donde}]\n` + caja.textContent).slice(0, 3000);
+}
+
+// En cuanto el operador toca una tecla o el ratón, el panel SUELTA el foco de
+// ese diálogo y no se lo vuelve a mover, repinte lo que repinte el contenido
+// (2026-08-07: el Tab se sentía pegado en el botón preseleccionado, porque el
+// detalle rehace su título, su cuerpo y su pie a cada rato y cada repintado
+// devolvía el foco). El seguimiento se rearma al abrirse el próximo diálogo.
+function soltarFocoDelDialogo() {
+  if (!vigilanteDeContenido) return;
+  notaFoco("suelta el foco: lo tomó el operador");
+  vigilanteDeContenido.disconnect();
+  focoPuestoPorElPanel = null;
+}
+document.addEventListener("keydown", soltarFocoDelDialogo, true);
+document.addEventListener("pointerdown", soltarFocoDelDialogo, true);
+if (DEBUG_FOCO) {
+  document.addEventListener("focusin", (e) => {
+    const el = e.target;
+    notaFoco("→ foco a " + ((el && (el.id || el.tagName)) || "?"));
+  }, true);
 }
 
 function revisarDialogo(dialogo) {
@@ -8666,6 +8708,7 @@ if (typeof MutationObserver !== "undefined") {
     if (!dialogo) return;
     const foco = document.activeElement;
     if (!foco || foco === document.body || foco === focoPuestoPorElPanel) {
+      notaFoco("repintó el diálogo: se rehace la preselección");
       preseleccionar(dialogo);
     }
   });
