@@ -1793,13 +1793,15 @@
   #acceso-caja h2 { margin:0 0 10px; font-size:16px; }
   #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
-  /* El campo tiene que VERSE campo aunque esté vacío (2026-08-07): el borde
-     salía de una variable --bor que nunca se definió, así que la caja quedaba
-     invisible hasta hacerle clic dentro y no se entendía por qué el botón no
-     dejaba pedir la activación. Vacío va en ámbar —el mismo "aquí falta algo"
-     de los filtros del panel— y se apaga en cuanto hay texto. */
+  /* El campo tiene que VERSE campo, con o sin texto adentro (2026-08-07,
+     corregido 2026-08-07b): el borde gris de --bor es casi invisible sobre
+     blanco, y encima el ámbar de "aquí falta algo" solo se pintaba con
+     :placeholder-shown — al escribir un nombre el campo volvía a ese gris
+     apenas visible y parecía texto suelto, no una caja. Ahora el borde
+     siempre es oscuro y grueso (se nota esté vacío o lleno); el ámbar queda
+     solo como aviso de "falta este dato". */
   #acceso-caja input[type=text] { width:100%; box-sizing:border-box;
-      padding:9px 11px; font-size:14px; border:1px solid var(--bor);
+      padding:9px 11px; font-size:14px; border:2px solid #64748b;
       border-radius:6px; background:#fff; }
   #acceso-caja input[type=text]:placeholder-shown { border-color:#f59e0b;
       background:#fffaf3; }
