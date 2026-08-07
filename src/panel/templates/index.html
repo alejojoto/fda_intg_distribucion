@@ -2706,8 +2706,13 @@
            distinto — de tarde lo que sale al día siguiente, o de mañana lo que
            quedó pendiente y sale ese mismo día — así que el día de entrega no
            es una regla del negocio sino de la máquina. Se guarda local
-           (config_dispositivo), como el vendedor. -->
-      <div class="ajustes-bloque">
+           (config_dispositivo), como el vendedor.
+           Desde 2026-08-07 el bloque es de Editor/Admin (permiso
+           identidad_maquina, igual que nombre y vendedor): un usuario general
+           no lo ve — pintarBloqueoMaquina lo esconde. Elegirlo la primera vez
+           sigue siendo de quien instala, y eso pasa por el aviso de
+           configuración obligatoria, no por aquí. -->
+      <div class="ajustes-bloque" id="dia-despacho-bloque">
         <h3>Día de despacho de esta máquina</h3>
         <div class="ajustes-fila" style="gap:24px">
           <label class="desc-todos">
@@ -16687,6 +16692,12 @@ function pintarBloqueoMaquina() {
     nombreBloqueado && vendedorBloqueado ? "none" : "";
   $("maquina-bloqueo").style.display =
     nombreBloqueado || vendedorBloqueado ? "" : "none";
+  // El día de facturación se ESCONDE entero en vez de deshabilitarse
+  // (2026-08-07, pedido del usuario): un usuario general no lo cambia ni ve
+  // la sección. Mientras todavía falta elegirlo sí se muestra — esa primera
+  // vez es de quien instala la computadora, igual que nombre y vendedor.
+  $("dia-despacho-bloque").style.display =
+    puedeEditar || configPendiente.includes("dia_despacho") ? "" : "none";
 }
 
 function ocultarMaquinaGuardado() {
@@ -16826,8 +16837,14 @@ function abrirConfigMaquina(falta, soloVista = false) {
     !puedeEditarIdentidad && !!(nombreMaquina || "").trim();
   $("configmaq-vendedor").disabled =
     !puedeEditarIdentidad && !!vendedorMaquina;
+  // Ya elegido, cambiarlo es de un editor (2026-08-07): los radios quedan a la
+  // vista con lo que hay puesto, pero sin tocar. Mientras falte elegirlo se
+  // habilitan — esa primera vez es de quien instala la computadora.
+  const diaBloqueado =
+    !puedeEditarIdentidad && !pendientes.includes("dia_despacho");
   document.querySelectorAll("input[name=configmaq-dia]").forEach(r => {
     r.checked = !pendientes.includes("dia_despacho") && r.value === diaDespacho;
+    r.disabled = diaBloqueado;
   });
   $("configmaq-error").style.display = "none";
   $("configmaq-overlay").classList.add("visible");
