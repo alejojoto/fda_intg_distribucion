@@ -775,9 +775,15 @@
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
       padding:0 10px 6px 0; white-space:nowrap; }
   .equipos-tabla td { padding:4px 10px 4px 0; vertical-align:middle; }
+  /* Nombre y vendedor en UNA línea (2026-08-08, pedido del usuario): con el
+     nombre, el identificador de la computadora y el vendedor apilados, esta
+     celda medía tres líneas contra una del resto y las columnas no se leían
+     como filas. El identificador queda en el hover, para desempatar dos
+     computadoras con el mismo nombre. */
+  .equipos-tabla .equipos-id { white-space:nowrap; }
   .equipos-tabla .equipos-nombre { font-weight:600; font-size:13px; }
-  .equipos-tabla .equipos-host { color:var(--mut); font-size:12px;
-      min-width:110px; }
+  .equipos-tabla .equipos-vendedor { color:var(--mut); font-size:12px;
+      margin-left:8px; }
   .equipos-tabla input[type=text] { width:190px; }
   .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
   /* Casilla marcada por implicación (un admin también es editor): se ve
@@ -16198,13 +16204,12 @@ function pintarEquipos() {
       </div>
     </td>`;
     // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
-    // pedido del usuario): aquí se leen, junto al identificador de la
-    // computadora, para saber de cuál es la fila.
+    // pedido del usuario): aquí se leen para saber de cuál computadora es la
+    // fila.
     return `<tr>
-      <td>
-        <div class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</div>
-        <div class="equipos-host">${host}</div>
-        <div class="equipos-host">${esc(etiquetaVendedorEquipo(m.vendedor))}</div>
+      <td class="equipos-id" title="${host}">
+        <span class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</span>
+        <span class="equipos-vendedor">${esc(etiquetaVendedorEquipo(m.vendedor))}</span>
       </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
