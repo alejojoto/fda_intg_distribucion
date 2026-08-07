@@ -10994,9 +10994,16 @@ function pintarLlenadosPorRevisar(lista) {
     // pedido del usuario): los mismos botones que su fila de PENDIENTES —
     // "Llenar igual" quita el candado con motivo y "Descartar" la cierra. La
     // nota de dónde pasó se queda: el documento a medias sigue en esa
-    // pantalla y alguien debe atenderlo allá. La de líneas omitidas sí se
-    // queda solo informativa: su documento salió en ese equipo y darlo por
-    // bueno o reemitirlo se decide donde está el papel.
+    // pantalla y alguien debe atenderlo allá.
+    // Y la ajena con LÍNEAS DE MENOS también (2026-08-07, regla del usuario:
+    // quien ve una revisión tiene que poder cerrarla, venga del equipo que
+    // venga). Era la única fila de esta lista sin ninguna salida —decía
+    // "se resuelve en tal equipo" y ahí se quedaba, aunque quien la mirara
+    // fuera un admin—, así que una revisión abierta dependía de que alguien
+    // se sentara en esa otra máquina. Ahora trae las tres salidas de la
+    // propia, y la delicada —reemitir el documento que salió allá— pasa por
+    // el mismo cuadro de motivo de "Volver a llenar", que ya advierte de qué
+    // equipo venía. La nota del equipo se queda: el papel está allá.
     // "Editar cliente" abre el editor del catálogo de Clientes: es edición de
     // catálogo, así que solo lo ve quien puede editarlo (permiso
     // ajustes_catalogos, src/roles.py) — el mismo criterio que esconde el
@@ -11021,6 +11028,14 @@ function pintarLlenadosPorRevisar(lista) {
       ? `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
            onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
       : "";
+    // El mismo botón para la ajena, con UNA diferencia: pregunta el motivo
+    // (volverAFacturar). El documento que se anula salió en otro equipo y el
+    // papel lo tiene alguien más, así que aquí sí hace falta decir por qué —
+    // en la propia el renglón ya lo dice (qué línea no entró).
+    const botonReemitirOmitidasAjena = tienePermiso("reabrir_factura")
+      ? `<button class="acento" title="Emite aquí un documento nuevo con todas las líneas; el que salió incompleto en ese equipo queda anulado en papel."
+           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
+      : "";
     const notaReemitir = tienePermiso("reabrir_factura") ? ""
       : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`;
     // El conflicto ignora la rama remota a propósito: resolverlo es cosa del
@@ -11037,7 +11052,11 @@ function pintarLlenadosPorRevisar(lista) {
              ${botonEditarCliente}
              <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
              <div class="mut">El documento a medias quedó en '${esc(f.maquina || "otra máquina")}'</div>${notaEditor}`
-          : `<span class="mut">Se resuelve en '${esc(f.maquina || "otra máquina")}'</span>`)
+          : `${botonReemitirOmitidasAjena}
+             <button title="El documento queda como salió: sale de esta lista en todos los equipos y se queda entre las procesadas, con el rastro de qué faltó."
+               onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
+             <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
+             <div class="mut">El documento salió en '${esc(f.maquina || "otra máquina")}'</div>${notaReemitir}`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          ${botonEditarCliente}
@@ -12068,19 +12087,27 @@ const ACCIONES_MOTIVO = {
     // llenando 2026-07-31): descartarla aquí la cierra en todas. Con un error
     // de allá puede haber quedado un documento a medias que este panel no
     // puede resolver; apartada o llenando todavía no tiene documento firme.
+    // Y desde 2026-08-07 también puede ser una que allá CERRÓ con líneas de
+    // menos: ahí el documento existe y está impreso en ese equipo, así que el
+    // aviso lo dice con todas sus letras — descartarla no lo borra.
     nota: (id, partes) => {
       const f = filaDeFactura(id, partes[0]);
       if (!f || !f.remota) return "";
       const maquina = f.maquina || "otra máquina";
+      const cerrada = f.estado === "completada";
       const situacion = f.estado === "error_llenado"
         ? `El llenado falló en '${maquina}'.`
         : f.estado === "llenando"
           ? `'${maquina}' la está llenando ahora mismo.`
-          : `'${maquina}' la tiene apartada.`;
+          : cerrada
+            ? `El documento ya salió en '${maquina}', con líneas de menos.`
+            : `'${maquina}' la tiene apartada.`;
       return `${situacion} Descartarla aquí la cierra para todas las máquinas`
            + (f.estado === "error_llenado"
               ? "; si allá quedó un documento a medias, hay que cancelarlo en ese equipo."
-              : ".");
+              : cerrada
+                ? "; el documento que ya salió hay que anularlo en papel en ese equipo."
+                : ".");
     },
     opciones: ["Ya se facturó a mano",
                "El cliente anuló el pedido",
@@ -12160,8 +12187,13 @@ function remotaDeFactura(pedido_id, parte) {
 
 // La fila tal como está pintada, en cualquiera de las dos listas. La usa la
 // nota del diálogo de reapertura, que aplica sobre todo a PROCESADAS.
+// `por_revisar` va de última (2026-08-07): esa lista se arma sin ventana de
+// fechas ni filtro de ruta, así que una revisión puede estar ahí y no en
+// PROCESADAS — y sin este respaldo el cuadro de motivo de esa factura salía
+// sin su advertencia ("la cerró tal equipo"), justo donde más importa.
 function filaDeFactura(pedido_id, parte) {
-  return [...ultimaLista.pendientes, ...(ultimaLista.procesadas || [])]
+  return [...ultimaLista.pendientes, ...(ultimaLista.procesadas || []),
+          ...(ultimaLista.por_revisar || [])]
     .find(x => x.pedido_id === pedido_id && x.parte === parte);
 }
 
@@ -12440,9 +12472,13 @@ async function confirmarMotivo() {
     // la nube que el estado compartido quedó libre — si no responde, no se
     // descarta nada y allá sigue su reintento, en vez de un descarte que solo
     // existe en esta máquina.
+    // Una que ese equipo ya CERRÓ no pasa por aquí (2026-08-07): no tiene
+    // candado que soltar y /api/tomar_factura la rechaza a propósito (tomar
+    // una cerrada sería reemitirla). Su descarte va derecho.
     for (const parte of partes) {
       const fila = filaDeFactura(pedido_id, parte);
       if (!fila || !fila.remota) continue;
+      if (["completada", "descartada", "facturada_a_mano"].includes(fila.estado)) continue;
       try {
         await api("/api/tomar_factura", {pedido_id, parte, motivo});
       } catch (e) {
