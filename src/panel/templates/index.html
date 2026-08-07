@@ -461,15 +461,15 @@
   tr.sep-fecha td { background:#eef1f6; color:var(--mut); font-weight:700;
                     font-size:12px; padding:5px 10px; border-bottom:1px solid #dde2ea; }
   tr.sep-fecha:hover td { background:#eef1f6; }
-  tr.sep-fecha.sep-fecha-antigua td { background:#fef0c7; color:#b54708; }
-  tr.sep-fecha.sep-fecha-antigua:hover td { background:#fef0c7; }
-  /* Filas de un grupo atrasado: matiz apenas visible, para que se note en
-     cualquier punto del scroll sin competir con los avisos de verdad
-     (fila-aviso, fila-conflicto) que ya usan ámbar/rojo más fuertes. */
-  tr.fila-atrasada td { background:#fffdf6; }
-  tr.fila-atrasada:hover td { background:#fef8e8; }
-  tr.fam-cabecera.fila-atrasada td { background:#fdf6e3; }
-  tr.fam-cabecera.fila-atrasada:hover td { background:#fdf6e3; }
+  tr.sep-fecha.sep-fecha-antigua td { background:#f97316; color:#ffffff; }
+  tr.sep-fecha.sep-fecha-antigua:hover td { background:#f97316; }
+  /* Filas de un grupo atrasado: amarillo resaltador (2026-08-07, pedido del
+     usuario: los matices suaves anteriores no se distinguían del blanco). El
+     separador de fecha va en naranja para seguir mandando sobre sus filas. */
+  tr.fila-atrasada td { background:#fde047; }
+  tr.fila-atrasada:hover td { background:#facc15; }
+  tr.fam-cabecera.fila-atrasada td { background:#fbbf24; }
+  tr.fam-cabecera.fila-atrasada:hover td { background:#f5b312; }
   /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
@@ -8167,6 +8167,13 @@ const ayerComoISO = () => {
 // lleva mucho tiempo esperando no se pierda al fondo de la lista.
 const esFechaAtrasada = (iso, hoy, ayer) => !!iso && iso !== hoy && iso !== ayer;
 
+// El color dice que algo pasa; el hover dice qué (2026-08-07, pedido del
+// usuario). La fila habla de UN pedido y la franja del día, de todos los suyos.
+const TITULO_PEDIDO_VIEJO =
+  "Pedido viejo: quedó de un día anterior y sigue sin facturar.";
+const TITULO_DIA_VIEJO =
+  "Órdenes viejas: pedidos de este día que siguen sin facturar.";
+
 // "Hoy" / "Ayer" / fecha corta (con año solo si no es el actual, como en
 // avisoFechaDelPedido) / "Sin fecha registrada" para lo que llegó sin dato.
 function etiquetaSeparadorFecha(iso, hoy, ayer) {
@@ -8193,7 +8200,8 @@ function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
     if (iso !== diaAnterior) {
       diaAnterior = iso;
       const atrasada = esFechaAtrasada(iso, hoy, ayer);
-      html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}">`
+      html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
+        + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
         + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer))}</td></tr>`;
     }
     html += render(item, esFechaAtrasada(iso, hoy, ayer));
@@ -9890,9 +9898,12 @@ const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 // desde la lista (`tiene_detalle`), así que va en el clic y se ahorra el viaje
 // al servidor. `clases` son las que ya lleva la fila por otro motivo (parte de
 // familia).
+// Una fila atrasada estrena el hover con lo suyo (2026-08-07): se reconoce por
+// la clase que ya le llega, así ninguno de sus llamadores tiene que repetirlo.
 function filaDetalle(f, clases = "") {
+  const viejo = clases.includes("fila-atrasada") ? `${TITULO_PEDIDO_VIEJO} ` : "";
   return ` class="${(clases + " abre-detalle").trim()}"`
-    + ` title="Clic para ver el detalle del pedido"`
+    + ` title="${viejo}Clic para ver el detalle del pedido"`
     + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
         f.tiene_detalle === false ? ",true" : ""})"`;
 }
@@ -10658,7 +10669,8 @@ function pintarPendientes(familias) {
       // familia solo aparece cuando de verdad hay varias partes.
       if (partes.length === 1 && !(f0.total_partes > 1)) return filaPendiente(f0, false, atrasada);
       return `
-      <tr class="fam-cabecera${atrasada ? " fila-atrasada" : ""}">
+      <tr class="fam-cabecera${atrasada ? " fila-atrasada" : ""}"
+          ${atrasada ? `title="${TITULO_PEDIDO_VIEJO}"` : ""}>
         <td><b>${esc(f0.pedido_id)}</b></td>
         <td>${celdaCliente(f0)}</td>
         <td>${esc(f0.ruta || "")}</td>
@@ -11108,9 +11120,10 @@ function pintarRevision(lista) {
     // fila, y ahí manda el botón de cada una.
     const abre = aperturasRevision(p, i);
     const claseAtrasada = atrasada ? " fila-atrasada" : "";
+    const viejo = atrasada ? `${TITULO_PEDIDO_VIEJO} ` : "";
     const clic = abre.length === 1
-      ? ` class="abre-editor${claseAtrasada}" title="Clic para ${abre[0].que}" onclick="${abre[0].llamada}"`
-      : (claseAtrasada ? ` class="${claseAtrasada.trim()}"` : "");
+      ? ` class="abre-editor${claseAtrasada}" title="${viejo}Clic para ${abre[0].que}" onclick="${abre[0].llamada}"`
+      : (claseAtrasada ? ` class="${claseAtrasada.trim()}" title="${TITULO_PEDIDO_VIEJO}"` : "");
     return `
     <tr${clic}>
       <td>${esc(p.pedido_id)}</td>
