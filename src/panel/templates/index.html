@@ -461,15 +461,17 @@
   tr.sep-fecha td { background:#eef1f6; color:var(--mut); font-weight:700;
                     font-size:12px; padding:5px 10px; border-bottom:1px solid #dde2ea; }
   tr.sep-fecha:hover td { background:#eef1f6; }
-  tr.sep-fecha.sep-fecha-antigua td { background:#f97316; color:#ffffff; }
-  tr.sep-fecha.sep-fecha-antigua:hover td { background:#f97316; }
-  /* Filas de un grupo atrasado: amarillo resaltador (2026-08-07, pedido del
-     usuario: los matices suaves anteriores no se distinguían del blanco). El
-     separador de fecha va en naranja para seguir mandando sobre sus filas. */
-  tr.fila-atrasada td { background:#fde047; }
-  tr.fila-atrasada:hover td { background:#facc15; }
-  tr.fam-cabecera.fila-atrasada td { background:#fbbf24; }
-  tr.fam-cabecera.fila-atrasada:hover td { background:#f5b312; }
+  tr.sep-fecha.sep-fecha-antigua td { background:#f2d488; color:#6b4e00; }
+  tr.sep-fecha.sep-fecha-antigua:hover td { background:#f2d488; }
+  /* Filas de un grupo atrasado (2026-08-08, pedido del usuario): amarillo
+     suave, visible contra el blanco pero sin el tono resaltador que cansa la
+     vista. El separador de fecha comparte la familia ámbar, un paso más
+     saturado, para seguir mandando sobre sus filas sin cortar la tabla con un
+     naranja de contraste ajeno. */
+  tr.fila-atrasada td { background:#fef5b8; }
+  tr.fila-atrasada:hover td { background:#fdeb96; }
+  tr.fam-cabecera.fila-atrasada td { background:#fce18c; }
+  tr.fam-cabecera.fila-atrasada:hover td { background:#f9d670; }
   /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
