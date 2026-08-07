@@ -15316,6 +15316,7 @@ async function cargarAjustes() {
     nombreMaquina = d.nombre_maquina || "";
     vendedorMaquina = d.vendedor_maquina || "";
     configPendiente = d.configuracion_pendiente || [];
+    vendedoresPorBajar = !!d.vendedores_por_bajar;
     $("maquina-nombre").value = nombreMaquina;
     pintarSelectVendedores($("vendedor-select"), vendedorMaquina);
     // Sin "equipo: …": el nombre está en el campo de al lado (2026-07-29).
@@ -15353,9 +15354,17 @@ async function cargarAjustes() {
     pintarBloqueoMaquina();
     // Mientras la computadora espera activación no se pide configurarla: la
     // pantalla de activación ya la tapa y el nombre lo toma de ahí.
-    if (!ACCESO_TAPA.includes(acceso.estado || "activo")
-        && (d.configuracion_pendiente || []).length && !resolverConfigMaquina)
-      abrirConfigMaquina(d.configuracion_pendiente);
+    if (resolverConfigMaquina && !configPendiente.length
+        && !vistaPreviaConfigMaquina) {
+      // Se completó sola mientras el formulario estaba abierto (bajó del sync
+      // lo que el administrador aprobó): no se le puede dejar al operador un
+      // aviso bloqueante pidiendo algo que ya está puesto. Resuelve `true`, así
+      // que el llenado que lo abrió sigue solo.
+      cerrarConfigMaquina(true);
+    } else if (!ACCESO_TAPA.includes(acceso.estado || "activo")
+        && configPendiente.length && !resolverConfigMaquina
+        && !vendedoresPorBajar)
+      abrirConfigMaquina(configPendiente);
     // Los bloques de admin se pintan por la supervisión EFECTIVA: con "ver
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
     const supervision = esMaquinaAdmin && esSupervisionEfectiva();
@@ -16719,6 +16728,16 @@ let nombreMaquina = "";        // lo que hay guardado ahora en esta máquina
 let vendedorMaquina = "";      // "" = ninguno elegido todavía
 let vendedoresCatalogo = [];   // activos, para los dos selectores
 let configPendiente = [];      // códigos de la configuración que falta aquí
+// El catálogo de vendedores todavía no bajó a esta computadora (2026-08-07).
+// Recién activada, la nube le empieza a responder en ese momento y su primera
+// sincronización corre en segundo plano: durante esos segundos el selector solo
+// ofrece el 0000 de reserva, así que este aviso pediría un vendedor que no está
+// entre qué elegir — y no suelta ni con Escape ni con clic afuera. Se espera a
+// que baje: el sondeo recarga AJUSTES en cuanto llega (entidades 'vendedores' y
+// 'maquinas') y para entonces el vendedor que aprobó el administrador ya está
+// puesto. El candado del llenado no se toca: sin vendedor el servidor lo sigue
+// cortando con 'sin_configurar'.
+let vendedoresPorBajar = false;
 const CONFIGMAQ_TEXTOS = {
   nombre: "el nombre de esta computadora",
   vendedor: "el vendedor con el que facturas",
@@ -16743,6 +16762,14 @@ function abrirConfigMaquina(falta, soloVista = false) {
   vistaPreviaConfigMaquina = soloVista;
   const pendientes = soloVista ? [] : (falta && falta.length
     ? falta : ["nombre", "vendedor", "dia_despacho"]);
+  // Guardar exige los tres campos, así que sin el catálogo de vendedores el
+  // formulario no se puede completar: se dice qué pasa en vez de abrir un aviso
+  // bloqueante sin salida (ver vendedoresPorBajar).
+  if (!soloVista && vendedoresPorBajar && pendientes.includes("vendedor")) {
+    mensaje("La configuración de esta computadora todavía está bajando de la "
+            + "nube; en cuanto llegue queda puesta y podrás facturar.", "alerta");
+    return Promise.resolve(false);
+  }
   if (soloVista) {
     $("configmaq-intro").textContent =
       "Vista previa: nada se borró, son los valores ya guardados en esta computadora.";
