@@ -2688,7 +2688,11 @@
          hasta que alguien la aprueba aquí; el bloque solo existe para la
          supervisión y los equipos con rol Admin. -->
     <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
-      <h3>Computadoras esperando activación</h3>
+      <!-- El título cambia con el botón de abajo: mientras se listan solo las
+           que esperan es "Solicitudes de activación"; al sumar las ya activas
+           pasa a "Computadoras registradas", porque el título viejo quedaba
+           mintiendo sobre lo que se estaba viendo. -->
+      <h3 id="solicitudes-titulo">Solicitudes de activación</h3>
       <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
         entrar con el nombre que le puso quien la instaló. Hasta que se active
         no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
@@ -2700,7 +2704,7 @@
          style="margin:0; display:none; color:var(--err)"></p>
       <div style="margin-top:12px">
         <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
-                class="secundario">Ver también las ya activas</button>
+                class="secundario">Ver las computadoras registradas</button>
       </div>
     </div>
 
@@ -3321,11 +3325,11 @@
          descuento se lee como que el cambio no quedó, sobre todo llegando desde
          la revisión del lote. Descartar va de último: es el que deshace. -->
     <div class="editor-acciones">
-      <button class="acento" id="detalle-llenar" style="display:none"
+      <button data-preseleccionado class="acento" id="detalle-llenar" style="display:none"
               onclick="llenarDesdeDetalle()">Llenar</button>
       <button class="primario" id="detalle-guardar" style="display:none"
               onclick="guardarYVolverDetalle()">Guardar cambios</button>
-      <button id="detalle-volver" onclick="cerrarDetalle()">Volver</button>
+      <button data-preseleccionado id="detalle-volver" onclick="cerrarDetalle()">Volver</button>
       <button id="detalle-descartar" style="display:none"
               onclick="descartarCambiosDetalle()">Descartar cambios</button>
     </div>
@@ -8458,9 +8462,13 @@ const CAMPOS_MENU_CONTEXTO =
 let menuCampo = null;          // campo sobre el que se abrió el menú
 let menuIni = 0, menuFin = 0;  // su selección al abrirlo: pulsar el menú la pierde
 
+// Que el menú esté abierto se pregunta por menuCampo y no por el display del
+// elemento: los bancos de Mac evalúan este archivo sobre un DOM mínimo donde
+// ese estilo no viene puesto, y leerlo daba el menú por abierto (2026-08-07).
 function menuContextoCerrar() {
+  if (!menuCampo) return;
   const menu = $("menu-contexto");
-  if (menu) menu.style.display = "none";
+  if (menu && menu.style) menu.style.display = "none";
   menuCampo = null;
 }
 
@@ -8493,15 +8501,15 @@ document.addEventListener("contextmenu", (e) => {
 });
 
 document.addEventListener("pointerdown", (e) => {
+  if (!menuCampo) return;
   const menu = $("menu-contexto");
-  if (menu && menu.style.display !== "none" && !menu.contains(e.target)) menuContextoCerrar();
+  if (!menu || !menu.contains || !menu.contains(e.target)) menuContextoCerrar();
 }, true);
 
 // En captura y cortando la propagación: con el menú abierto, Escape lo cierra a
 // él y no al modal que haya detrás.
 document.addEventListener("keydown", (e) => {
-  const menu = $("menu-contexto");
-  if (e.key === "Escape" && menu && menu.style.display !== "none") {
+  if (menuCampo && e.key === "Escape") {
     e.stopPropagation();
     menuContextoCerrar();
   }
@@ -8538,13 +8546,14 @@ async function leerPortapapeles() {
 // facturación, reiniciarlo—, la opción segura, de modo que la delicada se
 // alcance con un Tab y nunca con un Enter suelto. Los diálogos que se llenan a
 // mano no preseleccionan botón: ahí el foco pertenece al primer campo.
-function preseleccionar(boton) {
-  const btn = typeof boton === "string" ? $(boton) : boton;
-  if (!btn || btn.disabled) return;
-  // Tras el pintado: enfocar dentro de un contenedor que acaba de dejar de
-  // estar oculto no siempre prende en el mismo cuadro.
+function preseleccionar(dialogo) {
+  if (!dialogo) return;
+  // La elección va dentro del cuadro siguiente y no aquí: enfocar en un
+  // contenedor que acaba de dejar de estar oculto no siempre prende, y para
+  // entonces el diálogo ya terminó de pintarse.
   requestAnimationFrame(() => {
-    if (btn.disabled || !btn.isConnected) return;
+    const btn = botonPreseleccionado(dialogo);
+    if (!btn || !btn.isConnected || document.activeElement === btn) return;
     try { btn.focus({ preventScroll: true }); } catch (_) { return; }
     if (document.activeElement !== btn) return;
     btn.classList.add("preseleccionado");
@@ -8555,30 +8564,111 @@ function preseleccionar(boton) {
 
 // El botón elegido se marca con data-preseleccionado en el HTML, pegado a él,
 // para que se vea al leer la botonera y no en una lista aparte que se
-// desincronice. Se vigila la clase "visible" —que es como se muestran los
-// diálogos— en vez de tocar cada apertura: son más de veinte y varias ventanas
-// se abren por dos caminos distintos, así ninguna vía queda sin foco.
-// El vigilante solo existe si el entorno trae MutationObserver: los bancos de
-// Mac evalúan este archivo sobre un DOM mínimo (scripts/pruebas/*.mjs) y sin
+// desincronice. Se vigila cuándo se muestra cada diálogo en vez de tocar cada
+// apertura: son más de veinte y varias ventanas se abren por dos caminos
+// distintos, así ninguna vía queda sin foco.
+const dialogosAbiertos = [];   // en orden de apertura: el último es el de encima
+
+// Mientras hay un diálogo abierto, Tab se queda dentro de él. Antes recorría
+// también el fondo —los Llenar y Descartar de la lista entera— y el ciclo se
+// hacía larguísimo (2026-08-07, pedido del usuario). inert saca del recorrido y
+// del ratón el subárbol completo; donde el motor no lo soporte, la propiedad se
+// ignora y el Tab queda como estaba, sin romper nada.
+function aplicarInerciaDeFondo() {
+  const encima = dialogosAbiertos[dialogosAbiertos.length - 1] || null;
+  for (const hijo of document.body.children) {
+    if (hijo.tagName === "SCRIPT" || hijo.id === "menu-contexto") continue;
+    hijo.inert = !!encima && hijo !== encima;
+  }
+}
+
+// Durante un llenado el foreground lo tiene el programa de facturación, así que
+// el foco del documento no basta: sin activar la ventana el operador tenía que
+// pulsarla antes de poder usar Tab o Enter (2026-08-07).
+function activarVentanaDelPanel() {
+  const api = window.pywebview && window.pywebview.api;
+  if (!api || !api.traer_al_frente) return;   // el panel abierto en el navegador
+  try { api.traer_al_frente(); } catch (_) {}
+}
+
+// Un diálogo puede traer más de un botón marcado, en orden de preferencia: el
+// detalle de un pedido esconde su botón de llenar cuando ese pedido no se puede
+// llenar, y entonces el foco tiene que caer en el siguiente marcado.
+function botonPreseleccionado(dialogo) {
+  for (const boton of dialogo.querySelectorAll("[data-preseleccionado]")) {
+    if (!boton.disabled && boton.offsetParent !== null) return boton;
+  }
+  return null;
+}
+
+// El contenido de un diálogo puede llegar DESPUÉS de abrirse: el detalle de un
+// pedido se muestra con "Buscando el detalle…" y su botón de llenar aparece
+// recién cuando responde el servidor. Mientras el operador no haya movido el
+// foco él mismo, se vuelve a elegir el mejor botón marcado.
+let vigilanteDeContenido = null;   // se arma abajo, con el resto de los vigilantes
+
+function seguirContenido(dialogo) {
+  if (!vigilanteDeContenido) return;
+  vigilanteDeContenido.disconnect();
+  if (dialogo) {
+    vigilanteDeContenido.observe(dialogo, {
+      childList: true, subtree: true, attributes: true,
+      attributeFilter: ["style", "class", "disabled"] });
+  }
+}
+
+function revisarDialogo(dialogo) {
+  const visible = getComputedStyle(dialogo).display !== "none";
+  const donde = dialogosAbiertos.indexOf(dialogo);
+  if (visible && donde === -1) {
+    dialogosAbiertos.push(dialogo);
+    aplicarInerciaDeFondo();   // antes del foco: en un subárbol inerte no prende
+    preseleccionar(dialogo);
+    if (dialogo.querySelector("[data-preseleccionado]")) activarVentanaDelPanel();
+    seguirContenido(dialogo);
+  } else if (!visible && donde !== -1) {
+    dialogosAbiertos.splice(donde, 1);
+    aplicarInerciaDeFondo();
+    // Al cerrarse el de encima, el que queda debajo recupera su preselección:
+    // se le fue el foco cuando el otro lo tapó.
+    const previo = dialogosAbiertos[dialogosAbiertos.length - 1] || null;
+    preseleccionar(previo);
+    seguirContenido(previo);
+  }
+}
+
+// Los vigilantes solo se arman si el entorno trae MutationObserver: los bancos
+// de Mac evalúan este archivo sobre un DOM mínimo (scripts/pruebas/*.mjs) y sin
 // esta guarda el `new` de aquí tumbaba los 35 de un golpe, dejando el panel
 // entero sin red de prueba (2026-08-07). En el navegador no cambia nada.
-const vigilanteDeDialogos = typeof MutationObserver === "undefined" ? null
-  : new MutationObserver((cambios) => {
-  for (const cambio of cambios) {
-    const dialogo = cambio.target;
-    const seAcabaDeAbrir = dialogo.classList.contains("visible")
-        && !(cambio.oldValue || "").split(" ").includes("visible");
-    if (seAcabaDeAbrir) preseleccionar(dialogo.querySelector("[data-preseleccionado]"));
-  }
-});
-if (vigilanteDeDialogos) {
-  document.querySelectorAll("[data-preseleccionado]").forEach((btn) => {
-    const dialogo = btn.closest("[id$='-overlay']");
-    if (dialogo) {
-      vigilanteDeDialogos.observe(dialogo, {
-        attributes: true, attributeFilter: ["class"], attributeOldValue: true });
-    }
+if (typeof MutationObserver !== "undefined") {
+  // Por display calculado y no por la clase "visible": unos diálogos se muestran
+  // con esa clase y otros escribiendo el style, y así los dos caminos entran.
+  const dialogosDelPanel = document.querySelectorAll("[id$='-overlay']");
+  const vigilanteDeDialogos = new MutationObserver((cambios) => {
+    for (const cambio of cambios) revisarDialogo(cambio.target);
   });
+  // Repintados del diálogo de encima: se rehace la elección solo si el foco
+  // sigue donde lo dejamos —el operador que ya tabuló manda— y preseleccionar()
+  // se corta solo cuando el botón elegido no cambió, así el anillo que él mismo
+  // pone no vuelve a disparar esto.
+  vigilanteDeContenido = new MutationObserver(() => {
+    const dialogo = dialogosAbiertos[dialogosAbiertos.length - 1];
+    if (!dialogo) return;
+    const foco = document.activeElement;
+    const sinTocar = !foco || foco === document.body
+        || (foco.hasAttribute && foco.hasAttribute("data-preseleccionado"));
+    if (sinTocar) preseleccionar(dialogo);
+  });
+  dialogosDelPanel.forEach((dialogo) => {
+    vigilanteDeDialogos.observe(dialogo, {
+      attributes: true, attributeFilter: ["class", "style"] });
+  });
+  // Hay diálogos que el CSS oculta por una clase del body (modo-llenado), sin
+  // que cambie nada en el diálogo mismo: sin repasarlos aquí, uno de esos
+  // quedaría en la pila como abierto y el fondo, inerte para siempre.
+  new MutationObserver(() => dialogosDelPanel.forEach(revisarDialogo))
+      .observe(document.body, { attributes: true, attributeFilter: ["class"] });
 }
 
 async function menuContextoAccion(accion, btn) {
@@ -15102,8 +15192,10 @@ function pintarSolicitudes() {
     s => s.estado === "pendiente" || s.reinstalacion_pendiente);
   const resto = solicitudes.filter(s => !espera.includes(s));
   const lista = verEquiposActivos ? [...espera, ...resto] : espera;
+  $("solicitudes-titulo").textContent = verEquiposActivos
+    ? "Computadoras registradas" : "Solicitudes de activación";
   $("solicitudes-ver-activos").textContent = verEquiposActivos
-    ? "Ver solo las que esperan" : "Ver también las ya activas";
+    ? "Ver solo las solicitudes" : "Ver las computadoras registradas";
   $("solicitudes-ver-activos").style.display = resto.length ? "" : "none";
   $("solicitudes-vacio").style.display =
     (!lista.length && !$("solicitudes-error").textContent) ? "" : "none";
