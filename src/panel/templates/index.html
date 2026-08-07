@@ -1445,7 +1445,6 @@
      mismas subtabs livianas del resto del panel. Supervisión usa el morado de
      ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
   #sup-subtabs { margin-bottom:12px; }
-  #ajustes-subtabs { margin-top:0; }
   #admin-subtab-ajustes { --st-fg:#64748b; --st-bg:#64748b; }
   #admin-subtab-supervision { --st-fg:#6b21a8; --st-bg:#7e22ce; }
   #admin-panel-supervision { padding:0 14px 18px; }
@@ -2652,25 +2651,29 @@
          #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
          que los abren. -->
     <div id="ajustes-home">
-     <!-- Subpestañas de AJUSTES (2026-08-07, pedido del usuario): las computadoras
-          del parque son un tema aparte de los ajustes de esta máquina y solo las
-          gestiona un editor/admin. La barra aparece solo cuando esa subpestaña está
-          disponible: con una sola vista no hay entre qué alternar.
-          Computadoras va primero (2026-08-07, pedido del usuario: es la que se
-          usa mucho más de las dos). -->
+     <!-- Subpestañas de AJUSTES (2026-08-07, pedido del usuario): tres temas que
+          no se mezclan — los datos del negocio (iguales en todas las máquinas),
+          las computadoras del parque (solo editor/admin) y lo que cada quien
+          configura en SU equipo. Cada botón aparece solo si su vista tiene algo
+          que mostrar con los permisos del rol; con una sola vista no hay entre
+          qué alternar y la barra entera se esconde (ver pintarSubtabsAjustes). -->
     <div id="ajustes-subtabs" class="desc-subtabs" style="display:none">
+      <button type="button" id="ajustes-subtab-catalogos"
+              class="desc-subtab st-vigentes"
+              onclick="mostrarSubtabAjustes('catalogos')">Catálogos</button>
       <button type="button" id="ajustes-subtab-equipos"
-              class="desc-subtab st-proximas"
+              class="desc-subtab st-proximas activa"
               onclick="mostrarSubtabAjustes('equipos')">Otras computadoras<span
               class="cuenta" id="ajustes-subtab-equipos-cuenta"></span></button>
       <button type="button" id="ajustes-subtab-general"
-              class="desc-subtab st-historico activa"
+              class="desc-subtab st-historico"
               onclick="mostrarSubtabAjustes('general')">Esta máquina</button>
     </div>
-    <div id="ajustes-vista-general">
-      <!-- Catálogos primero en Ajustes (2026-08-05, pedido del usuario): mismo
-           bloque de siempre, solo que ahora abre la vista en vez de ir al
-           final — sigue oculto salvo permiso ajustes_catalogos (Editor/Admin). -->
+    <!-- Lo que NO es de esta máquina ni del parque: los datos del negocio, que
+         son iguales en todas las computadoras (2026-08-07, pedido del usuario
+         de partir AJUSTES en tres). Cada bloque sigue apareciendo según su
+         permiso; si no queda ninguno, cargarAjustes esconde la subpestaña. -->
+    <div id="ajustes-vista-catalogos" style="display:none">
       <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
            #catalogo-overlay / #rutas-overlay) — ver
            pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
@@ -2680,6 +2683,34 @@
           códigos usados por programa de facturación.</p>
         <div class="cat-btns" id="cat-btns"></div>
       </div>
+      <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
+           ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
+      <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
+        <h3>Series por ruta</h3>
+        <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
+          seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
+        <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
+      </div>
+      <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
+           el 2026-08-05, pedido del usuario): la cambian la supervisión y los
+           equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
+           el mundo — cambiar el corte es operación real, no opción de prueba. -->
+      <div class="ajustes-bloque" id="corte-bloque" style="display:none">
+        <h3>Fecha de corte de producción</h3>
+        <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
+          ofrecen en ninguna parte: son los que se facturaron a mano antes de
+          arrancar con el asistente. Muévela hacia adelante a medida que avance
+          la implantación, para que los días viejos que ya no se van a llenar
+          dejen de estorbar en pendientes y en revisión. Vale para todos los
+          equipos: cada uno la toma en su próximo refresco.</p>
+        <div class="ajustes-fila">
+          <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
+          <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
+        </div>
+        <div id="corte-confirma" style="display:none"></div>
+      </div>
+    </div>
+    <div id="ajustes-vista-general">
       <!-- Esta máquina (2026-07-29): las dos cosas que cada quien configura en SU
            computadora, juntas porque son obligatorias juntas — sin las dos no se
            llena nada (ver el aviso #configmaq-overlay). El nombre salió del
@@ -2735,32 +2766,6 @@
           Esa es la fecha estándar con la que se factura y se trae la tasa; el
           botón del calendario la repone con un clic, y en cualquier factura se
           puede cambiar a mano.</p>
-      </div>
-      <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
-           ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
-      <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
-        <h3>Series por ruta</h3>
-        <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
-          seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
-        <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
-      </div>
-      <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
-           el 2026-08-05, pedido del usuario): la cambian la supervisión y los
-           equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
-           el mundo — cambiar el corte es operación real, no opción de prueba. -->
-      <div class="ajustes-bloque" id="corte-bloque" style="display:none">
-        <h3>Fecha de corte de producción</h3>
-        <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
-          ofrecen en ninguna parte: son los que se facturaron a mano antes de
-          arrancar con el asistente. Muévela hacia adelante a medida que avance
-          la implantación, para que los días viejos que ya no se van a llenar
-          dejen de estorbar en pendientes y en revisión. Vale para todos los
-          equipos: cada uno la toma en su próximo refresco.</p>
-        <div class="ajustes-fila">
-          <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
-          <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
-        </div>
-        <div id="corte-confirma" style="display:none"></div>
       </div>
     </div>
     <div id="ajustes-vista-equipos" style="display:none">
@@ -15763,7 +15768,10 @@ setInterval(sondearAcceso, 60000);
 // no gestiona activaciones (regla del usuario, 2026-08-05). El backend repite
 // el candado en cada endpoint; esto decide qué se pinta.
 let accesoGestion = false;
-let subtabAjustes = "general";
+// AJUSTES abre en Computadoras cuando el permiso la habilita (2026-08-07,
+// pedido del usuario: es la que más se usa de las tres). Sin ese permiso,
+// pintarSubtabsAjustes cae a la primera que el rol sí tenga.
+let subtabAjustes = "equipos";
 let solicitudes = [];
 
 const fechaAcceso = (iso) => {
@@ -15793,27 +15801,46 @@ async function cargarSolicitudesAcceso() {
   pintarSolicitudes();
 }
 
+const VISTAS_AJUSTES = {
+  catalogos: ["ajustes-vista-catalogos", "ajustes-subtab-catalogos"],
+  equipos:   ["ajustes-vista-equipos",   "ajustes-subtab-equipos"],
+  general:   ["ajustes-vista-general",   "ajustes-subtab-general"],
+};
+
 function mostrarSubtabAjustes(cual) {
-  subtabAjustes = cual === "equipos" ? "equipos" : "general";
-  const esEquipos = subtabAjustes === "equipos";
-  $("ajustes-vista-general").style.display = esEquipos ? "none" : "";
-  $("ajustes-vista-equipos").style.display = esEquipos ? "" : "none";
-  $("ajustes-subtab-general").classList.toggle("activa", !esEquipos);
-  $("ajustes-subtab-equipos").classList.toggle("activa", esEquipos);
+  subtabAjustes = VISTAS_AJUSTES[cual] ? cual : "general";
+  for (const [id, [vista, boton]] of Object.entries(VISTAS_AJUSTES)) {
+    $(vista).style.display = id === subtabAjustes ? "" : "none";
+    $(boton).classList.toggle("activa", id === subtabAjustes);
+  }
 }
 
 // La subpestaña de computadoras es de editores/admin: el mismo permiso que
-// ya habilita cada control de adentro. Sin ninguno, la barra no se pinta y
-// AJUSTES se ve igual que siempre.
+// ya habilita cada control de adentro. Sin ninguno, su botón no se pinta.
 function puedeVerComputadoras() {
   return accesoGestion || tienePermiso("identidad_maquina")
       || tienePermiso("gestionar_editores") || tienePermiso("activar_maquinas");
 }
 
+// Qué subpestañas tienen algo que mostrar con los permisos de este rol. La de
+// esta máquina siempre está (nombre, vendedor y día de despacho no se degradan
+// por rol); la de catálogos, solo si alguno de sus tres bloques quedó visible
+// —cargarAjustes ya los decidió antes de llamar aquí—.
+function subtabsAjustesDisponibles() {
+  const hayCatalogos = ["catalogos-bloque", "rutas-series-bloque", "corte-bloque"]
+    .some(id => $(id).style.display !== "none");
+  return {catalogos: hayCatalogos, equipos: puedeVerComputadoras(), general: true};
+}
+
 function pintarSubtabsAjustes() {
-  const disponible = puedeVerComputadoras();
-  $("ajustes-subtabs").style.display = disponible ? "" : "none";
-  mostrarSubtabAjustes(disponible ? subtabAjustes : "general");
+  const hay = subtabsAjustesDisponibles();
+  for (const [id, [, boton]] of Object.entries(VISTAS_AJUSTES))
+    $(boton).style.display = hay[id] ? "" : "none";
+  // Con una sola vista no hay entre qué alternar: sobra la barra entera.
+  const cuantas = Object.values(hay).filter(Boolean).length;
+  $("ajustes-subtabs").style.display = cuantas > 1 ? "" : "none";
+  mostrarSubtabAjustes(hay[subtabAjustes] ? subtabAjustes
+    : hay.equipos ? "equipos" : hay.catalogos ? "catalogos" : "general");
   const espera = solicitudes.filter(
     s => s.estado === "pendiente" || s.reinstalacion_pendiente).length;
   $("ajustes-subtab-equipos-cuenta").textContent = espera ? `(${espera})` : "";
