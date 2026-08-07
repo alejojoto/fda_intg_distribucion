@@ -6686,6 +6686,11 @@ function opcionHacerPredetRuta() {
 function opcionRutaPredet() {
   const hacer = opcionHacerPredetRuta();
   if (hacer) return hacer;
+  // Quitarla es de quien la eligió (2026-08-07, regla del usuario): en una
+  // computadora sujeta a rutas la predeterminada la fija un Editor desde
+  // AJUSTES → Computadoras, así que el operador no la borra. El servidor ya
+  // lo rechaza; esta guarda evita ofrecer la opción que va a dar error.
+  if (exigeRuta) return "";
   if (rutaPredeterminada)
     return `<option value="${QUITAR_PREDET}">Quitar la ruta predeterminada (${
       esc(etiquetaRutaCorta(rutaPredeterminada))})</option>`;
@@ -8244,6 +8249,13 @@ async function cargar(conservarScroll = false) {
     // Series disponibles en esta computadora (2026-08-07): recortan el
     // selector de Serie en el pintarSeries() de más abajo.
     seriesMaquina = d.series_maquina || seriesMaquina;
+    // Si esta computadora está sujeta a rutas, en cada refresco (2026-08-07):
+    // antes solo llegaba en /api/ajustes, que no corre en el sondeo, así que
+    // asignarle rutas desde otro equipo no se notaba en el desplegable hasta
+    // reabrir el panel — seguía ofreciendo "Todas" y "Quitar la ruta
+    // predeterminada", que el servidor rechaza.
+    exigeRuta = !!d.exige_ruta;
+    rutaFija = !!d.ruta_fija;
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
     rutaPredeterminada = d.ruta_predeterminada || "";
     seriePredeterminada = d.serie_predeterminada || "";
@@ -8267,8 +8279,9 @@ async function cargar(conservarScroll = false) {
       }
     }
     // Sin ruta guardada en una máquina que exige una: se elige sola (ver
-    // preseleccionarRutaSiFalta). Va aquí y en la carga de ajustes porque
-    // exigeRuta y pendientes_por_ruta llegan por respuestas distintas.
+    // preseleccionarRutaSiFalta). Va aquí y en la carga de ajustes porque el
+    // catálogo de rutas ofrecidas y pendientes_por_ruta llegan por respuestas
+    // distintas.
     preseleccionarRutaSiFalta();
     pintarRutas(d.rutas, d.hay_sin_ruta);
     dispositivoPropio = d.dispositivo_propio || "";
