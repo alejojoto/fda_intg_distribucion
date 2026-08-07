@@ -773,7 +773,8 @@
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
       padding:0 10px 6px 0; white-space:nowrap; }
   .equipos-tabla td { padding:4px 10px 4px 0; vertical-align:middle; }
-  .equipos-tabla .equipos-host { color:var(--mut); font-size:12.5px;
+  .equipos-tabla .equipos-nombre { font-weight:600; font-size:13px; }
+  .equipos-tabla .equipos-host { color:var(--mut); font-size:12px;
       min-width:110px; }
   .equipos-tabla input[type=text] { width:190px; }
   .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
@@ -858,15 +859,31 @@
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
       border-radius:6px; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
+  /* Nombre y vendedor a la par, y "Todas" con su predeterminada en la misma
+     línea (2026-08-07, pedido del usuario): la ventana se lee en menos
+     franjas y entra completa sin scroll. */
+  .equipo-config-par { display:flex; gap:16px; align-items:flex-start; }
+  .equipo-config-par > .acceso-campo { flex:1 1 0; min-width:0; margin-top:0; }
+  .equipo-config-linea { display:flex; align-items:center; gap:16px;
+      flex-wrap:wrap; margin-bottom:6px; }
+  .equipo-config-linea > .acceso-check { margin:0; }
+  .equipo-config-linea > .acceso-predet { margin:0; flex:1 1 auto;
+      justify-content:flex-end; }
+  .equipo-config-linea > .acceso-predet select { flex:0 1 240px; }
   /* Día a facturar: son dos opciones, hoy o mañana. Un desplegable obliga a
      abrirlo para ver qué hay (2026-08-07, pedido del usuario), así que van a
      la vista tanto en la ventana como en la fila de cada computadora. */
   .dia-opciones { display:flex; align-items:center; gap:18px; font-size:13px; }
   .dia-opciones label { display:flex; align-items:center; gap:5px;
       cursor:pointer; }
-  .equipos-config .dia-opciones { font-size:12px; gap:12px; margin-top:4px; }
-  .equipos-config .mut { font-size:12px; display:block; margin-bottom:4px; }
-  .equipos-config button { font-size:12px; padding:3px 8px; }
+  /* La celda de la fila reparte en una línea: series, rutas, el día y el
+     botón, sin apilarse (2026-08-07, pedido del usuario). */
+  .equipos-config { display:flex; align-items:center; gap:16px;
+      flex-wrap:wrap; }
+  .equipos-config .dia-opciones { font-size:12px; gap:12px; }
+  .equipos-config .mut { font-size:12px; }
+  .equipos-config button { font-size:12px; padding:3px 8px;
+      margin-left:auto; }
   /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
      columna es angosta, así que el texto va sobre el botón y no al lado. */
   .sup-config-celda .mut { font-size:12px; display:block; margin-bottom:4px; }
@@ -3408,18 +3425,22 @@
   <div id="equipo-config">
     <h3 id="equipo-config-titulo"></h3>
     <p class="mut" id="equipo-config-intro" style="display:none; font-size:12.5px"></p>
-    <div class="acceso-campo" id="equipo-config-nombre-campo">
-      <label for="equipo-config-nombre" id="equipo-config-nombre-rotulo">Nombre</label>
-      <input type="text" id="equipo-config-nombre" maxlength="40"
-             placeholder="Nombre de la computadora">
-      <p class="mut" id="equipo-config-nombre-nota" style="margin:4px 0 0; font-size:12.5px"></p>
-      <p class="acceso-campo-error" id="equipo-config-err-nombre"></p>
-    </div>
-    <div class="acceso-campo" id="equipo-config-vendedor-campo">
-      <label for="equipo-config-vendedor" id="equipo-config-vendedor-rotulo">Vendedor</label>
-      <select id="equipo-config-vendedor"></select>
-      <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
-      <p class="acceso-campo-error" id="equipo-config-err-vendedor"></p>
+    <!-- Nombre y vendedor lado a lado (2026-08-07, pedido del usuario): son
+         dos datos cortos y juntos ocupan una sola franja de la ventana. -->
+    <div class="equipo-config-par">
+      <div class="acceso-campo" id="equipo-config-nombre-campo">
+        <label for="equipo-config-nombre" id="equipo-config-nombre-rotulo">Nombre</label>
+        <input type="text" id="equipo-config-nombre" maxlength="40"
+               placeholder="Nombre de la computadora">
+        <p class="mut" id="equipo-config-nombre-nota" style="margin:4px 0 0; font-size:12.5px"></p>
+        <p class="acceso-campo-error" id="equipo-config-err-nombre"></p>
+      </div>
+      <div class="acceso-campo" id="equipo-config-vendedor-campo">
+        <label for="equipo-config-vendedor" id="equipo-config-vendedor-rotulo">Vendedor</label>
+        <select id="equipo-config-vendedor"></select>
+        <span class="mut" id="equipo-config-vendedor-texto" style="display:none"></span>
+        <p class="acceso-campo-error" id="equipo-config-err-vendedor"></p>
+      </div>
     </div>
     <!-- Series, rutas y día en ese orden (2026-08-07, pedido del usuario):
          el mismo con el que se resumen en la línea de cada computadora, para
@@ -3429,30 +3450,37 @@
       <p class="mut equipo-config-ayuda">Son las series que esa computadora
         tiene cargadas en el programa de facturación. La predeterminada es con
         la que arranca cada factura suya.</p>
-      <label class="acceso-check"><input type="checkbox" id="equipo-config-series-todas"
-             onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
+      <!-- "Todas" y la predeterminada comparten línea (2026-08-07, pedido del
+           usuario): son las dos decisiones de la sección y leerlas juntas
+           ahorra una franja entera. -->
+      <div class="equipo-config-linea">
+        <label class="acceso-check"><input type="checkbox" id="equipo-config-series-todas"
+               onchange="configEquipoRecalcular('series')"> <span id="equipo-config-series-todas-rotulo"></span></label>
+        <div class="acceso-predet" id="equipo-config-series-predet-campo">
+          <label for="equipo-config-series-predet" id="equipo-config-series-predet-rotulo"></label>
+          <select id="equipo-config-series-predet"></select>
+          <span id="equipo-config-series-predet-texto" style="display:none"></span>
+        </div>
+      </div>
       <div id="equipo-config-series-lista" class="acceso-lista"></div>
       <p class="acceso-campo-error" id="equipo-config-err-series"></p>
-      <div class="acceso-predet" id="equipo-config-series-predet-campo">
-        <label for="equipo-config-series-predet" id="equipo-config-series-predet-rotulo"></label>
-        <select id="equipo-config-series-predet"></select>
-        <span id="equipo-config-series-predet-texto" style="display:none"></span>
-      </div>
       <p class="acceso-campo-error" id="equipo-config-err-serie_predeterminada"></p>
     </div>
     <div class="acceso-campo" id="equipo-config-rutas-campo">
       <label id="equipo-config-rutas-rotulo" style="display:none"></label>
       <p class="mut equipo-config-ayuda">Solo verá pedidos de esas rutas; con
         la predeterminada arranca ya filtrada al abrir.</p>
-      <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
-             onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
+      <div class="equipo-config-linea">
+        <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
+               onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
+        <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
+          <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
+          <select id="equipo-config-rutas-predet"></select>
+          <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
+        </div>
+      </div>
       <div id="equipo-config-rutas-lista" class="acceso-lista"></div>
       <p class="acceso-campo-error" id="equipo-config-err-rutas"></p>
-      <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
-        <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
-        <select id="equipo-config-rutas-predet"></select>
-        <span id="equipo-config-rutas-predet-texto" style="display:none"></span>
-      </div>
       <p class="acceso-campo-error" id="equipo-config-err-ruta_predeterminada"></p>
     </div>
     <div class="acceso-campo" id="equipo-config-dia-campo">
@@ -16119,7 +16147,8 @@ function pintarEquipos() {
     // del usuario): es lo que más se mueve de un día para otro y no amerita
     // abrir la ventana.
     const config = `<td class="equipos-config">
-      <span class="mut">${esc(resumenSeriesRutasEquipo(m))}</span>
+      <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
+      <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
       <div class="dia-opciones">
         <label><input type="radio" name="dia-equipo-${host}" value="manana"
                ${m.dia_despacho === "manana" ? "checked" : ""}
@@ -16130,13 +16159,15 @@ function pintarEquipos() {
       </div>
       <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
+    // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
+    // pedido del usuario): aquí se leen, junto al identificador de la
+    // computadora, para saber de cuál es la fila.
     return `<tr>
-      <td class="equipos-host">${host}</td>
-      <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
-                 placeholder="Sin nombre" ${puedeIdentidad
-                   ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></td>
-      <td><select ${puedeIdentidad
-                   ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></select></td>
+      <td>
+        <div class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</div>
+        <div class="equipos-host">${host}</div>
+        <div class="equipos-host">${esc(etiquetaVendedorEquipo(m.vendedor))}</div>
+      </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
       ${puedeActivar ? activa : ""}
@@ -16144,17 +16175,21 @@ function pintarEquipos() {
   }).join("");
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
-      <th>Computadora</th><th>Nombre</th><th>Vendedor</th>
+      <th>Computadora</th>
       ${puedeIdentidad ? "<th>Series, rutas y día</th>" : ""}
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
     </tr></thead>
     <tbody>${filas}</tbody></table>`;
-  $("equipos-lista").querySelectorAll("tbody tr").forEach((fila, indice) => {
-    pintarSelectVendedores(fila.querySelector("select"),
-                           equipos[indice].vendedor || "");
-  });
+}
+
+// El vendedor de esa computadora, con código y nombre juntos; sin catálogo a
+// mano queda el código solo, que es lo que se sabe.
+function etiquetaVendedorEquipo(codigo) {
+  if (!codigo) return "Sin vendedor";
+  const v = vendedoresCatalogo.find(x => x.codigo === codigo);
+  return v && v.nombre ? `${codigo} — ${v.nombre}` : codigo;
 }
 
 // Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
@@ -16249,33 +16284,6 @@ async function cambiarActivaEquipo(dispositivo, caja) {
   }
 }
 
-// Sin botón Guardar (2026-08-06, pedido del usuario): nombre y vendedor
-// guardan al salir del campo o elegir en el selector. Tras un error NO se
-// repinta: lo tecleado queda a la vista para corregirlo.
-async function guardarEquipoIdentidad(dispositivo, control) {
-  const fila = control.closest("tr");
-  const nombre = fila.querySelector('input[type="text"]').value.trim();
-  const vendedor = fila.querySelector("select").value;
-  if (!nombre) {
-    mensaje("Escribe el nombre de la computadora.", "error");
-    return;
-  }
-  control.disabled = true;
-  try {
-    const r = await api("/api/ajustes/equipo-identidad",
-                        {dispositivo, nombre, vendedor});
-    equipos = r.equipos_gestionables || [];
-    pintarEquipos();
-    mensaje(r.aviso ? `Datos guardados. ${r.aviso}`
-                    : "Datos de la computadora guardados.",
-            r.aviso ? "alerta" : "info");
-  } catch (e) {
-    mensaje(e.message, "error");
-  } finally {
-    control.disabled = false;
-  }
-}
-
 // El día a facturar desde la fila, sin abrir la ventana (2026-08-07). Viaja
 // por el mismo endpoint que la configuración completa, así que se reponen las
 // rutas y series que esa computadora ya tiene; null (sin configurar) equivale
@@ -16329,19 +16337,17 @@ const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
 // (2026-08-07): con qué series factura, qué rutas atiende y con qué día
 // arranca su Fecha a facturar. Es lo mismo que se cambia en "Detalles".
 function resumenConfigEquipo(m) {
-  return `${resumenSeriesRutasEquipo(m)}`
+  return `Series: ${resumenSeriesEquipo(m)} · Rutas: ${resumenRutasEquipo(m)}`
     + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
 }
 
-// Sin el día: en la fila de Computadoras el día es un par de opciones a la
-// vista justo debajo, y repetirlo también como texto sería el mismo dato dos
-// veces.
-function resumenSeriesRutasEquipo(m) {
-  return `Series: ${resumenAsignacion(m.series, m.serie_predeterminada,
-                                      "series", (x) => x)}`
-    + ` · Rutas: ${resumenAsignacion(m.rutas, m.ruta_predeterminada,
-                                     "rutas", etiquetaRutaCorta)}`;
-}
+// En la fila de Computadoras cada dato va en su propio bloque, repartido a lo
+// ancho de la celda; el día no se resume ahí porque está como par de opciones
+// a la vista, y repetirlo sería el mismo dato dos veces.
+const resumenSeriesEquipo = (m) =>
+  resumenAsignacion(m.series, m.serie_predeterminada, "series", (x) => x);
+const resumenRutasEquipo = (m) =>
+  resumenAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
 
 // La ventana sirve a dos orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
