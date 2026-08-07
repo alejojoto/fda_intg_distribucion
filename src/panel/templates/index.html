@@ -2364,7 +2364,8 @@
        SERIE también viaja siempre y es obligatoria: se elige en
        'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título. -->
   <div class="rutas-barra" id="rutas-barra">
-    <div class="campo"><span class="rotulo">Ruta</span><select id="f-ruta" onchange="cambioRuta(this.value)">
+    <div class="campo"><span class="rotulo">Ruta</span><select id="f-ruta" onchange="cambioRuta(this.value)"
+        title="Filtra la lista por ruta. La ★ marca con cuál abre el panel esta computadora.">
       <option value="">Todas</option></select></div>
     <div class="campo"><span class="rotulo">Serie</span>
       <!-- Automático por ruta (2026-08-02, AJUSTES → Rutas): visible SOLO
@@ -2376,7 +2377,7 @@
            descuadra contra el de Ruta, que no tiene aviso debajo. -->
       <span class="mut" id="serie-auto-nota" style="display:none"
             title="Esta ruta tiene una serie predeterminada configurada en AJUSTES → Rutas: se elige sola al elegir la ruta."></span><select id="f-serie"
-        title="Serie con la que sale cada factura de esta computadora. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
+        title="Serie con la que sale cada factura de esta computadora; la ★ marca con cuál arranca. Hace falta elegir una: se elige en 'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título."
         onchange="cambioSerie(this.value)"></select></div>
     <!-- data-atajo="despacho" (2026-07-21): el botón del medio del calendario
          de ESTE campo pone el día de despacho — se factura para el día de
@@ -2753,6 +2754,22 @@
           <b>vendedor</b> es el campo que se llena en la ficha de cada factura
           que se cargue desde aquí; solo aparecen los activos.
           Las dos cosas hacen falta para poder facturar.</p>
+      </div>
+      <!-- Rutas y series de esta computadora (2026-08-07, pedido del usuario):
+           antes la ruta y la serie predeterminadas se fijaban desde los
+           desplegables de la barra, con la opción "★ Hacer predeterminada".
+           Ahora se eligen aquí —junto con las rutas que atiende y las series
+           que tiene cargadas— con la misma ventana que se usa para las demás
+           computadoras. -->
+      <div class="ajustes-bloque" id="mi-config-bloque">
+        <h3>Rutas y series de esta máquina</h3>
+        <p class="mut" style="margin:4px 0 10px">Con qué series factura esta
+          computadora y qué rutas atiende. Las predeterminadas son con las que
+          arranca el panel al abrir.</p>
+        <div class="ajustes-fila">
+          <span class="mut" id="mi-config-resumen"></span>
+          <button class="primario" onclick="abrirConfigPropia()">Configurar rutas y series</button>
+        </div>
       </div>
       <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
            distinto — de tarde lo que sale al día siguiente, o de mañana lo que
@@ -5663,8 +5680,6 @@ async function resolverConflictoSync(id, decision, card) {
 let rutaSeleccionada = "";           // "" = todas; "__sin_ruta__" = sin Ruta Nombre
 let rutaPredeterminada = "";         // por máquina (config_dispositivo)
 let rutaPredetAplicada = false;      // la predeterminada se aplica solo al abrir
-const HACER_PREDET = "__hacer_predet__";
-const QUITAR_PREDET = "__quitar_predet__";
 
 // Series de pedidos vistas en Winledger (imagen del usuario 2026-07-19).
 // Solo el CAMPO por ahora: la lógica de series se define parte por parte;
@@ -5678,7 +5693,6 @@ let serieSeleccionada = "";
 let seriePredeterminada = "";
 let seriePredetAplicada = false;
 let babyPredetAplicado = false;      // el gramaje guardado se aplica solo al abrir
-const HACER_PREDET_SERIE = "__hacer_predet_serie__";
 
 // Config de serie de la ruta elegida (AJUSTES → Rutas, 2026-08-02), o null si
 // esa ruta no tiene fila en asistente_rutas_series — ahí sigue la selección
@@ -5713,14 +5727,9 @@ const seriesElegiblesDeRuta = (ruta) => {
   return seriesPermitidasDeRuta(ruta).filter(s => propias.includes(s));
 };
 
-// Misma regla que la ruta (opcionRutaPredet): la opción solo aparece cuando
-// de verdad va a cambiar algo. Con la predeterminada ya puesta no hay nada que
-// hacer, y sin serie elegida "hacerla predeterminada" borraría la guardada.
-function opcionSeriePredet(predetDeRuta) {
-  if (predetDeRuta || !serieSeleccionada || serieSeleccionada === seriePredeterminada) return "";
-  return `<option value="${HACER_PREDET_SERIE}">★ Hacer predeterminada la serie actual</option>`;
-}
-
+// Como la ruta (ver pintarRutas): fijar la serie predeterminada de esta
+// computadora dejó de hacerse desde este menú (2026-08-07, pedido del
+// usuario) y vive en AJUSTES → Esta máquina. Aquí queda la ★ que marca cuál es.
 function pintarSeries() {
   const cfg = configSerieDeRuta();
   // Las permitidas de la ruta cruzadas con las series de ESTA computadora
@@ -5755,25 +5764,14 @@ function pintarSeries() {
     ? "" : `<option value="" selected>— Elige una serie —</option>`;
   $("f-serie").innerHTML = vacia
     + pintadas.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
-        ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("")
-    + opcionSeriePredet(predetDeRuta);
+        ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("");
   const nota = $("serie-auto-nota");
   nota.style.display = predetDeRuta ? "" : "none";
   nota.textContent = predetDeRuta ? "automático por ruta" : "";
 }
 
-async function cambioSerie(valor) {
-  if (valor === HACER_PREDET_SERIE) {
-    try {
-      const r = await api("/api/ajustes/serie", {serie: serieSeleccionada});
-      seriePredeterminada = r.serie_predeterminada;
-      mensaje(`Serie predeterminada de esta máquina: ${seriePredeterminada || "—"}.`, "info");
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-  } else {
-    serieSeleccionada = valor;
-  }
+function cambioSerie(valor) {
+  serieSeleccionada = valor;
   pintarSeries();   // restaura la selección y los marcadores ★
 }
 
@@ -6768,35 +6766,16 @@ function pendientesFueraDeLaRuta() {
     .reduce((total, [, n]) => total + n, 0);
 }
 
-// La última opción del menú dice SIEMPRE lo que va a pasar (2026-07-31): la
-// misma "Hacer predeterminada la ruta actual", elegida con "Todas" puesto,
-// BORRABA la ruta guardada sin avisar — pasó el 19-jul, 16 segundos después de
-// fijarla, y desde entonces el panel abría sin filtro.
-function opcionHacerPredetRuta() {
-  return (rutaSeleccionada && rutaSeleccionada !== rutaPredeterminada)
-    ? `<option value="${HACER_PREDET}">★ Hacer predeterminada la ruta actual</option>`
-    : "";
-}
-
-function opcionRutaPredet() {
-  const hacer = opcionHacerPredetRuta();
-  if (hacer) return hacer;
-  // Quitarla es de quien la eligió (2026-08-07, regla del usuario): en una
-  // computadora sujeta a rutas la predeterminada la fija un Editor desde
-  // AJUSTES → Computadoras, así que el operador no la borra. El servidor ya
-  // lo rechaza; esta guarda evita ofrecer la opción que va a dar error.
-  if (exigeRuta) return "";
-  if (rutaPredeterminada)
-    return `<option value="${QUITAR_PREDET}">Quitar la ruta predeterminada (${
-      esc(etiquetaRutaCorta(rutaPredeterminada))})</option>`;
-  return "";
-}
-
+// Fijar o quitar la ruta predeterminada dejó de hacerse desde este menú
+// (2026-08-07, pedido del usuario): vive en AJUSTES → Esta máquina, junto con
+// las rutas que atiende la computadora. Aquí queda solo la ★ que marca cuál
+// es. El desplegable sigue cambiando la ruta del filtro, y en una computadora
+// sujeta a rutas sigue guardando la elegida como su ruta de trabajo.
 function pintarRutas(rutas, haySinRuta) {
   // Cambiar de ruta sigue siendo suyo y, desde el 2026-08-06, también cuál
-  // abre el panel: la que eligió al instalar no queda clavada. Nunca se ofrece
-  // QUITAR la predeterminada porque sin ruta no puede trabajar y el servidor
-  // rechaza la ruta vacía. Con una sola asignada, el desplegable se bloquea.
+  // abre el panel: la que eligió al instalar no queda clavada (en una
+  // computadora sujeta a rutas, elegirla aquí la guarda). Con una sola
+  // asignada, el desplegable se bloquea.
   $("f-ruta").disabled = exigeRuta && rutaFija;
   if (exigeRuta) {
     // Aquí NO se cuela la ruta que estuviera puesta (2026-08-07, regla del
@@ -6813,8 +6792,7 @@ function pintarRutas(rutas, haySinRuta) {
       ? "" : `<option value="" disabled selected>— Elige tu ruta —</option>`;
     $("f-ruta").innerHTML = vacia + opcionesUna.map(([valor, texto]) => `
       <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
-        ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
-      + (rutaFija ? "" : opcionHacerPredetRuta());
+        ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("");
     return;
   }
   const opciones = [["", "Todas"], ...(rutas || []).map(r => [r, nombreRuta(r)])];
@@ -6828,8 +6806,7 @@ function pintarRutas(rutas, haySinRuta) {
   const sel = $("f-ruta");
   sel.innerHTML = opciones.map(([valor, texto]) => `
     <option value="${esc(valor)}" ${valor === rutaSeleccionada ? "selected" : ""}>
-      ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("")
-    + opcionRutaPredet();
+      ${esc(texto)}${valor === rutaPredeterminada ? " ★" : ""}</option>`).join("");
 }
 
 // Equipos que ofrece el dropdown de máquina (hostname + nombre visible) y si
@@ -6891,39 +6868,6 @@ function pintarMaquinasFiltro(puede, equipos) {
 }
 
 async function cambioRuta(valor) {
-  if (valor === QUITAR_PREDET) {
-    avisarTrabajando("Quitando la ruta predeterminada…");
-    try {
-      await api("/api/ajustes/ruta", {ruta: ""});
-      rutaPredeterminada = "";
-      mensaje("Esta máquina ya no tiene ruta predeterminada: el panel abre sin filtro de ruta.", "info");
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
-    // Sin predeterminada, la ruta que esté puesta pasa a contar como filtro:
-    // la barra y el conteo se tiñen en el acto (la lista no cambia).
-    repintar();
-    return;
-  }
-  if (valor === HACER_PREDET) {
-    // Fija la ruta seleccionada como predeterminada de ESTA máquina y la
-    // deja seleccionada (se reajusta y selecciona a la vez).
-    avisarTrabajando("Fijando la ruta predeterminada…");
-    try {
-      const r = await api("/api/ajustes/ruta", {ruta: rutaSeleccionada});
-      rutaPredeterminada = r.ruta_predeterminada;
-      mensaje(`Ruta predeterminada de esta máquina: ${rutaPredeterminada ? nombreRuta(rutaPredeterminada) : "Todas"}.`, "info");
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
-    // Hacerla predeterminada la saca de los filtros que se denuncian, así que
-    // la barra y el conteo se destiñen en el acto (la lista es la misma: no se
-    // reconsulta).
-    repintar();
-    return;
-  }
   rutaSeleccionada = valor;
   // Para quien factura una ruta a la vez el desplegable ES su ruta de
   // trabajo: se guarda al elegir (2026-08-06), porque el servidor filtra por
@@ -15527,6 +15471,11 @@ async function cargarAjustes() {
       tabAdmin.style.display = supervision ? "" : "none";
       if (!supervision && tabActiva() === "admin") irATab("ajustes");
     }
+    // Rutas y series propias: el mismo permiso que exige su endpoint y que
+    // gobierna el nombre y el vendedor de al lado.
+    $("mi-config-bloque").style.display =
+      tienePermiso("identidad_maquina") ? "" : "none";
+    pintarMiConfigRutasSeries();
     $("catalogos-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     $("rutas-series-bloque").style.display =
@@ -16388,9 +16337,12 @@ const resumenSeriesEquipo = (m) =>
 const resumenRutasEquipo = (m) =>
   resumenAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
 
-// La ventana sirve a dos orígenes con los mismos selectores (2026-08-07):
+// La ventana sirve a tres orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
 //   {origen:"solicitud"}  → solicitud de activación (suma nombre y vendedor)
+//   {origen:"propia"}     → AJUSTES → Esta máquina (solo rutas y series: el
+//                           nombre, el vendedor y el día ya tienen su control
+//                           en ese mismo bloque)
 // `datos` es la configuración de partida (la fila del catálogo, o la que pidió
 // la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
 let configEquipo = null;
@@ -16442,20 +16394,43 @@ function abrirConfigSolicitud(dispositivo) {
   });
 }
 
+// Rutas y series de ESTA computadora, desde AJUSTES → Esta máquina. Reusa la
+// ventana de las demás con las secciones que aquí sobran escondidas: nombre,
+// vendedor y día ya se cambian en el mismo bloque, y dos controles para el
+// mismo dato se desincronizan.
+function abrirConfigPropia() {
+  abrirVentanaConfigEquipo({origen: "propia", datos: configPropia || {},
+                            nombreVisible: "esta computadora"});
+}
+
 function abrirVentanaConfigEquipo(ctx) {
   configEquipo = ctx;
   const {origen, datos, nombreVisible} = ctx;
   const esSolicitud = origen === "solicitud";
-  $("equipo-config-titulo").textContent = `Configuración de ${nombreVisible}`;
+  const esPropia = origen === "propia";
+  $("equipo-config-titulo").textContent = esPropia
+    ? "Rutas y series de esta computadora"
+    : `Configuración de ${nombreVisible}`;
   $("equipo-config-intro").textContent = esSolicitud
     ? (ctx.sinConfigPedida
        ? "La solicitud llegó sin configuración: lo que se elija aquí es con lo "
          + "que queda esa computadora al activarla."
        : "Es la configuración que pidió esa computadora. Corrígela si hace "
          + "falta: queda tal como se vea aquí al activarla.")
+    : esPropia
+    ? "Las series con las que factura esta computadora y las rutas que "
+      + "atiende. Cada predeterminada es con la que arranca el panel al abrir."
     : "Es la configuración con la que trabaja esa computadora. La toma en su "
       + "próximo refresco, sin que nadie tenga que ir hasta ella.";
   $("equipo-config-intro").style.display = "";
+  // Lo que la ventana propia no edita se esconde entero, y el vendedor además
+  // por su select: vendedorConfigEquipo() lee de ahí si está a la vista.
+  for (const id of ["equipo-config-nombre-campo", "equipo-config-vendedor-campo",
+                    "equipo-config-dia-campo"])
+    $(id).style.display = esPropia ? "none" : "";
+  $("equipo-config").querySelector(".equipo-config-par").style.display =
+    esPropia ? "none" : "";
+  $("equipo-config-vendedor").style.display = esPropia ? "none" : "";
   // Nombre y vendedor también en una computadora ya activa (2026-08-07,
   // pedido del usuario): esta ventana es TODO lo que se decide de esa
   // máquina, sin volver a la fila por dos campos sueltos.
@@ -16470,7 +16445,9 @@ function abrirVentanaConfigEquipo(ctx) {
   $("equipo-config-nombre-nota").style.display = esSolicitud ? "" : "none";
   $("equipo-config-vendedor-rotulo").textContent =
     "Vendedor con el que factura esa computadora";
-  pintarVendedorConfigEquipo(datos.vendedor || "");
+  // El pintado del selector lo vuelve a mostrar, así que en la propia no
+  // corre: ahí el vendedor se cambia arriba, en el bloque "Esta máquina".
+  if (!esPropia) pintarVendedorConfigEquipo(datos.vendedor || "");
   for (const tipo of ["rutas", "series"]) {
     const rotulo = $(`equipo-config-${tipo}-rotulo`);
     rotulo.style.display = "";
@@ -16679,6 +16656,11 @@ function cerrarConfigEquipo() {
 // esconde mientras dura la pregunta, para no tener dos Cancelar seguidos.
 function guardarConfigEquipo() {
   if (!configEquipo) return;
+  // La propia NO se confirma: el motivo de la pregunta es que el cambio le
+  // cae a una computadora ajena en su refresco y quien la pulsa no está
+  // delante para deshacerlo. Aquí es esta misma máquina y el efecto se ve en
+  // el acto, igual que el resto de AJUSTES → Esta máquina.
+  if (configEquipo.origen === "propia") { guardarConfigPropia(); return; }
   const esSolicitud = configEquipo.origen === "solicitud";
   const cancelar = $("equipo-config-cancelar");
   cancelar.style.display = "none";
@@ -16687,6 +16669,52 @@ function guardarConfigEquipo() {
             else guardarConfigEquipoDelCatalogo(); },
     esSolicitud ? "Confirmar activación" : "Confirmar cambios",
     () => { cancelar.style.display = ""; });
+}
+
+// Lo elegido para ESTA computadora entra de una: el servidor devuelve lo que
+// quedó (con una sola opción, la predeterminada se fuerza a esa) y con eso se
+// repintan la barra y el resumen del bloque, sin esperar al próximo refresco.
+async function guardarConfigPropia() {
+  const boton = $("equipo-config-guardar");
+  boton.disabled = true;
+  limpiarErroresConfigEquipo();
+  try {
+    const r = await api("/api/ajustes/mi-rutas-series", {
+      rutas: seleccionConfigEquipo("rutas"),
+      series: seleccionConfigEquipo("series"),
+      ruta_predeterminada: predetConfigEquipo("rutas"),
+      serie_predeterminada: predetConfigEquipo("series"),
+    });
+    configPropia = r.config_rutas_series || configPropia;
+    configPendiente = r.configuracion_pendiente || configPendiente;
+    seriesMaquina = r.series_maquina || seriesMaquina;
+    rutasOfrecidas = r.rutas_ofrecidas || rutasOfrecidas;
+    exigeRuta = !!r.exige_ruta;
+    rutaFija = !!r.ruta_fija;
+    rutaPredeterminada = r.ruta_predeterminada || "";
+    seriePredeterminada = r.serie_predeterminada || "";
+    pintarMiConfigRutasSeries();
+    pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
+    pintarSeries();
+    if (supOverviewCargado) pintarEquiposSupervision();
+    cerrarConfigEquipo();
+    mensaje("Rutas y series de esta computadora guardadas.", "info");
+  } catch (e) {
+    marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+// Resumen del bloque de AJUSTES → Esta máquina: la misma línea con la que se
+// describen las demás computadoras, sin el día (está justo abajo, con sus dos
+// opciones a la vista).
+function pintarMiConfigRutasSeries() {
+  const el = $("mi-config-resumen");
+  if (!el) return;
+  const m = configPropia || {};
+  el.textContent = `Series: ${resumenSeriesEquipo(m)}`
+    + ` · Rutas: ${resumenRutasEquipo(m)}`;
 }
 
 // La ventana edita TODO lo de esa computadora: nombre y vendedor por
