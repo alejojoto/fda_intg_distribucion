@@ -829,6 +829,20 @@
                 width:min(480px, 92vw); max-height:85vh; overflow:auto;
                 box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #ruta-editor h3 { margin:0 0 14px; font-size:14px; }
+  /* Configurar rutas/series de OTRA computadora (2026-08-07, AJUSTES →
+     Computadoras): mismo patrón visual que #ruta-editor-overlay, con las
+     mismas reglas de selección que el formulario de registro. */
+  #equipo-config-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                           display:none; z-index:20; align-items:flex-start;
+                           justify-content:center; }
+  #equipo-config-overlay.visible { display:flex; }
+  #equipo-config { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
+                   width:min(480px, 92vw); max-height:85vh; overflow:auto;
+                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #equipo-config h3 { margin:0 0 14px; font-size:14px; }
+  #equipo-config .acceso-check { font-size:13px; }
+  .equipos-config .mut { font-size:12px; display:block; margin-bottom:4px; }
+  .equipos-config button { font-size:12px; padding:3px 8px; }
   /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
      visible SOLO cuando la ruta elegida tiene configuración — dice a las
      claras por qué el selector cambió de opciones o de valor solo. */
@@ -1765,7 +1779,8 @@
   #acceso-overlay.visible { display:flex; }
   body.modo-llenado #acceso-overlay { display:none; }
   #acceso-caja { background:#fff; border-radius:10px; padding:24px 26px;
-      width:min(480px, 92vw); box-shadow:0 6px 30px rgba(0,0,0,.12); }
+      width:min(560px, 92vw); max-height:92vh; overflow:auto;
+      box-shadow:0 6px 30px rgba(0,0,0,.12); }
   #acceso-caja h2 { margin:0 0 10px; font-size:16px; }
   #acceso-caja p { margin:0 0 14px; font-size:13.5px; color:var(--mut);
       line-height:1.5; }
@@ -1782,6 +1797,30 @@
   #acceso-caja input[type=text]:focus { border-color:#1d4ed8;
       outline:2px solid rgba(29,78,216,.35); outline-offset:1px; }
   #acceso-error { color:var(--err); font-size:13px; margin:0 0 10px;
+      display:none; }
+  /* Configuración pedida junto con el nombre (2026-08-07): vendedor, rutas,
+     series y día de despacho dentro de la misma caja de activación. */
+  .acceso-campo { margin:14px 0 0; }
+  .acceso-campo > label { font-size:13px; font-weight:600; display:block;
+      margin-bottom:6px; }
+  .acceso-campo select { width:100%; box-sizing:border-box; padding:8px 10px;
+      font-size:13.5px; border:1px solid var(--bor); border-radius:6px;
+      background:#fff; }
+  .acceso-check { display:flex; align-items:center; gap:6px; font-weight:600;
+      font-size:13px; cursor:pointer; margin:0 0 6px; }
+  .acceso-lista { display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+      gap:4px 10px; max-height:132px; overflow:auto;
+      border:1px solid var(--bor); border-radius:6px; padding:8px 10px; }
+  .acceso-lista label { display:flex; align-items:center; gap:5px;
+      font-weight:400; font-size:13px; cursor:pointer; }
+  .acceso-lista .mut { grid-column:1/-1; font-size:12.5px; }
+  .acceso-predet { margin-top:8px; display:flex; align-items:center; gap:8px;
+      font-size:13px; }
+  .acceso-predet > label { font-weight:600; white-space:nowrap; margin:0; }
+  .acceso-predet select { flex:1; width:auto; }
+  .acceso-predet span { color:var(--mut); }
+  .acceso-campo-error { color:var(--err); font-size:12.5px; margin:4px 0 0;
       display:none; }
   #acceso-espera { display:flex; align-items:center; gap:10px;
       font-size:13.5px; color:var(--mut); }
@@ -3245,7 +3284,17 @@
             <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
                 onclick="limpiarBuscador('rutas-filtro', pintarFilasRutas)">&times;</button></span>
           <span class="mut" id="rutas-conteo"></span>
-          <button class="primario" style="margin-left:auto" onclick="abrirEditorRuta(null)">Configurar ruta</button>
+          <!-- Alta manual (2026-08-07): registrar una ruta antes de que
+               aparezca en un pedido. Desde aquí las rutas no se borran por
+               falta de pedidos; Eliminar solo quita la config de series. -->
+          <span style="margin-left:auto; display:flex; gap:6px; align-items:center">
+            <input type="text" id="ruta-nueva" maxlength="60" placeholder="Nueva ruta"
+                   oninput="$('ruta-nueva-agregar').disabled = !this.value.trim()"
+                   onkeydown="if(event.key==='Enter')crearRutaNueva()">
+            <button type="button" id="ruta-nueva-agregar" disabled
+                    onclick="crearRutaNueva()">Agregar</button>
+          </span>
+          <button class="primario" onclick="abrirEditorRuta(null)">Configurar ruta</button>
         </div>
         <div style="overflow-x:auto"><table id="t-rutas">
           <thead><tr><th>Ruta</th><th>Regla</th><th></th></tr></thead>
@@ -3288,6 +3337,39 @@
     <div class="editor-acciones">
       <button id="ruta-editor-guardar" class="primario" onclick="guardarEditorRuta()">Guardar</button>
       <button onclick="cerrarEditorRuta()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Configurar rutas o series de OTRA computadora (2026-08-07): se abre desde
+     su fila en AJUSTES → Computadoras. Mismas reglas que el registro: "Todas"
+     con un clic, o selección individual; la predeterminada solo se elige
+     cuando hay más de una. El de rutas incluye además el día de despacho. -->
+<div id="equipo-config-overlay" onclick="if(event.target===this)cerrarConfigEquipo()">
+  <div id="equipo-config">
+    <h3 id="equipo-config-titulo"></h3>
+    <div class="editor-campo">
+      <label class="acceso-check"><input type="checkbox" id="equipo-config-todas"
+             onchange="alternarTodasConfigEquipo()"> <span id="equipo-config-todas-rotulo"></span></label>
+      <div id="equipo-config-lista" class="acceso-lista"></div>
+    </div>
+    <div class="editor-campo" id="equipo-config-predet-campo">
+      <label for="equipo-config-predet" id="equipo-config-predet-rotulo"></label>
+      <select id="equipo-config-predet"></select>
+      <span class="mut" id="equipo-config-predet-texto" style="display:none"></span>
+    </div>
+    <div class="editor-campo" id="equipo-config-dia-campo">
+      <label for="equipo-config-dia">Día de despacho</label>
+      <select id="equipo-config-dia">
+        <option value="">— Sin elegir —</option>
+        <option value="hoy">Para hoy</option>
+        <option value="manana">Para mañana</option>
+      </select>
+    </div>
+    <div id="equipo-config-error" class="desc-error" style="display:none"></div>
+    <div class="editor-acciones">
+      <button id="equipo-config-guardar" class="primario" onclick="guardarConfigEquipo()">Guardar</button>
+      <button onclick="cerrarConfigEquipo()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3709,10 +3791,58 @@
       <p class="mut" style="margin:6px 0 0; font-size:12.5px">
         Es el nombre con el que el administrador la reconoce al aprobarla, y
         con el que después aparecen tus llenados en el historial de las demás.</p>
+      <!-- Configuración de trabajo pedida junto con el nombre (2026-08-07):
+           vendedor, rutas, series y día de despacho viajan con la solicitud
+           para que el administrador apruebe la computadora ya configurada.
+           Los datos salen de /api/acceso/catalogo-registro. -->
+      <div class="acceso-campo">
+        <label for="acceso-vendedor">Vendedor con el que factura</label>
+        <select id="acceso-vendedor" onchange="pintarBotonSolicitud()">
+          <option value="" selected>— Elegir… —</option>
+        </select>
+        <p class="acceso-campo-error" id="acceso-err-vendedor"></p>
+      </div>
+      <div class="acceso-campo">
+        <label>Rutas que atiende</label>
+        <label class="acceso-check"><input type="checkbox" id="acceso-rutas-todas"
+               onchange="alternarTodasRegistro('rutas')"> Todas las rutas</label>
+        <div id="acceso-rutas-lista" class="acceso-lista">
+          <span class="mut">Cargando las rutas…</span></div>
+        <p class="acceso-campo-error" id="acceso-err-rutas"></p>
+        <div class="acceso-predet" id="acceso-rutas-predet-campo" style="display:none">
+          <label for="acceso-rutas-predet">Ruta predeterminada</label>
+          <select id="acceso-rutas-predet"></select>
+          <span id="acceso-rutas-predet-texto" style="display:none"></span>
+        </div>
+        <p class="acceso-campo-error" id="acceso-err-ruta_predeterminada"></p>
+      </div>
+      <div class="acceso-campo">
+        <label>Series con las que factura</label>
+        <label class="acceso-check"><input type="checkbox" id="acceso-series-todas"
+               onchange="alternarTodasRegistro('series')"> Todas las series</label>
+        <div id="acceso-series-lista" class="acceso-lista">
+          <span class="mut">Cargando las series…</span></div>
+        <p class="acceso-campo-error" id="acceso-err-series"></p>
+        <div class="acceso-predet" id="acceso-series-predet-campo" style="display:none">
+          <label for="acceso-series-predet">Serie predeterminada</label>
+          <select id="acceso-series-predet"></select>
+          <span id="acceso-series-predet-texto" style="display:none"></span>
+        </div>
+        <p class="acceso-campo-error" id="acceso-err-serie_predeterminada"></p>
+      </div>
+      <div class="acceso-campo">
+        <label for="acceso-dia">Día de despacho</label>
+        <select id="acceso-dia">
+          <option value="" selected>— Elegir después —</option>
+          <option value="hoy">Para hoy</option>
+          <option value="manana">Para mañana</option>
+        </select>
+        <p class="acceso-campo-error" id="acceso-err-dia_despacho"></p>
+      </div>
       <div class="editor-acciones" style="margin-top:16px; align-items:center">
         <button class="primario" id="acceso-enviar" disabled
                 onclick="enviarSolicitudAcceso()">Pedir activación</button>
-        <span class="mut" id="acceso-falta-nombre" style="font-size:12.5px">
+        <span class="mut" id="acceso-falta" style="font-size:12.5px">
           Escribe primero el nombre: sin él no se puede pedir la
           activación.</span>
       </div>
@@ -5399,6 +5529,10 @@ const QUITAR_PREDET = "__quitar_predet__";
 // Solo el CAMPO por ahora: la lógica de series se define parte por parte;
 // la predeterminada por máquina usa la misma mecánica que la ruta.
 const SERIES = ["P00E", "P00F", "P00G", "P00I", "P00J", "P00L"];
+// Series disponibles en ESTA instalación del programa de facturación
+// (2026-08-07): las manda el servidor en /api/facturas y /api/ajustes según
+// la configuración de la computadora. Vacío = aún no llegó (se usa SERIES).
+let seriesMaquina = [];
 let serieSeleccionada = "";
 let seriePredeterminada = "";
 let seriePredetAplicada = false;
@@ -5432,10 +5566,12 @@ function opcionSeriePredet(predetDeRuta) {
 
 function pintarSeries() {
   const cfg = configSerieDeRuta();
-  // Sin config: las 6 series de siempre. Con config: SOLO las permitidas —
+  // Base: las series de ESTA computadora (2026-08-07), o las 6 de siempre
+  // mientras el dato no llega. Con config de ruta: SOLO las permitidas —
   // colar una serie que la ruta no admite sería facturarla con la serie
   // equivocada (mismo riesgo que describe reponerLote más abajo).
-  const opciones = (cfg && cfg.series_permitidas.length) ? cfg.series_permitidas : SERIES;
+  const base = seriesMaquina.length ? seriesMaquina : SERIES;
+  const opciones = (cfg && cfg.series_permitidas.length) ? cfg.series_permitidas : base;
   const predetDeRuta = cfg ? cfg.serie_predeterminada : "";
   if (predetDeRuta) {
     // La ruta manda: se elige sola, sin preguntar (COMPORTAMIENTO, pedido del
@@ -5447,11 +5583,16 @@ function pintarSeries() {
     // en vez de adivinar cuál de las permitidas usar.
     serieSeleccionada = "";
   }
+  // Si el recorte de la MÁQUINA dejó fuera la serie elegida, no se borra en
+  // silencio: se deja a la vista marcada y, si se intenta llenar con ella, el
+  // aviso del servidor (serie_no_disponible) explica el arreglo.
+  const pintadas = (serieSeleccionada && !opciones.includes(serieSeleccionada))
+    ? [...opciones, serieSeleccionada] : opciones;
   const marcaEstrella = predetDeRuta || seriePredeterminada;
   const vacia = serieSeleccionada
     ? "" : `<option value="" selected>— Elige una serie —</option>`;
   $("f-serie").innerHTML = vacia
-    + opciones.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
+    + pintadas.map(s => `<option value="${s}" ${s === serieSeleccionada ? "selected" : ""}>
         ${s}${s === marcaEstrella ? " ★" : ""}</option>`).join("")
     + opcionSeriePredet(predetDeRuta);
   const nota = $("serie-auto-nota");
@@ -6435,12 +6576,11 @@ function filtroBusquedaDinamico() {
 }
 
 // Nombre corto de una ruta para el dropdown ("Ruta LPG" → "LPG").
-// Esta computadora factura UNA ruta a la vez (sin el permiso ver_todas_rutas,
+// Esta computadora trabaja sujeta a una ruta (sin el permiso ver_todas_rutas,
 // 2026-08-05). Lo manda /api/ajustes; el backend lo repite en cada respuesta,
-// así que esto solo decide qué se pinta. Desde el 2026-08-07 llega SIEMPRE en
-// falso —el límite se apagó del lado del servidor, ver `_exige_ruta_propia`—,
-// así que todo lo que cuelga de aquí queda dormido hasta que se decida cómo
-// se limita; se despierta solo, sin tocar el panel.
+// así que esto solo decide qué se pinta. Desde el 2026-08-07 lo decide la
+// asignación de rutas de la computadora (ver `_exige_ruta_propia`): usuario
+// general con una lista concreta = sujeta; sin asignación o "*" = como antes.
 let exigeRuta = false;
 // El vendedor tiene una sola ruta asignada, así que no hay entre qué elegir.
 let rutaFija = false;
@@ -8012,6 +8152,9 @@ async function cargar(conservarScroll = false) {
     // misma respuesta —ya se pide en cada refresco— antes de pintarSeries()
     // más abajo, para que la ruta que quede puesta ya resuelva su serie.
     rutasSeriesConfig = d.rutas_series_config || {};
+    // Series disponibles en esta computadora (2026-08-07): recortan el
+    // selector de Serie en el pintarSeries() de más abajo.
+    seriesMaquina = d.series_maquina || seriesMaquina;
     // Ruta y serie predeterminadas de esta máquina: se aplican UNA vez, al abrir.
     rutaPredeterminada = d.ruta_predeterminada || "";
     seriePredeterminada = d.serie_predeterminada || "";
@@ -11609,6 +11752,14 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       });
       if (secuenciaActiva) detenerSecuencia();
       return "sin_configurar";
+    } else if (e.datos && e.datos.codigo === "serie_no_disponible") {
+      // La serie elegida no existe en esta instalación (2026-08-07): es
+      // configuración de la máquina, no de esta factura — reintentar con la
+      // misma serie fallaría igual, así que la corrida se pausa y el aviso
+      // del servidor ya dice el arreglo.
+      if (secuenciaActiva) pausarSecuenciaPorFallo(e.message);
+      else mensaje(e.message, "alerta");
+      return "error";
     } else if (e.datos && e.datos.codigo === "ya_llenada_sin_registro") {
       // Ya se llenó en esta sesión de prueba (que a propósito no deja
       // registro). En una CORRIDA no se pregunta nada: sale de la cola y se
@@ -15027,6 +15178,7 @@ async function cargarAjustes() {
     exigeRuta = !!d.exige_ruta;
     rutasOfrecidas = d.rutas_ofrecidas || [];
     rutaFija = !!d.ruta_fija;
+    seriesMaquina = d.series_maquina || seriesMaquina;
     preseleccionarRutaSiFalta();
     accesoGestion = !!d.acceso_gestion;
     acceso = d.acceso || acceso;
@@ -15141,6 +15293,10 @@ function pintarAcceso() {
   if (pideNombre && nombre && !$("acceso-nombre").value)
     $("acceso-nombre").value = nombre;
   if (pideNombre) {
+    // Los datos del formulario (vendedores, rutas, series) se piden al
+    // abrirlo; si la nube no respondió, este mismo repintado —que el sondeo
+    // corre cada 5 s— lo reintenta solo.
+    cargarCatalogoRegistro();
     pintarBotonSolicitud();
     // El cursor arranca dentro del campo: es lo único que hay que hacer en
     // esta pantalla. UNA sola vez — el sondeo repinta cada 5 s y devolver el
@@ -15150,14 +15306,155 @@ function pintarAcceso() {
   arrancarSondeoAcceso();
 }
 
-// El nombre es OBLIGATORIO para pedir la activación (2026-08-06): sin él el
-// botón queda deshabilitado — antes se podía pulsar y el rechazo se veía tan
-// discreto que parecía que no pasaba nada. El aviso al lado del botón dice
-// POR QUÉ está deshabilitado y desaparece en cuanto hay nombre.
+// --- Configuración pedida junto con el nombre (2026-08-07) ------------------
+// Vendedor, rutas, series, predeterminadas y día de despacho viajan con la
+// solicitud: el administrador aprueba la computadora ya configurada. Los
+// catálogos salen de /api/acceso/catalogo-registro, accesible antes de la
+// activación.
+let catalogoRegistro = null;
+let catalogoRegistroEnVuelo = false;
+
+async function cargarCatalogoRegistro() {
+  if (catalogoRegistro || catalogoRegistroEnVuelo) return;
+  catalogoRegistroEnVuelo = true;
+  try {
+    catalogoRegistro = await api("/api/acceso/catalogo-registro");
+    pintarConfigRegistro();
+  } catch (_) {
+    // Sin conexión: el próximo repintado del sondeo vuelve a pedirlo.
+  } finally {
+    catalogoRegistroEnVuelo = false;
+  }
+}
+
+// Pinta las listas UNA sola vez (dataset.pintado): el sondeo repinta la
+// pantalla cada 5 s y reconstruirlas le borraría al operador lo ya marcado.
+function pintarConfigRegistro() {
+  if (!catalogoRegistro) return;
+  const lista = $("acceso-rutas-lista");
+  if (!lista.dataset.pintado) {
+    lista.dataset.pintado = "1";
+    lista.innerHTML = (catalogoRegistro.rutas || []).length
+      ? catalogoRegistro.rutas.map(r => `<label><input type="checkbox" value="${esc(r)}"
+             onchange="cambioSeleccionRegistro('rutas')"> ${esc(nombreRuta(r))}</label>`).join("")
+      : `<span class="mut">Todavía no hay rutas registradas.</span>`;
+    $("acceso-series-lista").innerHTML = (catalogoRegistro.series || []).map(s =>
+      `<label><input type="checkbox" value="${esc(s)}"
+             onchange="cambioSeleccionRegistro('series')"> ${esc(s)}</label>`).join("");
+    $("acceso-vendedor").innerHTML = `<option value="" selected>— Elegir… —</option>`
+      + (catalogoRegistro.vendedores || []).map(v =>
+        `<option value="${esc(v.codigo)}">${esc(v.codigo)} — ${esc(v.nombre || "")}</option>`).join("");
+  }
+  pintarPredetRegistro("rutas");
+  pintarPredetRegistro("series");
+  pintarBotonSolicitud();
+}
+
+// "*" con "Todas" marcada; si no, la lista de valores canónicos marcados.
+function seleccionRegistro(tipo) {
+  if ($(`acceso-${tipo}-todas`).checked) return "*";
+  return [...$(`acceso-${tipo}-lista`).querySelectorAll("input:checked")]
+    .map(c => c.value);
+}
+
+// Marcar "Todas" deshabilita las individuales SIN desmarcarlas: al quitarla
+// vuelven tal como estaban (explorar un toggle no borra lo elegido).
+function alternarTodasRegistro(tipo) {
+  const todas = $(`acceso-${tipo}-todas`).checked;
+  [...$(`acceso-${tipo}-lista`).querySelectorAll("input")]
+    .forEach(c => { c.disabled = todas; });
+  cambioSeleccionRegistro(tipo);
+}
+
+function cambioSeleccionRegistro(tipo) {
+  pintarPredetRegistro(tipo);
+  pintarBotonSolicitud();
+}
+
+// Predeterminada de rutas/series en el registro: con UNA sola elegida no hay
+// nada que decidir (esa es, y se muestra como texto); con varias (o "Todas")
+// se elige en un selector con "Ninguna". Con nada elegido el campo se oculta.
+function pintarPredetRegistro(tipo) {
+  const sel = seleccionRegistro(tipo);
+  const conocidas = (catalogoRegistro || {})[tipo] || [];
+  const efectivas = sel === "*" ? conocidas : sel;
+  const campo = $(`acceso-${tipo}-predet-campo`);
+  const texto = $(`acceso-${tipo}-predet-texto`);
+  const select = $(`acceso-${tipo}-predet`);
+  const corto = tipo === "rutas" ? etiquetaRutaCorta : (s) => s;
+  if (sel !== "*" && sel.length === 1) {
+    campo.style.display = "";
+    select.style.display = "none";
+    texto.style.display = "";
+    texto.textContent = `Predeterminada: ${corto(sel[0])} (la única elegida)`;
+    return;
+  }
+  if (!efectivas.length) { campo.style.display = "none"; return; }
+  campo.style.display = "";
+  texto.style.display = "none";
+  select.style.display = "";
+  const previa = select.value;
+  select.innerHTML = `<option value="">— Ninguna —</option>`
+    + efectivas.map(v => `<option value="${esc(v)}" ${v === previa ? "selected" : ""}>
+        ${esc(corto(v))}</option>`).join("");
+  if (!efectivas.includes(previa)) select.value = "";
+}
+
+// La predeterminada que viaja en la solicitud ('' = ninguna). Con una sola
+// elegida es esa (el servidor además la fuerza).
+function predetRegistro(tipo) {
+  const sel = seleccionRegistro(tipo);
+  if (sel !== "*" && sel.length === 1) return sel[0];
+  return $(`acceso-${tipo}-predet`).value || "";
+}
+
+const CAMPOS_ERROR_REGISTRO = ["vendedor", "rutas", "series",
+  "ruta_predeterminada", "serie_predeterminada", "dia_despacho"];
+
+function limpiarErroresRegistro() {
+  for (const campo of CAMPOS_ERROR_REGISTRO) {
+    const el = $(`acceso-err-${campo}`);
+    el.textContent = "";
+    el.style.display = "none";
+  }
+}
+
+// Un 400 con {campo} del servidor marca el campo culpable con su mensaje.
+function marcarErrorRegistro(campo, texto) {
+  const el = CAMPOS_ERROR_REGISTRO.includes(campo)
+    ? $(`acceso-err-${campo}`) : null;
+  if (!el) {
+    $("acceso-error").textContent = texto;
+    $("acceso-error").style.display = "";
+    return;
+  }
+  el.textContent = texto;
+  el.style.display = "";
+}
+
+// El botón queda deshabilitado hasta que estén el nombre, el vendedor y al
+// menos una ruta y una serie (o sus "Todas"); el aviso y el título del botón
+// dicen POR QUÉ y desaparecen en cuanto no falta nada (2026-08-06, ampliado
+// 2026-08-07 con la configuración).
 function pintarBotonSolicitud() {
-  const falta = !$("acceso-nombre").value.trim();
-  $("acceso-enviar").disabled = falta;
-  $("acceso-falta-nombre").style.display = falta ? "" : "none";
+  const faltas = [];
+  if (!$("acceso-nombre").value.trim()) faltas.push("el nombre");
+  if (!$("acceso-vendedor").value) faltas.push("el vendedor");
+  const rutas = seleccionRegistro("rutas");
+  if (rutas !== "*" && !rutas.length) faltas.push("al menos una ruta (o todas)");
+  const series = seleccionRegistro("series");
+  if (series !== "*" && !series.length) faltas.push("al menos una serie (o todas)");
+  const texto = faltas.length
+    ? (faltas.length > 1 ? "Faltan " : "Falta ")
+      + (faltas.length > 1
+         ? faltas.slice(0, -1).join(", ") + " y " + faltas[faltas.length - 1]
+         : faltas[0])
+      + " para pedir la activación."
+    : "";
+  $("acceso-enviar").disabled = !!faltas.length;
+  $("acceso-enviar").title = texto;
+  $("acceso-falta").textContent = texto;
+  $("acceso-falta").style.display = faltas.length ? "" : "none";
 }
 
 function arrancarSondeoAcceso() {
@@ -15264,6 +15561,45 @@ function pintarSolicitudes() {
   $("solicitudes-lista").innerHTML = lista.map(pintarUnaSolicitud).join("");
 }
 
+// La configuración que la computadora pidió al registrarse (jsonb en la fila
+// de acceso); null si la solicitud vino solo con nombre (panel viejo).
+function configDeSolicitud(s) {
+  let cfg = s && s.configuracion;
+  if (typeof cfg === "string") {
+    try { cfg = JSON.parse(cfg); } catch (_) { cfg = null; }
+  }
+  return (cfg && typeof cfg === "object") ? cfg : null;
+}
+
+// "Todas" o los nombres cortos, con ★ en la predeterminada.
+function textoSeleccionSolicitada(sel, predet, corto) {
+  if (sel === "*")
+    return "Todas" + (predet ? ` · predet.: ${corto(predet)} ★` : "");
+  if (Array.isArray(sel) && sel.length)
+    return sel.map(v => corto(v) + (v === predet ? " ★" : "")).join(", ");
+  return "—";
+}
+
+// Las líneas de configuración solicitada que se muestran bajo una solicitud
+// pendiente. Sin configuración, una sola línea discreta que lo diga.
+function lineasConfigSolicitada(s) {
+  const cfg = configDeSolicitud(s);
+  if (!cfg)
+    return `<br><span class="mut">Sin configuración solicitada.</span>`;
+  const v = vendedoresCatalogo.find(x => x.codigo === cfg.vendedor);
+  const vendedor = cfg.vendedor
+    ? esc(cfg.vendedor) + (v && v.nombre ? ` — ${esc(v.nombre)}` : "")
+    : "—";
+  const dia = {hoy: "para hoy", manana: "para mañana"}[cfg.dia_despacho]
+    || "sin elegir";
+  return `<br>Vendedor: ${vendedor}
+    · Despacho: ${esc(dia)}<br>
+    Rutas: ${esc(textoSeleccionSolicitada(cfg.rutas, cfg.ruta_predeterminada,
+                                          etiquetaRutaCorta))}<br>
+    Series: ${esc(textoSeleccionSolicitada(cfg.series, cfg.serie_predeterminada,
+                                           (x) => x))}`;
+}
+
 function pintarUnaSolicitud(s) {
   const host = esc(s.dispositivo);
   const nombre = esc(s.nombre || s.nombre_solicitado || "");
@@ -15309,6 +15645,7 @@ function pintarUnaSolicitud(s) {
       · Versión: ${esc(s.version || "—")}<br>
       Última señal: ${esc(fechaAcceso(s.ultima_verificacion))}
       ${motivo ? `<br>Motivo anotado: ${esc(motivo)}` : ""}${historia}
+      ${enEspera ? lineasConfigSolicitada(s) : ""}
     </div>
     ${acciones ? `<div class="solicitud-acciones">${acciones}</div>` : ""}
   </div>`;
@@ -15323,8 +15660,15 @@ function confirmarActivarEquipo(btn, host) {
 async function activarEquipo(host) {
   const campo = $(`sol-nombre-${host}`);
   const nombre = campo ? campo.value.trim() : "";
+  // La configuración solicitada viaja en este mismo POST (la lista ya la
+  // trae): el servidor la escribe al catálogo al activar, así queda aunque
+  // la computadora nueva esté desconectada.
+  const cuerpo = {dispositivo: host, nombre};
+  const cfg = configDeSolicitud(
+    solicitudes.find(x => x.dispositivo === host));
+  if (cfg) cuerpo.configuracion = cfg;
   try {
-    const r = await api("/api/acceso/activar", {dispositivo: host, nombre});
+    const r = await api("/api/acceso/activar", cuerpo);
     mensaje(r.aviso || `Computadora ${nombre || host} activada.`,
             r.aviso ? "alerta" : "ok");
     await cargarSolicitudesAcceso();
@@ -15366,15 +15710,29 @@ async function enviarSolicitudAcceso() {
     $("acceso-error").style.display = "";
   };
   if (!nombre) return error("Escribe el nombre de esta computadora.");
+  // Enter en el campo de nombre llega aquí aunque el botón esté deshabilitado:
+  // el aviso de al lado ya dice qué falta.
+  if ($("acceso-enviar").disabled) return;
   const boton = $("acceso-enviar");
   boton.disabled = true;
   $("acceso-error").style.display = "none";
+  limpiarErroresRegistro();
+  // La configuración viaja con la solicitud: "*" cuando se marcó "Todas", si
+  // no la lista canónica; '' en lo que quedó sin elegir.
+  const cuerpo = {nombre,
+    vendedor: $("acceso-vendedor").value,
+    rutas: seleccionRegistro("rutas"),
+    series: seleccionRegistro("series"),
+    ruta_predeterminada: predetRegistro("rutas"),
+    serie_predeterminada: predetRegistro("series"),
+    dia_despacho: $("acceso-dia").value};
   try {
-    const r = await api("/api/acceso/solicitar", {nombre});
+    const r = await api("/api/acceso/solicitar", cuerpo);
     acceso = {...(r.acceso || {}), nombre_solicitado: nombre};
     pintarAcceso();
   } catch (e) {
-    error(e.message);
+    if (e.datos && e.datos.campo) marcarErrorRegistro(e.datos.campo, e.message);
+    else error(e.message);
   } finally {
     pintarBotonSolicitud();
   }
@@ -15429,6 +15787,16 @@ function pintarEquipos() {
       <input type="checkbox" ${m.activa ? "checked" : ""}
              title="Al quitarla, esa computadora queda fuera de servicio."
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
+    // Rutas y series del equipo (2026-08-07): resumen corto + sus dos
+    // editores, con el mismo permiso que Nombre/Vendedor.
+    const config = `<td class="equipos-config">
+      <span class="mut">Rutas: ${esc(resumenAsignacion(m.rutas,
+        m.ruta_predeterminada, "rutas", etiquetaRutaCorta))}
+        · Series: ${esc(resumenAsignacion(m.series,
+        m.serie_predeterminada, "series", (x) => x))}</span>
+      <button type="button" onclick="abrirConfigEquipo('${host}', 'rutas')">Configurar rutas</button>
+      <button type="button" onclick="abrirConfigEquipo('${host}', 'series')">Configurar series</button>
+    </td>`;
     return `<tr>
       <td class="equipos-host">${host}</td>
       <td><input type="text" maxlength="40" value="${esc(m.nombre || "")}"
@@ -15436,6 +15804,7 @@ function pintarEquipos() {
                    ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></td>
       <td><select ${puedeIdentidad
                    ? `onchange="guardarEquipoIdentidad('${host}', this)"` : "disabled"}></select></td>
+      ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
       ${puedeActivar ? activa : ""}
     </tr>`;
@@ -15443,6 +15812,7 @@ function pintarEquipos() {
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
       <th>Computadora</th><th>Nombre</th><th>Vendedor</th>
+      ${puedeIdentidad ? "<th>Rutas y series</th>" : ""}
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
@@ -15571,6 +15941,145 @@ async function guardarEquipoIdentidad(dispositivo, control) {
   } finally {
     control.disabled = false;
   }
+}
+
+// --- Rutas y series de OTRA computadora (2026-08-07) ------------------------
+// La asignación de rutas solo limita filtros y selectores de esa máquina; las
+// series son las que su instalación del programa de facturación de verdad
+// tiene. null/sin configurar equivale a todas (legado).
+
+// Resumen corto para la fila: "Todas" / el nombre si es una / "N rutas",
+// con "★ X" si hay predeterminada.
+function resumenAsignacion(sel, predet, plural, corto) {
+  const base = (sel === "*" || sel === null || sel === undefined) ? "Todas"
+    : sel.length === 1 ? corto(sel[0])
+    : `${sel.length} ${plural}`;
+  if (!predet) return base;
+  return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
+}
+
+let configEquipo = null;   // {dispositivo, modo: "rutas" | "series"} abierto
+
+// Rutas que este panel conoce para ofrecer en el editor: el catálogo que ya
+// viajó con la lista, más las que el propio equipo tenga asignadas (para que
+// ninguna asignada desaparezca del editor aunque salga del catálogo).
+function rutasConocidasParaEquipo(m) {
+  return [...new Set([...(ultimaLista.rutas || []),
+                      ...Object.keys(rutasSeriesConfig),
+                      ...(Array.isArray(m.rutas) ? m.rutas : [])])]
+    .sort((a, b) => nombreRuta(a).localeCompare(nombreRuta(b), "es"));
+}
+
+function abrirConfigEquipo(dispositivo, modo) {
+  const m = equipos.find(e => e.dispositivo === dispositivo);
+  if (!m) return;
+  configEquipo = {dispositivo, modo};
+  const esRutas = modo === "rutas";
+  const nombre = m.nombre || dispositivo;
+  $("equipo-config-titulo").textContent =
+    esRutas ? `Rutas de ${nombre}` : `Series de ${nombre}`;
+  $("equipo-config-todas-rotulo").textContent =
+    esRutas ? "Todas las rutas" : "Todas las series";
+  $("equipo-config-predet-rotulo").textContent =
+    esRutas ? "Ruta predeterminada" : "Serie predeterminada";
+  const sel = esRutas ? m.rutas : m.series;
+  const todas = sel === "*" || sel === null || sel === undefined;
+  $("equipo-config-todas").checked = todas;
+  const opciones = esRutas ? rutasConocidasParaEquipo(m) : SERIES;
+  const corto = esRutas ? etiquetaRutaCorta : (x) => x;
+  const marcadas = Array.isArray(sel) ? sel : [];
+  $("equipo-config-lista").innerHTML = opciones.length
+    ? opciones.map(v => `<label><input type="checkbox" value="${esc(v)}"
+          ${marcadas.includes(v) ? "checked" : ""} ${todas ? "disabled" : ""}
+          onchange="configEquipoRecalcular()"> ${esc(corto(v))}</label>`).join("")
+    : `<span class="mut">Todavía no hay rutas registradas.</span>`;
+  // El día de despacho solo va con las rutas: es parte de la misma
+  // configuración y así el administrador puede corregirlo desde aquí.
+  $("equipo-config-dia-campo").style.display = esRutas ? "" : "none";
+  $("equipo-config-dia").value = m.dia_despacho || "";
+  $("equipo-config-error").style.display = "none";
+  configEquipoRecalcular(
+    esRutas ? (m.ruta_predeterminada || "") : (m.serie_predeterminada || ""));
+  $("equipo-config-overlay").classList.add("visible");
+}
+
+// Mismas reglas del registro: "Todas" deshabilita las individuales SIN
+// desmarcarlas; la predeterminada solo se elige cuando la selección efectiva
+// tiene más de una (con una sola, es esa y se muestra como texto).
+function configEquipoRecalcular(preseleccionar) {
+  const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo) || {};
+  const esRutas = configEquipo.modo === "rutas";
+  const todas = $("equipo-config-todas").checked;
+  const cajas = [...$("equipo-config-lista").querySelectorAll("input")];
+  cajas.forEach(c => { c.disabled = todas; });
+  const marcadas = cajas.filter(c => c.checked).map(c => c.value);
+  const conocidas = esRutas ? rutasConocidasParaEquipo(m) : SERIES;
+  const efectivas = todas ? conocidas : marcadas;
+  const corto = esRutas ? etiquetaRutaCorta : (x) => x;
+  const campo = $("equipo-config-predet-campo");
+  const texto = $("equipo-config-predet-texto");
+  const select = $("equipo-config-predet");
+  if (!todas && marcadas.length === 1) {
+    campo.style.display = "";
+    select.style.display = "none";
+    texto.style.display = "";
+    texto.textContent = `${corto(marcadas[0])} (la única elegida)`;
+    return;
+  }
+  if (!efectivas.length) { campo.style.display = "none"; return; }
+  campo.style.display = "";
+  texto.style.display = "none";
+  select.style.display = "";
+  const previa = preseleccionar !== undefined ? preseleccionar : select.value;
+  select.innerHTML = `<option value="">— Ninguna —</option>`
+    + efectivas.map(v => `<option value="${esc(v)}" ${v === previa ? "selected" : ""}>
+        ${esc(corto(v))}</option>`).join("");
+  if (!efectivas.includes(previa)) select.value = "";
+}
+
+function alternarTodasConfigEquipo() {
+  configEquipoRecalcular();
+}
+
+function cerrarConfigEquipo() {
+  configEquipo = null;
+  $("equipo-config-overlay").classList.remove("visible");
+}
+
+// El endpoint pide el conjunto COMPLETO (rutas Y series): la mitad que no se
+// está editando viaja tal como estaba en la fila; sin configurar (null) viaja
+// como "*", que es su equivalente.
+function guardarConfigEquipo() {
+  const m = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
+  if (!m) { cerrarConfigEquipo(); return; }
+  const esRutas = configEquipo.modo === "rutas";
+  const todas = $("equipo-config-todas").checked;
+  const marcadas = [...$("equipo-config-lista").querySelectorAll("input:checked")]
+    .map(c => c.value);
+  const editada = todas ? "*" : marcadas;
+  const predetEditada = (!todas && marcadas.length === 1)
+    ? marcadas[0] : $("equipo-config-predet").value || "";
+  const talCual = (v) => (v === "*" || v === null || v === undefined) ? "*" : v;
+  const cuerpo = {
+    dispositivo: configEquipo.dispositivo,
+    rutas: esRutas ? editada : talCual(m.rutas),
+    series: esRutas ? talCual(m.series) : editada,
+    ruta_predeterminada: esRutas ? predetEditada : (m.ruta_predeterminada || ""),
+    serie_predeterminada: esRutas ? (m.serie_predeterminada || "") : predetEditada,
+    dia_despacho: esRutas ? $("equipo-config-dia").value : (m.dia_despacho || ""),
+  };
+  const boton = $("equipo-config-guardar");
+  boton.disabled = true;
+  api("/api/ajustes/equipo-rutas-series", cuerpo).then((r) => {
+    equipos = r.equipos_gestionables || equipos;
+    pintarEquipos();
+    cerrarConfigEquipo();
+    mensaje(`Configuración de ${m.nombre || m.dispositivo} guardada; `
+      + "la toma en su próximo refresco.", "info");
+  }).catch((e) => {
+    $("equipo-config-error").textContent = e.message;
+    $("equipo-config-error").style.display = "";
+  }).finally(() => { boton.disabled = false; });
 }
 
 // Vista del panel (2026-08-05): mirar el panel como otro rol. Desde el
@@ -16351,8 +16860,35 @@ const CATALOGOS = {
 // que #catalogo-overlay): el botón "Abrir rutas" solo abre, Cerrar/clic
 // afuera cierra — no hay estado de navegación que mantener.
 function abrirRutasVista() {
+  // El campo de alta arranca VACÍO siempre: nada escrito que nadie eligió.
+  $("ruta-nueva").value = "";
+  $("ruta-nueva-agregar").disabled = true;
   $("rutas-overlay").classList.add("visible");
   cargarRutasSeries();
+}
+
+// Alta manual de una ruta (2026-08-07): para registrarla antes de que
+// aparezca en un pedido. Queda sin serie configurada, como las detectadas
+// solas; desde aquí las rutas nunca se borran por falta de pedidos.
+async function crearRutaNueva() {
+  const campo = $("ruta-nueva");
+  const ruta = campo.value.trim();
+  if (!ruta) return;
+  const boton = $("ruta-nueva-agregar");
+  boton.disabled = true;
+  try {
+    const r = await api("/api/rutas-series/crear", {ruta});
+    if (r.creada) {
+      campo.value = "";
+      mensaje(`Ruta ${nombreRuta(r.ruta)} registrada.`, "info");
+      cargarRutasSeries();
+      return;   // el botón queda deshabilitado: el campo volvió a vacío
+    }
+    mensaje("Esa ruta ya está registrada.", "info");
+  } catch (e) {
+    mensaje(e.message, "error");
+  }
+  boton.disabled = !campo.value.trim();
 }
 
 function cerrarRutasVista() {
