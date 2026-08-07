@@ -2688,7 +2688,11 @@
          hasta que alguien la aprueba aquí; el bloque solo existe para la
          supervisión y los equipos con rol Admin. -->
     <div class="ajustes-bloque" id="solicitudes-bloque" style="display:none">
-      <h3>Computadoras esperando activación</h3>
+      <!-- El título cambia con el botón de abajo: mientras se listan solo las
+           que esperan es "Solicitudes de activación"; al sumar las ya activas
+           pasa a "Computadoras registradas", porque el título viejo quedaba
+           mintiendo sobre lo que se estaba viendo. -->
+      <h3 id="solicitudes-titulo">Solicitudes de activación</h3>
       <p class="mut" style="margin:4px 0 10px">Cada computadora nueva pide
         entrar con el nombre que le puso quien la instaló. Hasta que se active
         no ve pedidos ni puede facturar. Revisa que reconozcas el equipo antes
@@ -2700,7 +2704,7 @@
          style="margin:0; display:none; color:var(--err)"></p>
       <div style="margin-top:12px">
         <button onclick="mostrarEquiposActivos()" id="solicitudes-ver-activos"
-                class="secundario">Ver también las ya activas</button>
+                class="secundario">Ver las computadoras registradas</button>
       </div>
     </div>
 
@@ -15143,8 +15147,10 @@ function pintarSolicitudes() {
     s => s.estado === "pendiente" || s.reinstalacion_pendiente);
   const resto = solicitudes.filter(s => !espera.includes(s));
   const lista = verEquiposActivos ? [...espera, ...resto] : espera;
+  $("solicitudes-titulo").textContent = verEquiposActivos
+    ? "Computadoras registradas" : "Solicitudes de activación";
   $("solicitudes-ver-activos").textContent = verEquiposActivos
-    ? "Ver solo las que esperan" : "Ver también las ya activas";
+    ? "Ver solo las solicitudes" : "Ver las computadoras registradas";
   $("solicitudes-ver-activos").style.display = resto.length ? "" : "none";
   $("solicitudes-vacio").style.display =
     (!lista.length && !$("solicitudes-error").textContent) ? "" : "none";
