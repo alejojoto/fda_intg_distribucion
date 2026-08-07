@@ -463,13 +463,14 @@
   tr.sep-fecha:hover td { background:#eef1f6; }
   tr.sep-fecha.sep-fecha-antigua td { background:#f97316; color:#ffffff; }
   tr.sep-fecha.sep-fecha-antigua:hover td { background:#f97316; }
-  /* Filas de un grupo atrasado: amarillo resaltador (2026-08-07, pedido del
-     usuario: los matices suaves anteriores no se distinguían del blanco). El
+  /* Filas de un grupo atrasado: amarillo un escalón por debajo del resaltador
+     (2026-08-08, pedido del usuario) — los matices suaves originales se
+     perdían contra el blanco y el resaltador puro cansaba la vista. El
      separador de fecha va en naranja para seguir mandando sobre sus filas. */
-  tr.fila-atrasada td { background:#fde047; }
-  tr.fila-atrasada:hover td { background:#facc15; }
-  tr.fam-cabecera.fila-atrasada td { background:#fbbf24; }
-  tr.fam-cabecera.fila-atrasada:hover td { background:#f5b312; }
+  tr.fila-atrasada td { background:#fef08a; }
+  tr.fila-atrasada:hover td { background:#fbe36b; }
+  tr.fam-cabecera.fila-atrasada td { background:#fcd34d; }
+  tr.fam-cabecera.fila-atrasada:hover td { background:#f8c633; }
   /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
      ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
      125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
