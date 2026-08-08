@@ -299,6 +299,19 @@
   .rotulo-dia:empty { display:none; }
   .rotulo-dia.hoy    { background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
   .rotulo-dia.manana { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+  /* Series y rutas de cada computadora (2026-08-08, pedido del usuario): el
+     texto con ★ no dejaba ver de un vistazo la diferencia entre "todas" y una
+     asignación concreta. Ahora son etiquetas de color: gris = sin restricción
+     (Todas), violeta suave = lo asignado, violeta lleno = la predeterminada,
+     que es la que decide con qué arranca esa máquina. Verde y azul quedan
+     fuera: son el día (hoy/mañana); ámbar y rojo significan aviso. */
+  .chip-asig { display:inline-block; padding:1px 6px; border-radius:5px;
+               font-size:11px; font-weight:600; border:1px solid;
+               background:#f1f5f9; border-color:#cbd5e1; color:#475569;
+               vertical-align:1px; }
+  .chip-asig.propias { background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; }
+  .chip-asig.predet { background:#6d28d9; border-color:#6d28d9; color:#fff; }
+  .chip-asig + .chip-asig { margin-left:4px; }
   /* Tabs PENDIENTES / EN REVISIÓN / PROCESADAS / DESCUENTOS / AJUSTES — cada
      una con su color. Cuál está activa se lee de lejos por cuatro señales que
      se suman (feedback 2026-07-22: el tinte pálido solo no se distinguía, y
@@ -895,6 +908,12 @@
   .equipos-config .dia-celda { display:flex; align-items:center; gap:5px;
       font-size:12px; }
   .equipos-config .dia-celda select { font-size:12px; padding:2px 4px; }
+  /* El día también se reconoce por color, con los mismos tonos del cuadrito de
+     "Fecha a facturar" (verde hoy, azul mañana). Sin elegir se queda neutro. */
+  .equipos-config .dia-celda select.hoy { background:#ecfdf5; border-color:#a7f3d0;
+      color:#047857; font-weight:600; }
+  .equipos-config .dia-celda select.manana { background:#eff6ff; border-color:#bfdbfe;
+      color:#1d4ed8; font-weight:600; }
   .equipos-config .mut { font-size:12px; }
   .equipos-config button { font-size:12px; padding:3px 8px;
       margin-left:auto; }
@@ -7202,14 +7221,14 @@ function supConfigEquipo(equipo) {
   const host = esc(equipo.dispositivo || "");
   const m = equipos.find(e => e.dispositivo === equipo.dispositivo);
   if (m)
-    return `<span class="mut">${esc(resumenConfigEquipo(m))}</span>`
+    return `<span class="mut">${resumenConfigEquipo(m)}</span>`
       // Con el permiso de identidad se edita; sin él, la línea se ve igual
       // pero sin botón — es el mismo permiso que exige el endpoint.
       + (tienePermiso("identidad_maquina")
          ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>`
          : "");
   if (equipo.dispositivo === supDispositivoPropio && configPropia)
-    return `<span class="mut">${esc(resumenConfigEquipo(configPropia))}</span>
+    return `<span class="mut">${resumenConfigEquipo(configPropia)}</span>
       <span class="mut">Es esta computadora</span>`;
   return `<span class="mut">—</span>`;
 }
@@ -15985,7 +16004,7 @@ function resumenConfigSolicitada(s) {
         ? (sel.length === 1 ? corto(sel[0]) : `${sel.length} ${plural}`)
         : `sin ${plural}`;
     if (!predet) return base;
-    return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
+    return base === corto(predet) ? base : `${base}, arranca en ${corto(predet)}`;
   };
   return [parte(cfg.rutas, cfg.ruta_predeterminada, "rutas", etiquetaRutaCorta),
           parte(cfg.series, cfg.serie_predeterminada, "series", (x) => x),
@@ -16193,11 +16212,12 @@ function pintarEquipos() {
     // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
     const config = `<td class="equipos-config">
       <div>
-        <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
-        <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
+        <span class="mut">Series: ${chipsSeriesEquipo(m)}</span>
+        <span class="mut">Rutas: ${chipsRutasEquipo(m)}</span>
         <span class="dia-celda">
           <span class="mut">Día:</span>
-          <select onchange="onCambioDiaEquipo(this, '${host}')">
+          <select class="${m.dia_despacho || ""}"
+                  onchange="onCambioDiaEquipo(this, '${host}')">
             ${m.dia_despacho ? ""
               : "<option value=\"\" selected disabled>Sin elegir</option>"}
             <option value="manana" ${m.dia_despacho === "manana" ? "selected" : ""}>Mañana</option>
@@ -16385,33 +16405,47 @@ async function cambiarDiaEquipo(dispositivo, control) {
 // series son las que su instalación del programa de facturación de verdad
 // tiene. null/sin configurar equivale a todas (legado).
 
-// Resumen corto para la fila: "Todas" / el nombre si es una / "N rutas",
-// con "★ X" si hay predeterminada.
-function resumenAsignacion(sel, predet, plural, corto) {
-  const base = (sel === "*" || sel === null || sel === undefined) ? "Todas"
-    : sel.length === 1 ? corto(sel[0])
-    : `${sel.length} ${plural}`;
-  if (!predet) return base;
-  return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
+// Etiquetas de color en vez del texto con ★ (2026-08-08, pedido del usuario):
+// gris "Todas" = sin restricción, violeta suave = lo asignado, violeta lleno =
+// la predeterminada. Una asignación de una sola sale directa en violeta
+// lleno si coincide con la predeterminada.
+function chipsAsignacion(sel, predet, plural, corto) {
+  const chip = (texto, clase) =>
+    `<span class="chip-asig${clase ? " " + clase : ""}">${esc(texto)}</span>`;
+  const todas = sel === "*" || sel === null || sel === undefined;
+  const una = !todas && sel.length === 1;
+  if (una && (!predet || corto(sel[0]) === corto(predet)))
+    return chip(corto(sel[0]), "predet");
+  const base = todas ? chip("Todas", "")
+    : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`, "propias");
+  return predet ? base + chip(corto(predet), "predet") : base;
 }
 
 const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
+
+// El día con el mismo cuadrito de color de "Fecha a facturar" (verde hoy,
+// azul mañana) donde se lee sin poder cambiarlo.
+function chipDiaDespacho(dia) {
+  const etiqueta = ETIQUETA_DIA_DESPACHO[dia];
+  return etiqueta ? `<span class="rotulo-dia ${dia}">${etiqueta}</span>`
+                  : `<span class="mut">sin elegir</span>`;
+}
 
 // La línea de cada computadora, en el orden que pidió el usuario
 // (2026-08-07): con qué series factura, qué rutas atiende y con qué día
 // arranca su Fecha a facturar. Es lo mismo que se cambia en "Detalles".
 function resumenConfigEquipo(m) {
-  return `Series: ${resumenSeriesEquipo(m)} · Rutas: ${resumenRutasEquipo(m)}`
-    + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
+  return `Series: ${chipsSeriesEquipo(m)} · Rutas: ${chipsRutasEquipo(m)}`
+    + ` · Día fact.: ${chipDiaDespacho(m.dia_despacho)}`;
 }
 
 // En la fila de Computadoras cada dato va en su propio bloque, repartido a lo
 // ancho de la celda; el día no se resume ahí porque está como par de opciones
 // a la vista, y repetirlo sería el mismo dato dos veces.
-const resumenSeriesEquipo = (m) =>
-  resumenAsignacion(m.series, m.serie_predeterminada, "series", (x) => x);
-const resumenRutasEquipo = (m) =>
-  resumenAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
+const chipsSeriesEquipo = (m) =>
+  chipsAsignacion(m.series, m.serie_predeterminada, "series", (x) => x);
+const chipsRutasEquipo = (m) =>
+  chipsAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
 
 // La ventana sirve a tres orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
@@ -16840,8 +16874,8 @@ function pintarMiConfigRutasSeries() {
   const el = $("mi-config-resumen");
   if (!el) return;
   const m = configPropia || {};
-  el.textContent = `Series: ${resumenSeriesEquipo(m)}`
-    + ` · Rutas: ${resumenRutasEquipo(m)}`;
+  el.innerHTML = `Series: ${chipsSeriesEquipo(m)}`
+    + ` · Rutas: ${chipsRutasEquipo(m)}`;
 }
 
 // La ventana edita TODO lo de esa computadora: nombre y vendedor por
