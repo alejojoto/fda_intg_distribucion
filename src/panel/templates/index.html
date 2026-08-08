@@ -810,19 +810,24 @@
   .equipos-tabla { border-collapse:collapse; }
   .equipos-tabla th { text-align:left; font-size:11.5px; font-weight:700;
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
-      padding:0 10px 6px 0; white-space:nowrap; }
-  .equipos-tabla td { padding:4px 10px 4px 0; vertical-align:middle; }
-  /* Nombre y vendedor en UNA línea (2026-08-08, pedido del usuario): con el
-     nombre, el identificador de la computadora y el vendedor apilados, esta
-     celda medía tres líneas contra una del resto y las columnas no se leían
-     como filas. El identificador queda en el hover, para desempatar dos
-     computadoras con el mismo nombre. */
+      padding:0 8px 6px 0; white-space:nowrap; }
+  .equipos-tabla td { padding:4px 8px 4px 0; vertical-align:middle; }
+  /* Nombre y vendedor en DOS líneas (2026-08-08, pedido del usuario): con
+     Series/Rutas/Rol también apilados en su columna, esta celda ya no
+     desentonaba por ser la única de dos renglones — al revés, con todas las
+     columnas de una sola línea la fila quedaba más baja de lo que hace falta
+     y el resto de las celdas colgaban sueltas en el medio. El identificador
+     queda en el hover, para desempatar dos computadoras con el mismo nombre. */
   .equipos-tabla .equipos-id { white-space:nowrap; }
-  .equipos-tabla .equipos-nombre { font-weight:600; font-size:13px; }
-  .equipos-tabla .equipos-vendedor { color:var(--mut); font-size:12px;
-      margin-left:8px; }
+  .equipos-tabla .equipos-nombre { display:block; font-weight:600; font-size:13px; }
+  .equipos-tabla .equipos-vendedor { display:block; color:var(--mut); font-size:12px;
+      margin-top:1px; }
   .equipos-tabla input[type=text] { width:190px; }
   .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
+  /* Admin y Editor uno debajo del otro (2026-08-08, pedido del usuario): esta
+     columna solo la ve quien supervisa, así que apilarla no le quita nada a
+     nadie más y empareja su altura con el resto de las columnas apiladas. */
+  .equipos-tabla .equipos-roles { display:flex; flex-direction:column; gap:2px; }
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
@@ -939,6 +944,15 @@
      flex-wrap y el ancho de cada dato corría según el contenido de esa fila,
      así que nada quedaba alineado entre filas. Como columna de tabla real, el
      navegador la ensancha al máximo de todas las filas y alinea sola. */
+  /* Cuando la asignación trae DOS chips (p. ej. "3 rutas" + "★ Anzoátegui"),
+     van uno debajo del otro en vez de ensanchar la columna (2026-08-08,
+     pedido del usuario): compacto en ancho, y así la fila con dos chips no
+     desalinea el resto de la columna. Con un solo chip no cambia nada. */
+  .equipos-tabla .equipos-series,
+  .equipos-tabla .equipos-rutas { display:flex; flex-direction:column;
+      align-items:flex-start; gap:2px; }
+  .equipos-tabla .equipos-series .chip-asig + .chip-asig,
+  .equipos-tabla .equipos-rutas .chip-asig + .chip-asig { margin-left:0; }
   .equipos-tabla .equipos-dia select { font-size:12px; padding:2px 4px; }
   /* El día también se reconoce por color, con los mismos tonos del cuadrito de
      "Fecha a facturar" (verde hoy, azul mañana). Sin elegir se queda neutro. */
@@ -16658,7 +16672,7 @@ function pintarEquipos() {
     const host = esc(m.dispositivo);
     // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
     // no es editor" no existe.
-    const editor = asignaAdmin ? `<td>
+    const editor = asignaAdmin ? `<td class="equipos-roles">
       <label class="sup-rol-check" title="${m.es_admin
           ? "Quitarlo lo deja como Editor."
           : "Marca esta computadora como Admin."}">
