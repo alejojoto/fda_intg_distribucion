@@ -16857,18 +16857,19 @@ async function cambiarDiaEquipo(dispositivo, control) {
 // En series (2026-08-08) el violeta lleno queda reservado a la serie ÚNICA y la
 // predeterminada sale en violeta suave: con una sola serie el chip va solo y
 // ambos casos se veían igual.
-function chipsAsignacion(sel, predet, plural, corto, predetSuave) {
+function chipsAsignacion(sel, predet, plural, corto, esSerie) {
   const chip = (texto, clase) =>
     `<span class="chip-asig${clase ? " " + clase : ""}">${esc(texto)}</span>`;
   const todas = sel === "*" || sel === null || sel === undefined;
   const una = !todas && sel.length === 1;
   if (una && (!predet || corto(sel[0]) === corto(predet)))
-    return chip((predet ? "★ " : "") + corto(sel[0]), "predet");
+    return chip((esSerie ? "① " : predet ? "★ " : "") + corto(sel[0]),
+                "predet");
   const base = todas ? chip("Todas", "")
     : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`,
-           predetSuave ? "" : "propias");
+           esSerie ? "" : "propias");
   return predet
-    ? base + chip("★ " + corto(predet), predetSuave ? "propias" : "predet")
+    ? base + chip("★ " + corto(predet), esSerie ? "propias" : "predet")
     : base;
 }
 
