@@ -807,11 +807,16 @@
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
-  .equipos-tabla { border-collapse:collapse; }
+  /* Ancho al CONTENIDO, no al contenedor (2026-08-08, pedido del usuario): la
+     regla general de este panel es `table { width:100% }`, y estirada al
+     100% la tabla repartía el sobrante entre columnas — quedaba un hueco
+     grande tras el nombre y, con las celdas en nowrap, empujaba el ancho del
+     bloque entero hasta obligar a scrollear de lado. */
+  .equipos-tabla { border-collapse:collapse; width:auto; max-width:100%; }
   .equipos-tabla th { text-align:left; font-size:11.5px; font-weight:700;
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
-      padding:0 8px 6px 0; white-space:nowrap; }
-  .equipos-tabla td { padding:4px 8px 4px 0; vertical-align:middle; }
+      padding:0 6px 6px 0; white-space:nowrap; }
+  .equipos-tabla td { padding:4px 6px 4px 0; vertical-align:middle; }
   /* Nombre y vendedor en DOS líneas (2026-08-08, pedido del usuario): con
      Series/Rutas/Rol también apilados en su columna, esta celda ya no
      desentonaba por ser la única de dos renglones — al revés, con todas las
@@ -16733,7 +16738,9 @@ function pintarEquipos() {
     return `<tr>
       <td class="equipos-id" title="${host}">
         <span class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</span>
-        <span class="equipos-vendedor">${esc(etiquetaVendedorEquipo(m.vendedor))}</span>
+        <span class="equipos-vendedor"${m.vendedor
+            ? ` title="Vendedor ${esc(m.vendedor)}"` : ""}>${
+          esc(etiquetaVendedorEquipo(m.vendedor))}</span>
       </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
@@ -16751,12 +16758,14 @@ function pintarEquipos() {
     <tbody>${filas}</tbody></table>`;
 }
 
-// El vendedor de esa computadora, con código y nombre juntos; sin catálogo a
-// mano queda el código solo, que es lo que se sabe.
+// Solo el NOMBRE del vendedor (2026-08-08, pedido del usuario): el código
+// ocupaba ancho en una tabla que ya obligaba a scrollear de lado y no hace
+// falta para saber de quién es la computadora. Queda en el hover. Sin nombre
+// en el catálogo se muestra el código, que es lo único que se sabe.
 function etiquetaVendedorEquipo(codigo) {
   if (!codigo) return "Sin vendedor";
   const v = vendedoresCatalogo.find(x => x.codigo === codigo);
-  return v && v.nombre ? `${codigo} — ${v.nombre}` : codigo;
+  return v && v.nombre ? v.nombre : codigo;
 }
 
 // Confirmación propia de esta tabla (2026-08-08, pedido del usuario), con dos
