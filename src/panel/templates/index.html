@@ -9540,6 +9540,16 @@ function estadoParaTitulo() {
       ? ` (${Math.min(hechasEnFila + 1, metaEnFila)} de ${metaEnFila})` : "";
     return (TITULO_FASE[faseActual] || "llenando") + cuenta;
   }
+  // Computadora sin acceso (desactivada, rechazada, esperando activación) o
+  // marcada fuera de servicio: el título tampoco puede seguir contando el
+  // trabajo pendiente ni desglosándolo por ruta. El panel ya queda tapado,
+  // pero el título conservaba lo último escrito y era la única información de
+  // la operación que seguía a la vista (2026-08-08, pedido del usuario).
+  // Cadena vacía = solo el nombre de la app. Va DESPUÉS del llenado a
+  // propósito: si el acceso cae con un documento a medias, la fase sigue
+  // visible en la barra flotante hasta que el operador lo resuelva.
+  if (maquinaDesactivada || ACCESO_TAPA.includes(acceso.estado || "activo"))
+    return "";
   // Sin lista todavía no se inventa una cuenta: si la carga falla, un "sin
   // pendientes" mentiría en la barra hasta el próximo intento. Mientras tanto
   // queda el nombre pelado, que es con lo que abre la ventana.
@@ -9572,7 +9582,7 @@ function pintarTituloVentana() {
     Promise.resolve(api.titulo(estado)).catch(() => {});
     return;
   }
-  document.title = `${TITULO_PAGINA} — ${estado}`;
+  document.title = estado ? `${TITULO_PAGINA} — ${estado}` : TITULO_PAGINA;
 }
 
 // Baby Mix paq (FDA 2026-07-19, TEMPORAL hasta agotar los paquetes viejos):
@@ -15571,6 +15581,7 @@ async function cargarAjustes() {
 // compartido el que trae la reactivación y quita el aviso solo.
 function pintarDesactivada() {
   $("desactivada-overlay").classList.toggle("visible", maquinaDesactivada);
+  pintarTituloVentana();   // con la tapa puesta el título deja de contar
 }
 
 // --- Activación de esta computadora (2026-08-05) --------------------------
@@ -15589,6 +15600,9 @@ function pintarAcceso() {
   const estado = acceso.estado || "activo";
   const tapa = ACCESO_TAPA.includes(estado);
   $("acceso-overlay").classList.toggle("visible", tapa);
+  // Sin acceso, el título de la ventana vuelve al nombre pelado; al recuperarlo
+  // vuelve a contar con lo que ya haya cargado.
+  pintarTituloVentana();
   if (!tapa) { detenerSondeoAcceso(); return; }
   const pideNombre = estado === "sin_credencial" || estado === "desconocido"
     || estado === "olvidado";
