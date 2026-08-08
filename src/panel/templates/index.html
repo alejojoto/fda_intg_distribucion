@@ -901,6 +901,12 @@
       grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
       max-height:none; }
   #equipo-config .acceso-check { font-size:13px; }
+  /* "Todas las rutas" de un equipo con rol (2026-08-08): se ve apagado pero
+     NO va con `disabled` — un control deshabilitado no dispara el clic con el
+     que se explica por qué no se puede quitar (mismo motivo que #motivo-otro). */
+  #equipo-config .acceso-check.bloqueado { color:var(--mut); }
+  #equipo-config .acceso-check.bloqueado input { opacity:.55;
+      cursor:var(--cursor-prohibido); }
   #equipo-config .acceso-campo:first-of-type { margin-top:0; }
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
@@ -3632,8 +3638,14 @@
       <label id="equipo-config-rutas-rotulo" style="display:none"></label>
       <p class="mut equipo-config-ayuda">Solo verá pedidos de esas rutas; con
         la predeterminada arranca ya filtrada al abrir.</p>
+      <!-- Con rol (Admin o Editor) la sección queda de solo lectura: ver todas
+           las rutas es un permiso de Editor, así que la asignación no lo limita
+           en nada. La nota dice qué pasa con lo que ya tenía asignado. -->
+      <p class="mut equipo-config-ayuda" id="equipo-config-rutas-rol-nota"
+         style="display:none"></p>
       <div class="equipo-config-linea">
-        <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
+        <label class="acceso-check" id="equipo-config-rutas-todas-caja"><input type="checkbox" id="equipo-config-rutas-todas"
+               onclick="return onClickTodasRutasEquipo(event)"
                onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
         <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
           <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
@@ -7376,7 +7388,7 @@ function supConfigEquipo(equipo) {
          ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>`
          : "");
   if (equipo.dispositivo === supDispositivoPropio && configPropia)
-    return `<span class="mut">${resumenConfigEquipo(configPropia)}</span>
+    return `<span class="mut">${resumenConfigEquipo(configPropiaConRol())}</span>
       <span class="mut">Es esta computadora</span>`;
   return `<span class="mut">—</span>`;
 }
@@ -16945,8 +16957,20 @@ function resumenConfigEquipo(m) {
 // a la vista, y repetirlo sería el mismo dato dos veces.
 const chipsSeriesEquipo = (m) =>
   chipsAsignacion(m.series, m.serie_predeterminada, "series", (x) => x, true);
+// Un equipo con rol ve TODAS las rutas (permiso ver_todas_rutas, src/roles.py):
+// su asignación queda dormida, así que la línea dice "Todas" —lo que de verdad
+// ve— sin pisar lo guardado, que vuelve solo si se le quita el rol.
 const chipsRutasEquipo = (m) =>
-  chipsAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
+  chipsAsignacion(veTodasLasRutas(m) ? "*" : m.rutas, m.ruta_predeterminada,
+                  "rutas", etiquetaRutaCorta);
+
+const veTodasLasRutas = (m) => !!(m && (m.es_admin || m.es_editor));
+
+// La configuración propia no trae las marcas de rol de la fila del catálogo
+// (esta computadora no sale en la lista de las demás): se le pega la del
+// permiso, que es la misma verdad.
+const configPropiaConRol = () => ({...(configPropia || {}),
+                                   es_editor: tienePermiso("ver_todas_rutas")});
 
 // La ventana sirve a tres orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
@@ -17010,7 +17034,7 @@ function abrirConfigSolicitud(dispositivo) {
 // vendedor y día ya se cambian en el mismo bloque, y dos controles para el
 // mismo dato se desincronizan.
 function abrirConfigPropia() {
-  abrirVentanaConfigEquipo({origen: "propia", datos: configPropia || {},
+  abrirVentanaConfigEquipo({origen: "propia", datos: configPropiaConRol(),
                             nombreVisible: "esta computadora"});
 }
 
@@ -17072,8 +17096,10 @@ function abrirVentanaConfigEquipo(ctx) {
     const sel = tipo === "rutas" ? datos.rutas : datos.series;
     // Una computadora del catálogo sin configurar (null) equivale a todas
     // (legado); una solicitud sin configuración pedida abre en blanco, igual
-    // que el formulario de registro.
-    const todas = sel === "*"
+    // que el formulario de registro. Con rol, las rutas van en "Todas" a la
+    // fuerza: es lo que ese equipo ve de hecho.
+    const todas = (tipo === "rutas" && veTodasLasRutas(datos))
+      || sel === "*"
       || (!esSolicitud && (sel === null || sel === undefined));
     $(`equipo-config-${tipo}-todas`).checked = todas;
     const opciones = opcionesConfigEquipo(tipo, datos);
@@ -17095,6 +17121,7 @@ function abrirVentanaConfigEquipo(ctx) {
       : (datos.serie_predeterminada
          || (marcadas.length === 1 ? marcadas[0] : "")));
   }
+  pintarNotaRolRutasEquipo(datos, esPropia);
   $("equipo-config-dia-rotulo").textContent =
     `Día a facturar de ${nombreVisible}`;
   document.querySelectorAll("input[name=equipo-config-dia]")
@@ -17119,6 +17146,45 @@ function abrirVentanaConfigEquipo(ctx) {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   ctx.firma = firmaConfigEquipo();
   $("equipo-config-overlay").classList.add("visible");
+}
+
+const datosConfigEquipo = () => (configEquipo || {}).datos || {};
+
+// La nota de la sección Rutas cuando ese equipo tiene rol: por qué queda en
+// "Todas" sin poder quitarse, y qué pasa con las rutas que ya tenía.
+function pintarNotaRolRutasEquipo(datos, esPropia) {
+  const nota = $("equipo-config-rutas-rol-nota");
+  const conRol = veTodasLasRutas(datos);
+  $("equipo-config-rutas-todas-caja").classList.toggle("bloqueado", conRol);
+  if (!conRol) { nota.style.display = "none"; return; }
+  const guardadas = Array.isArray(datos.rutas) ? datos.rutas : [];
+  const cuales = guardadas.length <= 4
+    ? ` (${guardadas.map(etiquetaRutaCorta).join(", ")})` : "";
+  nota.textContent = (esPropia ? "Esta computadora ve" : "Ve")
+    + " todas las rutas por su rol (Admin o Editor)."
+    + (guardadas.length === 1
+       ? ` Su ruta asignada${cuales} queda guardada y vuelve a valer si se le`
+         + " quita el rol."
+       : guardadas.length
+       ? ` Sus ${guardadas.length} rutas asignadas${cuales} quedan guardadas y`
+         + " vuelven a valer si se le quita el rol."
+       : "");
+  nota.style.display = "";
+}
+
+// Quitarle "Todas las rutas" a un equipo con rol no se permite (2026-08-08,
+// pedido del usuario) y el intento no se queda mudo: dice por qué. El clic
+// llega porque la casilla NO va con `disabled` —una deshabilitada no dispara
+// nada—; preventDefault la deja como estaba.
+function onClickTodasRutasEquipo(ev) {
+  if (!veTodasLasRutas(datosConfigEquipo())) return true;
+  ev.preventDefault();
+  marcarErrorConfigEquipo("rutas",
+    "Solo las computadoras sin rol se limitan a unas rutas: un Editor o un "
+    + "Admin las ve todas."
+    + ((configEquipo || {}).origen === "propia" ? ""
+       : " Quítale el rol en la tabla de Computadoras para asignarle rutas."));
+  return false;
 }
 
 // Firma de lo editable de la ventana (lo mismo que se mandaría al guardar). Se
@@ -17201,6 +17267,22 @@ function configEquipoRecalcular(tipo, preseleccionar) {
     configEquipoPintarSerie(opcionesConfigEquipo(tipo, datos), preseleccionar);
     return;
   }
+  // Con rol la sección de rutas es de solo lectura: la reja se esconde y la
+  // predeterminada se LEE — es la ruta que ese equipo tiene puesta en su barra
+  // y la mueve él mismo, así que ofrecerla aquí sería un control que su
+  // próximo cambio de filtro pisa.
+  if (veTodasLasRutas(datos)) {
+    lista.style.display = "none";
+    const campoPredet = $("equipo-config-rutas-predet-campo");
+    const puesta = datos.ruta_predeterminada || "";
+    if (!puesta) { campoPredet.style.display = "none"; return; }
+    campoPredet.style.display = "";
+    $("equipo-config-rutas-predet").style.display = "none";
+    const leida = $("equipo-config-rutas-predet-texto");
+    leida.style.display = "";
+    leida.textContent = `${etiquetaRutaCorta(puesta)} (la que tiene puesta)`;
+    return;
+  }
   lista.style.display = todas ? "none" : "";
   const cajas = [...lista.querySelectorAll("input")];
   cajas.forEach(c => { c.disabled = todas; });
@@ -17251,6 +17333,13 @@ function configEquipoPintarSerie(conocidas, preseleccionar) {
 // Lo elegido en la ventana: "*" con "Todas", si no la lista canónica. En
 // series es la del desplegable, que ahí hace de selección.
 function seleccionConfigEquipo(tipo) {
+  // Con rol la ventana muestra "Todas", pero lo que viaja es lo que ese equipo
+  // YA tenía guardado: mandar "*" borraría la asignación que debe volver el
+  // día que deje de ser Editor.
+  if (tipo === "rutas" && veTodasLasRutas(datosConfigEquipo())) {
+    const guardadas = datosConfigEquipo().rutas;
+    return Array.isArray(guardadas) && guardadas.length ? guardadas : "*";
+  }
   if ($(`equipo-config-${tipo}-todas`).checked) return "*";
   if (tipo === "series") {
     const elegida = $("equipo-config-series-predet").value;
@@ -17261,6 +17350,10 @@ function seleccionConfigEquipo(tipo) {
 }
 
 function predetConfigEquipo(tipo) {
+  // Igual que la selección: con rol se conserva la que tiene puesta, para que
+  // el par (rutas, predeterminada) siga siendo el que se guardó.
+  if (tipo === "rutas" && veTodasLasRutas(datosConfigEquipo()))
+    return datosConfigEquipo().ruta_predeterminada || "";
   const sel = seleccionConfigEquipo(tipo);
   if (sel !== "*" && sel.length === 1) return sel[0];
   return $(`equipo-config-${tipo}-predet`).value || "";
@@ -17374,7 +17467,7 @@ async function guardarConfigPropia() {
 function pintarMiConfigRutasSeries() {
   const el = $("mi-config-resumen");
   if (!el) return;
-  const m = configPropia || {};
+  const m = configPropiaConRol();
   el.innerHTML = `Series: ${chipsSeriesEquipo(m)}`
     + ` · Rutas: ${chipsRutasEquipo(m)}`;
 }
