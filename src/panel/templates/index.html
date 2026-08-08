@@ -16863,12 +16863,13 @@ function chipsAsignacion(sel, predet, plural, corto, predetSuave) {
   const todas = sel === "*" || sel === null || sel === undefined;
   const una = !todas && sel.length === 1;
   if (una && (!predet || corto(sel[0]) === corto(predet)))
-    return chip(corto(sel[0]), "predet");
+    return chip((predet ? "★ " : "") + corto(sel[0]), "predet");
   const base = todas ? chip("Todas", "")
     : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`,
            predetSuave ? "" : "propias");
-  return predet ? base + chip(corto(predet), predetSuave ? "propias" : "predet")
-                : base;
+  return predet
+    ? base + chip("★ " + corto(predet), predetSuave ? "propias" : "predet")
+    : base;
 }
 
 const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
