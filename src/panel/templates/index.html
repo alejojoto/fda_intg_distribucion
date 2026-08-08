@@ -16633,25 +16633,34 @@ function pintarEquipos() {
   const asignaAdmin = esSupervisionEfectiva();
   const filas = equipos.map(m => {
     const host = esc(m.dispositivo);
+    // Una máquina fuera de servicio no recibe cambios: primero se vuelve a activar.
+    const fuera = !m.activa;
+    const titleFuera = "Está fuera de servicio: vuelve a activarla para cambiarle esto.";
+    const attrsFuera = fuera ? ` disabled title="${titleFuera}"` : "";
+    const titleAdmin = fuera
+      ? titleFuera
+      : (m.es_admin ? "Quitarlo lo deja como Editor."
+                    : "Marca esta computadora como Admin.");
+    const titleEditor = fuera
+      ? titleFuera
+      : (m.es_admin ? "Lo es por ser Admin."
+                    : "Marca esta computadora como Editor.");
+    const adminDisabled = fuera ? " disabled" : "";
+    const editorDisabled = (m.es_admin || fuera) ? " disabled" : "";
     // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
     // no es editor" no existe.
     const editor = asignaAdmin ? `<td class="equipos-roles"><div>
-      <label class="sup-rol-check" title="${m.es_admin
-          ? "Quitarlo lo deja como Editor."
-          : "Marca esta computadora como Admin."}">
-        <input type="checkbox" ${m.es_admin ? "checked" : ""}
+      <label class="sup-rol-check" title="${titleAdmin}">
+        <input type="checkbox" ${m.es_admin ? "checked" : ""}${adminDisabled}
                onclick="return onClickRolEquipo(event, '${host}', 'admin')"> Admin</label>
-      <label class="sup-rol-check" title="${m.es_admin
-          ? "Lo es por ser Admin."
-          : "Marca esta computadora como Editor."}">
-        <input type="checkbox" ${m.es_editor ? "checked" : ""}
-               ${m.es_admin ? "disabled" : ""}
+      <label class="sup-rol-check" title="${titleEditor}">
+        <input type="checkbox" ${m.es_editor ? "checked" : ""}${editorDisabled}
                onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></div></td>`
     : `<td class="equipos-check">
-      <input type="checkbox" ${m.es_editor ? "checked" : ""}
-             ${m.es_admin ? "disabled" : ""}
-             title="${m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
-                                 : "Marca esta computadora como Editor."}"
+      <input type="checkbox" ${m.es_editor ? "checked" : ""}${editorDisabled}
+             title="${fuera ? titleFuera
+                            : (m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
+                                          : "Marca esta computadora como Editor.")}"
              onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
       <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
@@ -16666,7 +16675,7 @@ function pintarEquipos() {
     const config = `<td class="equipos-series"><div>${chipsSeriesEquipo(m)}</div></td>
     <td class="equipos-rutas"><div>${chipsRutasEquipo(m)}</div></td>
     <td class="equipos-dia">
-      <select class="${m.dia_despacho || ""}"
+      <select class="${m.dia_despacho || ""}"${attrsFuera}
               onchange="onCambioDiaEquipo(this, '${host}')">
         ${m.dia_despacho ? ""
           : "<option value=\"\" selected disabled>Sin elegir</option>"}
@@ -16675,7 +16684,7 @@ function pintarEquipos() {
       </select>
     </td>
     <td class="equipos-configbtn">
-      <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
+      <button type="button"${attrsFuera} onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
     // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
     // pedido del usuario): aquí se leen para saber de cuál computadora es la
@@ -17001,6 +17010,11 @@ const cortoConfigEquipo = (tipo) => tipo === "rutas" ? etiquetaRutaCorta : (x) =
 function abrirConfigEquipo(dispositivo) {
   const m = equipos.find(e => e.dispositivo === dispositivo);
   if (!m) return;
+  if (!m.activa) {
+    mensaje("Esa computadora está fuera de servicio: vuelve a activarla "
+      + "para configurarla.", "alerta");
+    return;
+  }
   abrirVentanaConfigEquipo({origen: "equipo", dispositivo, datos: m,
                             nombreVisible: m.nombre || dispositivo});
 }
@@ -17418,6 +17432,16 @@ function cerrarConfigEquipo() {
 // dejar que el operador lo descubra pulsando Guardar (2026-08-08).
 function cerrarConfigEquipoSiSinPermiso() {
   if (!configEquipo || !editorVisible("equipo-config-overlay")) return;
+  if (configEquipo.origen === "equipo") {
+    const fila = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
+    if (fila && !fila.activa) {
+      if (confirmSalidaCerrar) confirmSalidaCerrar();
+      cerrarConfigEquipo();
+      mensaje("Esa computadora quedó fuera de servicio: la ventana se cerró "
+        + "sin guardar.", "alerta");
+      return;
+    }
+  }
   const puede = configEquipo.origen === "solicitud"
     ? accesoGestion : tienePermiso("identidad_maquina");
   if (puede) return;
