@@ -2831,6 +2831,9 @@
       <button type="button" id="ajustes-subtab-catalogos"
               class="desc-subtab st-vigentes"
               onclick="mostrarSubtabAjustes('catalogos')">Catálogos</button>
+      <button type="button" id="ajustes-subtab-corte"
+              class="desc-subtab st-revisar"
+              onclick="mostrarSubtabAjustes('corte')">Fecha de corte</button>
       <button type="button" id="ajustes-subtab-equipos"
               class="desc-subtab st-proximas activa"
               onclick="mostrarSubtabAjustes('equipos')">Otras computadoras<span
@@ -2861,10 +2864,13 @@
           seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
         <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
       </div>
-      <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
-           el 2026-08-05, pedido del usuario): la cambian la supervisión y los
-           equipos con rol Admin (permiso corte_produccion). Decide qué ve TODO
-           el mundo — cambiar el corte es operación real, no opción de prueba. -->
+    </div>
+    <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
+         el 2026-08-05 y sacada de Catálogos a subpestaña propia el 2026-08-08,
+         pedido del usuario): la cambian la supervisión y los equipos con rol
+         Admin (permiso corte_produccion). Decide qué ve TODO el mundo —
+         cambiar el corte es operación real, no un dato de catálogo. -->
+    <div id="ajustes-vista-corte" style="display:none">
       <div class="ajustes-bloque" id="corte-bloque" style="display:none">
         <h3>Fecha de corte de producción</h3>
         <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
@@ -16370,6 +16376,7 @@ async function cargarSolicitudesAcceso() {
 
 const VISTAS_AJUSTES = {
   catalogos: ["ajustes-vista-catalogos", "ajustes-subtab-catalogos"],
+  corte:     ["ajustes-vista-corte",     "ajustes-subtab-corte"],
   equipos:   ["ajustes-vista-equipos",   "ajustes-subtab-equipos"],
   general:   ["ajustes-vista-general",   "ajustes-subtab-general"],
 };
@@ -16391,12 +16398,15 @@ function puedeVerComputadoras() {
 
 // Qué subpestañas tienen algo que mostrar con los permisos de este rol. La de
 // esta máquina siempre está (nombre, vendedor y día de despacho no se degradan
-// por rol); la de catálogos, solo si alguno de sus tres bloques quedó visible
-// —cargarAjustes ya los decidió antes de llamar aquí—.
+// por rol); la de catálogos, solo si alguno de sus dos bloques quedó visible, y
+// la del corte solo si su único bloque lo está —cargarAjustes ya los decidió
+// antes de llamar aquí—.
 function subtabsAjustesDisponibles() {
-  const hayCatalogos = ["catalogos-bloque", "rutas-series-bloque", "corte-bloque"]
+  const hayCatalogos = ["catalogos-bloque", "rutas-series-bloque"]
     .some(id => $(id).style.display !== "none");
-  return {catalogos: hayCatalogos, equipos: puedeVerComputadoras(), general: true};
+  return {catalogos: hayCatalogos,
+          corte: $("corte-bloque").style.display !== "none",
+          equipos: puedeVerComputadoras(), general: true};
 }
 
 function pintarSubtabsAjustes() {
