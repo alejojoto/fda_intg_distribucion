@@ -2337,8 +2337,10 @@
 #banda-ambiente.bloqueado { background: #991b1b; color: #fff; }
 /* La torre movió esta computadora mientras estaba abierta (2026-08-08). Banda
    aparte de la de arriba: aquella dice DÓNDE estás y esta dice que estás por
-   cambiarte, y las dos pueden convivir un rato. Trae su acción al lado, que
-   es la regla de los avisos: nada de mandar al operador a resolverlo afuera. */
+   cambiarte, y las dos pueden convivir un rato. Excepción consciente a la
+   regla de "el aviso trae su acción": el botón que cerraba el asistente no
+   cerraba nada (reportado 2026-08-08), así que el aviso pide el cierre a mano
+   hasta que ese botón funcione (PLAN.md, pendiente post-desarrollo). */
 #banda-ambiente-cambio {
   display: flex;
   align-items: center;
@@ -2352,7 +2354,6 @@
   text-align: center;
   border-bottom: 1px solid rgba(0,0,0,.18);
 }
-#banda-ambiente-cambio button { font-size: 12px; padding: 3px 10px; }
 /* Verde: la máquina vuelve a facturar de verdad. */
 #banda-ambiente-cambio.a-produccion { background: #065f46; color: #fff; }
 /* Ámbar, igual que la banda de arriba: deja de facturar de verdad. */
@@ -2392,8 +2393,6 @@
    cambia en caliente porque partiría un llenado entre dos proyectos. #}
 <div id="banda-ambiente-cambio" style="display:none">
   <span id="banda-ambiente-cambio-texto"></span>
-  <button class="acento" type="button" id="banda-ambiente-cambio-boton"
-          onclick="aplicarCambioAmbiente()">Cerrar el asistente</button>
 </div>
 <header>
   <!-- Un poco más grande desde que la barra de título va sin iconito
@@ -16347,9 +16346,11 @@ function pintarBotonSolicitud() {
 // --- La torre movió esta computadora de ambiente (2026-08-08) --------------
 // El ambiente se resuelve al arrancar y no cambia en caliente: cambiarlo a
 // mitad de sesión significaría que un llenado empezado contra un proyecto
-// termine contra otro. Así que el aviso no arregla nada solo — dice qué pasó,
-// qué sigue pasando mientras tanto, y trae al lado la única acción que lo
-// aplica.
+// termine contra otro. El aviso dice qué pasó, qué sigue pasando mientras
+// tanto y qué tiene que hacer el operador. Llevaba un botón "Cerrar el
+// asistente" que no cerraba nada (reportado 2026-08-08): se retiró y el cierre
+// queda a mano hasta que ese botón funcione (endpoint /api/ambiente/aplicar
+// intacto en app.py, hoy sin quien lo llame).
 let ambienteCambioPendiente = null;
 
 function pintarCambioAmbiente(destino) {
@@ -16359,27 +16360,14 @@ function pintarCambioAmbiente(destino) {
   const aProduccion = ambienteCambioPendiente === "produccion";
   banda.className = aProduccion ? "a-produccion" : "a-pruebas";
   $("banda-ambiente-cambio-texto").textContent = aProduccion
-    ? "ESTA COMPUTADORA VOLVIÓ A PRODUCCIÓN — hasta que cierres y vuelvas a "
-      + "abrir el asistente, lo que se llene aquí sigue sin ser real."
+    ? "ESTA COMPUTADORA VOLVIÓ A PRODUCCIÓN — lo que se llene aquí sigue sin "
+      + "ser real. Cierra el asistente y vuelve a abrirlo para que el cambio "
+      + "entre."
     : "ESTA COMPUTADORA PASÓ AL AMBIENTE "
       + ambienteCambioPendiente.toUpperCase()
-      + " — hasta que cierres y vuelvas a abrir el asistente, lo que se llene "
-      + "aquí sigue siendo real.";
+      + " — lo que se llene aquí sigue siendo real. Cierra el asistente y "
+      + "vuelve a abrirlo para que el cambio entre.";
   banda.style.display = "";
-}
-
-async function aplicarCambioAmbiente() {
-  const boton = $("banda-ambiente-cambio-boton");
-  boton.disabled = true;
-  mensaje("Cerrando el asistente…", "info", true);
-  try {
-    await api("/api/ambiente/aplicar", {});
-    // No hay nada que pintar después: el panel se está apagando y la pantalla
-    // de "sin conexión" toma el relevo sola.
-  } catch (e) {
-    boton.disabled = false;
-    mensaje(e.message || "No se pudo cerrar el asistente.", "error");
-  }
 }
 
 function arrancarSondeoAcceso() {
