@@ -12110,10 +12110,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // arriba tiene la decisión y esto es lo que queda en la barra detrás.
     pregunta_trancon: `Parece que el programa de facturación se trancó: responde el aviso.`,
     reiniciando: `Reiniciando el programa de facturación: se cierra y se abre de nuevo…`,
-    // Falta pantalla (2026-08-08): el botón que el llenado necesita quedó fuera
-    // de la vista. El asistente ya no acomoda la ventana solo — la pide y
-    // arranca de nuevo apenas el botón se vea.
-    pide_maximizar: `Maximiza el programa de facturación: el botón Aceptar queda fuera de la pantalla y el llenado sigue solo en cuanto se vea.`,
+    // Falta pantalla (2026-08-08): algo que el llenado necesita quedó fuera de
+    // la vista (la Ficha cortada, o el Aceptar del Detalle). Texto de respaldo
+    // por si 'detalle' viniera vacío — la rama de abajo es la que manda cuando
+    // la fase es esta, y ahí el detalle dice QUÉ falta.
+    pide_maximizar: `Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.`,
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
@@ -12152,8 +12153,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
                 "alerta", false);
       else if (llenando && !$("btn-stop").disabled && f.fase === "pide_maximizar")
         // Ámbar y sin punto giratorio: falta pantalla y el llenado está parado
-        // esperando al operador, no trabajando.
-        mensaje(TEXTO_FASE.pide_maximizar, "alerta", false);
+        // esperando al operador, no trabajando. El detalle dice QUÉ no se ve.
+        mensaje((f.detalle ? f.detalle + " " : "")
+                + "Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.",
+                "alerta", false);
       else if (llenando && !$("btn-stop").disabled && TEXTO_FASE[f.fase])
         // Sin punto giratorio cuando quien tiene que actuar es el operador
         // (espera de la impresión, pausa), no el programa. Con la pausa PEDIDA
