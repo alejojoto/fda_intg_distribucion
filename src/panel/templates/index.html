@@ -3245,40 +3245,6 @@
            Aceptar lo decide el modo prueba contra la 999, y en producción el
            Aceptar es del operador (CONTRATOS.md 3.1 punto 3). -->
     </div>
-    <!-- Cómo abre el panel esta máquina (2026-07-29, pedido del usuario): la
-         ventana propia es el camino normal y este interruptor es la contingencia
-         si se queda pegada — antes había que editar el .env por escritorio
-         remoto (ASISTENTE_VENTANA_EDGE, que sigue existiendo para cuando el
-         panel no abre y no hay dónde pulsar). Lo lee ventana_panel.abrir_panel
-         al abrir el asistente. Vive en ADMIN (decisión del usuario ese día):
-         por ahora solo el equipo admin lo necesita — la ventana propia ya
-         quedó estable en las demás — y se generaliza a AJUSTES solo si vuelve
-         a hacer falta en una máquina de operación. Fuera del modo admin, como
-         el selector de Carga: es contingencia, no opción de prueba. -->
-    <div class="ajustes-bloque" id="ventana-bloque" style="display:none">
-      <h3>Ventana del asistente en esta máquina</h3>
-      <div class="ajustes-fila" style="gap:24px">
-        <label class="desc-todos"
-               title="El asistente abre en su propia ventana, con su ícono en la barra de tareas.">
-          <input type="radio" name="ventana-panel" value="propia"
-                 onchange="guardarVentanaPanel(this.value)">
-          Ventana propia
-        </label>
-        <label class="desc-todos"
-               title="El panel abre en el navegador, en una ventana sin pestañas ni barra de direcciones.">
-          <input type="radio" name="ventana-panel" value="navegador"
-                 onchange="guardarVentanaPanel(this.value)">
-          Navegador
-        </label>
-        <span class="prueba-nota"
-              title="La ventana la abre el lanzador antes de levantar el panel, así que la que ya está abierta sigue como está.">Se aplica al reabrir el asistente</span>
-      </div>
-      <p class="mut" style="margin:8px 0 0">
-        <b>Ventana propia:</b> tiene su ícono en la barra de tareas y, al anclarla,
-        pulsar el ícono trae la ventana que ya está abierta.<br>
-        <b>Navegador:</b> opción de respaldo, por si la ventana propia se queda
-        pegada durante un llenado.</p>
-    </div>
     </div>
     <div id="admin-panel-supervision">
       <div id="sup-cargando" style="display:none">
@@ -15977,7 +15943,6 @@ async function cargarAjustes() {
     $("vendedor-info").textContent =
       d.espejo_activo ? "nube: conectada" : "nube: sin conexión";
     pintarDiaDespacho(d.dia_despacho);
-    pintarVentanaPanel(d.ventana);
     pintarBotonesCatalogos();
     corteProduccion = d.corte_produccion || "";
     $("corte-fecha").value = corteProduccion;
@@ -16022,7 +15987,6 @@ async function cargarAjustes() {
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
     const supervision = esMaquinaAdmin && esSupervisionEfectiva();
     $("ajustes-admin-bloque").style.display = supervision ? "" : "none";
-    $("ventana-bloque").style.display = supervision ? "" : "none";
     // El corte vive en AJUSTES desde 2026-08-05: lo ven supervisión y Admin.
     $("corte-bloque").style.display =
       tienePermiso("corte_produccion") ? "" : "none";
@@ -17664,31 +17628,11 @@ async function guardarDiaDespacho(dia) {
   }
 }
 
-let ventanaPanel = "propia";
-
-function pintarVentanaPanel(v) {
-  ventanaPanel = v === "navegador" ? "navegador" : "propia";
-  document.querySelectorAll("input[name=ventana-panel]")
-          .forEach(r => { r.checked = r.value === ventanaPanel; });
-}
-
 function pintarBotonCorte() {
   const inp = $("corte-fecha");
   const btn = $("corte-btn");
   if (!inp || !btn) return;
   btn.disabled = !inp.value || inp.value === corteProduccion;
-}
-
-// Se guarda al marcar, sin botón aparte (igual que el día de despacho), y no se
-// anuncia: el radio ya lo dice y el efecto se ve al reabrir el asistente.
-async function guardarVentanaPanel(v) {
-  const anterior = ventanaPanel;
-  try {
-    pintarVentanaPanel((await api("/api/ajustes/ventana", {ventana: v})).ventana);
-  } catch (e) {
-    pintarVentanaPanel(anterior);   // el radio no se queda marcando lo que no se guardó
-    mensaje("No se pudo guardar cómo abre el panel: " + e.message, "error");
-  }
 }
 
 // Confirmación en dos pasos con el confirmar DESPLAZADO (pedido del usuario
