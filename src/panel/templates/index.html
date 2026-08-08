@@ -955,8 +955,6 @@
       margin-left:auto; }
   /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
      columna es angosta, así que el texto va sobre el botón y no al lado. */
-  .sup-config-celda .mut { font-size:12px; display:block; margin-bottom:4px; }
-  .sup-config-celda button { font-size:12px; padding:3px 8px; }
   /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
      visible SOLO cuando la ruta elegida tiene configuración — dice a las
      claras por qué el selector cambió de opciones o de valor solo. */
@@ -3262,9 +3260,6 @@
                    programa está listo en esa PC, con qué número se entra y si
                    dejó una solicitud esperando. -->
               <th>Soporte</th>
-              <!-- Lo mismo que AJUSTES → Computadoras (2026-08-07, pedido del
-                   usuario): con qué trabaja cada PC, editable desde aquí. -->
-              <th>Series, rutas y día</th>
               <th>Atención</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -7405,31 +7400,9 @@ function supFilaEquipo(equipo, sinDatos) {
         : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
     <td>${sinDatos ? "—" : supSoporteEquipo(equipo)}</td>
-    <td class="sup-config-celda">${supConfigEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
-}
-
-// Series, rutas y día en el overview (2026-08-07, pedido del usuario): la
-// misma línea y la misma ventana que en AJUSTES → Computadoras. Los equipos
-// que no se gestionan desde aquí (esta misma computadora y los de
-// supervisión) muestran el resumen sin botón: el backend rechaza editarlos
-// por otra vía, así que ofrecer el botón sería mentir.
-function supConfigEquipo(equipo) {
-  const host = esc(equipo.dispositivo || "");
-  const m = equipos.find(e => e.dispositivo === equipo.dispositivo);
-  if (m)
-    return `<span class="mut">${resumenConfigEquipo(m)}</span>`
-      // Con el permiso de identidad se edita; sin él, la línea se ve igual
-      // pero sin botón — es el mismo permiso que exige el endpoint.
-      + (tienePermiso("identidad_maquina")
-         ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>`
-         : "");
-  if (equipo.dispositivo === supDispositivoPropio && configPropia)
-    return `<span class="mut">${resumenConfigEquipo(configPropiaConRol())}</span>
-      <span class="mut">Es esta computadora</span>`;
-  return `<span class="mut">—</span>`;
 }
 
 // El registro de ACCESO (credencial/autorización) es otra fuente de verdad
