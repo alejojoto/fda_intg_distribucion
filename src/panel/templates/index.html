@@ -813,16 +813,18 @@
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
-  /* Ancho al CONTENIDO, no al contenedor (2026-08-08, pedido del usuario): la
-     regla general de este panel es `table { width:100% }`, y estirada al
-     100% la tabla repartía el sobrante entre columnas — quedaba un hueco
-     grande tras el nombre y, con las celdas en nowrap, empujaba el ancho del
-     bloque entero hasta obligar a scrollear de lado. */
-  .equipos-tabla { border-collapse:collapse; width:auto; max-width:100%; }
+  /* La tabla llega al mismo borde que las pestañas (2026-08-08, pedido del
+     usuario), pero el sobrante NO se reparte entre las columnas: estirada sin
+     más, quedaba un hueco grande tras el nombre. Se lo lleva entero la
+     columna del botón, que de paso separa los datos del equipo de sus
+     permisos y deja Rol y Activa contra el borde derecho —donde sale la
+     confirmación, anclada a la derecha de la fila. */
+  .equipos-tabla { border-collapse:collapse; width:100%; }
+  .equipos-tabla .equipos-configbtn { width:100%; }
   .equipos-tabla th { text-align:left; font-size:11.5px; font-weight:700;
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
-      padding:0 6px 6px 0; white-space:nowrap; }
-  .equipos-tabla td { padding:4px 6px 4px 0; vertical-align:middle; }
+      padding:0 9px 6px 0; white-space:nowrap; }
+  .equipos-tabla td { padding:4px 9px 4px 0; vertical-align:middle; }
   /* Nombre y vendedor en DOS líneas (2026-08-08, pedido del usuario): con
      Series/Rutas/Rol también apilados en su columna, esta celda ya no
      desentonaba por ser la única de dos renglones — al revés, con todas las
