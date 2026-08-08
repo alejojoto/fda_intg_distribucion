@@ -17192,7 +17192,8 @@ function pintarNotaRolRutasEquipo(datos, esPropia) {
        : guardadas.length
        ? ` Sus ${guardadas.length} rutas asignadas${cuales} quedan guardadas y`
          + " vuelven a valer si se le quita el rol."
-       : "");
+       : "")
+    + " La ruta predeterminada sí se elige: es con la que abre el panel.";
   nota.style.display = "";
 }
 
@@ -17291,20 +17292,28 @@ function configEquipoRecalcular(tipo, preseleccionar) {
     configEquipoPintarSerie(opcionesConfigEquipo(tipo, datos), preseleccionar);
     return;
   }
-  // Con rol la sección de rutas es de solo lectura: la reja se esconde y la
-  // predeterminada se LEE — es la ruta que ese equipo tiene puesta en su barra
-  // y la mueve él mismo, así que ofrecerla aquí sería un control que su
-  // próximo cambio de filtro pisa.
+  // Con rol la sección de rutas queda reducida a la predeterminada: la reja se
+  // esconde porque la asignación no lo limita en nada, pero la predeterminada
+  // sí se elige (2026-08-08, pedido del usuario) y entre TODAS las rutas, no
+  // entre las que tenga guardadas — quien las ve todas igual trabaja con una,
+  // y esa es con la que le abre el panel.
   if (veTodasLasRutas(datos)) {
     lista.style.display = "none";
+    const opciones = opcionesConfigEquipo("rutas", datos);
+    const corto = cortoConfigEquipo("rutas");
     const campoPredet = $("equipo-config-rutas-predet-campo");
-    const puesta = datos.ruta_predeterminada || "";
-    if (!puesta) { campoPredet.style.display = "none"; return; }
+    const texto = $("equipo-config-rutas-predet-texto");
+    const select = $("equipo-config-rutas-predet");
+    if (!opciones.length) { campoPredet.style.display = "none"; return; }
     campoPredet.style.display = "";
-    $("equipo-config-rutas-predet").style.display = "none";
-    const leida = $("equipo-config-rutas-predet-texto");
-    leida.style.display = "";
-    leida.textContent = `${etiquetaRutaCorta(puesta)} (la que tiene puesta)`;
+    texto.style.display = "none";
+    select.style.display = "";
+    const previa = preseleccionar !== undefined ? preseleccionar : select.value;
+    select.innerHTML = `<option value="">— Ninguna —</option>`
+      + opciones.map(v => `<option value="${esc(v)}"`
+        + `${v === previa ? " selected" : ""}>${esc(corto(v))}</option>`)
+          .join("");
+    if (!opciones.includes(previa)) select.value = "";
     return;
   }
   lista.style.display = todas ? "none" : "";
@@ -17374,10 +17383,16 @@ function seleccionConfigEquipo(tipo) {
 }
 
 function predetConfigEquipo(tipo) {
-  // Igual que la selección: con rol se conserva la que tiene puesta, para que
-  // el par (rutas, predeterminada) siga siendo el que se guardó.
-  if (tipo === "rutas" && veTodasLasRutas(datosConfigEquipo()))
-    return datosConfigEquipo().ruta_predeterminada || "";
+  // Con rol manda el desplegable, y sale por aquí ANTES de la lógica general:
+  // esa mira `seleccionConfigEquipo`, que devuelve la asignación dormida, y
+  // con una sola ruta guardada impondría esa pisando la elegida. Sin campo a
+  // la vista (catálogo de rutas todavía vacío) se conserva la guardada, para
+  // no borrarla con un "" que nadie eligió.
+  if (tipo === "rutas" && veTodasLasRutas(datosConfigEquipo())) {
+    return $("equipo-config-rutas-predet-campo").style.display === "none"
+      ? (datosConfigEquipo().ruta_predeterminada || "")
+      : ($("equipo-config-rutas-predet").value || "");
+  }
   const sel = seleccionConfigEquipo(tipo);
   if (sel !== "*" && sel.length === 1) return sel[0];
   return $(`equipo-config-${tipo}-predet`).value || "";
@@ -17472,9 +17487,15 @@ async function guardarConfigPropia() {
     rutaFija = !!r.ruta_fija;
     rutaPredeterminada = r.ruta_predeterminada || "";
     seriePredeterminada = r.serie_predeterminada || "";
+    // La predeterminada recién elegida entra YA en la barra (2026-08-08):
+    // esperar al próximo arranque del panel se ve como que no pasó nada.
+    const adoptar = rutaPredeterminada
+                    && rutaPredeterminada !== rutaSeleccionada;
+    if (adoptar) rutaSeleccionada = rutaPredeterminada;
     pintarMiConfigRutasSeries();
     pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
     pintarSeries();
+    if (adoptar) aplicarFiltros();
     if (supOverviewCargado) pintarEquiposSupervision();
     cerrarConfigEquipo();
     mensaje("Rutas y series de esta computadora guardadas.", "info");
