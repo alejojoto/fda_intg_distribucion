@@ -463,6 +463,14 @@
   #aviso-version-nueva { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; }
+  /* Rompe-vidrio puesto (2026-08-07): ámbar y no rojo — no hay nada roto, hay
+     una puerta abierta a conciencia. Se ve en TODAS las pestañas y no se
+     puede cerrar: el día que se olvide puesto, esta franja es lo único que
+     lo va a delatar. */
+  #aviso-rompe-vidrio { background:#fff4e0; color:#7a4a00; border-radius:8px;
+                     border-left:5px solid #d98300;
+                     padding:10px 14px; margin-bottom:10px; font-size:13.5px;
+                     font-weight:600; }
   /* Misma idea que fila-aviso-error pero inline, para la ★ de favorito
      (cabecera de cliente): sin caja, pegado al símbolo que lo disparó. */
   .obj-aviso-inline { color:#a12a2a; font-size:12px; font-weight:600; margin-left:4px; }
@@ -2528,6 +2536,13 @@
        acción tiene que quedar pegada a la lista. -->
   <div id="aviso-version-nueva" style="display:none"></div>
 
+  <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
+       este no lo dispara nada que haya pasado en esta computadora — es un
+       estado de la nube que vale para todas. Va arriba de todo y en todas las
+       pestañas porque no caduca solo: alguien tiene que acordarse de quitarlo,
+       y para eso tiene que verlo. -->
+  <div id="aviso-rompe-vidrio" style="display:none"></div>
+
   <!-- Doble llenado sin resolver (2026-07-28): franja roja fija hasta que
        alguien lo cierre. No es un mensaje que se desvanece — son dos
        documentos fiscales del mismo pedido, y mientras siga así hay plata
@@ -2984,6 +2999,24 @@
         <span class="prueba-nota" id="version-estable-nota" style="display:none"
               title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Congelada: no reciben actualizaciones</span>
       </div>
+      <!-- Rompe-vidrio (2026-08-07, tras el incidente del mismo día): volver a
+           una versión vieja no alcanza cuando la nube ya exige condiciones que
+           esa versión no sabe cumplir — el programa abre y aun así no trabaja.
+           Este interruptor hace que la nube las acepte. Va pegado al selector
+           de versión porque es su complemento: uno elige la versión, el otro
+           consigue que esa versión pueda trabajar. -->
+      <div class="ajustes-fila" id="rompe-vidrio-fila" style="display:none">
+        <b class="rotulo">Rompe-vidrio:</b>
+        <span id="rompe-vidrio-control"></span>
+        <span class="prueba-nota" id="rompe-vidrio-nota" style="display:none"></span>
+      </div>
+      <p class="mut" id="rompe-vidrio-texto" style="margin:8px 0 0;display:none">
+        Ponlo cuando mandes computadoras a una versión vieja y la nube las
+        rechace: el programa abre pero no carga pedidos ni sincroniza. Mientras
+        esté puesto, la nube acepta a esas computadoras sin que haya que
+        reinstalar nada. <b>No se quita solo</b> — quítalo cuando la emergencia
+        pase.</p>
+
       <p class="mut" style="margin:8px 0 0">
         Fija en qué versión corren <b>todas las computadoras de producción</b>.
         Con la <b>1.0</b> o la <b>1.1</b> se quedan ahí, sin recibir
@@ -9419,6 +9452,89 @@ function pintarAvisoVersionNueva(info) {
     + "cierres y vuelvas a abrir el programa.";
 }
 
+// Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
+// arriba, que la ve cualquiera en cualquier pestaña, y la fila de Ajustes de
+// admin, que solo ve quien puede moverlo.
+let rompeVidrio = {activo: false};
+
+function pintarRompeVidrio(estado) {
+  rompeVidrio = estado || {activo: false};
+  const activo = !!rompeVidrio.activo;
+  const horas = rompeVidrio.horas_puesto;
+
+  const franja = $("aviso-rompe-vidrio");
+  if (franja) {
+    franja.style.display = activo ? "" : "none";
+    if (activo) {
+      const desde = (horas || horas === 0) ? ` hace ${horas} h` : "";
+      franja.textContent =
+        `Rompe-vidrio puesto${desde} — la nube está aceptando computadoras `
+        + "con versiones viejas. Quítalo cuando la emergencia pase.";
+    }
+  }
+
+  const fila = $("rompe-vidrio-fila");
+  const texto = $("rompe-vidrio-texto");
+  const puede = tienePermiso("rompe_vidrio");
+  if (fila) fila.style.display = puede ? "" : "none";
+  if (texto) texto.style.display = puede ? "" : "none";
+  if (!puede) return;
+
+  const control = $("rompe-vidrio-control");
+  const nota = $("rompe-vidrio-nota");
+  if (!control) return;
+  control.innerHTML = "";
+
+  if (rompeVidrio.sin_migracion) {
+    control.textContent = "No disponible en esta nube todavía";
+    if (nota) {
+      nota.style.display = "";
+      nota.textContent = "Falta correr scripts/sql/045_rompe_vidrio.sql";
+    }
+    return;
+  }
+
+  const boton = document.createElement("button");
+  if (activo) {
+    // Quitarlo es la vuelta a la normalidad, no una acción destructiva: va en
+    // verde. La roja es ponerlo, que es la que abre la puerta.
+    boton.textContent = "Quitar el rompe-vidrio";
+    boton.onclick = () => confirmarSinQuitar(
+      boton, () => moverRompeVidrio(false), "Confirmar: quitarlo");
+    if (nota) {
+      nota.style.display = "";
+      nota.textContent = rompeVidrio.motivo
+        ? `Puesto: ${rompeVidrio.motivo}` : "Puesto";
+    }
+  } else {
+    // El motivo arranca VACÍO: quien lo pone escribe el suyo, y un valor
+    // sugerido se mezclaría con lo que teclee.
+    const motivo = document.createElement("input");
+    motivo.type = "text";
+    motivo.id = "rompe-vidrio-motivo";
+    motivo.placeholder = "motivo (opcional)";
+    motivo.style.width = "220px";
+    boton.className = "peligro";
+    boton.textContent = "Poner el rompe-vidrio";
+    boton.onclick = () => confirmarBorrar(
+      boton, () => moverRompeVidrio(true, motivo.value), "Confirmar: ponerlo");
+    control.append(motivo, document.createTextNode(" "));
+    if (nota) nota.style.display = "none";
+  }
+  control.append(boton);
+}
+
+async function moverRompeVidrio(activo, motivo) {
+  try {
+    const r = await api("/api/ajustes/rompe-vidrio",
+                        {activo: activo, motivo: motivo || ""});
+    pintarRompeVidrio(r.rompe_vidrio);
+  } catch (e) {
+    mensaje("No se pudo mover el rompe-vidrio: " + (e.message || e), "error");
+    pintarRompeVidrio(rompeVidrio);   // el control vuelve a su estado real
+  }
+}
+
 latido();
 setInterval(latido, LATIDO_MS);
 
@@ -15562,6 +15678,7 @@ async function cargarAjustes() {
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
     pintarVersionEstable(d.version_estable);
+    pintarRompeVidrio(d.rompe_vidrio);
     cargaEnCurso = d.carga_en_curso || null;
     pintarOpcionesPrueba(d.opciones_prueba);
     // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
