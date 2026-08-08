@@ -2276,6 +2276,26 @@
     th, td { padding:5px 10px; }
     .paginador { padding:6px 14px; }
   }
+/* Banda de ambiente (2026-08-08). Ocupa todo el ancho y NO se puede cerrar:
+   si esta computadora no factura de verdad, tiene que verse desde la puerta.
+   Va arriba de todo, antes de la cabecera, para que sea lo primero que se
+   lee y no algo que compite con el resto de la barra. */
+#banda-ambiente {
+  padding: 7px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,.18);
+}
+#banda-ambiente .detalle {
+  font-weight: 400;
+  opacity: .92;
+}
+/* Ámbar: no factura de verdad, pero funciona. */
+#banda-ambiente.pruebas { background: #b45309; color: #fff; }
+/* Rojo: no puede operar. El texto trae qué hacer. */
+#banda-ambiente.bloqueado { background: #991b1b; color: #fff; }
 </style>
 </head>
 <body>
@@ -2291,6 +2311,21 @@
   <button class="acento" id="sin-conexion-recargar" onclick="location.reload()"
           style="display:none">Recargar la ventana</button>
 </div>
+{# Banda de ambiente (2026-08-08). Solo aparece cuando hay algo que decir: en
+   producción no se pinta nada (sin UI ociosa). No se puede cerrar a propósito
+   — es la respuesta al caso de la laptop que quedó en modo prueba y nada en
+   pantalla lo decía, así que el error que salió después fue indescifrable. #}
+{% if ambiente.bloqueado %}
+<div id="banda-ambiente" class="bloqueado">
+  DESDE ESTA COMPUTADORA NO SE PUEDE FACTURAR
+  <span class="detalle">— {{ ambiente.bloqueado }}</span>
+</div>
+{% elif not ambiente.es_produccion %}
+<div id="banda-ambiente" class="pruebas">
+  AMBIENTE: {{ ambiente.ambiente|upper }}
+  <span class="detalle">— lo que se llene aquí no es real y no le llega a nadie.</span>
+</div>
+{% endif %}
 <header>
   <!-- Un poco más grande desde que la barra de título va sin iconito
        (2026-07-28): es el único sitio donde se ve el árbol dentro de
