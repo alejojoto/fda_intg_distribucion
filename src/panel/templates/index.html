@@ -16854,7 +16854,10 @@ async function cambiarDiaEquipo(dispositivo, control) {
 // gris "Todas" = sin restricción, violeta suave = lo asignado, violeta lleno =
 // la predeterminada. Una asignación de una sola sale directa en violeta
 // lleno si coincide con la predeterminada.
-function chipsAsignacion(sel, predet, plural, corto) {
+// En series (2026-08-08) el violeta lleno queda reservado a la serie ÚNICA y la
+// predeterminada sale en violeta suave: con una sola serie el chip va solo y
+// ambos casos se veían igual.
+function chipsAsignacion(sel, predet, plural, corto, predetSuave) {
   const chip = (texto, clase) =>
     `<span class="chip-asig${clase ? " " + clase : ""}">${esc(texto)}</span>`;
   const todas = sel === "*" || sel === null || sel === undefined;
@@ -16862,8 +16865,10 @@ function chipsAsignacion(sel, predet, plural, corto) {
   if (una && (!predet || corto(sel[0]) === corto(predet)))
     return chip(corto(sel[0]), "predet");
   const base = todas ? chip("Todas", "")
-    : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`, "propias");
-  return predet ? base + chip(corto(predet), "predet") : base;
+    : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`,
+           predetSuave ? "" : "propias");
+  return predet ? base + chip(corto(predet), predetSuave ? "propias" : "predet")
+                : base;
 }
 
 const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
@@ -16888,7 +16893,7 @@ function resumenConfigEquipo(m) {
 // ancho de la celda; el día no se resume ahí porque está como par de opciones
 // a la vista, y repetirlo sería el mismo dato dos veces.
 const chipsSeriesEquipo = (m) =>
-  chipsAsignacion(m.series, m.serie_predeterminada, "series", (x) => x);
+  chipsAsignacion(m.series, m.serie_predeterminada, "series", (x) => x, true);
 const chipsRutasEquipo = (m) =>
   chipsAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
 
