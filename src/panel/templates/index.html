@@ -935,7 +935,8 @@
   /* "Todas las rutas" de un equipo con rol (2026-08-08): se ve apagado pero
      NO va con `disabled` — un control deshabilitado no dispara el clic con el
      que se explica por qué no se puede quitar (mismo motivo que #motivo-otro). */
-  #equipo-config .acceso-check.bloqueado { color:var(--mut); }
+  #equipo-config .acceso-check.bloqueado { color:var(--mut);
+      cursor:var(--cursor-prohibido); }
   #equipo-config .acceso-check.bloqueado input { opacity:.55;
       cursor:var(--cursor-prohibido); }
   #equipo-config .acceso-campo:first-of-type { margin-top:0; }
@@ -17264,7 +17265,13 @@ const datosConfigEquipo = () => (configEquipo || {}).datos || {};
 function pintarNotaRolRutasEquipo(datos, esPropia) {
   const nota = $("equipo-config-rutas-rol-nota");
   const conRol = veTodasLasRutas(datos);
-  $("equipo-config-rutas-todas-caja").classList.toggle("bloqueado", conRol);
+  const caja = $("equipo-config-rutas-todas-caja");
+  caja.classList.toggle("bloqueado", conRol);
+  if (conRol) {
+    caja.title = "No se puede quitar: ve todas las rutas por su rol (Admin o Editor).";
+  } else {
+    caja.removeAttribute("title");
+  }
   if (!conRol) { nota.style.display = "none"; return; }
   const guardadas = Array.isArray(datos.rutas) ? datos.rutas : [];
   const cuales = guardadas.length <= 4
