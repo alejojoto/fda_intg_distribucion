@@ -8423,20 +8423,6 @@ function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
   return html;
 }
 
-// Reordena SOLO para pintar — nunca la lista de origen, de la que depende qué
-// pedido llena "Llenar el siguiente" (pendientesLlenables()[0]) — para que
-// dentro de un mismo día el más reciente quede primero. Dos sorts estables
-// encadenados: el primero ordena por el valor completo descendente: el
-// segundo reagrupa por día (ascendente, el más viejo primero — PENDIENTES no
-// se reordena entre días, solo se le pone separador) sin tocar el orden que
-// dejó el primero adentro de cada grupo.
-function ordenParaPintarPorDia(items, fechaDe) {
-  const copia = [...items];
-  copia.sort((a, b) => (fechaDe(b) || "").localeCompare(fechaDe(a) || ""));
-  copia.sort((a, b) => (fechaDe(a) || "").slice(0, 10).localeCompare((fechaDe(b) || "").slice(0, 10)));
-  return copia;
-}
-
 // Las partes de un mismo pedido llegan CONTIGUAS del backend (agrupadas y
 // ordenadas 1..N); aquí se juntan en bloques para pintarlas como una unidad.
 function agruparFamilias(lista) {
@@ -11140,18 +11126,23 @@ function clienteEnLinea(f) {
   return sucursal ? `${cliente} · ${sucursal}` : cliente;
 }
 
-// Separadores por fecha del PEDIDO (2026-08-02): el orden de fondo no se
-// toca (de él depende qué familia llena "Llenar el siguiente" —
-// pendientesLlenables()[0]) así que los días quedan en el mismo orden en que
-// ya vienen (el más viejo primero). Dentro de un mismo día sí se reordena
-// solo para pintar, más reciente primero (ordenParaPintarPorDia); "antigua"
-// (ni hoy ni ayer) es la misma familia que la lista lleva atrás olvidada.
+// Separadores por fecha del PEDIDO (2026-08-02): la lista se pinta EN EL ORDEN
+// EN QUE LLEGA (el más viejo primero, que es el mismo con el que "Llenar el
+// siguiente" toma la próxima — pendientesLlenables()[0]); aquí solo se
+// intercalan los separadores. "Antigua" (ni hoy ni ayer) es la familia que la
+// lista lleva atrás olvidada.
+//
+// Sin voltear NADA (2026-08-08): hasta hoy se reordenaba dentro del día —el
+// más reciente primero— DESPUÉS de haber cortado la página, que se corta en el
+// orden de fondo (ascendente). Con las dos cosas al revés, la fila de arriba no
+// era la primera de la lista sino la última de la página: al descartarla subía
+// al tope un pedido de la página siguiente y las demás filas no se movían
+// nunca. La página y el pintado tienen que leerse en el mismo sentido.
 const fechaDeFamilia = (partes) => partes[0].fecha_orden_salida;
 
 function pintarPendientes(familias) {
-  const enOrden = ordenParaPintarPorDia(familias, fechaDeFamilia);
   $("t-pendientes").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
-    enOrden, fechaDeFamilia, 8, (partes, atrasada) => {
+    familias, fechaDeFamilia, 8, (partes, atrasada) => {
       const f0 = partes[0];
       // Un pedido de una sola factura se pinta como siempre: la cabecera de
       // familia solo aparece cuando de verdad hay varias partes.
