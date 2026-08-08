@@ -471,6 +471,18 @@
                      border-left:5px solid #d98300;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; }
+  /* Solicitud de soporte viva (2026-08-08): la franja se queda puesta hasta
+     que el operador la cancele — es lo único que le recuerda que tiene que
+     dejar abierto el programa de soporte. Verde y con su acción adentro: no
+     hay nada roto, hay algo en curso. */
+  #aviso-soporte { display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+                     background:#eaf6ec; border:1px solid #b7dfc0; color:#1e6b33;
+                     border-radius:8px; padding:10px 14px; margin-bottom:10px;
+                     font-size:13.5px; }
+  #aviso-soporte b { display:block; font-size:13.5px; }
+  #aviso-soporte .sop-detalle { font-weight:400; color:#2d6b41; }
+  #aviso-soporte .sop-acciones { margin-left:auto; display:flex; gap:8px; }
+  .sop-numero { font-weight:700; letter-spacing:.6px; user-select:text; }
   /* Misma idea que fila-aviso-error pero inline, para la ★ de favorito
      (cabecera de cliente): sin caja, pegado al símbolo que lo disparó. */
   .obj-aviso-inline { color:#a12a2a; font-size:12px; font-weight:600; margin-left:4px; }
@@ -1085,6 +1097,29 @@
                border-radius:8px; padding:10px 12px; margin-top:12px;
                font-size:12.5px; }
   #ticket-numero { font-weight:700; letter-spacing:.6px; user-select:text; }
+  /* Soporte remoto (2026-08-08): encima del informe (z-index 21) como el
+     ticket, porque se abre desde ahí. Angosto a propósito — adentro hay una
+     frase y un botón, nada más. */
+  #soporte-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                     display:none; z-index:21; align-items:flex-start;
+                     justify-content:center; }
+  #soporte-overlay.visible { display:flex; }
+  #soporte-caja { background:#fff; border-radius:10px; padding:18px;
+                  margin-top:8vh; width:min(520px, 94vw); max-height:85vh;
+                  overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #soporte-caja h3 { margin:0 0 12px; font-size:14px; }
+  #soporte-cuerpo { font-size:13px; line-height:1.65; }
+  #soporte-cuerpo p { margin:0 0 8px; }
+  #soporte-cuerpo .sop-nota { color:#5a6472; font-size:12px; }
+  #soporte-cuerpo .sop-caja-ok { background:#eaf6ec; border:1px solid #b7dfc0;
+                  color:#1e6b33; border-radius:8px; padding:10px 12px;
+                  margin:10px 0 0; }
+  #soporte-cuerpo .sop-caja-falta { background:#fffaeb; border:1px solid #fde68a;
+                  color:#8a5b00; border-radius:8px; padding:10px 12px;
+                  margin:10px 0 0; }
+  #soporte-error { background:#fdecec; border:1px solid #f0b4b4; color:#b42318;
+                   border-radius:8px; padding:10px 12px; margin-top:10px;
+                   font-size:12.5px; }
   #ticket-error { margin-top:12px; }
   /* El punto giratorio sobre el botón azul necesita su propio contraste. */
   #ticket-enviar .spinner { border-color:rgba(255,255,255,.45);
@@ -1583,6 +1618,8 @@
   .sup-nube-lineas { display:flex; gap:4px 8px; flex-wrap:wrap; max-width:210px; }
   .sup-nube-lineas .sup-nube-ok { color:#15803d; font-weight:600; }
   .sup-nube-lineas .sup-nube-mal { color:#b42318; font-weight:600; }
+  /* El número de acceso se teclea del otro lado: seleccionable y sin cortarse. */
+  .sup-numero-acceso { font-size:12px; user-select:text; }
   .sup-problemas { display:flex; gap:4px; flex-wrap:wrap; max-width:260px; }
   .sup-problema { display:inline-block; background:#fff7ed; border:1px solid #fed7aa;
                   color:#9a3412; border-radius:999px; padding:2px 7px;
@@ -1611,6 +1648,7 @@
   .sup-ticket-estado.en-proceso { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
   .sup-ticket-estado.resuelto { background:#eaf7ef; border-color:#b7dfc0; color:#15803d; }
   .sup-ticket-estado.descartado { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
+  .sup-ticket-estado.cancelado { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
   #sup-equipo-overlay, #sup-ticket-overlay, #sup-actividad-overlay {
     position:fixed; inset:0; background:rgba(29,36,51,.45); display:none;
     z-index:20; align-items:flex-start; justify-content:center;
@@ -2543,6 +2581,12 @@
        y para eso tiene que verlo. -->
   <div id="aviso-rompe-vidrio" style="display:none"></div>
 
+  <!-- Solicitud de soporte remoto pendiente (2026-08-08). Fija mientras la
+       solicitud viva: si el operador cierra el programa de soporte, el técnico
+       no puede entrar y nadie se lo diría. Sobrevive al reinicio del panel
+       porque la solicitud se guarda en la configuración de la máquina. -->
+  <div id="aviso-soporte" style="display:none"></div>
+
   <!-- Doble llenado sin resolver (2026-07-28): franja roja fija hasta que
        alguien lo cierre. No es un mensaje que se desvanece — son dos
        documentos fiscales del mismo pedido, y mientras siga así hay plata
@@ -3157,6 +3201,10 @@
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
+              <!-- Soporte remoto (2026-08-08, pedido del usuario): si el
+                   programa está listo en esa PC, con qué número se entra y si
+                   dejó una solicitud esperando. -->
+              <th>Soporte</th>
               <!-- Lo mismo que AJUSTES → Computadoras (2026-08-07, pedido del
                    usuario): con qué trabaja cada PC, editable desde aquí. -->
               <th>Series, rutas y día</th>
@@ -3202,6 +3250,8 @@
                   data-estado="resuelto" onclick="cambiarFiltroTickets('resuelto')">Resueltos</button>
           <button type="button" class="desc-subtab sup-ticket-filtro"
                   data-estado="descartado" onclick="cambiarFiltroTickets('descartado')">Descartados</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="cancelado" onclick="cambiarFiltroTickets('cancelado')">Cancelados</button>
           <button type="button" class="desc-subtab sup-ticket-filtro"
                   data-estado="todos" onclick="cambiarFiltroTickets('todos')">Todos</button>
         </div>
@@ -3313,7 +3363,7 @@
     <div class="editor-acciones">
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
       <button type="button" id="diag-sync-copiar" onclick="copiarInformeSync(this)">Copiar informe</button>
-      <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
+      <button type="button" onclick="abrirSoporteRemoto()">Pedir soporte remoto</button>
       <button data-preseleccionado type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
   </div>
@@ -3341,6 +3391,19 @@
       <button type="button" id="ticket-copiar" onclick="copiarTicket(this)">Copiar informe</button>
       <button type="button" id="ticket-cancelar" onclick="cerrarTicket()">Cancelar</button>
     </div>
+  </div>
+</div>
+
+<!-- Soporte remoto (2026-08-08). Una sola ventana para todo el flujo: si falta
+     el programa se ofrece bajarlo ahí mismo y se vuelve a comprobar solo; si
+     está, un botón deja la solicitud registrada y lo abre. Sin cierre por clic
+     afuera cuando hay una descarga en curso (lo maneja cerrarSoporte). -->
+<div id="soporte-overlay" onclick="if(event.target===this)cerrarSoporte()">
+  <div id="soporte-caja">
+    <h3>Soporte remoto</h3>
+    <div id="soporte-cuerpo"></div>
+    <div id="soporte-error" style="display:none"></div>
+    <div class="editor-acciones" id="soporte-acciones"></div>
   </div>
 </div>
 
@@ -3378,6 +3441,9 @@
         <option value="en_proceso">En proceso</option>
         <option value="resuelto">Resuelto</option>
         <option value="descartado">Descartado</option>
+        <!-- Lo pone el propio equipo al cancelar su solicitud; el admin también
+             puede dejarlo así a mano si le consta que ya no hace falta. -->
+        <option value="cancelado">Cancelado por el equipo</option>
       </select>
     </div>
     <div class="editor-campo">
@@ -7023,6 +7089,7 @@ let supTicketFiltro = "abiertos";
 let supTicketAbierto = null;
 
 const SUP_PROBLEMAS = {
+  soporte_pendiente: "pidió soporte",
   sin_reportar: "sin reportar",
   cola_trancada: "cola trancada",
   outbox_acumulado: "cambios sin subir",
@@ -7050,6 +7117,16 @@ const SUP_TICKET_ESTADOS = {
   en_proceso: "En proceso",
   resuelto: "Resuelto",
   descartado: "Descartado",
+  cancelado: "Cancelado por el equipo",
+};
+
+// Estado del programa de soporte remoto en cada equipo (columna `rustdesk_estado`
+// de la telemetría, scripts/sql/045).
+const SUP_RUSTDESK = {
+  listo: "Listo",
+  sin_id: "Sin número",
+  sin_programa: "Sin programa",
+  sin_comprobar: "Sin comprobar",
 };
 
 function supVisible() {
@@ -7181,6 +7258,31 @@ function supNubeEquipo(equipo) {
   return `<div class="sup-nube-lineas">${partes.join("")}</div>`;
 }
 
+// Soporte remoto de un equipo (2026-08-08). El número de acceso se pinta
+// seleccionable: es lo que el técnico teclea para entrar. Un equipo que corre
+// una versión sin telemetría de soporte no reporta el campo — se dice "sin
+// dato" y no se inventa un "listo".
+function supSoporteEquipo(equipo) {
+  const partes = [];
+  const estado = equipo.rustdesk_estado || "";
+  if (!estado) {
+    partes.push(`<span class="mut">sin dato</span>`);
+  } else if (estado === "listo") {
+    partes.push(`<span class="sup-nube-ok">Listo</span>`);
+  } else if (estado === "sin_programa") {
+    partes.push(`<span class="sup-nube-mal">Sin programa</span>`);
+  } else {
+    partes.push(`<span>${esc(SUP_RUSTDESK[estado] || estado)}</span>`);
+  }
+  let html = `<div class="sup-nube-lineas">${partes.join("")}</div>`;
+  if (equipo.rustdesk_id)
+    html += `<div class="sup-numero-acceso sop-numero">${esc(equipo.rustdesk_id)}</div>`;
+  if (equipo.soporte_ticket)
+    html += `<div class="sup-estado-nota atrasada">solicitud ${
+      esc(equipo.soporte_ticket)}</div>`;
+  return html;
+}
+
 function supProblemasEquipo(equipo) {
   return `<div class="sup-problemas">${(equipo.problemas || []).map(p =>
     `<span class="sup-problema" title="${esc(p.texto || "")}">${
@@ -7239,6 +7341,7 @@ function supFilaEquipo(equipo, sinDatos) {
             atrasada ? " · atrasada" : ""}</div>`
         : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
+    <td>${sinDatos ? "—" : supSoporteEquipo(equipo)}</td>
     <td class="sup-config-celda">${supConfigEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
@@ -7379,7 +7482,7 @@ function pintarEquiposSupervision() {
     .concat(supSinDatos.map(e => supFilaEquipo(e, true)));
   $("sup-equipos-tabla").querySelector("tbody").innerHTML = filas.length
     ? filas.join("")
-    : `<tr><td colspan="7" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
+    : `<tr><td colspan="8" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
   const quedan = Number(supResumen.equipos || 0) > supEquipos.length;
   $("sup-equipos-mas").style.display = quedan ? "" : "none";
 }
@@ -7592,9 +7695,13 @@ function pintarFiltrosTickets() {
 function pintarTicketsSupervision() {
   const cuerpo = $("sup-tickets-tabla").querySelector("tbody");
   cuerpo.innerHTML = supTickets.length ? supTickets.map(t => `<tr>
-    <td><b>${esc(t.id || "—")}</b></td>
+    <td><b>${esc(t.id || "—")}</b>${
+      t.tipo === "soporte_remoto"
+        ? `<div class="sup-estado-nota">solicitud remota</div>` : ""}</td>
     <td>${esc(supFechaCorta(t.creado_en))}</td>
-    <td>${esc(t.maquina || t.dispositivo || "—")}</td>
+    <td>${esc(t.maquina || t.dispositivo || "—")}${
+      t.rustdesk_id
+        ? `<div class="sup-numero-acceso mut">acceso ${esc(t.rustdesk_id)}</div>` : ""}</td>
     <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
     <td>${supEstadoTicket(t.estado)}</td>
     <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
@@ -7702,8 +7809,26 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
           <div class="sup-dato"><span>Versión:</span>${esc(equipo.version || "—")}</div>
           ${equipo.rama ? `<div class="sup-dato"><span>Canal:</span>${
             esc(supCanalEquipo(equipo))}</div>` : ""}
+          <!-- El commit fuente (2026-08-08, pedido del usuario): es lo que
+               identifica el CÓDIGO que corre. La versión de arriba es el hash
+               del build de distribución y difiere entre canales aunque el
+               código sea el mismo, así que sola no dice qué está corriendo. -->
+          ${equipo.commit_fuente ? `<div class="sup-dato"><span>Commit:</span>
+            <span class="sup-numero-acceso">${esc(equipo.commit_fuente)}</span>${
+            equipo.fecha_release ? ` · ${esc(supFechaCorta(equipo.fecha_release))}` : ""
+            }</div>` : ""}
           <div class="sup-dato"><span>Plataforma:</span>${esc(equipo.plataforma || "—")}</div>
         </div>
+      </div>
+      <div class="sup-detalle-seccion"><h4>Soporte remoto</h4>
+        <div class="sup-dato"><span>Programa:</span>${
+          esc(SUP_RUSTDESK[equipo.rustdesk_estado] || equipo.rustdesk_estado || "sin dato")}</div>
+        <div class="sup-dato"><span>Número de acceso:</span>${
+          equipo.rustdesk_id
+            ? `<span class="sup-numero-acceso">${esc(equipo.rustdesk_id)}</span>`
+            : "—"}</div>
+        ${equipo.soporte_ticket ? `<div class="sup-dato"><span>Solicitud pendiente:</span>
+          <b>${esc(equipo.soporte_ticket)}</b></div>` : ""}
       </div>
       <div class="sup-detalle-seccion"><h4>Sincronización</h4>
         <div class="sup-dato"><span>Camino:</span>${esc(equipo.camino || "—")}</div>
@@ -7878,6 +8003,12 @@ async function abrirDetalleTicketSupervision(id) {
         <div>
           <div class="sup-dato"><span>Fecha del equipo:</span>${esc(supFechaCorta(ticket.fecha_local))}</div>
           <div class="sup-dato"><span>Fecha de la nube:</span>${esc(supFechaCorta(ticket.creado_en))}</div>
+          ${ticket.tipo === "soporte_remoto"
+            ? `<div class="sup-dato"><span>Pidió:</span>conexión remota</div>` : ""}
+          <!-- El número con el que se entra: lo primero que se necesita de una
+               solicitud remota, así que va arriba y seleccionable. -->
+          ${ticket.rustdesk_id ? `<div class="sup-dato"><span>Número de acceso:</span>
+            <span class="sup-numero-acceso">${esc(ticket.rustdesk_id)}</span></div>` : ""}
         </div>
       </div>
       <div class="sup-detalle-seccion"><h4>Mensaje</h4>
@@ -8598,26 +8729,206 @@ async function abrirDiagnosticoSync() {
   }
 }
 
-// Abre el programa de soporte remoto que viene con el asistente (2026-08-05).
-// No arranca solo con Windows a propósito: se abre acá, el día que hace falta.
-async function abrirSoporteRemoto(btn) {
-  if (btn.disabled) return;
-  const original = btn.textContent;
-  btn.disabled = true;
-  btn.innerHTML = `<span class="spinner"></span>Abriendo…`;
+// ---------------------------------------------------------------------------
+// Soporte remoto (2026-08-08). Antes esto era un botón que solo lanzaba el
+// programa: el operador tenía que leer su número por teléfono y no quedaba
+// registro de que había pedido ayuda. Ahora el mismo botón comprueba el
+// programa, lo instala si falta, deja la solicitud escrita con el número
+// adentro y lo abre. Todo lo que el operador tiene que saber cabe en una
+// ventana con un botón.
+// ---------------------------------------------------------------------------
+
+// Último estado que mandó el servidor: {programa, numero, solicitud, ...}.
+let soporte = {programa: {}, numero: "", solicitud: null};
+let soporteEnVuelo = false;
+
+function soporteHaySolicitud() { return !!(soporte.solicitud && soporte.solicitud.id); }
+
+// La franja de arriba. Es lo único que le recuerda al operador que tiene que
+// dejar el programa abierto, así que no se desvanece: se va cuando cancela.
+function pintarAvisoSoporte() {
+  const caja = $("aviso-soporte");
+  if (!caja) return;
+  if (!soporteHaySolicitud()) { caja.style.display = "none"; caja.innerHTML = ""; return; }
+  const numero = soporte.solicitud.rustdesk_id || soporte.numero || "";
+  caja.innerHTML =
+      `<div><b>Soporte técnico solicitado</b>`
+    + `<span class="sop-detalle">La solicitud está pendiente. Mantén abierto el `
+    + `programa de soporte remoto para permitir la conexión.`
+    + (numero ? ` Número de acceso: <span class="sop-numero">${esc(numero)}</span>.` : "")
+    + `</span></div>`
+    + `<span class="sop-acciones">`
+    + `<button type="button" onclick="abrirSoporteRemoto()">Ver la solicitud</button>`
+    + `<button type="button" id="soporte-cancelar-franja"`
+    + ` onclick="cancelarSoporte(this)">Cancelar solicitud</button>`
+    + `</span>`;
+  caja.style.display = "";
+}
+
+function aplicarEstadoSoporte(d) {
+  if (!d) return;
+  soporte = {programa: d.programa || {}, numero: d.numero || "",
+             solicitud: d.solicitud || null,
+             puede_instalar: !!d.puede_instalar};
+  pintarAvisoSoporte();
+  if ($("soporte-overlay").classList.contains("visible")) pintarSoporte();
+}
+
+async function cargarEstadoSoporte({comprobar = false} = {}) {
   try {
-    await api("/api/soporte/abrir-remoto", {});   // cuerpo vacío = POST
-    btn.textContent = "Ya está abierto";
-    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 4000);
-  } catch (e) {
-    mensaje(e.message, "error");
-    btn.textContent = original;
-    btn.disabled = false;
+    aplicarEstadoSoporte(await api("/api/soporte/estado" + (comprobar ? "?comprobar=1" : "")));
+  } catch (_) { /* informativo: si el panel no responde ya hay otro aviso */ }
+}
+
+// Qué se ve dentro de la ventana. Tres situaciones y nada más: hay solicitud,
+// falta el programa, o se puede pedir.
+function pintarSoporte() {
+  const cuerpo = $("soporte-cuerpo");
+  const acciones = $("soporte-acciones");
+  const prog = soporte.programa || {};
+  const cerrar = `<button data-preseleccionado type="button" onclick="cerrarSoporte()">Cerrar</button>`;
+
+  if (soporteHaySolicitud()) {
+    const numero = soporte.solicitud.rustdesk_id || soporte.numero || "";
+    cuerpo.innerHTML =
+        `<div class="sop-caja-ok"><b>Soporte técnico solicitado</b><br>`
+      + `La solicitud está pendiente. Mantén abierto el programa de soporte `
+      + `remoto para permitir la conexión.</div>`
+      + (numero ? `<p style="margin-top:10px">Número de acceso de esta `
+                + `computadora: <span class="sop-numero">${esc(numero)}</span></p>` : "")
+      + `<p class="sop-nota">Solicitud ${esc(soporte.solicitud.id)}. `
+      + (prog.sin_contrasena
+          ? `Cuando el técnico se conecte vas a ver un aviso para aceptar: acéptalo.`
+          : `Si el programa pide una contraseña, dísela al técnico.`)
+      + `</p>`;
+    acciones.innerHTML =
+        `<button type="button" class="primario" id="soporte-abrir"`
+      + ` onclick="reabrirSoporte(this)">Abrir el programa de nuevo</button>`
+      + `<button type="button" id="soporte-cancelar"`
+      + ` onclick="cancelarSoporte(this)">Cancelar solicitud</button>`
+      + cerrar;
+    return;
   }
+
+  if (prog.comprobado && !prog.disponible) {
+    cuerpo.innerHTML =
+        `<div class="sop-caja-falta">En esta computadora falta el programa de `
+      + `soporte remoto.</div>`
+      + `<p style="margin-top:10px">Se descarga una sola vez y queda instalado `
+      + `junto al asistente. No hace falta ser administrador.</p>`;
+    acciones.innerHTML =
+        (soporte.puede_instalar
+          ? `<button type="button" class="primario" id="soporte-instalar"`
+            + ` onclick="instalarSoporte(this)">Instalar y pedir soporte</button>`
+          : `<p class="sop-nota">Esta computadora no puede instalarlo sola. `
+            + `Avísale al administrador.</p>`)
+      + cerrar;
+    return;
+  }
+
+  cuerpo.innerHTML =
+      `<p>Al pedir soporte queda registrada una solicitud con los datos de esta `
+    + `computadora y se abre el programa de soporte remoto.</p>`
+    + (soporte.numero
+        ? `<p class="sop-nota">Número de acceso de esta computadora: `
+          + `<span class="sop-numero">${esc(soporte.numero)}</span></p>`
+        : `<p class="sop-nota">El número de acceso se lee al pedir soporte.</p>`)
+    + `<p class="sop-nota">No se envían contraseñas ni claves de acceso.</p>`;
+  acciones.innerHTML =
+      `<button type="button" class="primario" id="soporte-pedir"`
+    + ` onclick="pedirSoporte(this)">Pedir soporte remoto</button>`
+    + cerrar;
+}
+
+function errorSoporte(texto) {
+  const caja = $("soporte-error");
+  caja.textContent = texto || "";
+  caja.style.display = texto ? "" : "none";
+}
+
+// El mismo botón que abre esta ventana la cierra (regla del panel).
+function abrirSoporteRemoto() {
+  if ($("soporte-overlay").classList.contains("visible")) { cerrarSoporte(); return; }
+  errorSoporte("");
+  pintarSoporte();
+  $("soporte-overlay").classList.add("visible");
+  // La comprobación de verdad (¿está el programa? ¿cuál es el número?) puede
+  // tardar segundos: la ventana se abre YA con lo último sabido y se repinta
+  // cuando llega. Nunca se le hace esperar al operador delante de un vacío.
+  cargarEstadoSoporte({comprobar: true});
+}
+
+function cerrarSoporte() {
+  if (soporteEnVuelo) return;   // hay una descarga o un envío a medias
+  $("soporte-overlay").classList.remove("visible");
+}
+
+async function conBotonOcupado(btn, rotulo, tarea) {
+  if (!btn || btn.disabled || soporteEnVuelo) return;
+  const original = btn.innerHTML;
+  soporteEnVuelo = true;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${rotulo}`;
+  errorSoporte("");
+  try {
+    await tarea();
+  } catch (e) {
+    errorSoporte(e.message);
+    if (!$("soporte-overlay").classList.contains("visible")) mensaje(e.message, "error");
+  } finally {
+    soporteEnVuelo = false;
+    btn.disabled = false;
+    btn.innerHTML = original;
+    pintarSoporte();
+  }
+}
+
+function pedirSoporte(btn) {
+  return conBotonOcupado(btn, "Pidiendo soporte…", async () => {
+    try {
+      aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+    } catch (e) {
+      // El servidor manda el estado hasta cuando falla (p. ej. falta el
+      // programa): se aplica igual, así la ventana pasa sola a ofrecer la
+      // instalación en vez de dejar un error sin salida.
+      if (e.datos) aplicarEstadoSoporte(e.datos);
+      throw e;
+    }
+  });
+}
+
+function instalarSoporte(btn) {
+  return conBotonOcupado(btn, "Descargando…", async () => {
+    aplicarEstadoSoporte(await api("/api/soporte/instalar-remoto", {}));
+    // Comprobación automática de que quedó disponible: si no, no se pide nada
+    // y la ventana vuelve a ofrecer la instalación.
+    await cargarEstadoSoporte({comprobar: true});
+    if (!(soporte.programa || {}).disponible)
+      throw new Error("El programa se descargó pero todavía no está disponible. "
+                      + "Vuelve a intentar.");
+    aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+  });
+}
+
+function reabrirSoporte(btn) {
+  return conBotonOcupado(btn, "Abriendo…", async () => {
+    aplicarEstadoSoporte(await api("/api/soporte/abrir-remoto", {}));
+  });
+}
+
+// Cancelar no borra nada: la solicitud queda en el registro de soporte como
+// cancelada. Se confirma en el mismo sitio (nada de popup del navegador).
+function cancelarSoporte(btn) {
+  confirmarSinQuitar(btn, () => conBotonOcupado(btn, "Cancelando…", async () => {
+    const r = await api("/api/soporte/solicitud/cancelar", {});
+    aplicarEstadoSoporte(r);
+    if (r.aviso) mensaje(r.aviso, "alerta");
+  }), "Confirmar cancelar");
 }
 
 function cerrarDiagnosticoSync() {
   cerrarTicket();   // el ticket va encima: cerrar el de atrás lo dejaría huérfano
+  cerrarSoporte();  // ídem la ventana de soporte remoto
   $("diag-sync-overlay").classList.remove("visible");
 }
 
@@ -22429,6 +22740,10 @@ consultarTasaBCV();   // en paralelo con cargar(): el BCV puede tardar segundos
 // PENDIENTES aparezca correcto desde el primer pintado.
 const ajustesInicial = cargarAjustes();
 borradorAvisoRevisar();   // si el panel se cerró con un editor a medias, ofrece retomarlo
+// Solicitud de soporte pendiente (2026-08-08): sin comprobar nada (eso lo hace
+// el panel al arrancar, en su propio hilo) — aquí solo se pinta la franja si
+// esta computadora quedó con una solicitud viva de antes.
+cargarEstadoSoporte();
 // Vista previa de la configuración obligatoria (?ver_configuracion=1,
 // 2026-07-31): no borra nada, espera a que ambas cargas traigan los valores
 // reales de esta computadora y recién ahí abre la pantalla ya llena con ellos.
