@@ -15975,6 +15975,8 @@ async function cargarAjustes() {
     // gobierna el nombre y el vendedor de al lado.
     $("mi-config-bloque").style.display =
       tienePermiso("identidad_maquina") ? "" : "none";
+    // Esconder el bloque no alcanza si la ventana que abre está encima.
+    cerrarConfigEquipoSiSinPermiso();
     pintarMiConfigRutasSeries();
     $("catalogos-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
@@ -17407,6 +17409,23 @@ function marcarErrorConfigEquipo(campo, texto) {
 function cerrarConfigEquipo() {
   configEquipo = null;
   $("equipo-config-overlay").classList.remove("visible");
+}
+
+// El rol de esta computadora puede caer con la ventana ya abierta: la
+// supervisión se lo quita, baja por el sync y cargarAjustes esconde el bloque
+// de atrás — pero la ventana sobrevive y su Guardar solo puede chocar contra
+// el candado de su endpoint (403). Se cierra aquí, diciendo por qué, en vez de
+// dejar que el operador lo descubra pulsando Guardar (2026-08-08).
+function cerrarConfigEquipoSiSinPermiso() {
+  if (!configEquipo || !editorVisible("equipo-config-overlay")) return;
+  const puede = configEquipo.origen === "solicitud"
+    ? accesoGestion : tienePermiso("identidad_maquina");
+  if (puede) return;
+  if (confirmSalidaCerrar) confirmSalidaCerrar();
+  cerrarConfigEquipo();
+  mensaje("Esta computadora dejó de tener permiso para configurar rutas y "
+    + "series: la ventana se cerró sin guardar. Los roles se asignan desde "
+    + "la supervisión.", "alerta");
 }
 
 // Guardar se confirma (2026-08-07, pedido del usuario): lo que sale de aquí
