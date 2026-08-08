@@ -878,9 +878,10 @@
   .equipo-config-linea > .acceso-predet { margin:0; flex:1 1 auto;
       justify-content:flex-end; }
   .equipo-config-linea > .acceso-predet select { flex:0 1 240px; }
-  /* Día a facturar: son dos opciones, hoy o mañana. Un desplegable obliga a
-     abrirlo para ver qué hay (2026-08-07, pedido del usuario), así que van a
-     la vista tanto en la ventana como en la fila de cada computadora. */
+  /* Día a facturar: son dos opciones, hoy o mañana. En la VENTANA de
+     configuración van las dos a la vista; en la fila de cada computadora es un
+     desplegable que muestra solo el día vigente (2026-08-08, pedido del
+     usuario), porque el par repetido en cada fila llenaba la tabla de ruido. */
   .dia-opciones { display:flex; align-items:center; gap:18px; font-size:13px; }
   .dia-opciones label { display:flex; align-items:center; gap:5px;
       cursor:pointer; }
@@ -891,7 +892,9 @@
      verticalmente respecto al nombre del equipo (2026-08-08). */
   .equipos-config > div { display:flex; align-items:center; gap:16px;
       flex-wrap:wrap; }
-  .equipos-config .dia-opciones { font-size:12px; gap:12px; }
+  .equipos-config .dia-celda { display:flex; align-items:center; gap:5px;
+      font-size:12px; }
+  .equipos-config .dia-celda select { font-size:12px; padding:2px 4px; }
   .equipos-config .mut { font-size:12px; }
   .equipos-config button { font-size:12px; padding:3px 8px;
       margin-left:auto; }
@@ -16192,14 +16195,15 @@ function pintarEquipos() {
       <div>
         <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
         <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
-        <div class="dia-opciones">
-          <label><input type="radio" name="dia-equipo-${host}" value="manana"
-                 ${m.dia_despacho === "manana" ? "checked" : ""}
-                 onclick="return onClickDiaEquipo(event, '${host}')"> Mañana</label>
-          <label><input type="radio" name="dia-equipo-${host}" value="hoy"
-                 ${m.dia_despacho === "hoy" ? "checked" : ""}
-                 onclick="return onClickDiaEquipo(event, '${host}')"> Hoy</label>
-        </div>
+        <span class="dia-celda">
+          <span class="mut">Día:</span>
+          <select onchange="onCambioDiaEquipo(this, '${host}')">
+            ${m.dia_despacho ? ""
+              : "<option value=\"\" selected disabled>Sin elegir</option>"}
+            <option value="manana" ${m.dia_despacho === "manana" ? "selected" : ""}>Mañana</option>
+            <option value="hoy" ${m.dia_despacho === "hoy" ? "selected" : ""}>Hoy</option>
+          </select>
+        </span>
         <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
       </div>
     </td>`;
@@ -16268,18 +16272,20 @@ function onClickRolEquipo(ev, dispositivo, rol) {
 
 // El día a facturar de OTRA computadora también se confirma (2026-08-07,
 // pedido del usuario): cambiarlo altera cómo trabaja esa máquina mañana
-// temprano, y un clic al pasar no puede decidir eso. Se esconden las dos
-// opciones mientras dura la pregunta, para no dejar la otra invitando a un
-// segundo clic.
-function onClickDiaEquipo(ev, dispositivo) {
-  const caja = ev.target;
-  const dia = caja.value;
-  ev.preventDefault();
-  confirmarSinQuitar(caja.closest(".dia-opciones"), () => {
-    caja.checked = true;
-    cambiarDiaEquipo(dispositivo, caja);
+// temprano, y un clic al pasar no puede decidir eso. Mismo patrón que
+// onCambioVersionEstable: el selector vuelve enseguida al día guardado —no se
+// adelanta a un cambio que todavía no ocurrió— y se esconde mientras dura la
+// pregunta, así que la etiqueta dice para qué día va a quedar.
+function onCambioDiaEquipo(sel, dispositivo) {
+  const m = equipos.find(e => e.dispositivo === dispositivo);
+  if (!m) return;
+  const dia = sel.value;
+  if (dia === (m.dia_despacho || "")) return;
+  sel.value = m.dia_despacho || "";
+  confirmarSinQuitar(sel.closest(".dia-celda"), () => {
+    sel.value = dia;
+    cambiarDiaEquipo(dispositivo, sel);
   }, `Confirmar: factura para ${ETIQUETA_DIA_DESPACHO[dia]}`);
-  return false;
 }
 
 function onClickActivaEquipo(ev, dispositivo) {
@@ -16350,7 +16356,6 @@ async function cambiarActivaEquipo(dispositivo, caja) {
 async function cambiarDiaEquipo(dispositivo, control) {
   const m = equipos.find(e => e.dispositivo === dispositivo);
   if (!m) return;
-  const anterior = m.dia_despacho || "";
   control.disabled = true;
   try {
     const r = await api("/api/ajustes/equipo-rutas-series", {
@@ -16368,9 +16373,9 @@ async function cambiarDiaEquipo(dispositivo, control) {
       + `${ETIQUETA_DIA_DESPACHO[control.value]}; lo toma en su próximo refresco.`,
       "info");
   } catch (e) {
-    control.disabled = false;
-    document.querySelectorAll(`input[name="dia-equipo-${dispositivo}"]`)
-            .forEach(r => { r.checked = r.value === anterior; });
+    // Repintar deja el selector en el día que esa computadora sigue teniendo:
+    // `equipos` no se tocó, así que no queda mostrando un cambio que no entró.
+    pintarEquipos();
     mensaje("No se pudo cambiar el día a facturar: " + e.message, "error");
   }
 }
