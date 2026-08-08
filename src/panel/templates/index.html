@@ -313,10 +313,13 @@
      fuera: son el día (hoy/mañana); ámbar y rojo significan aviso.
      Cuando un rol es el que abre todas las rutas, el chip nombra ese rol con
      su propio color (2026-08-08): fucsia = Admin, cian = Editor. */
+  /* Nunca se parte en dos renglones (2026-08-08): es una etiqueta, y "★" o
+     "①" solos en una línea no se entienden. Su ancho es el piso de la
+     columna, así el reparto del sobrante no lo puede exprimir. */
   .chip-asig { display:inline-block; padding:1px 6px; border-radius:5px;
                font-size:11px; font-weight:600; border:1px solid;
                background:#f1f5f9; border-color:#cbd5e1; color:#475569;
-               vertical-align:1px; }
+               vertical-align:1px; white-space:nowrap; }
   .chip-asig.propias { background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; }
   .chip-asig.predet { background:#6d28d9; border-color:#6d28d9; color:#fff; }
   .chip-asig.rol-admin  { background:#fdf2f8; border-color:#fbcfe8; color:#be185d; }
@@ -813,14 +816,13 @@
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
-  /* La tabla llega al mismo borde que las pestañas (2026-08-08, pedido del
-     usuario), pero el sobrante NO se reparte entre las columnas: estirada sin
-     más, quedaba un hueco grande tras el nombre. Se lo lleva entero la
-     columna del botón, que de paso separa los datos del equipo de sus
-     permisos y deja Rol y Activa contra el borde derecho —donde sale la
-     confirmación, anclada a la derecha de la fila. */
+  /* La tabla llega al mismo borde que las pestañas y el sobrante se REPARTE
+     entre las columnas (2026-08-08, pedido del usuario). Antes se lo llevaba
+     entero la columna del botón: dejaba las demás en su mínimo —los chips se
+     partían en dos renglones— y todo el aire junto en un hueco entre
+     Configurar y Rol. El reparto natural de la tabla lo distribuye a cada
+     columna según lo que mide su contenido. */
   .equipos-tabla { border-collapse:collapse; width:100%; }
-  .equipos-tabla .equipos-configbtn { width:100%; }
   .equipos-tabla th { text-align:left; font-size:11.5px; font-weight:700;
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
       padding:0 9px 6px 0; white-space:nowrap; }
