@@ -133,9 +133,15 @@
   #sin-conexion button { flex:none; }
   #sin-conexion .spinner { border-color:rgba(255,255,255,.4); border-top-color:#fff; }
   /* Ancho de trabajo (2026-07-31): las listas se quedaban cortas con 1200px.
-     El tope en vw deja siempre aire a los lados — a pantalla completa el texto
-     de las tablas quedaría demasiado largo para seguir una fila con la vista. */
-  main { padding:16px 18px; max-width:min(1560px, 94vw); margin:0 auto; width:100%;
+     El tope deja siempre aire a los lados — a pantalla completa el texto de
+     las tablas quedaría demasiado largo para seguir una fila con la vista.
+     El aire se mide en % y NO en vw (2026-08-08): el vw mide contra la
+     ventana, pero el body tiene piso de 1200px, así que al angostar la
+     ventana por debajo de ese piso el contenido se encogía mientras el body
+     se quedaba quieto — los márgenes laterales CRECÍAN al achicar la ventana
+     y el contenido quedaba cortado a la derecha. El % mide contra el body,
+     que ya respeta el piso, así que el aire es el mismo a cualquier ancho. */
+  main { padding:16px 18px; max-width:min(1560px, 94%); margin:0 auto; width:100%;
          flex:1; min-height:0; display:flex; flex-direction:column; }
   /* Todo lo que no sea el panel de la tab activa mantiene su altura;
      el panel activo absorbe el resto de la ventana. */
