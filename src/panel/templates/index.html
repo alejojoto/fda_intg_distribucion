@@ -304,13 +304,17 @@
      asignación concreta. Ahora son etiquetas de color: gris = sin restricción
      (Todas), violeta suave = lo asignado, violeta lleno = la predeterminada,
      que es la que decide con qué arranca esa máquina. Verde y azul quedan
-     fuera: son el día (hoy/mañana); ámbar y rojo significan aviso. */
+     fuera: son el día (hoy/mañana); ámbar y rojo significan aviso.
+     Cuando un rol es el que abre todas las rutas, el chip nombra ese rol con
+     su propio color (2026-08-08): fucsia = Admin, cian = Editor. */
   .chip-asig { display:inline-block; padding:1px 6px; border-radius:5px;
                font-size:11px; font-weight:600; border:1px solid;
                background:#f1f5f9; border-color:#cbd5e1; color:#475569;
                vertical-align:1px; }
   .chip-asig.propias { background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; }
   .chip-asig.predet { background:#6d28d9; border-color:#6d28d9; color:#fff; }
+  .chip-asig.rol-admin  { background:#fdf2f8; border-color:#fbcfe8; color:#be185d; }
+  .chip-asig.rol-editor { background:#ecfeff; border-color:#a5f3fc; color:#0e7490; }
   .chip-asig + .chip-asig { margin-left:4px; }
   /* Tabs PENDIENTES / EN REVISIÓN / PROCESADAS / DESCUENTOS / AJUSTES — cada
      una con su color. Cuál está activa se lee de lejos por cuatro señales que
@@ -16918,7 +16922,9 @@ async function cambiarDiaEquipo(dispositivo, control) {
 // En series (2026-08-08) el violeta lleno queda reservado a la serie ÚNICA y la
 // predeterminada sale en violeta suave: con una sola serie el chip va solo y
 // ambos casos se veían igual.
-function chipsAsignacion(sel, predet, plural, corto, esSerie) {
+// `chipTodas` cambia el chip gris de "sin restricción" por otro rótulo con su
+// color (lo usan las rutas para nombrar el rol que las abre todas).
+function chipsAsignacion(sel, predet, plural, corto, esSerie, chipTodas) {
   const chip = (texto, clase) =>
     `<span class="chip-asig${clase ? " " + clase : ""}">${esc(texto)}</span>`;
   const todas = sel === "*" || sel === null || sel === undefined;
@@ -16926,7 +16932,8 @@ function chipsAsignacion(sel, predet, plural, corto, esSerie) {
   if (una && (!predet || corto(sel[0]) === corto(predet)))
     return chip((esSerie ? "① " : predet ? "★ " : "") + corto(sel[0]),
                 "predet");
-  const base = todas ? chip("Todas", "")
+  const base = todas ? chip(chipTodas ? chipTodas.texto : "Todas",
+                            chipTodas ? chipTodas.clase : "")
     : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`,
            esSerie ? "" : "propias");
   return predet
@@ -16959,10 +16966,17 @@ const chipsSeriesEquipo = (m) =>
   chipsAsignacion(m.series, m.serie_predeterminada, "series", (x) => x, true);
 // Un equipo con rol ve TODAS las rutas (permiso ver_todas_rutas, src/roles.py):
 // su asignación queda dormida, así que la línea dice "Todas" —lo que de verdad
-// ve— sin pisar lo guardado, que vuelve solo si se le quita el rol.
+// ve— sin pisar lo guardado, que vuelve solo si se le quita el rol. Y en vez de
+// un gris igual al de cualquiera sin restricción, el chip nombra el rol que se
+// las abre, con su color (2026-08-08, pedido del usuario).
 const chipsRutasEquipo = (m) =>
   chipsAsignacion(veTodasLasRutas(m) ? "*" : m.rutas, m.ruta_predeterminada,
-                  "rutas", etiquetaRutaCorta);
+                  "rutas", etiquetaRutaCorta, false,
+                  veTodasLasRutas(m) ? chipRolTodasLasRutas(m) : null);
+
+const chipRolTodasLasRutas = (m) => m && m.es_admin
+  ? {texto: "Admin", clase: "rol-admin"}
+  : {texto: "Editor", clase: "rol-editor"};
 
 const veTodasLasRutas = (m) => !!(m && (m.es_admin || m.es_editor));
 
@@ -16970,7 +16984,9 @@ const veTodasLasRutas = (m) => !!(m && (m.es_admin || m.es_editor));
 // (esta computadora no sale en la lista de las demás): se le pega la del
 // permiso, que es la misma verdad.
 const configPropiaConRol = () => ({...(configPropia || {}),
-                                   es_editor: tienePermiso("ver_todas_rutas")});
+                                   es_editor: tienePermiso("ver_todas_rutas"),
+                                   es_admin: permisosUI.rol_efectivo === "admin"
+                                     || permisosUI.rol_efectivo === "supervisor"});
 
 // La ventana sirve a tres orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
