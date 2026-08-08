@@ -133,9 +133,15 @@
   #sin-conexion button { flex:none; }
   #sin-conexion .spinner { border-color:rgba(255,255,255,.4); border-top-color:#fff; }
   /* Ancho de trabajo (2026-07-31): las listas se quedaban cortas con 1200px.
-     El tope en vw deja siempre aire a los lados — a pantalla completa el texto
-     de las tablas quedaría demasiado largo para seguir una fila con la vista. */
-  main { padding:16px 18px; max-width:min(1560px, 94vw); margin:0 auto; width:100%;
+     El tope deja siempre aire a los lados — a pantalla completa el texto de
+     las tablas quedaría demasiado largo para seguir una fila con la vista.
+     El aire se mide en % y NO en vw (2026-08-08): el vw mide contra la
+     ventana, pero el body tiene piso de 1200px, así que al angostar la
+     ventana por debajo de ese piso el contenido se encogía mientras el body
+     se quedaba quieto — los márgenes laterales CRECÍAN al achicar la ventana
+     y el contenido quedaba cortado a la derecha. El % mide contra el body,
+     que ya respeta el piso, así que el aire es el mismo a cualquier ancho. */
+  main { padding:16px 18px; max-width:min(1560px, 94%); margin:0 auto; width:100%;
          flex:1; min-height:0; display:flex; flex-direction:column; }
   /* Todo lo que no sea el panel de la tab activa mantiene su altura;
      el panel activo absorbe el resto de la ventana. */
@@ -299,6 +305,26 @@
   .rotulo-dia:empty { display:none; }
   .rotulo-dia.hoy    { background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
   .rotulo-dia.manana { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+  /* Series y rutas de cada computadora (2026-08-08, pedido del usuario): el
+     texto con ★ no dejaba ver de un vistazo la diferencia entre "todas" y una
+     asignación concreta. Ahora son etiquetas de color: gris = sin restricción
+     (Todas), violeta suave = lo asignado, violeta lleno = la predeterminada,
+     que es la que decide con qué arranca esa máquina. Verde y azul quedan
+     fuera: son el día (hoy/mañana); ámbar y rojo significan aviso.
+     Cuando un rol es el que abre todas las rutas, el chip nombra ese rol con
+     su propio color (2026-08-08): fucsia = Admin, cian = Editor. */
+  /* Nunca se parte en dos renglones (2026-08-08): es una etiqueta, y "★" o
+     "①" solos en una línea no se entienden. Su ancho es el piso de la
+     columna, así el reparto del sobrante no lo puede exprimir. */
+  .chip-asig { display:inline-block; padding:1px 6px; border-radius:5px;
+               font-size:11px; font-weight:600; border:1px solid;
+               background:#f1f5f9; border-color:#cbd5e1; color:#475569;
+               vertical-align:1px; white-space:nowrap; }
+  .chip-asig.propias { background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; }
+  .chip-asig.predet { background:#6d28d9; border-color:#6d28d9; color:#fff; }
+  .chip-asig.rol-admin  { background:#fdf2f8; border-color:#fbcfe8; color:#be185d; }
+  .chip-asig.rol-editor { background:#ecfeff; border-color:#a5f3fc; color:#0e7490; }
+  .chip-asig + .chip-asig { margin-left:4px; }
   /* Tabs PENDIENTES / EN REVISIÓN / PROCESADAS / DESCUENTOS / AJUSTES — cada
      una con su color. Cuál está activa se lee de lejos por cuatro señales que
      se suman (feedback 2026-07-22: el tinte pálido solo no se distinguía, y
@@ -450,6 +476,26 @@
   #aviso-version-nueva { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; }
+  /* Rompe-vidrio puesto (2026-08-07): ámbar y no rojo — no hay nada roto, hay
+     una puerta abierta a conciencia. Se ve en TODAS las pestañas y no se
+     puede cerrar: el día que se olvide puesto, esta franja es lo único que
+     lo va a delatar. */
+  #aviso-rompe-vidrio { background:#fff4e0; color:#7a4a00; border-radius:8px;
+                     border-left:5px solid #d98300;
+                     padding:10px 14px; margin-bottom:10px; font-size:13.5px;
+                     font-weight:600; }
+  /* Solicitud de soporte viva (2026-08-08): la franja se queda puesta hasta
+     que el operador la cancele — es lo único que le recuerda que tiene que
+     dejar abierto el programa de soporte. Verde y con su acción adentro: no
+     hay nada roto, hay algo en curso. */
+  #aviso-soporte { display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+                     background:#eaf6ec; border:1px solid #b7dfc0; color:#1e6b33;
+                     border-radius:8px; padding:10px 14px; margin-bottom:10px;
+                     font-size:13.5px; }
+  #aviso-soporte b { display:block; font-size:13.5px; }
+  #aviso-soporte .sop-detalle { font-weight:400; color:#2d6b41; }
+  #aviso-soporte .sop-acciones { margin-left:auto; display:flex; gap:8px; }
+  .sop-numero { font-weight:700; letter-spacing:.6px; user-select:text; }
   /* Misma idea que fila-aviso-error pero inline, para la ★ de favorito
      (cabecera de cliente): sin caja, pegado al símbolo que lo disparó. */
   .obj-aviso-inline { color:#a12a2a; font-size:12px; font-weight:600; margin-left:4px; }
@@ -770,19 +816,49 @@
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
-  .equipos-tabla { border-collapse:collapse; }
+  /* El sobrante se REPARTE entre las columnas (2026-08-08, pedido del
+     usuario). Antes se lo llevaba entero la columna del botón: dejaba las
+     demás en su mínimo —los chips se partían en dos renglones— y todo el aire
+     junto en un hueco entre Configurar y Rol. El reparto natural de la tabla
+     lo distribuye a cada columna según lo que mide su contenido.
+     El tope corta la tabla más o menos donde termina la última pestaña, para
+     que la sección no se estire sola hasta el borde en una pantalla ancha.
+     Es aproximado a propósito: el ancho real de las pestañas depende de los
+     contadores, que cambian solos. Vale SOLO para esta tabla — el ancho del
+     resto del panel no se toca. */
+  .equipos-tabla { border-collapse:collapse; width:100%; max-width:800px; }
   .equipos-tabla th { text-align:left; font-size:11.5px; font-weight:700;
       letter-spacing:.4px; text-transform:uppercase; color:var(--mut);
-      padding:0 10px 6px 0; white-space:nowrap; }
-  .equipos-tabla td { padding:4px 10px 4px 0; vertical-align:middle; }
-  .equipos-tabla .equipos-nombre { font-weight:600; font-size:13px; }
-  .equipos-tabla .equipos-host { color:var(--mut); font-size:12px;
-      min-width:110px; }
+      padding:0 9px 6px 0; white-space:nowrap; }
+  .equipos-tabla td { padding:4px 9px 4px 0; vertical-align:middle; }
+  /* Nombre y vendedor en DOS líneas (2026-08-08, pedido del usuario): con
+     Series/Rutas/Rol también apilados en su columna, esta celda ya no
+     desentonaba por ser la única de dos renglones — al revés, con todas las
+     columnas de una sola línea la fila quedaba más baja de lo que hace falta
+     y el resto de las celdas colgaban sueltas en el medio. El identificador
+     queda en el hover, para desempatar dos computadoras con el mismo nombre. */
+  .equipos-tabla .equipos-id { white-space:nowrap; }
+  .equipos-tabla .equipos-nombre { display:block; font-weight:600; font-size:13px; }
+  .equipos-tabla .equipos-vendedor { display:block; color:var(--mut); font-size:12px;
+      margin-top:1px; }
   .equipos-tabla input[type=text] { width:190px; }
   .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
+  /* Admin y Editor uno debajo del otro (2026-08-08, pedido del usuario): esta
+     columna solo la ve quien supervisa, así que apilarla no le quita nada a
+     nadie más y empareja su altura con el resto de las columnas apiladas.
+     El flex va en un div INTERIOR, nunca en el td: ver la nota de
+     .equipos-series. */
+  .equipos-tabla .equipos-roles > div { display:flex; flex-direction:column;
+      gap:2px; }
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
+  /* La pregunta de confirmación FLOTA sobre la fila (2026-08-08, pedido del
+     usuario): puesta en línea ensanchaba la celda, partía la fila en dos
+     renglones y corría el botón justo cuando hay que acertarle para confirmar.
+     La fila es el ancla, así la pregunta sale siempre en el mismo lugar sin
+     importar de qué columna salió. */
+  .equipos-tabla tbody tr { position:relative; }
   /* Opciones del modo prueba agrupadas por tema (2026-07-27, pedido del
      usuario): antes eran una columna de líneas sueltas con un párrafo de
      explicación debajo de cada una. Ahora cada grupo lleva un rótulo y sus
@@ -856,6 +932,12 @@
       grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
       max-height:none; }
   #equipo-config .acceso-check { font-size:13px; }
+  /* "Todas las rutas" de un equipo con rol (2026-08-08): se ve apagado pero
+     NO va con `disabled` — un control deshabilitado no dispara el clic con el
+     que se explica por qué no se puede quitar (mismo motivo que #motivo-otro). */
+  #equipo-config .acceso-check.bloqueado { color:var(--mut); }
+  #equipo-config .acceso-check.bloqueado input { opacity:.55;
+      cursor:var(--cursor-prohibido); }
   #equipo-config .acceso-campo:first-of-type { margin-top:0; }
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
@@ -872,24 +954,47 @@
   .equipo-config-linea > .acceso-predet { margin:0; flex:1 1 auto;
       justify-content:flex-end; }
   .equipo-config-linea > .acceso-predet select { flex:0 1 240px; }
-  /* Día a facturar: son dos opciones, hoy o mañana. Un desplegable obliga a
-     abrirlo para ver qué hay (2026-08-07, pedido del usuario), así que van a
-     la vista tanto en la ventana como en la fila de cada computadora. */
+  /* Día a facturar: son dos opciones, hoy o mañana. En la VENTANA de
+     configuración van las dos a la vista; en la fila de cada computadora es un
+     desplegable que muestra solo el día vigente (2026-08-08, pedido del
+     usuario), porque el par repetido en cada fila llenaba la tabla de ruido. */
   .dia-opciones { display:flex; align-items:center; gap:18px; font-size:13px; }
   .dia-opciones label { display:flex; align-items:center; gap:5px;
       cursor:pointer; }
-  /* La celda de la fila reparte en una línea: series, rutas, el día y el
-     botón, sin apilarse (2026-08-07, pedido del usuario). */
-  .equipos-config { display:flex; align-items:center; gap:16px;
-      flex-wrap:wrap; }
-  .equipos-config .dia-opciones { font-size:12px; gap:12px; }
-  .equipos-config .mut { font-size:12px; }
-  .equipos-config button { font-size:12px; padding:3px 8px;
-      margin-left:auto; }
+  /* Series, rutas, día y el botón van cada uno en su propia columna de tabla
+     (2026-08-08, pedido del usuario): antes compartían una sola celda con
+     flex-wrap y el ancho de cada dato corría según el contenido de esa fila,
+     así que nada quedaba alineado entre filas. Como columna de tabla real, el
+     navegador la ensancha al máximo de todas las filas y alinea sola. */
+  /* Cuando la asignación trae DOS chips (p. ej. "3 rutas" + "★ Anzoátegui"),
+     van uno debajo del otro en vez de ensanchar la columna (2026-08-08,
+     pedido del usuario): compacto en ancho, y así la fila con dos chips no
+     desalinea el resto de la columna. Con un solo chip no cambia nada.
+     El flex va en un div INTERIOR: un td con display:flex deja de ser celda
+     de tabla —el navegador envuelve los td vecinos que dejaron de serlo en UNA
+     celda anónima— y Series y Rutas terminaban apilados bajo el mismo rótulo,
+     con el resto de las columnas corridas (2026-08-08).
+     Los dos chips van SIEMPRE en el mismo orden y posición: arriba el alcance
+     (Todas / N rutas / la única) y abajo la predeterminada (★). Alineados al
+     tope, así el primer chip queda a la misma altura en todas las filas, tenga
+     esa fila uno o dos. */
+  .equipos-tabla .equipos-series, .equipos-tabla .equipos-rutas,
+  .equipos-tabla .equipos-roles { vertical-align:top; }
+  .equipos-tabla .equipos-series > div,
+  .equipos-tabla .equipos-rutas > div { display:flex; flex-direction:column;
+      align-items:flex-start; gap:2px; }
+  .equipos-tabla .equipos-series .chip-asig + .chip-asig,
+  .equipos-tabla .equipos-rutas .chip-asig + .chip-asig { margin-left:0; }
+  .equipos-tabla .equipos-dia select { font-size:12px; padding:2px 4px; }
+  /* El día también se reconoce por color, con los mismos tonos del cuadrito de
+     "Fecha a facturar" (verde hoy, azul mañana). Sin elegir se queda neutro. */
+  .equipos-tabla .equipos-dia select.hoy { background:#ecfdf5; border-color:#a7f3d0;
+      color:#047857; font-weight:600; }
+  .equipos-tabla .equipos-dia select.manana { background:#eff6ff; border-color:#bfdbfe;
+      color:#1d4ed8; font-weight:600; }
+  .equipos-tabla .equipos-configbtn button { font-size:12px; padding:3px 8px; }
   /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
      columna es angosta, así que el texto va sobre el botón y no al lado. */
-  .sup-config-celda .mut { font-size:12px; display:block; margin-bottom:4px; }
-  .sup-config-celda button { font-size:12px; padding:3px 8px; }
   /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
      visible SOLO cuando la ruta elegida tiene configuración — dice a las
      claras por qué el selector cambió de opciones o de valor solo. */
@@ -1046,6 +1151,29 @@
                border-radius:8px; padding:10px 12px; margin-top:12px;
                font-size:12.5px; }
   #ticket-numero { font-weight:700; letter-spacing:.6px; user-select:text; }
+  /* Soporte remoto (2026-08-08): encima del informe (z-index 21) como el
+     ticket, porque se abre desde ahí. Angosto a propósito — adentro hay una
+     frase y un botón, nada más. */
+  #soporte-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                     display:none; z-index:21; align-items:flex-start;
+                     justify-content:center; }
+  #soporte-overlay.visible { display:flex; }
+  #soporte-caja { background:#fff; border-radius:10px; padding:18px;
+                  margin-top:8vh; width:min(520px, 94vw); max-height:85vh;
+                  overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #soporte-caja h3 { margin:0 0 12px; font-size:14px; }
+  #soporte-cuerpo { font-size:13px; line-height:1.65; }
+  #soporte-cuerpo p { margin:0 0 8px; }
+  #soporte-cuerpo .sop-nota { color:#5a6472; font-size:12px; }
+  #soporte-cuerpo .sop-caja-ok { background:#eaf6ec; border:1px solid #b7dfc0;
+                  color:#1e6b33; border-radius:8px; padding:10px 12px;
+                  margin:10px 0 0; }
+  #soporte-cuerpo .sop-caja-falta { background:#fffaeb; border:1px solid #fde68a;
+                  color:#8a5b00; border-radius:8px; padding:10px 12px;
+                  margin:10px 0 0; }
+  #soporte-error { background:#fdecec; border:1px solid #f0b4b4; color:#b42318;
+                   border-radius:8px; padding:10px 12px; margin-top:10px;
+                   font-size:12.5px; }
   #ticket-error { margin-top:12px; }
   /* El punto giratorio sobre el botón azul necesita su propio contraste. */
   #ticket-enviar .spinner { border-color:rgba(255,255,255,.45);
@@ -1407,6 +1535,12 @@
   /* Variante no destructiva (confirmarSinQuitar): rojo es para borrar/descartar;
      acciones como "Llenar en fila" usan el mismo verde de DESCUENTOS. */
   .confirmar-borrar .cb-si.ok { background:#16a34a; border-color:#16a34a; }
+  /* Variante flotante (confirmarEnFilaEquipo): la pregunta se pinta ENCIMA de
+     la fila, alineada a su borde derecho, sin ocupar espacio propio. */
+  .confirmar-borrar.confirmar-flotante { position:absolute; right:0; top:50%;
+      transform:translateY(-50%); z-index:6; white-space:nowrap;
+      padding:4px 6px; border-radius:8px; background:#fff;
+      border:1px solid #d7dbe3; box-shadow:0 4px 14px rgba(16,24,40,.18); }
   /* Aviso "hay cambios sin guardar" al intentar cerrar un editor: ocupa la
      botonera del editor mientras se decide (Guardar / Salir sin guardar /
      Seguir editando). El mensaje a la izquierda, los botones a la derecha. */
@@ -1544,6 +1678,8 @@
   .sup-nube-lineas { display:flex; gap:4px 8px; flex-wrap:wrap; max-width:210px; }
   .sup-nube-lineas .sup-nube-ok { color:#15803d; font-weight:600; }
   .sup-nube-lineas .sup-nube-mal { color:#b42318; font-weight:600; }
+  /* El número de acceso se teclea del otro lado: seleccionable y sin cortarse. */
+  .sup-numero-acceso { font-size:12px; user-select:text; }
   .sup-problemas { display:flex; gap:4px; flex-wrap:wrap; max-width:260px; }
   .sup-problema { display:inline-block; background:#fff7ed; border:1px solid #fed7aa;
                   color:#9a3412; border-radius:999px; padding:2px 7px;
@@ -1572,6 +1708,7 @@
   .sup-ticket-estado.en-proceso { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
   .sup-ticket-estado.resuelto { background:#eaf7ef; border-color:#b7dfc0; color:#15803d; }
   .sup-ticket-estado.descartado { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
+  .sup-ticket-estado.cancelado { background:#eef1f5; border-color:#d5dae2; color:#5f6b7a; }
   #sup-equipo-overlay, #sup-ticket-overlay, #sup-actividad-overlay {
     position:fixed; inset:0; background:rgba(29,36,51,.45); display:none;
     z-index:20; align-items:flex-start; justify-content:center;
@@ -2318,7 +2455,7 @@
            mouse y teclado. Ver FASES_DEL_OPERADOR en el sondeo de fase. -->
       <!-- Corto a propósito (2026-08-01, pedido del usuario): una sola frase
            para que quepa en la misma línea que el Detener. -->
-      <span id="aviso-no-tocar">⚠️ <b>No muevas el mouse ni teclees durante el llenado.</b></span>
+      <span id="aviso-no-tocar">⚠️ <b>No hagas clic ni presiones teclas durante el llenado.</b></span>
       <!-- Paso de cierre con "Imprimir: sí" (fase 'esperando_impresion'): solo
            se ve mientras el poll de fase la reporte (ver llenar()). Va antes
            del Detener porque es la acción primaria. -->
@@ -2496,6 +2633,19 @@
        antes que la de conflictos a propósito: si las dos están, la que pide
        acción tiene que quedar pegada a la lista. -->
   <div id="aviso-version-nueva" style="display:none"></div>
+
+  <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
+       este no lo dispara nada que haya pasado en esta computadora — es un
+       estado de la nube que vale para todas. Va arriba de todo y en todas las
+       pestañas porque no caduca solo: alguien tiene que acordarse de quitarlo,
+       y para eso tiene que verlo. -->
+  <div id="aviso-rompe-vidrio" style="display:none"></div>
+
+  <!-- Solicitud de soporte remoto pendiente (2026-08-08). Fija mientras la
+       solicitud viva: si el operador cierra el programa de soporte, el técnico
+       no puede entrar y nadie se lo diría. Sobrevive al reinicio del panel
+       porque la solicitud se guarda en la configuración de la máquina. -->
+  <div id="aviso-soporte" style="display:none"></div>
 
   <!-- Doble llenado sin resolver (2026-07-28): franja roja fija hasta que
        alguien lo cierre. No es un mensaje que se desvanece — son dos
@@ -2953,6 +3103,24 @@
         <span class="prueba-nota" id="version-estable-nota" style="display:none"
               title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Congelada: no reciben actualizaciones</span>
       </div>
+      <!-- Rompe-vidrio (2026-08-07, tras el incidente del mismo día): volver a
+           una versión vieja no alcanza cuando la nube ya exige condiciones que
+           esa versión no sabe cumplir — el programa abre y aun así no trabaja.
+           Este interruptor hace que la nube las acepte. Va pegado al selector
+           de versión porque es su complemento: uno elige la versión, el otro
+           consigue que esa versión pueda trabajar. -->
+      <div class="ajustes-fila" id="rompe-vidrio-fila" style="display:none">
+        <b class="rotulo">Rompe-vidrio:</b>
+        <span id="rompe-vidrio-control"></span>
+        <span class="prueba-nota" id="rompe-vidrio-nota" style="display:none"></span>
+      </div>
+      <p class="mut" id="rompe-vidrio-texto" style="margin:8px 0 0;display:none">
+        Ponlo cuando mandes computadoras a una versión vieja y la nube las
+        rechace: el programa abre pero no carga pedidos ni sincroniza. Mientras
+        esté puesto, la nube acepta a esas computadoras sin que haya que
+        reinstalar nada. <b>No se quita solo</b> — quítalo cuando la emergencia
+        pase.</p>
+
       <p class="mut" style="margin:8px 0 0">
         Fija en qué versión corren <b>todas las computadoras de producción</b>.
         Con la <b>1.0</b> o la <b>1.1</b> se quedan ahí, sin recibir
@@ -3042,40 +3210,6 @@
            Aceptar lo decide el modo prueba contra la 999, y en producción el
            Aceptar es del operador (CONTRATOS.md 3.1 punto 3). -->
     </div>
-    <!-- Cómo abre el panel esta máquina (2026-07-29, pedido del usuario): la
-         ventana propia es el camino normal y este interruptor es la contingencia
-         si se queda pegada — antes había que editar el .env por escritorio
-         remoto (ASISTENTE_VENTANA_EDGE, que sigue existiendo para cuando el
-         panel no abre y no hay dónde pulsar). Lo lee ventana_panel.abrir_panel
-         al abrir el asistente. Vive en ADMIN (decisión del usuario ese día):
-         por ahora solo el equipo admin lo necesita — la ventana propia ya
-         quedó estable en las demás — y se generaliza a AJUSTES solo si vuelve
-         a hacer falta en una máquina de operación. Fuera del modo admin, como
-         el selector de Carga: es contingencia, no opción de prueba. -->
-    <div class="ajustes-bloque" id="ventana-bloque" style="display:none">
-      <h3>Ventana del asistente en esta máquina</h3>
-      <div class="ajustes-fila" style="gap:24px">
-        <label class="desc-todos"
-               title="El asistente abre en su propia ventana, con su ícono en la barra de tareas.">
-          <input type="radio" name="ventana-panel" value="propia"
-                 onchange="guardarVentanaPanel(this.value)">
-          Ventana propia
-        </label>
-        <label class="desc-todos"
-               title="El panel abre en el navegador, en una ventana sin pestañas ni barra de direcciones.">
-          <input type="radio" name="ventana-panel" value="navegador"
-                 onchange="guardarVentanaPanel(this.value)">
-          Navegador
-        </label>
-        <span class="prueba-nota"
-              title="La ventana la abre el lanzador antes de levantar el panel, así que la que ya está abierta sigue como está.">Se aplica al reabrir el asistente</span>
-      </div>
-      <p class="mut" style="margin:8px 0 0">
-        <b>Ventana propia:</b> tiene su ícono en la barra de tareas y, al anclarla,
-        pulsar el ícono trae la ventana que ya está abierta.<br>
-        <b>Navegador:</b> opción de respaldo, por si la ventana propia se queda
-        pegada durante un llenado.</p>
-    </div>
     </div>
     <div id="admin-panel-supervision">
       <div id="sup-cargando" style="display:none">
@@ -3093,9 +3227,10 @@
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
-              <!-- Lo mismo que AJUSTES → Computadoras (2026-08-07, pedido del
-                   usuario): con qué trabaja cada PC, editable desde aquí. -->
-              <th>Series, rutas y día</th>
+              <!-- Soporte remoto (2026-08-08, pedido del usuario): si el
+                   programa está listo en esa PC, con qué número se entra y si
+                   dejó una solicitud esperando. -->
+              <th>Soporte</th>
               <th>Atención</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -3138,6 +3273,8 @@
                   data-estado="resuelto" onclick="cambiarFiltroTickets('resuelto')">Resueltos</button>
           <button type="button" class="desc-subtab sup-ticket-filtro"
                   data-estado="descartado" onclick="cambiarFiltroTickets('descartado')">Descartados</button>
+          <button type="button" class="desc-subtab sup-ticket-filtro"
+                  data-estado="cancelado" onclick="cambiarFiltroTickets('cancelado')">Cancelados</button>
           <button type="button" class="desc-subtab sup-ticket-filtro"
                   data-estado="todos" onclick="cambiarFiltroTickets('todos')">Todos</button>
         </div>
@@ -3249,7 +3386,7 @@
     <div class="editor-acciones">
       <button type="button" class="primario" onclick="abrirTicket()">Crear ticket de soporte</button>
       <button type="button" id="diag-sync-copiar" onclick="copiarInformeSync(this)">Copiar informe</button>
-      <button type="button" onclick="abrirSoporteRemoto(this)">Abrir soporte remoto</button>
+      <button type="button" onclick="abrirSoporteRemoto()">Pedir soporte remoto</button>
       <button data-preseleccionado type="button" onclick="cerrarDiagnosticoSync()">Cerrar</button>
     </div>
   </div>
@@ -3277,6 +3414,19 @@
       <button type="button" id="ticket-copiar" onclick="copiarTicket(this)">Copiar informe</button>
       <button type="button" id="ticket-cancelar" onclick="cerrarTicket()">Cancelar</button>
     </div>
+  </div>
+</div>
+
+<!-- Soporte remoto (2026-08-08). Una sola ventana para todo el flujo: si falta
+     el programa se ofrece bajarlo ahí mismo y se vuelve a comprobar solo; si
+     está, un botón deja la solicitud registrada y lo abre. Sin cierre por clic
+     afuera cuando hay una descarga en curso (lo maneja cerrarSoporte). -->
+<div id="soporte-overlay" onclick="if(event.target===this)cerrarSoporte()">
+  <div id="soporte-caja">
+    <h3>Soporte remoto</h3>
+    <div id="soporte-cuerpo"></div>
+    <div id="soporte-error" style="display:none"></div>
+    <div class="editor-acciones" id="soporte-acciones"></div>
   </div>
 </div>
 
@@ -3314,6 +3464,9 @@
         <option value="en_proceso">En proceso</option>
         <option value="resuelto">Resuelto</option>
         <option value="descartado">Descartado</option>
+        <!-- Lo pone el propio equipo al cancelar su solicitud; el admin también
+             puede dejarlo así a mano si le consta que ya no hace falta. -->
+        <option value="cancelado">Cancelado por el equipo</option>
       </select>
     </div>
     <div class="editor-campo">
@@ -3490,8 +3643,14 @@
       <label id="equipo-config-rutas-rotulo" style="display:none"></label>
       <p class="mut equipo-config-ayuda">Solo verá pedidos de esas rutas; con
         la predeterminada arranca ya filtrada al abrir.</p>
+      <!-- Con rol (Admin o Editor) la sección queda de solo lectura: ver todas
+           las rutas es un permiso de Editor, así que la asignación no lo limita
+           en nada. La nota dice qué pasa con lo que ya tenía asignado. -->
+      <p class="mut equipo-config-ayuda" id="equipo-config-rutas-rol-nota"
+         style="display:none"></p>
       <div class="equipo-config-linea">
-        <label class="acceso-check"><input type="checkbox" id="equipo-config-rutas-todas"
+        <label class="acceso-check" id="equipo-config-rutas-todas-caja"><input type="checkbox" id="equipo-config-rutas-todas"
+               onclick="return onClickTodasRutasEquipo(event)"
                onchange="configEquipoRecalcular('rutas')"> <span id="equipo-config-rutas-todas-rotulo"></span></label>
         <div class="acceso-predet" id="equipo-config-rutas-predet-campo">
           <label for="equipo-config-rutas-predet" id="equipo-config-rutas-predet-rotulo"></label>
@@ -6952,6 +7111,7 @@ let supTicketFiltro = "abiertos";
 let supTicketAbierto = null;
 
 const SUP_PROBLEMAS = {
+  soporte_pendiente: "pidió soporte",
   sin_reportar: "sin reportar",
   cola_trancada: "cola trancada",
   outbox_acumulado: "cambios sin subir",
@@ -6979,6 +7139,16 @@ const SUP_TICKET_ESTADOS = {
   en_proceso: "En proceso",
   resuelto: "Resuelto",
   descartado: "Descartado",
+  cancelado: "Cancelado por el equipo",
+};
+
+// Estado del programa de soporte remoto en cada equipo (columna `rustdesk_estado`
+// de la telemetría, scripts/sql/045).
+const SUP_RUSTDESK = {
+  listo: "Listo",
+  sin_id: "Sin número",
+  sin_programa: "Sin programa",
+  sin_comprobar: "Sin comprobar",
 };
 
 function supVisible() {
@@ -7110,6 +7280,31 @@ function supNubeEquipo(equipo) {
   return `<div class="sup-nube-lineas">${partes.join("")}</div>`;
 }
 
+// Soporte remoto de un equipo (2026-08-08). El número de acceso se pinta
+// seleccionable: es lo que el técnico teclea para entrar. Un equipo que corre
+// una versión sin telemetría de soporte no reporta el campo — se dice "sin
+// dato" y no se inventa un "listo".
+function supSoporteEquipo(equipo) {
+  const partes = [];
+  const estado = equipo.rustdesk_estado || "";
+  if (!estado) {
+    partes.push(`<span class="mut">sin dato</span>`);
+  } else if (estado === "listo") {
+    partes.push(`<span class="sup-nube-ok">Listo</span>`);
+  } else if (estado === "sin_programa") {
+    partes.push(`<span class="sup-nube-mal">Sin programa</span>`);
+  } else {
+    partes.push(`<span>${esc(SUP_RUSTDESK[estado] || estado)}</span>`);
+  }
+  let html = `<div class="sup-nube-lineas">${partes.join("")}</div>`;
+  if (equipo.rustdesk_id)
+    html += `<div class="sup-numero-acceso sop-numero">${esc(equipo.rustdesk_id)}</div>`;
+  if (equipo.soporte_ticket)
+    html += `<div class="sup-estado-nota atrasada">solicitud ${
+      esc(equipo.soporte_ticket)}</div>`;
+  return html;
+}
+
 function supProblemasEquipo(equipo) {
   return `<div class="sup-problemas">${(equipo.problemas || []).map(p =>
     `<span class="sup-problema" title="${esc(p.texto || "")}">${
@@ -7168,31 +7363,10 @@ function supFilaEquipo(equipo, sinDatos) {
             atrasada ? " · atrasada" : ""}</div>`
         : ""}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
-    <td class="sup-config-celda">${supConfigEquipo(equipo)}</td>
+    <td>${sinDatos ? "—" : supSoporteEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
     <td>${accion}</td>
   </tr>`;
-}
-
-// Series, rutas y día en el overview (2026-08-07, pedido del usuario): la
-// misma línea y la misma ventana que en AJUSTES → Computadoras. Los equipos
-// que no se gestionan desde aquí (esta misma computadora y los de
-// supervisión) muestran el resumen sin botón: el backend rechaza editarlos
-// por otra vía, así que ofrecer el botón sería mentir.
-function supConfigEquipo(equipo) {
-  const host = esc(equipo.dispositivo || "");
-  const m = equipos.find(e => e.dispositivo === equipo.dispositivo);
-  if (m)
-    return `<span class="mut">${esc(resumenConfigEquipo(m))}</span>`
-      // Con el permiso de identidad se edita; sin él, la línea se ve igual
-      // pero sin botón — es el mismo permiso que exige el endpoint.
-      + (tienePermiso("identidad_maquina")
-         ? `<button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>`
-         : "");
-  if (equipo.dispositivo === supDispositivoPropio && configPropia)
-    return `<span class="mut">${esc(resumenConfigEquipo(configPropia))}</span>
-      <span class="mut">Es esta computadora</span>`;
-  return `<span class="mut">—</span>`;
 }
 
 // El registro de ACCESO (credencial/autorización) es otra fuente de verdad
@@ -7308,7 +7482,7 @@ function pintarEquiposSupervision() {
     .concat(supSinDatos.map(e => supFilaEquipo(e, true)));
   $("sup-equipos-tabla").querySelector("tbody").innerHTML = filas.length
     ? filas.join("")
-    : `<tr><td colspan="7" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
+    : `<tr><td colspan="8" class="sup-lista-vacia">No hay equipos para mostrar.</td></tr>`;
   const quedan = Number(supResumen.equipos || 0) > supEquipos.length;
   $("sup-equipos-mas").style.display = quedan ? "" : "none";
 }
@@ -7521,9 +7695,13 @@ function pintarFiltrosTickets() {
 function pintarTicketsSupervision() {
   const cuerpo = $("sup-tickets-tabla").querySelector("tbody");
   cuerpo.innerHTML = supTickets.length ? supTickets.map(t => `<tr>
-    <td><b>${esc(t.id || "—")}</b></td>
+    <td><b>${esc(t.id || "—")}</b>${
+      t.tipo === "soporte_remoto"
+        ? `<div class="sup-estado-nota">solicitud remota</div>` : ""}</td>
     <td>${esc(supFechaCorta(t.creado_en))}</td>
-    <td>${esc(t.maquina || t.dispositivo || "—")}</td>
+    <td>${esc(t.maquina || t.dispositivo || "—")}${
+      t.rustdesk_id
+        ? `<div class="sup-numero-acceso mut">acceso ${esc(t.rustdesk_id)}</div>` : ""}</td>
     <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
     <td>${supEstadoTicket(t.estado)}</td>
     <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
@@ -7631,8 +7809,26 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
           <div class="sup-dato"><span>Versión:</span>${esc(equipo.version || "—")}</div>
           ${equipo.rama ? `<div class="sup-dato"><span>Canal:</span>${
             esc(supCanalEquipo(equipo))}</div>` : ""}
+          <!-- El commit fuente (2026-08-08, pedido del usuario): es lo que
+               identifica el CÓDIGO que corre. La versión de arriba es el hash
+               del build de distribución y difiere entre canales aunque el
+               código sea el mismo, así que sola no dice qué está corriendo. -->
+          ${equipo.commit_fuente ? `<div class="sup-dato"><span>Commit:</span>
+            <span class="sup-numero-acceso">${esc(equipo.commit_fuente)}</span>${
+            equipo.fecha_release ? ` · ${esc(supFechaCorta(equipo.fecha_release))}` : ""
+            }</div>` : ""}
           <div class="sup-dato"><span>Plataforma:</span>${esc(equipo.plataforma || "—")}</div>
         </div>
+      </div>
+      <div class="sup-detalle-seccion"><h4>Soporte remoto</h4>
+        <div class="sup-dato"><span>Programa:</span>${
+          esc(SUP_RUSTDESK[equipo.rustdesk_estado] || equipo.rustdesk_estado || "sin dato")}</div>
+        <div class="sup-dato"><span>Número de acceso:</span>${
+          equipo.rustdesk_id
+            ? `<span class="sup-numero-acceso">${esc(equipo.rustdesk_id)}</span>`
+            : "—"}</div>
+        ${equipo.soporte_ticket ? `<div class="sup-dato"><span>Solicitud pendiente:</span>
+          <b>${esc(equipo.soporte_ticket)}</b></div>` : ""}
       </div>
       <div class="sup-detalle-seccion"><h4>Sincronización</h4>
         <div class="sup-dato"><span>Camino:</span>${esc(equipo.camino || "—")}</div>
@@ -7807,6 +8003,12 @@ async function abrirDetalleTicketSupervision(id) {
         <div>
           <div class="sup-dato"><span>Fecha del equipo:</span>${esc(supFechaCorta(ticket.fecha_local))}</div>
           <div class="sup-dato"><span>Fecha de la nube:</span>${esc(supFechaCorta(ticket.creado_en))}</div>
+          ${ticket.tipo === "soporte_remoto"
+            ? `<div class="sup-dato"><span>Pidió:</span>conexión remota</div>` : ""}
+          <!-- El número con el que se entra: lo primero que se necesita de una
+               solicitud remota, así que va arriba y seleccionable. -->
+          ${ticket.rustdesk_id ? `<div class="sup-dato"><span>Número de acceso:</span>
+            <span class="sup-numero-acceso">${esc(ticket.rustdesk_id)}</span></div>` : ""}
         </div>
       </div>
       <div class="sup-detalle-seccion"><h4>Mensaje</h4>
@@ -8527,26 +8729,206 @@ async function abrirDiagnosticoSync() {
   }
 }
 
-// Abre el programa de soporte remoto que viene con el asistente (2026-08-05).
-// No arranca solo con Windows a propósito: se abre acá, el día que hace falta.
-async function abrirSoporteRemoto(btn) {
-  if (btn.disabled) return;
-  const original = btn.textContent;
-  btn.disabled = true;
-  btn.innerHTML = `<span class="spinner"></span>Abriendo…`;
+// ---------------------------------------------------------------------------
+// Soporte remoto (2026-08-08). Antes esto era un botón que solo lanzaba el
+// programa: el operador tenía que leer su número por teléfono y no quedaba
+// registro de que había pedido ayuda. Ahora el mismo botón comprueba el
+// programa, lo instala si falta, deja la solicitud escrita con el número
+// adentro y lo abre. Todo lo que el operador tiene que saber cabe en una
+// ventana con un botón.
+// ---------------------------------------------------------------------------
+
+// Último estado que mandó el servidor: {programa, numero, solicitud, ...}.
+let soporte = {programa: {}, numero: "", solicitud: null};
+let soporteEnVuelo = false;
+
+function soporteHaySolicitud() { return !!(soporte.solicitud && soporte.solicitud.id); }
+
+// La franja de arriba. Es lo único que le recuerda al operador que tiene que
+// dejar el programa abierto, así que no se desvanece: se va cuando cancela.
+function pintarAvisoSoporte() {
+  const caja = $("aviso-soporte");
+  if (!caja) return;
+  if (!soporteHaySolicitud()) { caja.style.display = "none"; caja.innerHTML = ""; return; }
+  const numero = soporte.solicitud.rustdesk_id || soporte.numero || "";
+  caja.innerHTML =
+      `<div><b>Soporte técnico solicitado</b>`
+    + `<span class="sop-detalle">La solicitud está pendiente. Mantén abierto el `
+    + `programa de soporte remoto para permitir la conexión.`
+    + (numero ? ` Número de acceso: <span class="sop-numero">${esc(numero)}</span>.` : "")
+    + `</span></div>`
+    + `<span class="sop-acciones">`
+    + `<button type="button" onclick="abrirSoporteRemoto()">Ver la solicitud</button>`
+    + `<button type="button" id="soporte-cancelar-franja"`
+    + ` onclick="cancelarSoporte(this)">Cancelar solicitud</button>`
+    + `</span>`;
+  caja.style.display = "";
+}
+
+function aplicarEstadoSoporte(d) {
+  if (!d) return;
+  soporte = {programa: d.programa || {}, numero: d.numero || "",
+             solicitud: d.solicitud || null,
+             puede_instalar: !!d.puede_instalar};
+  pintarAvisoSoporte();
+  if ($("soporte-overlay").classList.contains("visible")) pintarSoporte();
+}
+
+async function cargarEstadoSoporte({comprobar = false} = {}) {
   try {
-    await api("/api/soporte/abrir-remoto", {});   // cuerpo vacío = POST
-    btn.textContent = "Ya está abierto";
-    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 4000);
-  } catch (e) {
-    mensaje(e.message, "error");
-    btn.textContent = original;
-    btn.disabled = false;
+    aplicarEstadoSoporte(await api("/api/soporte/estado" + (comprobar ? "?comprobar=1" : "")));
+  } catch (_) { /* informativo: si el panel no responde ya hay otro aviso */ }
+}
+
+// Qué se ve dentro de la ventana. Tres situaciones y nada más: hay solicitud,
+// falta el programa, o se puede pedir.
+function pintarSoporte() {
+  const cuerpo = $("soporte-cuerpo");
+  const acciones = $("soporte-acciones");
+  const prog = soporte.programa || {};
+  const cerrar = `<button data-preseleccionado type="button" onclick="cerrarSoporte()">Cerrar</button>`;
+
+  if (soporteHaySolicitud()) {
+    const numero = soporte.solicitud.rustdesk_id || soporte.numero || "";
+    cuerpo.innerHTML =
+        `<div class="sop-caja-ok"><b>Soporte técnico solicitado</b><br>`
+      + `La solicitud está pendiente. Mantén abierto el programa de soporte `
+      + `remoto para permitir la conexión.</div>`
+      + (numero ? `<p style="margin-top:10px">Número de acceso de esta `
+                + `computadora: <span class="sop-numero">${esc(numero)}</span></p>` : "")
+      + `<p class="sop-nota">Solicitud ${esc(soporte.solicitud.id)}. `
+      + (prog.sin_contrasena
+          ? `Cuando el técnico se conecte vas a ver un aviso para aceptar: acéptalo.`
+          : `Si el programa pide una contraseña, dísela al técnico.`)
+      + `</p>`;
+    acciones.innerHTML =
+        `<button type="button" class="primario" id="soporte-abrir"`
+      + ` onclick="reabrirSoporte(this)">Abrir el programa de nuevo</button>`
+      + `<button type="button" id="soporte-cancelar"`
+      + ` onclick="cancelarSoporte(this)">Cancelar solicitud</button>`
+      + cerrar;
+    return;
   }
+
+  if (prog.comprobado && !prog.disponible) {
+    cuerpo.innerHTML =
+        `<div class="sop-caja-falta">En esta computadora falta el programa de `
+      + `soporte remoto.</div>`
+      + `<p style="margin-top:10px">Se descarga una sola vez y queda instalado `
+      + `junto al asistente. No hace falta ser administrador.</p>`;
+    acciones.innerHTML =
+        (soporte.puede_instalar
+          ? `<button type="button" class="primario" id="soporte-instalar"`
+            + ` onclick="instalarSoporte(this)">Instalar y pedir soporte</button>`
+          : `<p class="sop-nota">Esta computadora no puede instalarlo sola. `
+            + `Avísale al administrador.</p>`)
+      + cerrar;
+    return;
+  }
+
+  cuerpo.innerHTML =
+      `<p>Al pedir soporte queda registrada una solicitud con los datos de esta `
+    + `computadora y se abre el programa de soporte remoto.</p>`
+    + (soporte.numero
+        ? `<p class="sop-nota">Número de acceso de esta computadora: `
+          + `<span class="sop-numero">${esc(soporte.numero)}</span></p>`
+        : `<p class="sop-nota">El número de acceso se lee al pedir soporte.</p>`)
+    + `<p class="sop-nota">No se envían contraseñas ni claves de acceso.</p>`;
+  acciones.innerHTML =
+      `<button type="button" class="primario" id="soporte-pedir"`
+    + ` onclick="pedirSoporte(this)">Pedir soporte remoto</button>`
+    + cerrar;
+}
+
+function errorSoporte(texto) {
+  const caja = $("soporte-error");
+  caja.textContent = texto || "";
+  caja.style.display = texto ? "" : "none";
+}
+
+// El mismo botón que abre esta ventana la cierra (regla del panel).
+function abrirSoporteRemoto() {
+  if ($("soporte-overlay").classList.contains("visible")) { cerrarSoporte(); return; }
+  errorSoporte("");
+  pintarSoporte();
+  $("soporte-overlay").classList.add("visible");
+  // La comprobación de verdad (¿está el programa? ¿cuál es el número?) puede
+  // tardar segundos: la ventana se abre YA con lo último sabido y se repinta
+  // cuando llega. Nunca se le hace esperar al operador delante de un vacío.
+  cargarEstadoSoporte({comprobar: true});
+}
+
+function cerrarSoporte() {
+  if (soporteEnVuelo) return;   // hay una descarga o un envío a medias
+  $("soporte-overlay").classList.remove("visible");
+}
+
+async function conBotonOcupado(btn, rotulo, tarea) {
+  if (!btn || btn.disabled || soporteEnVuelo) return;
+  const original = btn.innerHTML;
+  soporteEnVuelo = true;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${rotulo}`;
+  errorSoporte("");
+  try {
+    await tarea();
+  } catch (e) {
+    errorSoporte(e.message);
+    if (!$("soporte-overlay").classList.contains("visible")) mensaje(e.message, "error");
+  } finally {
+    soporteEnVuelo = false;
+    btn.disabled = false;
+    btn.innerHTML = original;
+    pintarSoporte();
+  }
+}
+
+function pedirSoporte(btn) {
+  return conBotonOcupado(btn, "Pidiendo soporte…", async () => {
+    try {
+      aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+    } catch (e) {
+      // El servidor manda el estado hasta cuando falla (p. ej. falta el
+      // programa): se aplica igual, así la ventana pasa sola a ofrecer la
+      // instalación en vez de dejar un error sin salida.
+      if (e.datos) aplicarEstadoSoporte(e.datos);
+      throw e;
+    }
+  });
+}
+
+function instalarSoporte(btn) {
+  return conBotonOcupado(btn, "Descargando…", async () => {
+    aplicarEstadoSoporte(await api("/api/soporte/instalar-remoto", {}));
+    // Comprobación automática de que quedó disponible: si no, no se pide nada
+    // y la ventana vuelve a ofrecer la instalación.
+    await cargarEstadoSoporte({comprobar: true});
+    if (!(soporte.programa || {}).disponible)
+      throw new Error("El programa se descargó pero todavía no está disponible. "
+                      + "Vuelve a intentar.");
+    aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+  });
+}
+
+function reabrirSoporte(btn) {
+  return conBotonOcupado(btn, "Abriendo…", async () => {
+    aplicarEstadoSoporte(await api("/api/soporte/abrir-remoto", {}));
+  });
+}
+
+// Cancelar no borra nada: la solicitud queda en el registro de soporte como
+// cancelada. Se confirma en el mismo sitio (nada de popup del navegador).
+function cancelarSoporte(btn) {
+  confirmarSinQuitar(btn, () => conBotonOcupado(btn, "Cancelando…", async () => {
+    const r = await api("/api/soporte/solicitud/cancelar", {});
+    aplicarEstadoSoporte(r);
+    if (r.aviso) mensaje(r.aviso, "alerta");
+  }), "Confirmar cancelar");
 }
 
 function cerrarDiagnosticoSync() {
   cerrarTicket();   // el ticket va encima: cerrar el de atrás lo dejaría huérfano
+  cerrarSoporte();  // ídem la ventana de soporte remoto
   $("diag-sync-overlay").classList.remove("visible");
 }
 
@@ -9381,6 +9763,89 @@ function pintarAvisoVersionNueva(info) {
     + "cierres y vuelvas a abrir el programa.";
 }
 
+// Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
+// arriba, que la ve cualquiera en cualquier pestaña, y la fila de Ajustes de
+// admin, que solo ve quien puede moverlo.
+let rompeVidrio = {activo: false};
+
+function pintarRompeVidrio(estado) {
+  rompeVidrio = estado || {activo: false};
+  const activo = !!rompeVidrio.activo;
+  const horas = rompeVidrio.horas_puesto;
+
+  const franja = $("aviso-rompe-vidrio");
+  if (franja) {
+    franja.style.display = activo ? "" : "none";
+    if (activo) {
+      const desde = (horas || horas === 0) ? ` hace ${horas} h` : "";
+      franja.textContent =
+        `Rompe-vidrio puesto${desde} — la nube está aceptando computadoras `
+        + "con versiones viejas. Quítalo cuando la emergencia pase.";
+    }
+  }
+
+  const fila = $("rompe-vidrio-fila");
+  const texto = $("rompe-vidrio-texto");
+  const puede = tienePermiso("rompe_vidrio");
+  if (fila) fila.style.display = puede ? "" : "none";
+  if (texto) texto.style.display = puede ? "" : "none";
+  if (!puede) return;
+
+  const control = $("rompe-vidrio-control");
+  const nota = $("rompe-vidrio-nota");
+  if (!control) return;
+  control.innerHTML = "";
+
+  if (rompeVidrio.sin_migracion) {
+    control.textContent = "No disponible en esta nube todavía";
+    if (nota) {
+      nota.style.display = "";
+      nota.textContent = "Falta correr scripts/sql/045_rompe_vidrio.sql";
+    }
+    return;
+  }
+
+  const boton = document.createElement("button");
+  if (activo) {
+    // Quitarlo es la vuelta a la normalidad, no una acción destructiva: va en
+    // verde. La roja es ponerlo, que es la que abre la puerta.
+    boton.textContent = "Quitar el rompe-vidrio";
+    boton.onclick = () => confirmarSinQuitar(
+      boton, () => moverRompeVidrio(false), "Confirmar: quitarlo");
+    if (nota) {
+      nota.style.display = "";
+      nota.textContent = rompeVidrio.motivo
+        ? `Puesto: ${rompeVidrio.motivo}` : "Puesto";
+    }
+  } else {
+    // El motivo arranca VACÍO: quien lo pone escribe el suyo, y un valor
+    // sugerido se mezclaría con lo que teclee.
+    const motivo = document.createElement("input");
+    motivo.type = "text";
+    motivo.id = "rompe-vidrio-motivo";
+    motivo.placeholder = "motivo (opcional)";
+    motivo.style.width = "220px";
+    boton.className = "peligro";
+    boton.textContent = "Poner el rompe-vidrio";
+    boton.onclick = () => confirmarBorrar(
+      boton, () => moverRompeVidrio(true, motivo.value), "Confirmar: ponerlo");
+    control.append(motivo, document.createTextNode(" "));
+    if (nota) nota.style.display = "none";
+  }
+  control.append(boton);
+}
+
+async function moverRompeVidrio(activo, motivo) {
+  try {
+    const r = await api("/api/ajustes/rompe-vidrio",
+                        {activo: activo, motivo: motivo || ""});
+    pintarRompeVidrio(r.rompe_vidrio);
+  } catch (e) {
+    mensaje("No se pudo mover el rompe-vidrio: " + (e.message || e), "error");
+    pintarRompeVidrio(rompeVidrio);   // el control vuelve a su estado real
+  }
+}
+
 latido();
 setInterval(latido, LATIDO_MS);
 
@@ -9447,6 +9912,7 @@ const TITULO_FASE = {
   esperando_impresion: "esperando tu «Continuar»",
   pausado: "en pausa",
   esperando_popup: "cierra el aviso del programa",
+  pide_maximizar: "maximiza el programa",
 };
 let faseActual = null;      // última fase que devolvió /api/fase_llenado
 let tituloPuesto = null;    // lo último escrito: cambiarlo es un viaje a la ventana
@@ -9501,6 +9967,16 @@ function estadoParaTitulo() {
       ? ` (${Math.min(hechasEnFila + 1, metaEnFila)} de ${metaEnFila})` : "";
     return (TITULO_FASE[faseActual] || "llenando") + cuenta;
   }
+  // Computadora sin acceso (desactivada, rechazada, esperando activación) o
+  // marcada fuera de servicio: el título tampoco puede seguir contando el
+  // trabajo pendiente ni desglosándolo por ruta. El panel ya queda tapado,
+  // pero el título conservaba lo último escrito y era la única información de
+  // la operación que seguía a la vista (2026-08-08, pedido del usuario).
+  // Cadena vacía = solo el nombre de la app. Va DESPUÉS del llenado a
+  // propósito: si el acceso cae con un documento a medias, la fase sigue
+  // visible en la barra flotante hasta que el operador lo resuelva.
+  if (maquinaDesactivada || ACCESO_TAPA.includes(acceso.estado || "activo"))
+    return "";
   // Sin lista todavía no se inventa una cuenta: si la carga falla, un "sin
   // pendientes" mentiría en la barra hasta el próximo intento. Mientras tanto
   // queda el nombre pelado, que es con lo que abre la ventana.
@@ -9533,7 +10009,7 @@ function pintarTituloVentana() {
     Promise.resolve(api.titulo(estado)).catch(() => {});
     return;
   }
-  document.title = `${TITULO_PAGINA} — ${estado}`;
+  document.title = estado ? `${TITULO_PAGINA} — ${estado}` : TITULO_PAGINA;
 }
 
 // Baby Mix paq (FDA 2026-07-19, TEMPORAL hasta agotar los paquetes viejos):
@@ -11634,6 +12110,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // arriba tiene la decisión y esto es lo que queda en la barra detrás.
     pregunta_trancon: `Parece que el programa de facturación se trancó: responde el aviso.`,
     reiniciando: `Reiniciando el programa de facturación: se cierra y se abre de nuevo…`,
+    // Falta pantalla (2026-08-08): algo que el llenado necesita quedó fuera de
+    // la vista (la Ficha cortada, o el Aceptar del Detalle). Texto de respaldo
+    // por si 'detalle' viniera vacío — la rama de abajo es la que manda cuando
+    // la fase es esta, y ahí el detalle dice QUÉ falta.
+    pide_maximizar: `Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.`,
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
@@ -11641,7 +12122,8 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // aquí por lo mismo (aún no se toca Winledger), pero es el programa quien
   // trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
-                              "pregunta_trancon", "preparando_datos"];
+                              "pregunta_trancon", "preparando_datos",
+                              "pide_maximizar"];
   const pollFase = setInterval(async () => {
     try {
       const f = await api("/api/fase_llenado");
@@ -11668,6 +12150,12 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // inercia del «Continuar» repetido: ámbar, sin punto giratorio (aquí
         // también actúa el operador, no el programa).
         mensaje(`Van ${f.papel.impresas} impresiones seguidas: revisa que el papel siga alineado antes de continuar.`,
+                "alerta", false);
+      else if (llenando && !$("btn-stop").disabled && f.fase === "pide_maximizar")
+        // Ámbar y sin punto giratorio: falta pantalla y el llenado está parado
+        // esperando al operador, no trabajando. El detalle dice QUÉ no se ve.
+        mensaje((f.detalle ? f.detalle + " " : "")
+                + "Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.",
                 "alerta", false);
       else if (llenando && !$("btn-stop").disabled && TEXTO_FASE[f.fase])
         // Sin punto giratorio cuando quien tiene que actuar es el operador
@@ -11700,14 +12188,15 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       btnContinuar.title = tocaPapel
         ? "Confirma que revisaste el papel: la cuenta vuelve a cero y la corrida sigue."
         : "Sigue con la siguiente factura de la corrida.";
-      // ⏸ no aplica en la espera de la impresión ni en la pregunta del
-      // trancón: ahí el llenado YA está parado esperando al operador, así que
-      // pausar no adelantaría nada (queja del usuario 2026-07-27). Tampoco con
-      // un stop ya pedido.
+      // ⏸ no aplica en la espera de la impresión, en la pregunta del trancón ni
+      // mientras se pide maximizar: ahí el llenado YA está parado esperando al
+      // operador, así que pausar no adelantaría nada (queja del usuario
+      // 2026-07-27). Tampoco con un stop ya pedido.
       $("btn-pausa").style.display =
         (llenando && !$("btn-stop").disabled
          && f.fase !== "esperando_impresion"
-         && f.fase !== "pregunta_trancon") ? "" : "none";
+         && f.fase !== "pregunta_trancon"
+         && f.fase !== "pide_maximizar") ? "" : "none";
       // El interruptor de la pausa vive en el servidor: si el llenado está
       // pausado, el botón lo dice aunque esta pestaña no haya sido la que lo
       // pulsó (o se haya recargado en medio).
@@ -15419,7 +15908,6 @@ async function cargarAjustes() {
     $("vendedor-info").textContent =
       d.espejo_activo ? "nube: conectada" : "nube: sin conexión";
     pintarDiaDespacho(d.dia_despacho);
-    pintarVentanaPanel(d.ventana);
     pintarBotonesCatalogos();
     corteProduccion = d.corte_produccion || "";
     $("corte-fecha").value = corteProduccion;
@@ -15464,7 +15952,6 @@ async function cargarAjustes() {
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
     const supervision = esMaquinaAdmin && esSupervisionEfectiva();
     $("ajustes-admin-bloque").style.display = supervision ? "" : "none";
-    $("ventana-bloque").style.display = supervision ? "" : "none";
     // El corte vive en AJUSTES desde 2026-08-05: lo ven supervisión y Admin.
     $("corte-bloque").style.display =
       tienePermiso("corte_produccion") ? "" : "none";
@@ -15503,6 +15990,7 @@ async function cargarAjustes() {
     $("admin-modo-chk").checked = modoAdmin;
     pintarModoPrueba();
     pintarVersionEstable(d.version_estable);
+    pintarRompeVidrio(d.rompe_vidrio);
     cargaEnCurso = d.carga_en_curso || null;
     pintarOpcionesPrueba(d.opciones_prueba);
     // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
@@ -15522,6 +16010,7 @@ async function cargarAjustes() {
 // compartido el que trae la reactivación y quita el aviso solo.
 function pintarDesactivada() {
   $("desactivada-overlay").classList.toggle("visible", maquinaDesactivada);
+  pintarTituloVentana();   // con la tapa puesta el título deja de contar
 }
 
 // --- Activación de esta computadora (2026-08-05) --------------------------
@@ -15540,6 +16029,9 @@ function pintarAcceso() {
   const estado = acceso.estado || "activo";
   const tapa = ACCESO_TAPA.includes(estado);
   $("acceso-overlay").classList.toggle("visible", tapa);
+  // Sin acceso, el título de la ventana vuelve al nombre pelado; al recuperarlo
+  // vuelve a contar con lo que ya haya cargado.
+  pintarTituloVentana();
   if (!tapa) { detenerSondeoAcceso(); return; }
   const pideNombre = estado === "sin_credencial" || estado === "desconocido"
     || estado === "olvidado";
@@ -15958,7 +16450,7 @@ function resumenConfigSolicitada(s) {
         ? (sel.length === 1 ? corto(sel[0]) : `${sel.length} ${plural}`)
         : `sin ${plural}`;
     if (!predet) return base;
-    return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
+    return base === corto(predet) ? base : `${base}, arranca en ${corto(predet)}`;
   };
   return [parte(cfg.rutas, cfg.ruta_predeterminada, "rutas", etiquetaRutaCorta),
           parte(cfg.series, cfg.serie_predeterminada, "series", (x) => x),
@@ -16117,6 +16609,9 @@ async function enviarSolicitudAcceso() {
 // cada POST; los permisos se vuelven a comprobar aquí para que una vista
 // reducida no conserve columnas pintadas con permisos anteriores.
 function pintarEquipos() {
+  // Repintar la tabla borra la fila donde vivía la pregunta: se cierra aquí
+  // para no dejar viva una confirmación que ya no está en pantalla.
+  if (confirmEquipoAbierto) confirmEquipoAbierto();
   const bloque = $("equipos-bloque");
   const puedeIdentidad = tienePermiso("identidad_maquina");
   const puedeRol = tienePermiso("gestionar_editores");
@@ -16138,7 +16633,7 @@ function pintarEquipos() {
     const host = esc(m.dispositivo);
     // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
     // no es editor" no existe.
-    const editor = asignaAdmin ? `<td>
+    const editor = asignaAdmin ? `<td class="equipos-roles"><div>
       <label class="sup-rol-check" title="${m.es_admin
           ? "Quitarlo lo deja como Editor."
           : "Marca esta computadora como Admin."}">
@@ -16149,7 +16644,7 @@ function pintarEquipos() {
           : "Marca esta computadora como Editor."}">
         <input type="checkbox" ${m.es_editor ? "checked" : ""}
                ${m.es_admin ? "disabled" : ""}
-               onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></td>`
+               onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></div></td>`
     : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}
              ${m.es_admin ? "disabled" : ""}
@@ -16160,31 +16655,35 @@ function pintarEquipos() {
       <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
              title="Al apagarlo, esa computadora queda fuera de servicio."
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
-    // Series, rutas y día del equipo (2026-08-07), repartidos en la fila:
+    // Series, rutas y día del equipo (2026-08-07), cada uno en su columna:
     // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
     // mueve de un día para otro— y "Configurar" abre la ventana con todo,
     // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
-    const config = `<td class="equipos-config">
-      <span class="mut">Series: ${esc(resumenSeriesEquipo(m))}</span>
-      <span class="mut">Rutas: ${esc(resumenRutasEquipo(m))}</span>
-      <div class="dia-opciones">
-        <label><input type="radio" name="dia-equipo-${host}" value="manana"
-               ${m.dia_despacho === "manana" ? "checked" : ""}
-               onclick="return onClickDiaEquipo(event, '${host}')"> Mañana</label>
-        <label><input type="radio" name="dia-equipo-${host}" value="hoy"
-               ${m.dia_despacho === "hoy" ? "checked" : ""}
-               onclick="return onClickDiaEquipo(event, '${host}')"> Hoy</label>
-      </div>
+    // Sin rótulos "Series:"/"Rutas:"/"Día:" (2026-08-08, pedido del usuario):
+    // ya los dice el encabezado de cada columna.
+    const config = `<td class="equipos-series"><div>${chipsSeriesEquipo(m)}</div></td>
+    <td class="equipos-rutas"><div>${chipsRutasEquipo(m)}</div></td>
+    <td class="equipos-dia">
+      <select class="${m.dia_despacho || ""}"
+              onchange="onCambioDiaEquipo(this, '${host}')">
+        ${m.dia_despacho ? ""
+          : "<option value=\"\" selected disabled>Sin elegir</option>"}
+        <option value="manana" ${m.dia_despacho === "manana" ? "selected" : ""}>Mañana</option>
+        <option value="hoy" ${m.dia_despacho === "hoy" ? "selected" : ""}>Hoy</option>
+      </select>
+    </td>
+    <td class="equipos-configbtn">
       <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
     // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
-    // pedido del usuario): aquí se leen, junto al identificador de la
-    // computadora, para saber de cuál es la fila.
+    // pedido del usuario): aquí se leen para saber de cuál computadora es la
+    // fila.
     return `<tr>
-      <td>
-        <div class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</div>
-        <div class="equipos-host">${host}</div>
-        <div class="equipos-host">${esc(etiquetaVendedorEquipo(m.vendedor))}</div>
+      <td class="equipos-id" title="${host}">
+        <span class="equipos-nombre">${esc(m.nombre || "Sin nombre")}</span>
+        <span class="equipos-vendedor"${m.vendedor
+            ? ` title="Vendedor ${esc(m.vendedor)}"` : ""}>${
+          esc(etiquetaVendedorEquipo(m.vendedor))}</span>
       </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
@@ -16194,7 +16693,7 @@ function pintarEquipos() {
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
       <th>Computadora</th>
-      ${puedeIdentidad ? "<th>Series, rutas y día</th>" : ""}
+      ${puedeIdentidad ? "<th>Series</th><th>Rutas</th><th>Día</th><th></th>" : ""}
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
@@ -16202,12 +16701,45 @@ function pintarEquipos() {
     <tbody>${filas}</tbody></table>`;
 }
 
-// El vendedor de esa computadora, con código y nombre juntos; sin catálogo a
-// mano queda el código solo, que es lo que se sabe.
+// Solo el NOMBRE del vendedor (2026-08-08, pedido del usuario): el código
+// ocupaba ancho en una tabla que ya obligaba a scrollear de lado y no hace
+// falta para saber de quién es la computadora. Queda en el hover. Sin nombre
+// en el catálogo se muestra el código, que es lo único que se sabe.
 function etiquetaVendedorEquipo(codigo) {
   if (!codigo) return "Sin vendedor";
   const v = vendedoresCatalogo.find(x => x.codigo === codigo);
-  return v && v.nombre ? `${codigo} — ${v.nombre}` : codigo;
+  return v && v.nombre ? v.nombre : codigo;
+}
+
+// Confirmación propia de esta tabla (2026-08-08, pedido del usuario), con dos
+// diferencias frente a confirmarSinQuitar: no esconde el control que la
+// disparó —esconderlo movía el resto de la fila— y solo puede haber UNA
+// pregunta abierta a la vez. Marcar Admin y Editor casi a la vez sacaba dos
+// preguntas superpuestas sin saber cuál se estaba respondiendo; ahora la
+// nueva reemplaza a la anterior, así que vale la última que se tocó.
+let confirmEquipoAbierto = null;
+
+function confirmarEnFilaEquipo(nodo, alConfirmar, etiqueta) {
+  if (confirmEquipoAbierto) confirmEquipoAbierto();
+  const cont = document.createElement("span");
+  cont.className = "confirmar-borrar confirmar-flotante";
+  const si = document.createElement("button");
+  si.className = "cb-si ok"; si.textContent = etiqueta; si.disabled = true;
+  const no = document.createElement("button");
+  no.className = "cb-no"; no.textContent = "Cancelar";
+  cont.append(si, no);                 // Confirmar primero, Cancelar de último
+  nodo.closest("tr").lastElementChild.append(cont);
+  const t = setTimeout(() => { si.disabled = false; }, 400);   // retardo anti doble-clic
+  // Si nadie responde en 7 s, la pregunta se va sola: una confirmación
+  // olvidada en pantalla es un clic accidental esperando.
+  const tVuelta = setTimeout(() => cerrar(), 7000);
+  const cerrar = () => {
+    clearTimeout(t); clearTimeout(tVuelta); cont.remove();
+    if (confirmEquipoAbierto === cerrar) confirmEquipoAbierto = null;
+  };
+  confirmEquipoAbierto = cerrar;
+  no.onclick = () => cerrar();
+  si.onclick = () => { cerrar(); alConfirmar(); };
 }
 
 // Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
@@ -16220,7 +16752,7 @@ function onClickEditorEquipo(ev, dispositivo) {
   const caja = ev.target;
   const activando = caja.checked;
   ev.preventDefault();
-  confirmarSinQuitar(caja, () => {
+  confirmarEnFilaEquipo(caja, () => {
     caja.checked = activando;
     cambiarEditorEquipo(dispositivo, caja);
   }, activando ? "Confirmar: puede editar" : "Confirmar: deja de editar");
@@ -16234,7 +16766,7 @@ function onClickRolEquipo(ev, dispositivo, rol) {
   const etiqueta = rol === "admin"
     ? (activando ? "Confirmar: pasa a Admin" : "Confirmar: baja a Editor")
     : (activando ? "Confirmar: pasa a Editor" : "Confirmar: se queda sin rol");
-  confirmarSinQuitar(caja.closest("label"), () => {
+  confirmarEnFilaEquipo(caja, () => {
     caja.checked = activando;
     cambiarRolEquipo(dispositivo, rol, caja);
   }, etiqueta);
@@ -16243,25 +16775,27 @@ function onClickRolEquipo(ev, dispositivo, rol) {
 
 // El día a facturar de OTRA computadora también se confirma (2026-08-07,
 // pedido del usuario): cambiarlo altera cómo trabaja esa máquina mañana
-// temprano, y un clic al pasar no puede decidir eso. Se esconden las dos
-// opciones mientras dura la pregunta, para no dejar la otra invitando a un
-// segundo clic.
-function onClickDiaEquipo(ev, dispositivo) {
-  const caja = ev.target;
-  const dia = caja.value;
-  ev.preventDefault();
-  confirmarSinQuitar(caja.closest(".dia-opciones"), () => {
-    caja.checked = true;
-    cambiarDiaEquipo(dispositivo, caja);
+// temprano, y un clic al pasar no puede decidir eso. Mismo patrón que
+// onCambioVersionEstable: el selector vuelve enseguida al día guardado —no se
+// adelanta a un cambio que todavía no ocurrió—, y como la pregunta flota sobre
+// la fila, la etiqueta es la que dice para qué día va a quedar.
+function onCambioDiaEquipo(sel, dispositivo) {
+  const m = equipos.find(e => e.dispositivo === dispositivo);
+  if (!m) return;
+  const dia = sel.value;
+  if (dia === (m.dia_despacho || "")) return;
+  sel.value = m.dia_despacho || "";
+  confirmarEnFilaEquipo(sel, () => {
+    sel.value = dia;
+    cambiarDiaEquipo(dispositivo, sel);
   }, `Confirmar: factura para ${ETIQUETA_DIA_DESPACHO[dia]}`);
-  return false;
 }
 
 function onClickActivaEquipo(ev, dispositivo) {
   const caja = ev.target;
   const activando = caja.checked;
   ev.preventDefault();
-  confirmarSinQuitar(caja, () => {
+  confirmarEnFilaEquipo(caja, () => {
     caja.checked = activando;
     cambiarActivaEquipo(dispositivo, caja);
   }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
@@ -16325,7 +16859,6 @@ async function cambiarActivaEquipo(dispositivo, caja) {
 async function cambiarDiaEquipo(dispositivo, control) {
   const m = equipos.find(e => e.dispositivo === dispositivo);
   if (!m) return;
-  const anterior = m.dia_despacho || "";
   control.disabled = true;
   try {
     const r = await api("/api/ajustes/equipo-rutas-series", {
@@ -16343,9 +16876,9 @@ async function cambiarDiaEquipo(dispositivo, control) {
       + `${ETIQUETA_DIA_DESPACHO[control.value]}; lo toma en su próximo refresco.`,
       "info");
   } catch (e) {
-    control.disabled = false;
-    document.querySelectorAll(`input[name="dia-equipo-${dispositivo}"]`)
-            .forEach(r => { r.checked = r.value === anterior; });
+    // Repintar deja el selector en el día que esa computadora sigue teniendo:
+    // `equipos` no se tocó, así que no queda mostrando un cambio que no entró.
+    pintarEquipos();
     mensaje("No se pudo cambiar el día a facturar: " + e.message, "error");
   }
 }
@@ -16355,33 +16888,78 @@ async function cambiarDiaEquipo(dispositivo, control) {
 // series son las que su instalación del programa de facturación de verdad
 // tiene. null/sin configurar equivale a todas (legado).
 
-// Resumen corto para la fila: "Todas" / el nombre si es una / "N rutas",
-// con "★ X" si hay predeterminada.
-function resumenAsignacion(sel, predet, plural, corto) {
-  const base = (sel === "*" || sel === null || sel === undefined) ? "Todas"
-    : sel.length === 1 ? corto(sel[0])
-    : `${sel.length} ${plural}`;
-  if (!predet) return base;
-  return base === corto(predet) ? `${base} ★` : `${base} ★ ${corto(predet)}`;
+// Etiquetas de color en vez del texto con ★ (2026-08-08, pedido del usuario):
+// gris "Todas" = sin restricción, violeta suave = lo asignado, violeta lleno =
+// la predeterminada. Una asignación de una sola sale directa en violeta
+// lleno si coincide con la predeterminada.
+// En series (2026-08-08) el violeta lleno queda reservado a la serie ÚNICA y la
+// predeterminada sale en violeta suave: con una sola serie el chip va solo y
+// ambos casos se veían igual.
+// `chipTodas` cambia el chip gris de "sin restricción" por otro rótulo con su
+// color (lo usan las rutas para nombrar el rol que las abre todas).
+function chipsAsignacion(sel, predet, plural, corto, esSerie, chipTodas) {
+  const chip = (texto, clase) =>
+    `<span class="chip-asig${clase ? " " + clase : ""}">${esc(texto)}</span>`;
+  const todas = sel === "*" || sel === null || sel === undefined;
+  const una = !todas && sel.length === 1;
+  if (una && (!predet || corto(sel[0]) === corto(predet)))
+    return chip((esSerie ? "① " : predet ? "★ " : "") + corto(sel[0]),
+                "predet");
+  const base = todas ? chip(chipTodas ? chipTodas.texto : "Todas",
+                            chipTodas ? chipTodas.clase : "")
+    : chip(una ? corto(sel[0]) : `${sel.length} ${plural}`,
+           esSerie ? "" : "propias");
+  return predet
+    ? base + chip("★ " + corto(predet), esSerie ? "propias" : "predet")
+    : base;
 }
 
 const ETIQUETA_DIA_DESPACHO = {hoy: "hoy", manana: "mañana"};
+
+// El día con el mismo cuadrito de color de "Fecha a facturar" (verde hoy,
+// azul mañana) donde se lee sin poder cambiarlo.
+function chipDiaDespacho(dia) {
+  const etiqueta = ETIQUETA_DIA_DESPACHO[dia];
+  return etiqueta ? `<span class="rotulo-dia ${dia}">${etiqueta}</span>`
+                  : `<span class="mut">sin elegir</span>`;
+}
 
 // La línea de cada computadora, en el orden que pidió el usuario
 // (2026-08-07): con qué series factura, qué rutas atiende y con qué día
 // arranca su Fecha a facturar. Es lo mismo que se cambia en "Detalles".
 function resumenConfigEquipo(m) {
-  return `Series: ${resumenSeriesEquipo(m)} · Rutas: ${resumenRutasEquipo(m)}`
-    + ` · Día fact.: ${ETIQUETA_DIA_DESPACHO[m.dia_despacho] || "sin elegir"}`;
+  return `Series: ${chipsSeriesEquipo(m)} · Rutas: ${chipsRutasEquipo(m)}`
+    + ` · Día fact.: ${chipDiaDespacho(m.dia_despacho)}`;
 }
 
 // En la fila de Computadoras cada dato va en su propio bloque, repartido a lo
 // ancho de la celda; el día no se resume ahí porque está como par de opciones
 // a la vista, y repetirlo sería el mismo dato dos veces.
-const resumenSeriesEquipo = (m) =>
-  resumenAsignacion(m.series, m.serie_predeterminada, "series", (x) => x);
-const resumenRutasEquipo = (m) =>
-  resumenAsignacion(m.rutas, m.ruta_predeterminada, "rutas", etiquetaRutaCorta);
+const chipsSeriesEquipo = (m) =>
+  chipsAsignacion(m.series, m.serie_predeterminada, "series", (x) => x, true);
+// Un equipo con rol ve TODAS las rutas (permiso ver_todas_rutas, src/roles.py):
+// su asignación queda dormida, así que la línea dice "Todas" —lo que de verdad
+// ve— sin pisar lo guardado, que vuelve solo si se le quita el rol. Y en vez de
+// un gris igual al de cualquiera sin restricción, el chip nombra el rol que se
+// las abre, con su color (2026-08-08, pedido del usuario).
+const chipsRutasEquipo = (m) =>
+  chipsAsignacion(veTodasLasRutas(m) ? "*" : m.rutas, m.ruta_predeterminada,
+                  "rutas", etiquetaRutaCorta, false,
+                  veTodasLasRutas(m) ? chipRolTodasLasRutas(m) : null);
+
+const chipRolTodasLasRutas = (m) => m && m.es_admin
+  ? {texto: "Admin", clase: "rol-admin"}
+  : {texto: "Editor", clase: "rol-editor"};
+
+const veTodasLasRutas = (m) => !!(m && (m.es_admin || m.es_editor));
+
+// La configuración propia no trae las marcas de rol de la fila del catálogo
+// (esta computadora no sale en la lista de las demás): se le pega la del
+// permiso, que es la misma verdad.
+const configPropiaConRol = () => ({...(configPropia || {}),
+                                   es_editor: tienePermiso("ver_todas_rutas"),
+                                   es_admin: permisosUI.rol_efectivo === "admin"
+                                     || permisosUI.rol_efectivo === "supervisor"});
 
 // La ventana sirve a tres orígenes con los mismos selectores (2026-08-07):
 //   {origen:"equipo"}     → fila de Computadoras / overview de ADMIN
@@ -16445,7 +17023,7 @@ function abrirConfigSolicitud(dispositivo) {
 // vendedor y día ya se cambian en el mismo bloque, y dos controles para el
 // mismo dato se desincronizan.
 function abrirConfigPropia() {
-  abrirVentanaConfigEquipo({origen: "propia", datos: configPropia || {},
+  abrirVentanaConfigEquipo({origen: "propia", datos: configPropiaConRol(),
                             nombreVisible: "esta computadora"});
 }
 
@@ -16507,8 +17085,10 @@ function abrirVentanaConfigEquipo(ctx) {
     const sel = tipo === "rutas" ? datos.rutas : datos.series;
     // Una computadora del catálogo sin configurar (null) equivale a todas
     // (legado); una solicitud sin configuración pedida abre en blanco, igual
-    // que el formulario de registro.
-    const todas = sel === "*"
+    // que el formulario de registro. Con rol, las rutas van en "Todas" a la
+    // fuerza: es lo que ese equipo ve de hecho.
+    const todas = (tipo === "rutas" && veTodasLasRutas(datos))
+      || sel === "*"
       || (!esSolicitud && (sel === null || sel === undefined));
     $(`equipo-config-${tipo}-todas`).checked = todas;
     const opciones = opcionesConfigEquipo(tipo, datos);
@@ -16530,6 +17110,7 @@ function abrirVentanaConfigEquipo(ctx) {
       : (datos.serie_predeterminada
          || (marcadas.length === 1 ? marcadas[0] : "")));
   }
+  pintarNotaRolRutasEquipo(datos, esPropia);
   $("equipo-config-dia-rotulo").textContent =
     `Día a facturar de ${nombreVisible}`;
   document.querySelectorAll("input[name=equipo-config-dia]")
@@ -16554,6 +17135,46 @@ function abrirVentanaConfigEquipo(ctx) {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   ctx.firma = firmaConfigEquipo();
   $("equipo-config-overlay").classList.add("visible");
+}
+
+const datosConfigEquipo = () => (configEquipo || {}).datos || {};
+
+// La nota de la sección Rutas cuando ese equipo tiene rol: por qué queda en
+// "Todas" sin poder quitarse, y qué pasa con las rutas que ya tenía.
+function pintarNotaRolRutasEquipo(datos, esPropia) {
+  const nota = $("equipo-config-rutas-rol-nota");
+  const conRol = veTodasLasRutas(datos);
+  $("equipo-config-rutas-todas-caja").classList.toggle("bloqueado", conRol);
+  if (!conRol) { nota.style.display = "none"; return; }
+  const guardadas = Array.isArray(datos.rutas) ? datos.rutas : [];
+  const cuales = guardadas.length <= 4
+    ? ` (${guardadas.map(etiquetaRutaCorta).join(", ")})` : "";
+  nota.textContent = (esPropia ? "Esta computadora ve" : "Ve")
+    + " todas las rutas por su rol (Admin o Editor)."
+    + (guardadas.length === 1
+       ? ` Su ruta asignada${cuales} queda guardada y vuelve a valer si se le`
+         + " quita el rol."
+       : guardadas.length
+       ? ` Sus ${guardadas.length} rutas asignadas${cuales} quedan guardadas y`
+         + " vuelven a valer si se le quita el rol."
+       : "")
+    + " La ruta predeterminada sí se elige: es con la que abre el panel.";
+  nota.style.display = "";
+}
+
+// Quitarle "Todas las rutas" a un equipo con rol no se permite (2026-08-08,
+// pedido del usuario) y el intento no se queda mudo: dice por qué. El clic
+// llega porque la casilla NO va con `disabled` —una deshabilitada no dispara
+// nada—; preventDefault la deja como estaba.
+function onClickTodasRutasEquipo(ev) {
+  if (!veTodasLasRutas(datosConfigEquipo())) return true;
+  ev.preventDefault();
+  marcarErrorConfigEquipo("rutas",
+    "Solo las computadoras sin rol se limitan a unas rutas: un Editor o un "
+    + "Admin las ve todas."
+    + ((configEquipo || {}).origen === "propia" ? ""
+       : " Quítale el rol en la tabla de Computadoras para asignarle rutas."));
+  return false;
 }
 
 // Firma de lo editable de la ventana (lo mismo que se mandaría al guardar). Se
@@ -16636,6 +17257,30 @@ function configEquipoRecalcular(tipo, preseleccionar) {
     configEquipoPintarSerie(opcionesConfigEquipo(tipo, datos), preseleccionar);
     return;
   }
+  // Con rol la sección de rutas queda reducida a la predeterminada: la reja se
+  // esconde porque la asignación no lo limita en nada, pero la predeterminada
+  // sí se elige (2026-08-08, pedido del usuario) y entre TODAS las rutas, no
+  // entre las que tenga guardadas — quien las ve todas igual trabaja con una,
+  // y esa es con la que le abre el panel.
+  if (veTodasLasRutas(datos)) {
+    lista.style.display = "none";
+    const opciones = opcionesConfigEquipo("rutas", datos);
+    const corto = cortoConfigEquipo("rutas");
+    const campoPredet = $("equipo-config-rutas-predet-campo");
+    const texto = $("equipo-config-rutas-predet-texto");
+    const select = $("equipo-config-rutas-predet");
+    if (!opciones.length) { campoPredet.style.display = "none"; return; }
+    campoPredet.style.display = "";
+    texto.style.display = "none";
+    select.style.display = "";
+    const previa = preseleccionar !== undefined ? preseleccionar : select.value;
+    select.innerHTML = `<option value="">— Ninguna —</option>`
+      + opciones.map(v => `<option value="${esc(v)}"`
+        + `${v === previa ? " selected" : ""}>${esc(corto(v))}</option>`)
+          .join("");
+    if (!opciones.includes(previa)) select.value = "";
+    return;
+  }
   lista.style.display = todas ? "none" : "";
   const cajas = [...lista.querySelectorAll("input")];
   cajas.forEach(c => { c.disabled = todas; });
@@ -16686,6 +17331,13 @@ function configEquipoPintarSerie(conocidas, preseleccionar) {
 // Lo elegido en la ventana: "*" con "Todas", si no la lista canónica. En
 // series es la del desplegable, que ahí hace de selección.
 function seleccionConfigEquipo(tipo) {
+  // Con rol la ventana muestra "Todas", pero lo que viaja es lo que ese equipo
+  // YA tenía guardado: mandar "*" borraría la asignación que debe volver el
+  // día que deje de ser Editor.
+  if (tipo === "rutas" && veTodasLasRutas(datosConfigEquipo())) {
+    const guardadas = datosConfigEquipo().rutas;
+    return Array.isArray(guardadas) && guardadas.length ? guardadas : "*";
+  }
   if ($(`equipo-config-${tipo}-todas`).checked) return "*";
   if (tipo === "series") {
     const elegida = $("equipo-config-series-predet").value;
@@ -16696,6 +17348,16 @@ function seleccionConfigEquipo(tipo) {
 }
 
 function predetConfigEquipo(tipo) {
+  // Con rol manda el desplegable, y sale por aquí ANTES de la lógica general:
+  // esa mira `seleccionConfigEquipo`, que devuelve la asignación dormida, y
+  // con una sola ruta guardada impondría esa pisando la elegida. Sin campo a
+  // la vista (catálogo de rutas todavía vacío) se conserva la guardada, para
+  // no borrarla con un "" que nadie eligió.
+  if (tipo === "rutas" && veTodasLasRutas(datosConfigEquipo())) {
+    return $("equipo-config-rutas-predet-campo").style.display === "none"
+      ? (datosConfigEquipo().ruta_predeterminada || "")
+      : ($("equipo-config-rutas-predet").value || "");
+  }
   const sel = seleccionConfigEquipo(tipo);
   if (sel !== "*" && sel.length === 1) return sel[0];
   return $(`equipo-config-${tipo}-predet`).value || "";
@@ -16790,9 +17452,15 @@ async function guardarConfigPropia() {
     rutaFija = !!r.ruta_fija;
     rutaPredeterminada = r.ruta_predeterminada || "";
     seriePredeterminada = r.serie_predeterminada || "";
+    // La predeterminada recién elegida entra YA en la barra (2026-08-08):
+    // esperar al próximo arranque del panel se ve como que no pasó nada.
+    const adoptar = rutaPredeterminada
+                    && rutaPredeterminada !== rutaSeleccionada;
+    if (adoptar) rutaSeleccionada = rutaPredeterminada;
     pintarMiConfigRutasSeries();
     pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
     pintarSeries();
+    if (adoptar) aplicarFiltros();
     if (supOverviewCargado) pintarEquiposSupervision();
     cerrarConfigEquipo();
     mensaje("Rutas y series de esta computadora guardadas.", "info");
@@ -16809,9 +17477,9 @@ async function guardarConfigPropia() {
 function pintarMiConfigRutasSeries() {
   const el = $("mi-config-resumen");
   if (!el) return;
-  const m = configPropia || {};
-  el.textContent = `Series: ${resumenSeriesEquipo(m)}`
-    + ` · Rutas: ${resumenRutasEquipo(m)}`;
+  const m = configPropiaConRol();
+  el.innerHTML = `Series: ${chipsSeriesEquipo(m)}`
+    + ` · Rutas: ${chipsRutasEquipo(m)}`;
 }
 
 // La ventana edita TODO lo de esa computadora: nombre y vendedor por
@@ -16925,31 +17593,11 @@ async function guardarDiaDespacho(dia) {
   }
 }
 
-let ventanaPanel = "propia";
-
-function pintarVentanaPanel(v) {
-  ventanaPanel = v === "navegador" ? "navegador" : "propia";
-  document.querySelectorAll("input[name=ventana-panel]")
-          .forEach(r => { r.checked = r.value === ventanaPanel; });
-}
-
 function pintarBotonCorte() {
   const inp = $("corte-fecha");
   const btn = $("corte-btn");
   if (!inp || !btn) return;
   btn.disabled = !inp.value || inp.value === corteProduccion;
-}
-
-// Se guarda al marcar, sin botón aparte (igual que el día de despacho), y no se
-// anuncia: el radio ya lo dice y el efecto se ve al reabrir el asistente.
-async function guardarVentanaPanel(v) {
-  const anterior = ventanaPanel;
-  try {
-    pintarVentanaPanel((await api("/api/ajustes/ventana", {ventana: v})).ventana);
-  } catch (e) {
-    pintarVentanaPanel(anterior);   // el radio no se queda marcando lo que no se guardó
-    mensaje("No se pudo guardar cómo abre el panel: " + e.message, "error");
-  }
 }
 
 // Confirmación en dos pasos con el confirmar DESPLAZADO (pedido del usuario
@@ -22231,6 +22879,10 @@ consultarTasaBCV();   // en paralelo con cargar(): el BCV puede tardar segundos
 // PENDIENTES aparezca correcto desde el primer pintado.
 const ajustesInicial = cargarAjustes();
 borradorAvisoRevisar();   // si el panel se cerró con un editor a medias, ofrece retomarlo
+// Solicitud de soporte pendiente (2026-08-08): sin comprobar nada (eso lo hace
+// el panel al arrancar, en su propio hilo) — aquí solo se pinta la franja si
+// esta computadora quedó con una solicitud viva de antes.
+cargarEstadoSoporte();
 // Vista previa de la configuración obligatoria (?ver_configuracion=1,
 // 2026-07-31): no borra nada, espera a que ambas cargas traigan los valores
 // reales de esta computadora y recién ahí abre la pantalla ya llena con ellos.
