@@ -826,8 +826,11 @@
   .equipos-tabla .equipos-check { text-align:center; white-space:nowrap; }
   /* Admin y Editor uno debajo del otro (2026-08-08, pedido del usuario): esta
      columna solo la ve quien supervisa, así que apilarla no le quita nada a
-     nadie más y empareja su altura con el resto de las columnas apiladas. */
-  .equipos-tabla .equipos-roles { display:flex; flex-direction:column; gap:2px; }
+     nadie más y empareja su altura con el resto de las columnas apiladas.
+     El flex va en un div INTERIOR, nunca en el td: ver la nota de
+     .equipos-series. */
+  .equipos-tabla .equipos-roles > div { display:flex; flex-direction:column;
+      gap:2px; }
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
@@ -947,9 +950,19 @@
   /* Cuando la asignación trae DOS chips (p. ej. "3 rutas" + "★ Anzoátegui"),
      van uno debajo del otro en vez de ensanchar la columna (2026-08-08,
      pedido del usuario): compacto en ancho, y así la fila con dos chips no
-     desalinea el resto de la columna. Con un solo chip no cambia nada. */
-  .equipos-tabla .equipos-series,
-  .equipos-tabla .equipos-rutas { display:flex; flex-direction:column;
+     desalinea el resto de la columna. Con un solo chip no cambia nada.
+     El flex va en un div INTERIOR: un td con display:flex deja de ser celda
+     de tabla —el navegador envuelve los td vecinos que dejaron de serlo en UNA
+     celda anónima— y Series y Rutas terminaban apilados bajo el mismo rótulo,
+     con el resto de las columnas corridas (2026-08-08).
+     Los dos chips van SIEMPRE en el mismo orden y posición: arriba el alcance
+     (Todas / N rutas / la única) y abajo la predeterminada (★). Alineados al
+     tope, así el primer chip queda a la misma altura en todas las filas, tenga
+     esa fila uno o dos. */
+  .equipos-tabla .equipos-series, .equipos-tabla .equipos-rutas,
+  .equipos-tabla .equipos-roles { vertical-align:top; }
+  .equipos-tabla .equipos-series > div,
+  .equipos-tabla .equipos-rutas > div { display:flex; flex-direction:column;
       align-items:flex-start; gap:2px; }
   .equipos-tabla .equipos-series .chip-asig + .chip-asig,
   .equipos-tabla .equipos-rutas .chip-asig + .chip-asig { margin-left:0; }
@@ -16672,7 +16685,7 @@ function pintarEquipos() {
     const host = esc(m.dispositivo);
     // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
     // no es editor" no existe.
-    const editor = asignaAdmin ? `<td class="equipos-roles">
+    const editor = asignaAdmin ? `<td class="equipos-roles"><div>
       <label class="sup-rol-check" title="${m.es_admin
           ? "Quitarlo lo deja como Editor."
           : "Marca esta computadora como Admin."}">
@@ -16683,7 +16696,7 @@ function pintarEquipos() {
           : "Marca esta computadora como Editor."}">
         <input type="checkbox" ${m.es_editor ? "checked" : ""}
                ${m.es_admin ? "disabled" : ""}
-               onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></td>`
+               onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></div></td>`
     : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}
              ${m.es_admin ? "disabled" : ""}
@@ -16700,8 +16713,8 @@ function pintarEquipos() {
     // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
     // Sin rótulos "Series:"/"Rutas:"/"Día:" (2026-08-08, pedido del usuario):
     // ya los dice el encabezado de cada columna.
-    const config = `<td class="equipos-series">${chipsSeriesEquipo(m)}</td>
-    <td class="equipos-rutas">${chipsRutasEquipo(m)}</td>
+    const config = `<td class="equipos-series"><div>${chipsSeriesEquipo(m)}</div></td>
+    <td class="equipos-rutas"><div>${chipsRutasEquipo(m)}</div></td>
     <td class="equipos-dia">
       <select class="${m.dia_despacho || ""}"
               onchange="onCambioDiaEquipo(this, '${host}')">
