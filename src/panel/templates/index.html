@@ -934,25 +934,19 @@
   .dia-opciones { display:flex; align-items:center; gap:18px; font-size:13px; }
   .dia-opciones label { display:flex; align-items:center; gap:5px;
       cursor:pointer; }
-  /* La celda de la fila reparte en una línea: series, rutas, el día y el
-     botón, sin apilarse (2026-08-07, pedido del usuario). El flex va en un
-     div INTERIOR: un td con display:flex deja de ser celda de tabla —el
-     navegador lo envuelve en una celda anónima— y esa columna se corre
-     verticalmente respecto al nombre del equipo (2026-08-08). */
-  .equipos-config > div { display:flex; align-items:center; gap:16px;
-      flex-wrap:wrap; }
-  .equipos-config .dia-celda { display:flex; align-items:center; gap:5px;
-      font-size:12px; }
-  .equipos-config .dia-celda select { font-size:12px; padding:2px 4px; }
+  /* Series, rutas, día y el botón van cada uno en su propia columna de tabla
+     (2026-08-08, pedido del usuario): antes compartían una sola celda con
+     flex-wrap y el ancho de cada dato corría según el contenido de esa fila,
+     así que nada quedaba alineado entre filas. Como columna de tabla real, el
+     navegador la ensancha al máximo de todas las filas y alinea sola. */
+  .equipos-tabla .equipos-dia select { font-size:12px; padding:2px 4px; }
   /* El día también se reconoce por color, con los mismos tonos del cuadrito de
      "Fecha a facturar" (verde hoy, azul mañana). Sin elegir se queda neutro. */
-  .equipos-config .dia-celda select.hoy { background:#ecfdf5; border-color:#a7f3d0;
+  .equipos-tabla .equipos-dia select.hoy { background:#ecfdf5; border-color:#a7f3d0;
       color:#047857; font-weight:600; }
-  .equipos-config .dia-celda select.manana { background:#eff6ff; border-color:#bfdbfe;
+  .equipos-tabla .equipos-dia select.manana { background:#eff6ff; border-color:#bfdbfe;
       color:#1d4ed8; font-weight:600; }
-  .equipos-config .mut { font-size:12px; }
-  .equipos-config button { font-size:12px; padding:3px 8px;
-      margin-left:auto; }
+  .equipos-tabla .equipos-configbtn button { font-size:12px; padding:3px 8px; }
   /* Resumen de series/rutas/día dentro de la tabla de supervisión: la
      columna es angosta, así que el texto va sobre el botón y no al lado. */
   /* Nota "automático" pegada al selector de Serie de la barra (2026-08-02):
@@ -16686,26 +16680,25 @@ function pintarEquipos() {
       <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
              title="Al apagarlo, esa computadora queda fuera de servicio."
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
-    // Series, rutas y día del equipo (2026-08-07), repartidos en la fila:
+    // Series, rutas y día del equipo (2026-08-07), cada uno en su columna:
     // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
     // mueve de un día para otro— y "Configurar" abre la ventana con todo,
     // nombre y vendedor incluidos. Todo esto pide el permiso de identidad.
-    const config = `<td class="equipos-config">
-      <div>
-        <span class="mut">Series: ${chipsSeriesEquipo(m)}</span>
-        <span class="mut">Rutas: ${chipsRutasEquipo(m)}</span>
-        <span class="dia-celda">
-          <span class="mut">Día:</span>
-          <select class="${m.dia_despacho || ""}"
-                  onchange="onCambioDiaEquipo(this, '${host}')">
-            ${m.dia_despacho ? ""
-              : "<option value=\"\" selected disabled>Sin elegir</option>"}
-            <option value="manana" ${m.dia_despacho === "manana" ? "selected" : ""}>Mañana</option>
-            <option value="hoy" ${m.dia_despacho === "hoy" ? "selected" : ""}>Hoy</option>
-          </select>
-        </span>
-        <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
-      </div>
+    // Sin rótulos "Series:"/"Rutas:"/"Día:" (2026-08-08, pedido del usuario):
+    // ya los dice el encabezado de cada columna.
+    const config = `<td class="equipos-series">${chipsSeriesEquipo(m)}</td>
+    <td class="equipos-rutas">${chipsRutasEquipo(m)}</td>
+    <td class="equipos-dia">
+      <select class="${m.dia_despacho || ""}"
+              onchange="onCambioDiaEquipo(this, '${host}')">
+        ${m.dia_despacho ? ""
+          : "<option value=\"\" selected disabled>Sin elegir</option>"}
+        <option value="manana" ${m.dia_despacho === "manana" ? "selected" : ""}>Mañana</option>
+        <option value="hoy" ${m.dia_despacho === "hoy" ? "selected" : ""}>Hoy</option>
+      </select>
+    </td>
+    <td class="equipos-configbtn">
+      <button type="button" onclick="abrirConfigEquipo('${host}')">Configurar</button>
     </td>`;
     // Nombre y vendedor solo se CAMBIAN dentro de "Configurar" (2026-08-07,
     // pedido del usuario): aquí se leen para saber de cuál computadora es la
@@ -16723,7 +16716,7 @@ function pintarEquipos() {
   $("equipos-lista").innerHTML = `<table class="equipos-tabla">
     <thead><tr>
       <th>Computadora</th>
-      ${puedeIdentidad ? "<th>Series, rutas y día</th>" : ""}
+      ${puedeIdentidad ? "<th>Series</th><th>Rutas</th><th>Día</th><th></th>" : ""}
       ${puedeRol ? (asignaAdmin ? "<th>Rol</th>"
                                 : "<th class=\"equipos-check\">Editor</th>") : ""}
       ${puedeActivar ? "<th class=\"equipos-check\">Activa</th>" : ""}
