@@ -6610,7 +6610,10 @@ function tabActiva() {
 function soltarFiltro(cual) {
   if (cual === "buscar") $("f-buscar").value = "";
   else if (cual === "ruta") {
-    rutaSeleccionada = "";
+    // En una computadora sujeta a rutas, "quitar el filtro" es volver a la
+    // suya (2026-08-08): dejarlo vacío la deja sin ninguna elegida y con la
+    // lista en blanco, que no es lo que pide quien cierra ese aviso.
+    rutaSeleccionada = exigeRuta ? rutaPredeterminada : "";
     pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
   } else if (cual === "desde" || cual === "hasta") {
     $("f-" + cual).value = "";
@@ -6963,13 +6966,11 @@ function pendientesFueraDeLaRuta() {
 // Fijar o quitar la ruta predeterminada dejó de hacerse desde este menú
 // (2026-08-07, pedido del usuario): vive en AJUSTES → Esta máquina, junto con
 // las rutas que atiende la computadora. Aquí queda solo la ★ que marca cuál
-// es. El desplegable sigue cambiando la ruta del filtro, y en una computadora
-// sujeta a rutas sigue guardando la elegida como su ruta de trabajo.
+// es. El desplegable cambia la ruta con la que se trabaja ahora, sin mover la
+// predeterminada (2026-08-08).
 function pintarRutas(rutas, haySinRuta) {
-  // Cambiar de ruta sigue siendo suyo y, desde el 2026-08-06, también cuál
-  // abre el panel: la que eligió al instalar no queda clavada (en una
-  // computadora sujeta a rutas, elegirla aquí la guarda). Con una sola
-  // asignada, el desplegable se bloquea.
+  // Con una sola ruta asignada no hay entre qué elegir: el desplegable se
+  // bloquea.
   $("f-ruta").disabled = exigeRuta && rutaFija;
   if (exigeRuta) {
     // Aquí NO se cuela la ruta que estuviera puesta (2026-08-07, regla del
@@ -7061,20 +7062,12 @@ function pintarMaquinasFiltro(puede, equipos) {
       ${esc(texto)}</option>`).join("");
 }
 
+// Cambiar de ruta aquí NO toca la predeterminada (2026-08-08, regla del
+// usuario): es trabajar hoy en otra ruta, igual que el selector de Serie. La
+// predeterminada —la que abre el panel— se cambia solo en AJUSTES, y su ★
+// sigue marcando cuál es mientras se trabaja en otra.
 async function cambioRuta(valor) {
   rutaSeleccionada = valor;
-  // Para quien factura una ruta a la vez el desplegable ES su ruta de
-  // trabajo: se guarda al elegir (2026-08-06), porque el servidor filtra por
-  // la ruta guardada de esta máquina, no por el parámetro del navegador — y
-  // la configuración inicial ya no la pide.
-  if (exigeRuta && valor) {
-    try {
-      const r = await api("/api/ajustes/ruta", {ruta: valor});
-      rutaPredeterminada = r.ruta_predeterminada;
-    } catch (e) {
-      mensaje(e.message, "error");
-    }
-  }
   // La serie se resuelve según la config de ESTA ruta (AJUSTES → Rutas) antes
   // de aplicar el filtro: si la ruta nueva tiene predeterminada, se elige
   // sola; si solo restringe, se limpia lo que quedó fuera (ver pintarSeries).
@@ -7085,10 +7078,10 @@ async function cambioRuta(valor) {
 // Preselección al abrir (2026-08-06, pedido del usuario): si la computadora
 // factura una ruta a la vez y todavía no tiene ninguna elegida ni guardada,
 // se elige sola la que más pendientes tenga (empate: la primera del catálogo)
-// y se guarda como la suya — igual que si el operador la hubiera elegido en
-// la barra; cambiarla después sigue siendo un clic. Sin esto, una
-// instalación nueva abría con la lista vacía y el aviso de "elige tu ruta",
-// con el trabajo esperando en todas.
+// y esa SÍ queda como su predeterminada — es la que le faltaba tener, no un
+// cambio de la que ya tenía (por eso el desplegable de la barra ya no guarda
+// nada, ver cambioRuta). Sin esto, una instalación nueva abría con la lista
+// vacía y el aviso de "elige tu ruta", con el trabajo esperando en todas.
 // Y re-elección cuando la que tenía DEJÓ de ser suya (2026-08-07, reporte del
 // usuario): un Editor le cambia la asignación desde otro equipo y la ruta
 // puesta se quedaba puesta —con su estrella y con las facturas de esa ruta a
