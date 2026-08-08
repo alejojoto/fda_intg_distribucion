@@ -2334,6 +2334,28 @@
 #banda-ambiente.pruebas { background: #b45309; color: #fff; }
 /* Rojo: no puede operar. El texto trae qué hacer. */
 #banda-ambiente.bloqueado { background: #991b1b; color: #fff; }
+/* La torre movió esta computadora mientras estaba abierta (2026-08-08). Banda
+   aparte de la de arriba: aquella dice DÓNDE estás y esta dice que estás por
+   cambiarte, y las dos pueden convivir un rato. Trae su acción al lado, que
+   es la regla de los avisos: nada de mandar al operador a resolverlo afuera. */
+#banda-ambiente-cambio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 7px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,.18);
+}
+#banda-ambiente-cambio button { font-size: 12px; padding: 3px 10px; }
+/* Verde: la máquina vuelve a facturar de verdad. */
+#banda-ambiente-cambio.a-produccion { background: #065f46; color: #fff; }
+/* Ámbar, igual que la banda de arriba: deja de facturar de verdad. */
+#banda-ambiente-cambio.a-pruebas { background: #b45309; color: #fff; }
 </style>
 </head>
 <body>
@@ -2364,6 +2386,14 @@
   <span class="detalle">— lo que se llene aquí no es real y no le llega a nadie.</span>
 </div>
 {% endif %}
+{# Cambio de ambiente pedido desde la torre con el asistente ya abierto
+   (2026-08-08). Nace oculto y lo enciende el sondeo de acceso; el ambiente no
+   cambia en caliente porque partiría un llenado entre dos proyectos. #}
+<div id="banda-ambiente-cambio" style="display:none">
+  <span id="banda-ambiente-cambio-texto"></span>
+  <button class="acento" type="button" id="banda-ambiente-cambio-boton"
+          onclick="aplicarCambioAmbiente()">Cerrar el asistente</button>
+</div>
 <header>
   <!-- Un poco más grande desde que la barra de título va sin iconito
        (2026-07-28): es el único sitio donde se ve el árbol dentro de
@@ -16311,6 +16341,44 @@ function pintarBotonSolicitud() {
   $("acceso-falta").style.display = faltas.length ? "" : "none";
 }
 
+// --- La torre movió esta computadora de ambiente (2026-08-08) --------------
+// El ambiente se resuelve al arrancar y no cambia en caliente: cambiarlo a
+// mitad de sesión significaría que un llenado empezado contra un proyecto
+// termine contra otro. Así que el aviso no arregla nada solo — dice qué pasó,
+// qué sigue pasando mientras tanto, y trae al lado la única acción que lo
+// aplica.
+let ambienteCambioPendiente = null;
+
+function pintarCambioAmbiente(destino) {
+  ambienteCambioPendiente = destino || null;
+  const banda = $("banda-ambiente-cambio");
+  if (!ambienteCambioPendiente) { banda.style.display = "none"; return; }
+  const aProduccion = ambienteCambioPendiente === "produccion";
+  banda.className = aProduccion ? "a-produccion" : "a-pruebas";
+  $("banda-ambiente-cambio-texto").textContent = aProduccion
+    ? "ESTA COMPUTADORA VOLVIÓ A PRODUCCIÓN — hasta que cierres y vuelvas a "
+      + "abrir el asistente, lo que se llene aquí sigue sin ser real."
+    : "ESTA COMPUTADORA PASÓ AL AMBIENTE "
+      + ambienteCambioPendiente.toUpperCase()
+      + " — hasta que cierres y vuelvas a abrir el asistente, lo que se llene "
+      + "aquí sigue siendo real.";
+  banda.style.display = "";
+}
+
+async function aplicarCambioAmbiente() {
+  const boton = $("banda-ambiente-cambio-boton");
+  boton.disabled = true;
+  mensaje("Cerrando el asistente…", "info", true);
+  try {
+    await api("/api/ambiente/aplicar", {});
+    // No hay nada que pintar después: el panel se está apagando y la pantalla
+    // de "sin conexión" toma el relevo sola.
+  } catch (e) {
+    boton.disabled = false;
+    mensaje(e.message || "No se pudo cerrar el asistente.", "error");
+  }
+}
+
 function arrancarSondeoAcceso() {
   if (accesoSondeo) return;
   accesoSondeo = setInterval(sondearAcceso, 5000);
@@ -16338,6 +16406,7 @@ async function sondearAcceso() {
       maquinaDesactivada = !!r.maquina_desactivada;
       pintarDesactivada();
     }
+    if ("ambiente_pendiente" in r) pintarCambioAmbiente(r.ambiente_pendiente);
     // Recién activada: el nombre ya quedó puesto por el servidor, así que se
     // recarga todo y el formulario pide únicamente lo que falta. El mensaje
     // REEMPLAZA al último banner de error (2026-08-06): el "no se pudo
