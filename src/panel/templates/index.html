@@ -822,6 +822,12 @@
   /* Casilla marcada por implicación (un admin también es editor): se ve
      marcada pero no se puede tocar, igual que en la pantalla de Equipos. */
   .equipos-tabla input:disabled { cursor:not-allowed; }
+  /* La pregunta de confirmación FLOTA sobre la fila (2026-08-08, pedido del
+     usuario): puesta en línea ensanchaba la celda, partía la fila en dos
+     renglones y corría el botón justo cuando hay que acertarle para confirmar.
+     La fila es el ancla, así la pregunta sale siempre en el mismo lugar sin
+     importar de qué columna salió. */
+  .equipos-tabla tbody tr { position:relative; }
   /* Opciones del modo prueba agrupadas por tema (2026-07-27, pedido del
      usuario): antes eran una columna de líneas sueltas con un párrafo de
      explicación debajo de cada una. Ahora cada grupo lleva un rótulo y sus
@@ -1481,6 +1487,12 @@
   /* Variante no destructiva (confirmarSinQuitar): rojo es para borrar/descartar;
      acciones como "Llenar en fila" usan el mismo verde de DESCUENTOS. */
   .confirmar-borrar .cb-si.ok { background:#16a34a; border-color:#16a34a; }
+  /* Variante flotante (confirmarEnFilaEquipo): la pregunta se pinta ENCIMA de
+     la fila, alineada a su borde derecho, sin ocupar espacio propio. */
+  .confirmar-borrar.confirmar-flotante { position:absolute; right:0; top:50%;
+      transform:translateY(-50%); z-index:6; white-space:nowrap;
+      padding:4px 6px; border-radius:8px; background:#fff;
+      border:1px solid #d7dbe3; box-shadow:0 4px 14px rgba(16,24,40,.18); }
   /* Aviso "hay cambios sin guardar" al intentar cerrar un editor: ocupa la
      botonera del editor mientras se decide (Guardar / Salir sin guardar /
      Seguir editando). El mensaje a la izquierda, los botones a la derecha. */
@@ -16611,6 +16623,9 @@ async function enviarSolicitudAcceso() {
 // cada POST; los permisos se vuelven a comprobar aquí para que una vista
 // reducida no conserve columnas pintadas con permisos anteriores.
 function pintarEquipos() {
+  // Repintar la tabla borra la fila donde vivía la pregunta: se cierra aquí
+  // para no dejar viva una confirmación que ya no está en pantalla.
+  if (confirmEquipoAbierto) confirmEquipoAbierto();
   const bloque = $("equipos-bloque");
   const puedeIdentidad = tienePermiso("identidad_maquina");
   const puedeRol = tienePermiso("gestionar_editores");
@@ -16707,6 +16722,37 @@ function etiquetaVendedorEquipo(codigo) {
   return v && v.nombre ? `${codigo} — ${v.nombre}` : codigo;
 }
 
+// Confirmación propia de esta tabla (2026-08-08, pedido del usuario), con dos
+// diferencias frente a confirmarSinQuitar: no esconde el control que la
+// disparó —esconderlo movía el resto de la fila— y solo puede haber UNA
+// pregunta abierta a la vez. Marcar Admin y Editor casi a la vez sacaba dos
+// preguntas superpuestas sin saber cuál se estaba respondiendo; ahora la
+// nueva reemplaza a la anterior, así que vale la última que se tocó.
+let confirmEquipoAbierto = null;
+
+function confirmarEnFilaEquipo(nodo, alConfirmar, etiqueta) {
+  if (confirmEquipoAbierto) confirmEquipoAbierto();
+  const cont = document.createElement("span");
+  cont.className = "confirmar-borrar confirmar-flotante";
+  const si = document.createElement("button");
+  si.className = "cb-si ok"; si.textContent = etiqueta; si.disabled = true;
+  const no = document.createElement("button");
+  no.className = "cb-no"; no.textContent = "Cancelar";
+  cont.append(si, no);                 // Confirmar primero, Cancelar de último
+  nodo.closest("tr").lastElementChild.append(cont);
+  const t = setTimeout(() => { si.disabled = false; }, 400);   // retardo anti doble-clic
+  // Si nadie responde en 7 s, la pregunta se va sola: una confirmación
+  // olvidada en pantalla es un clic accidental esperando.
+  const tVuelta = setTimeout(() => cerrar(), 7000);
+  const cerrar = () => {
+    clearTimeout(t); clearTimeout(tVuelta); cont.remove();
+    if (confirmEquipoAbierto === cerrar) confirmEquipoAbierto = null;
+  };
+  confirmEquipoAbierto = cerrar;
+  no.onclick = () => cerrar();
+  si.onclick = () => { cerrar(); alConfirmar(); };
+}
+
 // Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
 // OTRA máquina; con un interruptor de un clic es fácil moverlos sin querer
 // (pedido del usuario 2026-08-06). Mismo patrón que onClickEsPruebaChk: el
@@ -16717,7 +16763,7 @@ function onClickEditorEquipo(ev, dispositivo) {
   const caja = ev.target;
   const activando = caja.checked;
   ev.preventDefault();
-  confirmarSinQuitar(caja, () => {
+  confirmarEnFilaEquipo(caja, () => {
     caja.checked = activando;
     cambiarEditorEquipo(dispositivo, caja);
   }, activando ? "Confirmar: puede editar" : "Confirmar: deja de editar");
@@ -16731,7 +16777,7 @@ function onClickRolEquipo(ev, dispositivo, rol) {
   const etiqueta = rol === "admin"
     ? (activando ? "Confirmar: pasa a Admin" : "Confirmar: baja a Editor")
     : (activando ? "Confirmar: pasa a Editor" : "Confirmar: se queda sin rol");
-  confirmarSinQuitar(caja.closest("label"), () => {
+  confirmarEnFilaEquipo(caja, () => {
     caja.checked = activando;
     cambiarRolEquipo(dispositivo, rol, caja);
   }, etiqueta);
@@ -16742,15 +16788,15 @@ function onClickRolEquipo(ev, dispositivo, rol) {
 // pedido del usuario): cambiarlo altera cómo trabaja esa máquina mañana
 // temprano, y un clic al pasar no puede decidir eso. Mismo patrón que
 // onCambioVersionEstable: el selector vuelve enseguida al día guardado —no se
-// adelanta a un cambio que todavía no ocurrió— y se esconde mientras dura la
-// pregunta, así que la etiqueta dice para qué día va a quedar.
+// adelanta a un cambio que todavía no ocurrió—, y como la pregunta flota sobre
+// la fila, la etiqueta es la que dice para qué día va a quedar.
 function onCambioDiaEquipo(sel, dispositivo) {
   const m = equipos.find(e => e.dispositivo === dispositivo);
   if (!m) return;
   const dia = sel.value;
   if (dia === (m.dia_despacho || "")) return;
   sel.value = m.dia_despacho || "";
-  confirmarSinQuitar(sel.closest(".dia-celda"), () => {
+  confirmarEnFilaEquipo(sel, () => {
     sel.value = dia;
     cambiarDiaEquipo(dispositivo, sel);
   }, `Confirmar: factura para ${ETIQUETA_DIA_DESPACHO[dia]}`);
@@ -16760,7 +16806,7 @@ function onClickActivaEquipo(ev, dispositivo) {
   const caja = ev.target;
   const activando = caja.checked;
   ev.preventDefault();
-  confirmarSinQuitar(caja, () => {
+  confirmarEnFilaEquipo(caja, () => {
     caja.checked = activando;
     cambiarActivaEquipo(dispositivo, caja);
   }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
