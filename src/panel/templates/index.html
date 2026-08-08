@@ -15636,8 +15636,11 @@ function pintarAcceso() {
       + "Computadoras.",
   }[estado];
   $("acceso-titulo").textContent = titulo;
+  // El motivo que anotó el administrador es una nota interna suya: al
+  // operador de una computadora desactivada no le dice nada que pueda usar.
   $("acceso-texto").textContent = texto
-    + (acceso.motivo ? ` Motivo anotado: ${acceso.motivo}` : "");
+    + (acceso.motivo && estado !== "desactivado"
+       ? ` Motivo anotado: ${acceso.motivo}` : "");
   const nombre = acceso.nombre_solicitado || "";
   // El nombre pedido solo tiene sentido mientras la solicitud está en juego.
   // A una computadora desactivada no se le muestra el nombre que tenía: no
