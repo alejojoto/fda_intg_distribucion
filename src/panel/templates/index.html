@@ -949,10 +949,16 @@
      #equipo-config-overlay, y pierde el aspecto de diálogo flotante. Título e
      intro se esconden: el bloque ya trae los suyos y repetirlos es ruido. */
   #mi-config-bloque #equipo-config { background:none; border-radius:0;
-      padding:0; margin-top:0; width:auto; max-height:none;
+      padding:0; margin-top:14px; width:auto; max-width:560px; max-height:none;
       overflow:visible; box-shadow:none; }
   #mi-config-bloque #equipo-config-titulo,
   #mi-config-bloque #equipo-config-intro { display:none; }
+  /* Incrustada, "Todas" y la predeterminada van las dos a la izquierda en vez
+     de a lados contrarios de la línea (2026-08-09, pedido del usuario): el
+     flex-end de abajo separaba bien en la ventana ancha de 820px, pero en
+     esta caja compacta dejaba un salto vacío en el medio. */
+  #mi-config-bloque .equipo-config-linea > .acceso-predet {
+      justify-content:flex-start; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
   /* Nombre y vendedor a la par, y "Todas" con su predeterminada en la misma
      línea (2026-08-07, pedido del usuario): la ventana se lee en menos
