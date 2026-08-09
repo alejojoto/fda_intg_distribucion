@@ -17119,8 +17119,8 @@ const chipsRutasEquipo = (m) =>
                   veTodasLasRutas(m) ? chipRolTodasLasRutas(m) : null);
 
 const chipRolTodasLasRutas = (m) => m && m.es_admin
-  ? {texto: "Admin", clase: "rol-admin"}
-  : {texto: "Editor", clase: "rol-editor"};
+  ? {texto: "Admin - Todas", clase: "rol-admin"}
+  : {texto: "Editor - Todas", clase: "rol-editor"};
 
 const veTodasLasRutas = (m) => !!(m && (m.es_admin || m.es_editor));
 
