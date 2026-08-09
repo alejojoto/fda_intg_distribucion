@@ -14571,8 +14571,16 @@ function pedirMotivoFechaDesfase(donde) {
 
 function motivoDeFechaParaFactura(pedido_id, parte) {
   const donde = secuenciaActiva || previoResolver ? "previo" : "detalle";
-  const d = desfaseDeFechas(facturasDeLaVentana(donde));
-  return d && d.firma === fechaDesfaseOk[donde] ? motivoFechaDesfase[donde] : null;
+  // El detalle se cierra justo antes de llamar a llenar(), por lo que ya no
+  // sirve consultar `facturasDeLaVentana("detalle")`: quedaría vacía y el
+  // motivo elegido se perdería en el request. La fila de la factura sigue en
+  // la lista hasta que el servidor responda, y permite comprobar el desfase
+  // concreto que se está enviando.
+  const fila = filaDeFactura(pedido_id, parte);
+  const d = desfaseDeFechas(fila ? [fila] : []);
+  const firmaConfirmada = fechaDesfaseOk[donde] || "";
+  return d && firmaConfirmada.startsWith(`${d.isoFacturar}|`)
+    ? motivoFechaDesfase[donde] || null : null;
 }
 
 function avisoFechaDelPedido(facturas, donde) {
