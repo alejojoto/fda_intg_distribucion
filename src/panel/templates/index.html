@@ -959,6 +959,11 @@
      esta caja compacta dejaba un salto vacío en el medio. */
   #mi-config-bloque .equipo-config-linea > .acceso-predet {
       justify-content:flex-start; }
+  /* Botón de confirmación de la propia (2026-08-09): oculto salvo que haya
+     algo sin guardar (actualizarConfirmPropia), en el mismo lugar donde se
+     leía Guardar/Cancelar antes. */
+  #equipo-config-propia-confirmar { display:block; width:fit-content;
+      margin:14px 0 0 auto; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
   /* Nombre y vendedor a la par, y "Todas" con su predeterminada en la misma
      línea (2026-08-07, pedido del usuario): la ventana se lee en menos
@@ -3770,6 +3775,14 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <button id="equipo-config-guardar" class="primario" onclick="guardarConfigEquipo()">Guardar</button>
       <button id="equipo-config-cancelar" onclick="intentarCerrarConfigEquipo()">Cancelar</button>
     </div>
+    <!-- Solo para la propia (2026-08-09, pedido del usuario): sin Guardar ni
+         Cancelar fijos —la caja no es un formulario que se cierra—, cambiar
+         algo es lo único que hace falta para que aparezca el botón, y
+         confirmarlo la guarda. Fuera de .editor-acciones a propósito: esa fila
+         la maneja pedirConfirmSalida para equipo/solicitud y no debe tocar
+         este botón. -->
+    <button type="button" id="equipo-config-propia-confirmar" class="primario"
+            style="display:none" onclick="guardarConfigPropia()">Confirmar cambios</button>
   </div>
 </div>
 
@@ -17194,12 +17207,23 @@ function abrirConfigSolicitud(dispositivo) {
 // mismo dato se desincronizan. No es una ventana ni algo que se abra o
 // colapse (2026-08-09, pedido del usuario): la pestaña AJUSTES tiene dos
 // secciones y media, esta caja cabe siempre desplegada dentro de su bloque.
-// Repintar (recargar datos, guardar, cancelar) es solo volver a llamar esta
-// función con los datos vigentes.
+// Tampoco tiene Guardar/Cancelar fijos: repintar (recargar datos o guardar)
+// es solo volver a llamar esta función con los datos vigentes.
 function abrirConfigPropia() {
   abrirVentanaConfigEquipo({origen: "propia", datos: configPropiaConRol(),
                             nombreVisible: "esta computadora"});
 }
+
+// Único gatillo para guardar la propia (2026-08-09, pedido del usuario): sin
+// Guardar fijo, cambiar cualquier casilla o desplegable de la caja es lo que
+// hace aparecer "Confirmar cambios" — antes de tocar algo no hay nada que
+// decir ahí. Delegado en #equipo-config porque los checkboxes de la lista se
+// generan de nuevo en cada repintado (no existen todavía al registrar esto).
+$("equipo-config").addEventListener("change", () => {
+  if ((configEquipo || {}).origen !== "propia") return;
+  $("equipo-config-propia-confirmar").style.display =
+    configEquipoHayCambios() ? "" : "none";
+});
 
 function abrirVentanaConfigEquipo(ctx) {
   configEquipo = ctx;
@@ -17233,6 +17257,12 @@ function abrirVentanaConfigEquipo(ctx) {
   $("equipo-config").querySelector(".equipo-config-par").style.display =
     esPropia ? "none" : "";
   $("equipo-config-vendedor").style.display = esPropia ? "none" : "";
+  // Sin Guardar/Cancelar fijos en la propia (2026-08-09): el botón de
+  // confirmar arranca oculto en cada repintado — recién aparece si de verdad
+  // se cambia algo (ver actualizarConfirmPropia).
+  $("equipo-config").querySelector(".editor-acciones").style.display =
+    esPropia ? "none" : "";
+  if (esPropia) $("equipo-config-propia-confirmar").style.display = "none";
   // Nombre y vendedor también en una computadora ya activa (2026-08-07,
   // pedido del usuario): esta ventana es TODO lo que se decide de esa
   // máquina, sin volver a la fila por dos campos sueltos.
@@ -17386,12 +17416,9 @@ function configEquipoHayCambios() {
 // Intento de cierre (clic afuera o Cancelar): con cambios sin guardar,
 // pregunta antes de descartar; sin cambios, cierra directo. En una solicitud
 // el "Guardar" es la activación, así que el botón de la pregunta lo dice.
-// La propia no tiene nada que cerrar (2026-08-09): Cancelar solo descarta lo
-// tecleado y repinta desde lo último guardado, sin preguntar — mismo criterio
-// que el Guardar de la propia: el efecto es sobre esta misma máquina y se ve
-// en el acto.
+// La propia nunca llega aquí (2026-08-09): sin Cancelar ni overlay que
+// cerrar, solo equipo/solicitud usan esta función.
 function intentarCerrarConfigEquipo() {
-  if ((configEquipo || {}).origen === "propia") { abrirConfigPropia(); return; }
   if (!configEquipoHayCambios()) { cerrarConfigEquipo(); return; }
   const esSolicitud = (configEquipo || {}).origen === "solicitud";
   pedirConfirmSalida({
@@ -17636,13 +17663,11 @@ function cerrarConfigEquipoSiSinPermiso() {
 // cambia cómo trabaja OTRA computadora en su próximo refresco, y quien lo
 // pulsa no está delante de ella para deshacerlo. El Cancelar de la ventana se
 // esconde mientras dura la pregunta, para no tener dos Cancelar seguidos.
+// La propia guarda por su propio botón (#equipo-config-propia-confirmar →
+// guardarConfigPropia) y nunca llega aquí: Guardar/Cancelar están ocultos
+// para ese origen (2026-08-09). Esta función queda solo para equipo/solicitud.
 function guardarConfigEquipo() {
   if (!configEquipo) return;
-  // La propia NO se confirma: el motivo de la pregunta es que el cambio le
-  // cae a una computadora ajena en su refresco y quien la pulsa no está
-  // delante para deshacerlo. Aquí es esta misma máquina y el efecto se ve en
-  // el acto, igual que el resto de AJUSTES → Esta máquina.
-  if (configEquipo.origen === "propia") { guardarConfigPropia(); return; }
   const esSolicitud = configEquipo.origen === "solicitud";
   const cancelar = $("equipo-config-cancelar");
   cancelar.style.display = "none";
@@ -17657,7 +17682,7 @@ function guardarConfigEquipo() {
 // quedó (con una sola opción, la predeterminada se fuerza a esa) y con eso se
 // repinta la barra, sin esperar al próximo refresco.
 async function guardarConfigPropia() {
-  const boton = $("equipo-config-guardar");
+  const boton = $("equipo-config-propia-confirmar");
   boton.disabled = true;
   limpiarErroresConfigEquipo();
   try {
