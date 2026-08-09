@@ -11543,14 +11543,6 @@ const CASOS_REVISION = [
     detalle: "Líneas del pedido con error de fórmula (#ERROR!) — el panel no " +
              "puede tocarlas: se corrigen en AppSheet",
   },
-  // El pedido llegó sin nada que llenar y ya no es del día en curso
-  // (2026-07-31): no hay dato que corregir aquí, se completa en la app de
-  // pedidos — por eso no lleva botón, como los casos de AppSheet.
-  {
-    prefijo: "A este pedido le faltan detalles",
-    objeto: () => "<b>Detalle del pedido</b>",
-    detalle: (p, m) => `${m} — se completa en la app de pedidos`,
-  },
   {
     prefijo: "Causa_Salida",
     objeto: () => "Presentación (Paq./kg)",
