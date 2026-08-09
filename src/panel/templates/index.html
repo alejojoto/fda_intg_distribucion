@@ -10358,7 +10358,7 @@ function chipEstado(f) {
 // Va al lado del chip de estado, en pendientes y procesadas.
 const chipDespacho = (f) =>
   f.despacho_difiere
-    ? ` <span class="chip despacho-difiere" title="En alguna línea, lo despachado no coincide con lo aprobado. Se llena igual; abre el pedido y el aviso morado dice cuáles son y cómo elegir cuál va en cada línea.">despacho ≠ aprobado</span>`
+    ? ` <span class="chip despacho-difiere" title="En alguna línea, lo despachado no coincide con lo aprobado. Abre el pedido: el aviso morado dice cuáles son y cómo elegir cuál va en cada línea.">despacho ≠ aprobado</span>`
     : "";
 
 // Líneas con cantidad o descuento puestos a mano en el detalle (2026-07-29).
@@ -14681,11 +14681,14 @@ function avisoDespachoDifiere(clave) {
     `<li>${esc(l.descripcion || l.codigo_winledger)}: aprobada ${
        fmtCantidad(l.cantidad_automatica)} · despachada ${
        fmtCantidad(l.cantidad_despachada)} — ${esc(cual(l))}</li>`).join("");
+  // Sin "se llena igual" (2026-08-09, pedido del usuario): cada renglón ya dice
+  // cuál cantidad va, así que la frase no agrega nada y le roba el ojo a lo que
+  // de verdad importa, que es cómo cambiarla.
   const salida = !d.puede_editar
-    ? "Se llena igual: cambiar cuál va lo hace un editor."
+    ? "Cambiar cuál va lo hace un editor."
     : detalleEdicionHabilitada
       ? "Cada una de esas líneas trae abajo los botones Aprobada y Despachada."
-      : "Se llena igual. Con «Habilitar edición» eliges línea por línea cuál va.";
+      : "Con «Habilitar edición» eliges línea por línea cuál va.";
   return `<div class="pap-ojo pap-ojo-morado pap-ojo-alerta"><div class="pap-ojo-tri-col">${
       TRIANGULO_ALERTA}</div><div>${esc(hecho)}`
     + `<ul class="pap-ojo-lineas">${listadas}</ul>${esc(salida)}</div></div>`;
