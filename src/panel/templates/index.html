@@ -9795,6 +9795,17 @@ async function reintentarConexion() {
   btn.disabled = false;
 }
 
+// Qué hay en pantalla que una recarga se llevaría por delante. Un llenado o
+// una corrida en curso cuentan aunque el proceso que los atendía ya no exista:
+// su aviso ("el llenado quedó a medias") hay que leerlo antes de que la página
+// se rehaga. Lo demás son las ventanas con datos tecleados.
+function puedeRecargarSola() {
+  return !llenando && !secuenciaActiva && !esperandoLogin
+      && !esperandoEnvioPlataforma && !llenadoInterrumpido
+      && !detalleAbierto && !previoResolver && !catalogoActual
+      && !hermanasPendientes;
+}
+
 async function latido() {
   // Señal de vida hacia la ventana propia (2026-07-29). Va ANTES del /salud y
   // sin depender de él: si el panel se cae, esta página sigue viva y es la que
@@ -9826,9 +9837,15 @@ async function latido() {
   }
   if (salud.pid !== pidPanel) {
     // Responde otro proceso: lo que esta página tenga en memoria (un llenado
-    // en curso, la lista cargada) es de la corrida que murió. Recargar es del
-    // operador, no automático: puede haber un borrador a medio escribir.
+    // en curso, la lista cargada) es de la corrida que murió.
     panelReabierto = true;
+    // Con la pantalla libre se recarga SOLA (2026-08-09, pedido del usuario):
+    // el aviso "recarga esta ventana" era un paso manual en el único momento
+    // en que nadie lo espera —el panel acaba de reiniciarse solo para traer
+    // código nuevo—, y por él la página seguía corriendo el JS viejo. Con algo
+    // abierto o a medias sigue mandando el aviso, que ya trae su botón: ahí la
+    // recarga se llevaría por delante lo que el operador tenga escrito.
+    if (puedeRecargarSola()) { location.reload(); return; }
     pintarSinConexion();
     return;
   }
