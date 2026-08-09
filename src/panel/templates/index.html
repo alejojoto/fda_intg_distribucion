@@ -172,7 +172,7 @@
   /* --- Filtro activo (2026-07-31, pedido del usuario) ----------------------
      Con cualquier filtro puesto la lista deja de estar completa, y eso tiene
      que verse ANTES de leer la lista: la barra entera se tiñe de ámbar (el
-     mismo color de atención de los chips despacho-difiere/por-revisar) con una
+     mismo color de atención del chip por-revisar) con una
      franja gruesa a la izquierda, cada campo que está filtrando se marca solo,
      y arriba sale el aviso con lo que está filtrando y cómo quitarlo. */
   #filtros-barra.filtrando { background:#fffaf3; border-color:#f5c98a;
@@ -397,7 +397,7 @@
   .paginador .nav { display:flex; gap:6px; align-items:center; margin-left:36px; }
   .paginador button { padding:3px 10px; }
   /* Conteo con un filtro activo (buscador, fecha, ruta, "Llenadas en esta máquina" o
-     el filtro de un catálogo): mismo ámbar de atención que despacho-difiere/
+     el filtro de un catálogo): mismo ámbar de atención que el chip
      por-revisar, para que salte a la vista que la lista NO está completa
      (pedido del usuario 2026-07-31). */
   .conteo-filtrado { color:var(--warn); font-weight:600; }
@@ -564,8 +564,12 @@
      las dos significan "esa es de la otra máquina"). */
   .chip.llenando, .chip.reservada, .chip.familia-ajena { background:#fef0c7; color:#b54708; }
   /* Marca de visibilidad (PLAN.md pendiente 18): despachado != aprobado en
-     alguna línea. Ámbar con borde para distinguirla de los chips de estado. */
-  .chip.despacho-difiere { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
+     alguna línea. Morado lleno (2026-08-09, pedido del usuario), el mismo de las
+     series y rutas predeterminadas: es el color del aviso que lo explica dentro
+     de la ventana del pedido, así el chip de la lista y ese aviso se asocian sin
+     leer nada. Sale del ámbar a propósito — el ámbar es "hay que resolver esto
+     antes de llenar" (fecha, revisión) y esto se llena igual. */
+  .chip.despacho-difiere { background:#6d28d9; color:#fff; border:1px solid #6d28d9; }
   /* Producto repetido en el pedido que se factura sumado en una línea. Es un
      aviso distinto del de despacho: con su propio color no hay que leer el
      texto para distinguirlos cuando una factura trae los dos. */
@@ -578,7 +582,7 @@
      tiene que verse antes de llenar. */
   .chip.ajustada { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
   /* "Por revisar" (2026-07-29): quedaron líneas omitidas sin despachar. Mismo
-     ámbar que despacho-difiere: ese color ya dice "hay que mirar esto". */
+     ámbar que el resto de los avisos: ese color ya dice "hay que mirar esto". */
   .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   /* "Filtro activo" junto al conteo de una lista filtrada: mismo ámbar, para
      que se note que lo que se ve no es la lista completa. */
@@ -626,6 +630,12 @@
     border:1px solid #f3ddb0; background:#fdf3e3; color:#b45309;
     font-weight:600; cursor:pointer; }
   #detalle-editar-btn:hover { background:#faeacf; }
+  /* Con una discrepancia de despacho a la vista, el botón toma el morado del
+     aviso que manda a pulsarlo (2026-08-09, pedido del usuario): el aviso dice
+     "habilita la edición" y el ojo cae solo en el único control de ese color. */
+  #detalle-editar-btn.destacado { border-color:#c4b5fd; background:#ede9fe;
+                                  color:#5b21b6; }
+  #detalle-editar-btn.destacado:hover { background:#ddd6fe; }
   /* La nota general (qué son estos números) abre el cuerpo desde que la
      cabecera vive en #detalle-fijo: aire antes de la tabla. */
   #detalle-cuerpo > .det-nota { margin:0 0 8px; }
@@ -2120,6 +2130,16 @@
   .pap-ojo-tri-col { flex:0 0 46px; position:relative; }
   .pap-ojo-triangulo { position:absolute; inset:0; width:100%; height:100%;
                        color:#d92d20; }
+  /* Aviso morado (2026-08-09, pedido del usuario): lo despachado que no coincide
+     con lo aprobado. Mismo formato y triángulo que el del desfase de fecha —
+     igual de difícil de pasar por alto—, pero en el morado del chip de la lista,
+     porque NO pide intervención: la factura se llena igual, solo avisa. */
+  .pap-ojo-morado { background:#ede9fe; color:#5b21b6; }
+  .pap-ojo-morado .pap-ojo-triangulo { color:#6d28d9; }
+  /* Las líneas con discrepancia, una por renglón: el aviso dice cuáles son sin
+     tener que ir a buscarlas en la tabla. */
+  .pap-ojo-lineas { margin:5px 0 0; padding-left:18px; }
+  .pap-ojo-lineas li { margin-top:2px; }
   /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
      las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
      la lista ni a cancelar la corrida. */
@@ -10338,7 +10358,7 @@ function chipEstado(f) {
 // Va al lado del chip de estado, en pendientes y procesadas.
 const chipDespacho = (f) =>
   f.despacho_difiere
-    ? ` <span class="chip despacho-difiere" title="En alguna línea, lo despachado no coincide con lo aprobado. Se factura lo aprobado; en el detalle puedes elegir cuál va en cada línea.">despacho ≠ aprobado</span>`
+    ? ` <span class="chip despacho-difiere" title="En alguna línea, lo despachado no coincide con lo aprobado. Abre el pedido: el aviso morado dice cuáles son y cómo elegir cuál va en cada línea.">despacho ≠ aprobado</span>`
     : "";
 
 // Líneas con cantidad o descuento puestos a mano en el detalle (2026-07-29).
@@ -11000,7 +11020,8 @@ function contenidoDetalle(clave) {
       : !detalleEdicionHabilitada
       ? `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento.
-          <button type="button" id="detalle-editar-btn"
+          <button type="button" id="detalle-editar-btn"${
+            lineasDespachoDifiere(d).length ? ` class="destacado"` : ""}
                   onclick="habilitarEdicionDetalle()">Habilitar edición</button></div>`
       : `<div class="det-nota">${fraseDescuentosDetalle(d)}
           Esto es lo que se escribe en el documento; puedes editar los números.</div>
@@ -11521,14 +11542,6 @@ const CASOS_REVISION = [
     objeto: () => "Dato dañado en AppSheet",
     detalle: "Líneas del pedido con error de fórmula (#ERROR!) — el panel no " +
              "puede tocarlas: se corrigen en AppSheet",
-  },
-  // El pedido llegó sin nada que llenar y ya no es del día en curso
-  // (2026-07-31): no hay dato que corregir aquí, se completa en la app de
-  // pedidos — por eso no lleva botón, como los casos de AppSheet.
-  {
-    prefijo: "A este pedido le faltan detalles",
-    objeto: () => "<b>Detalle del pedido</b>",
-    detalle: (p, m) => `${m} — se completa en la app de pedidos`,
   },
   {
     prefijo: "Causa_Salida",
@@ -14631,6 +14644,48 @@ function avisoFechaDelPedido(facturas, donde) {
     + `${esc(cierre)}${salida}</div></div>`;
 }
 
+// Líneas donde lo despachado no coincide con lo aprobado, con el dato de cuánto
+// se despachó: sin ese número no hay nada que elegir. Misma condición con la que
+// filaLineaDetalle ofrece los botones Aprobada/Despachada, para que el aviso
+// nombre exactamente las líneas que los traen.
+const lineasDespachoDifiere = (d) =>
+  ((d || {}).lineas || []).filter(l => l.despacho_difiere
+                                       && l.cantidad_despachada !== null);
+
+// Lo despachado que no coincide con lo aprobado (PLAN.md pendiente 18). El chip
+// de la lista dice que la factura tiene alguna; este aviso dice CUÁL y con qué
+// números, en el morado de ese chip (2026-08-09, pedido del usuario). A
+// diferencia del desfase de fecha NO pide intervención ninguna para llenar: la
+// factura sale igual, esto solo avisa.
+function avisoDespachoDifiere(clave) {
+  const d = detalleDatos[clave];
+  const lineas = lineasDespachoDifiere(d);
+  if (!lineas.length) return "";
+  const hecho = lineas.length === 1
+    ? "En una línea lo despachado no coincide con lo aprobado."
+    : `En ${lineas.length} líneas lo despachado no coincide con lo aprobado.`;
+  // Cada línea cierra con la que de verdad se va a escribir: con varias líneas,
+  // unas con la elección cambiada y otras no, una frase general mentiría.
+  const cual = (l) => l.cantidad === l.cantidad_automatica ? "va la aprobada"
+    : l.cantidad === l.cantidad_despachada ? "va la despachada"
+    : `va ${fmtCantidad(l.cantidad)}, a mano`;
+  const listadas = lineas.map(l =>
+    `<li>${esc(l.descripcion || l.codigo_winledger)}: aprobada ${
+       fmtCantidad(l.cantidad_automatica)} · despachada ${
+       fmtCantidad(l.cantidad_despachada)} — ${esc(cual(l))}</li>`).join("");
+  // Sin "se llena igual" (2026-08-09, pedido del usuario): cada renglón ya dice
+  // cuál cantidad va, así que la frase no agrega nada y le roba el ojo a lo que
+  // de verdad importa, que es cómo cambiarla.
+  const salida = !d.puede_editar
+    ? "Cambiar cuál va lo hace un editor."
+    : detalleEdicionHabilitada
+      ? "Cada una de esas líneas trae abajo los botones Aprobada y Despachada."
+      : "Con «Habilitar edición» eliges línea por línea cuál va.";
+  return `<div class="pap-ojo pap-ojo-morado pap-ojo-alerta"><div class="pap-ojo-tri-col">${
+      TRIANGULO_ALERTA}</div><div>${esc(hecho)}`
+    + `<ul class="pap-ojo-lineas">${listadas}</ul>${esc(salida)}</div></div>`;
+}
+
 function pintarPrevioAvisos() {
   $("previo-avisos").innerHTML =
     htmlAvisosPuestaAPunto(avisosPuestaAPunto(previoCola.length,
@@ -14647,7 +14702,9 @@ function htmlAvisosDetalle(clave) {
   const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
   return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
        + botonesSerieRapidos(false)
-       + avisoFechaDelPedido(fila ? [fila] : [], "detalle");
+       + avisoFechaDelPedido(fila ? [fila] : [], "detalle")
+       // De último: los de arriba hay que resolverlos para llenar, este no.
+       + avisoDespachoDifiere(clave);
 }
 
 // El div de avisos del detalle existe solo con la factura llenable (lo crea
