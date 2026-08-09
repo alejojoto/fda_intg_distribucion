@@ -11333,6 +11333,8 @@ function filaPendiente(f, enFamilia, atrasada = false) {
 // local_state._anotar_historial; los encabezados de REAPERTURA son los de
 // local_state._ENCABEZADO_REEMISION — si allá se reescriben, actualizar aquí.
 const ENCABEZADO_REAPERTURA = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} — (Reemisión pedida|Reabierta)/;
+const ENCABEZADO_FECHA_INUSUAL =
+  /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} — Fecha de facturación inusual:/;
 
 // El renglón más nuevo que cuenta una reapertura, para donde el panel promete
 // justamente eso ("Marcada para volver a llenar"): tomar el último renglón a
@@ -11341,15 +11343,15 @@ function ultimaReapertura(nota) {
   return (nota || "").split("\n").filter(l => ENCABEZADO_REAPERTURA.test(l.trim())).pop() || "";
 }
 
-// El historial SIN su renglón más nuevo, que es el que ya cuenta la celda de
-// al lado (falló esto, se descartó por aquello, se llenó): repetirlo debajo
-// sería decir dos veces lo mismo en la misma fila. La reapertura es la
-// excepción — no tiene celda propia: una factura marcada para volver a llenar
-// no trae detalle de error que mostrar.
+// El historial SIN su renglón más nuevo cuando la propia fila ya lo cuenta
+// (fallo, descarte o llenado). Reaperturas y fechas inusuales sí se conservan:
+// no tienen otra columna que muestre su motivo y deben verse en Detalle.
 function historialPrevio(nota) {
   const renglones = (nota || "").split("\n").filter(l => l.trim());
   if (!renglones.length) return "";
-  const previos = ENCABEZADO_REAPERTURA.test(renglones[renglones.length - 1])
+  const ultimo = renglones[renglones.length - 1];
+  const previos = (ENCABEZADO_REAPERTURA.test(ultimo)
+                   || ENCABEZADO_FECHA_INUSUAL.test(ultimo))
     ? renglones : renglones.slice(0, -1);
   return previos.join("\n");
 }
