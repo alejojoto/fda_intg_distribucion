@@ -2374,6 +2374,14 @@
 #banda-ambiente-cambio.a-produccion { background: #065f46; color: #fff; }
 /* Ámbar, igual que la banda de arriba: deja de facturar de verdad. */
 #banda-ambiente-cambio.a-pruebas { background: #b45309; color: #fff; }
+
+/* Pestaña Equipos de la torre de control (?vista=equipos, 2026-08-09): la
+   app entera corre igual, pero en pantalla solo queda la vista de
+   computadoras de AJUSTES — la torre la embebe en un marco. El aviso de
+   sin-conexión se conserva: si este panel muere, es lo que lo dice. */
+body.solo-equipos > header { display: none !important; }
+body.solo-equipos main > :not(#sec-ajustes) { display: none !important; }
+body.solo-equipos #ajustes-subtabs { display: none !important; }
 </style>
 </head>
 <body>
@@ -16765,18 +16773,25 @@ function pintarEquipos() {
     const host = esc(m.dispositivo);
     // Una máquina fuera de servicio no recibe cambios: primero se vuelve a activar.
     const fuera = !m.activa;
+    // Equipos de supervisión: solo los lista el panel de la torre
+    // (2026-08-09). Se ven completos pero protegidos — son la vía de vuelta
+    // si alguien desactiva de más, y su configuración se maneja en su propia
+    // máquina. El backend rechaza igual cualquier POST sobre ellos.
+    const sup = !!m.es_supervision;
+    const titleSup = "Equipo de supervisión: se ve, pero no se toca desde aquí.";
     const titleFuera = "Está fuera de servicio: vuelve a activarla para cambiarle esto.";
-    const attrsFuera = fuera ? ` disabled title="${titleFuera}"` : "";
-    const titleAdmin = fuera
+    const attrsFuera = sup ? ` disabled title="${titleSup}"`
+      : fuera ? ` disabled title="${titleFuera}"` : "";
+    const titleAdmin = sup ? titleSup : fuera
       ? titleFuera
       : (m.es_admin ? "Quitarlo lo deja como Editor."
                     : "Marca esta computadora como Admin.");
-    const titleEditor = fuera
+    const titleEditor = sup ? titleSup : fuera
       ? titleFuera
       : (m.es_admin ? "Lo es por ser Admin."
                     : "Marca esta computadora como Editor.");
-    const adminDisabled = fuera ? " disabled" : "";
-    const editorDisabled = (m.es_admin || fuera) ? " disabled" : "";
+    const adminDisabled = (fuera || sup) ? " disabled" : "";
+    const editorDisabled = (m.es_admin || fuera || sup) ? " disabled" : "";
     // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
     // no es editor" no existe.
     const editor = asignaAdmin ? `<td class="equipos-roles"><div>
@@ -16788,13 +16803,14 @@ function pintarEquipos() {
                onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></div></td>`
     : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}${editorDisabled}
-             title="${fuera ? titleFuera
+             title="${sup ? titleSup : fuera ? titleFuera
                             : (m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
                                           : "Marca esta computadora como Editor.")}"
              onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
-      <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
-             title="Al apagarlo, esa computadora queda fuera de servicio."
+      <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}${sup ? " disabled" : ""}
+             title="${sup ? "Un equipo de supervisión no se saca de servicio: siempre queda una vía de vuelta."
+                          : "Al apagarlo, esa computadora queda fuera de servicio."}"
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
     // Series, rutas y día del equipo (2026-08-07), cada uno en su columna:
     // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
@@ -16825,6 +16841,7 @@ function pintarEquipos() {
         <span class="equipos-vendedor"${m.vendedor
             ? ` title="Vendedor ${esc(m.vendedor)}"` : ""}>${
           esc(etiquetaVendedorEquipo(m.vendedor))}</span>
+        ${sup ? '<span class="equipos-vendedor">supervisión</span>' : ""}
       </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
@@ -23082,6 +23099,15 @@ cargarEstadoSoporte();
 // reales de esta computadora y recién ahí abre la pantalla ya llena con ellos.
 if (new URLSearchParams(window.location.search).get("ver_configuracion") === "1") {
   Promise.all([cargaInicial, ajustesInicial]).then(() => abrirConfigMaquina([], true));
+}
+// Pestaña Equipos de la torre de control (?vista=equipos, 2026-08-09): la
+// misma app, pero en pantalla solo la vista de computadoras de AJUSTES — la
+// torre la embebe para gestionar el parque real aunque el Mac esté en
+// pruebas. Todo lo demás sigue corriendo igual, solo que sin pintarse (el
+// recorte visual lo hace la clase solo-equipos en el CSS).
+if (new URLSearchParams(window.location.search).get("vista") === "equipos") {
+  document.body.classList.add("solo-equipos");
+  ajustesInicial.then(() => cambiarTab("ajustes"));
 }
 </script>
 <!-- Menú de clic derecho de los campos de texto (2026-08-06). Va al final del
