@@ -935,13 +935,35 @@
   /* "Todas las rutas" de un equipo con rol (2026-08-08): se ve apagado pero
      NO va con `disabled` — un control deshabilitado no dispara el clic con el
      que se explica por qué no se puede quitar (mismo motivo que #motivo-otro). */
-  #equipo-config .acceso-check.bloqueado { color:var(--mut); }
+  #equipo-config .acceso-check.bloqueado { color:var(--mut);
+      cursor:var(--cursor-prohibido); }
   #equipo-config .acceso-check.bloqueado input { opacity:.55;
       cursor:var(--cursor-prohibido); }
   #equipo-config .acceso-campo:first-of-type { margin-top:0; }
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
       border-radius:6px; }
+  /* Rutas y series de ESTA máquina no necesitan ventana aparte (2026-08-09,
+     pedido del usuario): #equipo-config se mueve por JS dentro de
+     #mi-config-bloque (abrirVentanaConfigEquipo) en vez de abrirse en
+     #equipo-config-overlay, y pierde el aspecto de diálogo flotante. Título e
+     intro se esconden: el bloque ya trae los suyos y repetirlos es ruido. */
+  #mi-config-bloque #equipo-config { background:none; border-radius:0;
+      padding:0; margin-top:14px; width:auto; max-width:560px; max-height:none;
+      overflow:visible; box-shadow:none; }
+  #mi-config-bloque #equipo-config-titulo,
+  #mi-config-bloque #equipo-config-intro { display:none; }
+  /* Incrustada, "Todas" y la predeterminada van las dos a la izquierda en vez
+     de a lados contrarios de la línea (2026-08-09, pedido del usuario): el
+     flex-end de abajo separaba bien en la ventana ancha de 820px, pero en
+     esta caja compacta dejaba un salto vacío en el medio. */
+  #mi-config-bloque .equipo-config-linea > .acceso-predet {
+      justify-content:flex-start; }
+  /* Botón de confirmación de la propia (2026-08-09): oculto salvo que haya
+     algo sin guardar (actualizarConfirmPropia), en el mismo lugar donde se
+     leía Guardar/Cancelar antes. */
+  #equipo-config-propia-confirmar { display:block; width:fit-content;
+      margin:14px 0 0 auto; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
   /* Nombre y vendedor a la par, y "Todas" con su predeterminada en la misma
      línea (2026-08-07, pedido del usuario): la ventana se lee en menos
@@ -2314,6 +2336,57 @@
     th, td { padding:5px 10px; }
     .paginador { padding:6px 14px; }
   }
+/* Banda de ambiente (2026-08-08). Ocupa todo el ancho y NO se puede cerrar:
+   si esta computadora no factura de verdad, tiene que verse desde la puerta.
+   Va arriba de todo, antes de la cabecera, para que sea lo primero que se
+   lee y no algo que compite con el resto de la barra. */
+#banda-ambiente {
+  padding: 7px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,.18);
+}
+#banda-ambiente .detalle {
+  font-weight: 400;
+  opacity: .92;
+}
+/* Ámbar: no factura de verdad, pero funciona. */
+#banda-ambiente.pruebas { background: #b45309; color: #fff; }
+/* Rojo: no puede operar. El texto trae qué hacer. */
+#banda-ambiente.bloqueado { background: #991b1b; color: #fff; }
+/* La torre movió esta computadora mientras estaba abierta (2026-08-08). Banda
+   aparte de la de arriba: aquella dice DÓNDE estás y esta dice que estás por
+   cambiarte, y las dos pueden convivir un rato. Excepción consciente a la
+   regla de "el aviso trae su acción": el botón que cerraba el asistente no
+   cerraba nada (reportado 2026-08-08), así que el aviso pide el cierre a mano
+   hasta que ese botón funcione (PLAN.md, pendiente post-desarrollo). */
+#banda-ambiente-cambio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 7px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,.18);
+}
+/* Verde: la máquina vuelve a facturar de verdad. */
+#banda-ambiente-cambio.a-produccion { background: #065f46; color: #fff; }
+/* Ámbar, igual que la banda de arriba: deja de facturar de verdad. */
+#banda-ambiente-cambio.a-pruebas { background: #b45309; color: #fff; }
+
+/* Pestaña Equipos de la torre de control (?vista=equipos, 2026-08-09): la
+   app entera corre igual, pero en pantalla solo queda la vista de
+   computadoras de AJUSTES — la torre la embebe en un marco. El aviso de
+   sin-conexión se conserva: si este panel muere, es lo que lo dice. */
+body.solo-equipos > header { display: none !important; }
+body.solo-equipos main > :not(#sec-ajustes) { display: none !important; }
+body.solo-equipos #ajustes-subtabs { display: none !important; }
 </style>
 </head>
 <body>
@@ -2328,6 +2401,27 @@
           onclick="reintentarConexion()">Volver a intentar</button>
   <button class="acento" id="sin-conexion-recargar" onclick="location.reload()"
           style="display:none">Recargar la ventana</button>
+</div>
+{# Banda de ambiente (2026-08-08). Solo aparece cuando hay algo que decir: en
+   producción no se pinta nada (sin UI ociosa). No se puede cerrar a propósito
+   — es la respuesta al caso de la laptop que quedó en modo prueba y nada en
+   pantalla lo decía, así que el error que salió después fue indescifrable. #}
+{% if ambiente.bloqueado %}
+<div id="banda-ambiente" class="bloqueado">
+  DESDE ESTA COMPUTADORA NO SE PUEDE FACTURAR
+  <span class="detalle">— {{ ambiente.bloqueado }}</span>
+</div>
+{% elif not ambiente.es_produccion %}
+<div id="banda-ambiente" class="pruebas">
+  AMBIENTE: {{ ambiente.ambiente|upper }}
+  <span class="detalle">— lo que se llene aquí no es real y no le llega a nadie.</span>
+</div>
+{% endif %}
+{# Cambio de ambiente pedido desde la torre con el asistente ya abierto
+   (2026-08-08). Nace oculto y lo enciende el sondeo de acceso; el ambiente no
+   cambia en caliente porque partiría un llenado entre dos proyectos. #}
+<div id="banda-ambiente-cambio" style="display:none">
+  <span id="banda-ambiente-cambio-texto"></span>
 </div>
 <header>
   <!-- Un poco más grande desde que la barra de título va sin iconito
@@ -2924,10 +3018,6 @@
         <p class="mut" style="margin:4px 0 10px">Con qué series factura esta
           computadora y qué rutas atiende. Las predeterminadas son con las que
           arranca el panel al abrir.</p>
-        <div class="ajustes-fila">
-          <span class="mut" id="mi-config-resumen"></span>
-          <button class="primario" onclick="abrirConfigPropia()">Configurar rutas y series</button>
-        </div>
       </div>
       <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
            distinto — de tarde lo que sale al día siguiente, o de mañana lo que
@@ -3685,6 +3775,14 @@
       <button id="equipo-config-guardar" class="primario" onclick="guardarConfigEquipo()">Guardar</button>
       <button id="equipo-config-cancelar" onclick="intentarCerrarConfigEquipo()">Cancelar</button>
     </div>
+    <!-- Solo para la propia (2026-08-09, pedido del usuario): sin Guardar ni
+         Cancelar fijos —la caja no es un formulario que se cierra—, cambiar
+         algo es lo único que hace falta para que aparezca el botón, y
+         confirmarlo la guarda. Fuera de .editor-acciones a propósito: esa fila
+         la maneja pedirConfirmSalida para equipo/solicitud y no debe tocar
+         este botón. -->
+    <button type="button" id="equipo-config-propia-confirmar" class="primario"
+            style="display:none" onclick="guardarConfigPropia()">Confirmar cambios</button>
   </div>
 </div>
 
@@ -4418,13 +4516,6 @@ let completaEnFila = false;       // true = "pedido completo" (siguiente pedido 
 // pendiente de la ruta elegida. Solo existe sin imprimir, con una ruta elegida
 // y fuera de producción (ver rutaCompletaDisponible).
 let rutaCompletaEnFila = false;
-// "todas las rutas" (2026-08-05, pedido del usuario): sin ruta elegida y sin
-// imprimir, el lote se lleva TODO lo pendiente, ruta por ruta — la corrida va
-// por bloques y al cruzar de bloque cambia sola a la serie asignada de la ruta
-// siguiente (o se detiene a pedirla si no tiene). Es lo que vuelve segura una
-// corrida larga sin ruta: la serie ya no puede quedarse pegada de una ruta
-// anterior.
-let todasRutasEnFila = false;
 // --- Corrida por bloques de ruta (2026-08-05) -------------------------------
 // Sin ruta elegida la fila NUNCA mezcla rutas al azar: se ordena por bloques
 // (ver llenablesEnOrdenDeFila) y la serie se resuelve factura por factura con
@@ -4442,6 +4533,11 @@ let rutaEsperandoSerie = null;      // la corrida está detenida pidiendo serie
 // papel NUNCA se cambia de ruta ni de serie en silencio — al agotarse la ruta
 // con cupo pendiente, la corrida se detiene y ofrece continuar o parar.
 let cambioRutaPendiente = null;     // {siguiente, serie} mientras espera la decisión
+// Cruce de bloque de ruta con impresión (2026-08-09): en una corrida SIN ruta
+// elegida el lote puede pasar de una ruta a otra a mitad de camino. Con papel
+// eso es cambiar el talonario, así que la corrida se detiene en el cruce y
+// pregunta. {ruta, serie} de la ruta que viene mientras espera la decisión.
+let cambioBloquePendiente = null;
 // Corrida encadenada de "Llenar en fila" (2026-07-26, PLAN.md pendiente 8):
 // colaEnFila es la fila EXACTA que el lote va a llenar — la que quedó apartada
 // en el estado compartido al arrancar (pendiente 33), así que ninguna otra
@@ -4779,7 +4875,8 @@ function actualizarModoLlenado() {
   // Las esperas de la corrida por rutas (2026-08-05) también son modo llenado:
   // la decisión —serie de una ruta, o continuar con la siguiente— vive en la
   // barra, y soltar el modo aquí escondería justo los botones que la piden.
-  const esperaDeRuta = rutaEsperandoSerie !== null || cambioRutaPendiente !== null;
+  const esperaDeRuta = rutaEsperandoSerie !== null || cambioRutaPendiente !== null
+                       || cambioBloquePendiente !== null;
   const activo = llenando || relanzandoTrasConfirmacion || secuenciaActiva ||
                  esperandoLogin || pausadoPorFallo || esperandoEnvioPlataforma ||
                  llenadoDeOtraVentana || esperaDeRuta;
@@ -9698,6 +9795,17 @@ async function reintentarConexion() {
   btn.disabled = false;
 }
 
+// Qué hay en pantalla que una recarga se llevaría por delante. Un llenado o
+// una corrida en curso cuentan aunque el proceso que los atendía ya no exista:
+// su aviso ("el llenado quedó a medias") hay que leerlo antes de que la página
+// se rehaga. Lo demás son las ventanas con datos tecleados.
+function puedeRecargarSola() {
+  return !llenando && !secuenciaActiva && !esperandoLogin
+      && !esperandoEnvioPlataforma && !llenadoInterrumpido
+      && !detalleAbierto && !previoResolver && !catalogoActual
+      && !hermanasPendientes;
+}
+
 async function latido() {
   // Señal de vida hacia la ventana propia (2026-07-29). Va ANTES del /salud y
   // sin depender de él: si el panel se cae, esta página sigue viva y es la que
@@ -9729,9 +9837,15 @@ async function latido() {
   }
   if (salud.pid !== pidPanel) {
     // Responde otro proceso: lo que esta página tenga en memoria (un llenado
-    // en curso, la lista cargada) es de la corrida que murió. Recargar es del
-    // operador, no automático: puede haber un borrador a medio escribir.
+    // en curso, la lista cargada) es de la corrida que murió.
     panelReabierto = true;
+    // Con la pantalla libre se recarga SOLA (2026-08-09, pedido del usuario):
+    // el aviso "recarga esta ventana" era un paso manual en el único momento
+    // en que nadie lo espera —el panel acaba de reiniciarse solo para traer
+    // código nuevo—, y por él la página seguía corriendo el JS viejo. Con algo
+    // abierto o a medias sigue mandando el aviso, que ya trae su botón: ahí la
+    // recarga se llevaría por delante lo que el operador tenga escrito.
+    if (puedeRecargarSola()) { location.reload(); return; }
     pintarSinConexion();
     return;
   }
@@ -10396,7 +10510,8 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
-  fechaDesfaseOk.detalle = "";      // la fecha se decide una vez por factura
+  fechaDesfaseOk.detalle = "";
+  motivoFechaDesfase.detalle = "";
   delete detalleFallos[clave];
   if (sinDetalle) sinDetalleGuardado.add(clave);
   else sinDetalleGuardado.delete(clave);
@@ -10421,7 +10536,8 @@ function abrirDetalleCargando(pedidoId, parte) {
   detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
-  fechaDesfaseOk.detalle = "";      // la fecha se decide una vez por factura
+  fechaDesfaseOk.detalle = "";
+  motivoFechaDesfase.detalle = "";
   delete detalleFallos[clave];
   delete detalleDatos[clave];
   sinDetalleGuardado.delete(clave); // reabrir la vuelve a armar: sí habrá detalle
@@ -11217,6 +11333,8 @@ function filaPendiente(f, enFamilia, atrasada = false) {
 // local_state._anotar_historial; los encabezados de REAPERTURA son los de
 // local_state._ENCABEZADO_REEMISION — si allá se reescriben, actualizar aquí.
 const ENCABEZADO_REAPERTURA = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} — (Reemisión pedida|Reabierta)/;
+const ENCABEZADO_FECHA_INUSUAL =
+  /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} — Fecha de facturación inusual:/;
 
 // El renglón más nuevo que cuenta una reapertura, para donde el panel promete
 // justamente eso ("Marcada para volver a llenar"): tomar el último renglón a
@@ -11225,15 +11343,15 @@ function ultimaReapertura(nota) {
   return (nota || "").split("\n").filter(l => ENCABEZADO_REAPERTURA.test(l.trim())).pop() || "";
 }
 
-// El historial SIN su renglón más nuevo, que es el que ya cuenta la celda de
-// al lado (falló esto, se descartó por aquello, se llenó): repetirlo debajo
-// sería decir dos veces lo mismo en la misma fila. La reapertura es la
-// excepción — no tiene celda propia: una factura marcada para volver a llenar
-// no trae detalle de error que mostrar.
+// El historial SIN su renglón más nuevo cuando la propia fila ya lo cuenta
+// (fallo, descarte o llenado). Reaperturas y fechas inusuales sí se conservan:
+// no tienen otra columna que muestre su motivo y deben verse en Detalle.
 function historialPrevio(nota) {
   const renglones = (nota || "").split("\n").filter(l => l.trim());
   if (!renglones.length) return "";
-  const previos = ENCABEZADO_REAPERTURA.test(renglones[renglones.length - 1])
+  const ultimo = renglones[renglones.length - 1];
+  const previos = (ENCABEZADO_REAPERTURA.test(ultimo)
+                   || ENCABEZADO_FECHA_INUSUAL.test(ultimo))
     ? renglones : renglones.slice(0, -1);
   return previos.join("\n");
 }
@@ -12230,6 +12348,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
        // de prueba (sin registro que lo recuerde). La corrida jamás lo manda.
        repetir_confirmado: repetirConfirmado,
        familia_ajena_motivo: motivoFamilia,
+       motivo_fecha_inusual: motivoDeFechaParaFactura(pedido_id, parte),
        autorizar_cancelar: autorizarCancelar});
     // ¿Algo del llenado anterior estorbando en Winledger — documento a medias
     // en la Ficha o una ventana de artículo abierta? El programa NO lo toca sin
@@ -12550,6 +12669,15 @@ let motivoPedido = null;   // {accion, pedido_id, partes} mientras el diálogo e
 // Cada acción trae sus opciones (la última siempre "Otro" con texto libre) y
 // el texto de su botón.
 const ACCIONES_MOTIVO = {
+  fecha_desfasada: {
+    titulo: (_id, _partes, contexto) => `Facturar con fecha distinta — ¿por qué?`,
+    nota: (_id, _partes, contexto) => contexto?.aviso || "",
+    opciones: ["Reemisión de factura",
+               "El pedido quedó pendiente de facturar",
+               "Corrección administrativa"],
+    boton: "Registrar motivo",
+    clase: "primario",
+  },
   // "refacturar" = reabrir y llenar una factura cerrada: reemitir una
   // completada o recuperar una descartada / facturada a mano. Su botón dice
   // "Volver a llenar" como el de la lista (2026-07-23, texto distinto de
@@ -12834,12 +12962,12 @@ async function resolverConAnulacion(pedido_id, parte) {
 
 // `partes` es una lista: normalmente una sola, y varias cuando el operador
 // contesta que sí a la pregunta por las facturas hermanas del pedido.
-function abrirMotivo(accion, pedido_id, partes) {
+function abrirMotivo(accion, pedido_id, partes, contexto = null) {
   const cfg = ACCIONES_MOTIVO[accion];
-  motivoPedido = {accion, pedido_id, partes};
-  $("motivo-titulo").textContent = cfg.titulo(pedido_id, partes);
+  motivoPedido = {accion, pedido_id, partes, contexto};
+  $("motivo-titulo").textContent = cfg.titulo(pedido_id, partes, contexto);
   const nota = typeof cfg.nota === "function"
-    ? cfg.nota(pedido_id, partes) : (cfg.nota || "");
+    ? cfg.nota(pedido_id, partes, contexto) : (cfg.nota || "");
   $("motivo-nota").textContent = nota;
   $("motivo-nota").style.display = nota ? "" : "none";
   $("motivo-opciones").innerHTML =
@@ -12848,7 +12976,6 @@ function abrirMotivo(accion, pedido_id, partes) {
     `<label><input type="radio" name="motivo-refact" value="__otro__">Otro:</label>` +
     `<input type="text" id="motivo-otro" placeholder="Escribe cuál es el motivo" required>`;
   const radios = document.querySelectorAll("input[name=motivo-refact]");
-  radios[0].checked = true;                   // la primera opción
   radios.forEach(r => r.addEventListener("change", () => sincronizarMotivoOtro(true)));
   // Clic en el campo de texto = elegir "Otro" (2026-07-30, pedido del usuario):
   // quien va a escribir el motivo no debería tener que pulsar antes el radio.
@@ -12869,7 +12996,8 @@ function abrirMotivo(accion, pedido_id, partes) {
 // el que se elige "Otro"; el tabIndex mantiene el comportamiento anterior de
 // saltarlo al tabular mientras está bloqueado.
 function sincronizarMotivoOtro(enfocar) {
-  const esOtro = document.querySelector("input[name=motivo-refact]:checked").value === "__otro__";
+  const elegido = document.querySelector("input[name=motivo-refact]:checked");
+  const esOtro = !!elegido && elegido.value === "__otro__";
   const campo = $("motivo-otro");
   campo.readOnly = !esOtro;
   campo.tabIndex = esOtro ? 0 : -1;
@@ -12950,10 +13078,25 @@ function intentarCerrarMotivo() {
 async function confirmarMotivo() {
   if (!motivoPedido) return;
   const elegido = document.querySelector("input[name=motivo-refact]:checked");
+  if (!elegido) {
+    mensaje("Elige o escribe un motivo antes de continuar.", "error");
+    return;
+  }
   const motivo = (!elegido || elegido.value === "__otro__")
     ? $("motivo-otro").value.trim() : elegido.value;
   if (!motivo) { $("motivo-otro").reportValidity(); return; }   // el motivo es obligatorio
-  const {accion, pedido_id, partes} = motivoPedido;
+  const {accion, pedido_id, partes, contexto} = motivoPedido;
+  if (accion === "fecha_desfasada") {
+    const donde = contexto?.donde;
+    const d = donde && desfaseDeFechas(facturasDeLaVentana(donde));
+    if (!d || d.firma !== contexto.firma) { cerrarMotivo(); return; }
+    fechaDesfaseOk[donde] = d.firma;
+    motivoFechaDesfase[donde] = motivo;
+    cerrarMotivo();
+    if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
+    else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+    return;
+  }
   if (accion === "descartar") {
     // Antes de tocar nada: qué otras facturas del pedido quedan sin llenar
     // (la lista todavía está fresca). Si las hay, se pregunta después.
@@ -13219,37 +13362,30 @@ async function confirmarHermanas() {
 }
 
 // --- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) ---------------
-// Tamaño del lote, como DROPDOWN (pedido del usuario). Las
-// opciones NO son las mismas en los dos modos de impresión: con Imprimir: sí
-// van 1..10 completas y NADA MÁS (2026-07-25, restaurado el 2026-07-26 tras
-// perderse en el cambio del cierre de la corrida) porque el papel obliga a
-// lotes cortos y de tamaño variable — si quedan 7 fichas en la serie, ese 7
-// tiene que agarrarse de un clic. Sin imprimir bastan los atajos 1/5/10.
-// El "otro…" que había ahí (campo libre, sin tope) se retiró el 2026-07-31 a
-// pedido del usuario: un lote largo arriesga pasarse a la serie equivocada, así
-// que 10 es el techo de TODO lote numérico, con ruta elegida o sin ella. Sin
-// imprimir y con una ruta elegida se suma "ruta completa", que llena todas las
-// pendientes de esa ruta (2026-07-30, pedido del usuario) y es la única forma
-// de pasar de 10. La corrida encadena en ambos casos; con "sí" solo cambia que
-// se espera el «Continuar» del operador entre facturas.
+// Tamaño del lote, como DROPDOWN (pedido del usuario). Van 1..10 en los DOS
+// modos de impresión y con ruta elegida o sin ella (2026-08-09, pedido del
+// usuario): antes sin papel solo se ofrecían los atajos 1/5/10 y con papel sin
+// ruta elegida el tope era 1, y ninguna de las dos listas dejaba pedir la
+// cantidad que hacía falta — si quedan 7 fichas en la serie, ese 7 tiene que
+// agarrarse de un clic. El "otro…" que había ahí (campo libre, sin tope) se
+// retiró el 2026-07-31: un lote largo arriesga pasarse a la serie equivocada,
+// así que 10 sigue siendo el techo de TODO lote numérico. Con una ruta elegida
+// se suma "ruta completa", que llena todas las pendientes de esa ruta
+// (2026-07-30, pedido del usuario) y es la única forma de pasar de 10. La
+// corrida encadena en ambos casos; con "sí" solo cambia que se espera el
+// «Continuar» del operador entre facturas.
 const imprimirEnFila = () =>
   document.querySelector('input[name="enfila-imp"]:checked').value === "si";
 
 // "ruta completa" (2026-07-30, pedido del usuario): llenar de un tirón todo lo
 // pendiente de la ruta elegida. Con impresión no aparece (el papel obliga a
 // lotes cortos y de tamaño variable) y sin ruta elegida tampoco: sería "todo lo
-// que haya", que no es lo que se pidió. El gate de la barra (enFilaDisponible)
-// la deja fuera de las máquinas de operación.
+// que haya" — y llenar una ruta entera exige tenerla escogida (2026-08-09,
+// regla del usuario; por eso se retiró "todas las rutas", que era justo eso).
+// El gate de la barra (enFilaDisponible) la deja fuera de las máquinas de
+// operación.
 function rutaCompletaDisponible() {
   return !imprimirEnFila() && rutaSeleccionada !== "" && enFilaDisponible();
-}
-
-// "todas las rutas" (2026-08-05): el espejo de "ruta completa" para cuando NO
-// hay ruta elegida — solo sin imprimir. La corrida va por bloques de ruta y la
-// serie cambia sola al cruzar de bloque (o se pide si la ruta no tiene), así
-// que la corrida larga ya no arriesga salir con la serie equivocada.
-function todasRutasDisponible() {
-  return !imprimirEnFila() && rutaSeleccionada === "" && enFilaDisponible();
 }
 
 // El <select> se reconstruye solo cuando cambia lo que muestra (si "ruta
@@ -13258,10 +13394,9 @@ function todasRutasDisponible() {
 let firmaCantidadesPintada = null;
 function firmaCantidades() {
   // La firma son las opciones mismas (2026-08-05): el menú cambia con la
-  // impresión, la ruta y sus cuentas ("ruta completa", "todas las rutas", el
-  // 1 solo de imprimir sin ruta), y enumerar aquí cada combinación se quedaba
-  // corto — cambiar de ruta con la misma cantidad dejaba el hover nombrando la
-  // anterior, y el tope de imprimir sin ruta ni entraba.
+  // impresión, la ruta y sus cuentas ("ruta completa" y su total), y enumerar
+  // aquí cada combinación se quedaba corto — cambiar de ruta con la misma
+  // cantidad dejaba el hover nombrando la anterior.
   return opcionesDeCantidad().map(o => `${o.valor}|${o.texto}|${o.hover || ""}`).join(";");
 }
 function sincronizarCantidades() {
@@ -13276,9 +13411,10 @@ function sincronizarCantidades() {
 // llenar.
 const HOVER_PEDIDO_COMPLETO = "Llena el siguiente pedido disponible completo, "
   + "sin importar en cuántas facturas esté dividido (cada factura son máx. 25 líneas).";
-const NUMEROS_CON_IMPRESION = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const NUMEROS_SIN_IMPRESION = [1, 5, 10];
-const CANTIDAD_ESTANDAR = 5;
+// La misma lista en los dos modos de impresión (2026-08-09, pedido del
+// usuario): lo que cambia con el papel es la UNIDAD (pedidos sin él, facturas
+// con él), no cuántas se pueden pedir.
+const NUMEROS_EN_FILA = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // Sin imprimir la fila se mide en PEDIDOS, no en facturas (2026-07-31, pedido
 // del usuario): un pedido dividido se llena entero o no se llena, así que
@@ -13319,31 +13455,15 @@ function opcionesDeCantidad() {
   // menú tiene que poder decirla — no puede mostrar una cantidad distinta de la
   // que se va a llenar. Esa es la ÚNICA vía a un número fuera de la lista: a
   // mano no se teclea nada, el tope de lo que se elige son 10 (2026-07-31).
-  // Con impresión y SIN ruta elegida el tope es 1 (2026-08-05, regla del
-  // usuario): con papel una corrida es de una sola ruta — la serie y el
-  // talonario van amarrados a ella —, así que el lote de varias exige elegirla.
-  // "Pedido completo" se queda: sus facturas son de un solo pedido, o sea de
-  // una sola ruta.
-  const numeros = imp
-    ? (rutaSeleccionada !== "" ? NUMEROS_CON_IMPRESION : [1])
-    : NUMEROS_SIN_IMPRESION;
-  const hoverImpSinRuta = imp && rutaSeleccionada === ""
-    ? "Con impresión, más de una factura por corrida solo con una ruta "
-      + "elegida: la serie y el papel van amarrados a la ruta." : "";
-  const numerico = !completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila;
+  // Sin ruta elegida el lote puede cruzar rutas: va por BLOQUES y, con papel,
+  // la corrida se detiene en cada cruce para que el operador cambie el
+  // talonario (2026-08-09) — antes eso se evitaba con un tope de 1, que dejaba
+  // el menú sin nada que ofrecer.
+  const numeros = NUMEROS_EN_FILA;
+  const numerico = !completaEnFila && !rutaCompletaEnFila;
   for (const n of (numerico && !numeros.includes(cantidadEnFila)
                    ? [...numeros, cantidadEnFila].sort((a, b) => a - b) : numeros))
-    ops.push({valor: String(n), texto: unidadEnFila(n),
-              ...(hoverImpSinRuta ? {hover: hoverImpSinRuta} : {})});
-  if (todasRutasDisponible()) {
-    ops.push({
-      valor: "todas",
-      texto: `todas las rutas (${unidadEnFila(unidadesDe(pendientesLlenables()))})`,
-      hover: `Llena todos los pedidos pendientes, ruta por ruta y en orden: `
-           + `cada bloque sale con la serie asignada de su ruta, y si una ruta `
-           + `no tiene serie la corrida se detiene ahí para que la elijas.`,
-    });
-  }
+    ops.push({valor: String(n), texto: unidadEnFila(n)});
   if (rutaCompletaDisponible()) {
     // "(sin ruta)" es un grupo real de pedidos, no la ausencia de filtro: se
     // nombra distinto para que el hover no diga "la ruta __sin_ruta__".
@@ -13366,8 +13486,7 @@ function opcionesDeCantidad() {
 // La opción elegida AHORA, con el mismo valor que llevan los <option>.
 const valorCantidadActual = () =>
   completaEnFila ? "completa"
-  : rutaCompletaEnFila ? "ruta"
-  : todasRutasEnFila ? "todas" : String(cantidadEnFila);
+  : rutaCompletaEnFila ? "ruta" : String(cantidadEnFila);
 
 const opcionesCantidadHtml = () => {
   const actual = valorCantidadActual();
@@ -13383,14 +13502,10 @@ const opcionesCantidadHtml = () => {
 // cantidad mayor traída de un lote de ruta baja a 10.
 function acomodarCantidadAlModo() {
   if (!rutaCompletaDisponible()) rutaCompletaEnFila = false;
-  if (!todasRutasDisponible()) todasRutasEnFila = false;
   // Sin imprimir "pedido completo" no se ofrece porque "1 pedido" es lo mismo:
   // la elección cae en su equivalente exacto, no en el estándar.
   if (completaEnFila && enFilaEnPedidos()) { completaEnFila = false; cantidadEnFila = 1; }
   if (imprimirEnFila() && cantidadEnFila > 10) cantidadEnFila = 10;
-  // Con impresión y sin ruta el tope es 1 (2026-08-05): ver opcionesDeCantidad.
-  if (imprimirEnFila() && rutaSeleccionada === "" && cantidadEnFila > 1)
-    cantidadEnFila = 1;
 }
 
 function pintarCantidades() {
@@ -13412,8 +13527,7 @@ function pintarCantidades() {
 function fijarCantidad(valor) {
   completaEnFila = valor === "completa";
   rutaCompletaEnFila = valor === "ruta";
-  todasRutasEnFila = valor === "todas";
-  if (!completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila)
+  if (!completaEnFila && !rutaCompletaEnFila)
     cantidadEnFila = parseInt(valor, 10);
 }
 
@@ -13585,10 +13699,9 @@ function lanzarEnFila() {
   // sentido enseñar un lote que igual no va a arrancar.
   if (!pendientesLlenables().length) { mensaje("No hay pendientes.", "info"); return; }
   if (completaEnFila) { arrancarSecuencia(familiaDelSiguiente().partes); return; }
-  // Ruta completa / todas las rutas: el lote se lleva TODO lo pendiente (de la
-  // ruta, o de todas por bloques), así que no hay corte que pueda partir un
-  // pedido en dos lotes y nada que preguntar.
-  if (rutaCompletaEnFila || todasRutasEnFila) {
+  // Ruta completa: el lote se lleva TODO lo pendiente de la ruta, así que no hay
+  // corte que pueda partir un pedido en dos lotes y nada que preguntar.
+  if (rutaCompletaEnFila) {
     arrancarSecuencia(pendientesLlenables().length);
     return;
   }
@@ -13670,7 +13783,8 @@ function revisarLotePrevio(meta) {
   previoDescuentosFallo = "";
   previoTocado = false;
   previoAbiertoEn = Date.now();
-  fechaDesfaseOk.previo = "";       // la fecha se decide una vez por lote
+  fechaDesfaseOk.previo = "";
+  motivoFechaDesfase.previo = "";
   pintarPrevioLote();
   // Los descuentos se piden EN PARALELO: la ventana abre con lo que el panel
   // ya tiene en la lista y esa columna se completa sola al llegar la
@@ -14244,7 +14358,7 @@ function rehacerPrevioLote() {
 // siguiente). Sin imprimir la numérica viene en pedidos y se traduce aquí.
 function metaDelModo() {
   const hay = pendientesParaLaFila();
-  if (rutaCompletaEnFila || todasRutasEnFila) return hay.length;
+  if (rutaCompletaEnFila) return hay.length;
   if (completaEnFila) return hay.length ? familiaDelSiguiente(hay).partes : 0;
   return facturasDeCantidad(cantidadEnFila, hay);
 }
@@ -14311,17 +14425,13 @@ function previoQuitarSinReponer() {
   rehacerPrevioLote();
 }
 
-// La impresión decide qué cantidades se ofrecen y en qué se cuentan (pedidos sin
-// papel, facturas con él), así que cambiarla puede mover la cantidad vigente: la
-// que el modo nuevo no ofrezca vuelve al estándar (2026-07-31, pedido del
-// usuario) en vez de quedarse como un número suelto que ese modo no lista. La
-// fila se rehace para que lo que está a la vista sea lo que se va a llenar.
+// La impresión ya no cambia QUÉ cantidades se ofrecen (2026-08-09: son 1..10 en
+// los dos modos), pero sí en qué se cuentan (pedidos sin papel, facturas con
+// él) y qué opciones existen aparte del número ("pedido completo", "ruta
+// completa"). La fila se rehace para que lo que está a la vista sea lo que se
+// va a llenar.
 function cambioImpresionEnFila() {
-  const numeros = imprimirEnFila() ? NUMEROS_CON_IMPRESION : NUMEROS_SIN_IMPRESION;
-  if (!completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila
-      && !numeros.includes(cantidadEnFila))
-    cantidadEnFila = CANTIDAD_ESTANDAR;
-  pintarCantidades();          // las cantidades ofrecidas dependen del papel
+  pintarCantidades();          // la unidad y las opciones dependen del papel
   if (previoResolver) rehacerPrevioLote();  // la línea de proceso también cambia
   if (detalleAbierto) pintarVentanaDetalle(detalleAbierto);
 }
@@ -14370,16 +14480,12 @@ function botonesSerieRapidos(porBloques) {
     .join("")}</div></div>`;
 }
 
-// --- El pedido no es del día anterior (2026-08-01, pedido del usuario) -------
-// Un pedido se factura al día SIGUIENTE de su orden de salida: llenando para
-// hoy, el pedido es de ayer; para mañana, de hoy. Cuando no calza se dice antes
-// de llenar, porque el documento sale con la fecha a facturar y no con la del
-// pedido. La corrección va en el propio aviso, que es lo que este dato tiene de
-// distinto respecto a la serie o la tasa: no hay nada que escribir, solo mover
-// la fecha al día que le toca a ese pedido.
-// Desde 2026-08-05 (pedido del usuario) no es una sugerencia que se pueda pasar
-// de largo: el botón de llenar queda apagado hasta que el operador elija una de
-// las dos fechas — la que el aviso propone o la que ya está puesta.
+// --- Fecha a facturar y fecha del pedido ------------------------------------
+// La fecha configurada manda siempre: el aviso nunca la cambia ni propone
+// moverla. Normalmente se factura el día siguiente al pedido. La excepción de
+// fin de semana es operativa, no de feriados: un pedido del viernes se puede
+// facturar sábado, domingo o lunes. En cualquier otro cruce se exige un motivo
+// explícito, que queda en el historial de cada factura llenada.
 const diaAntesDe = (iso) => {
   const d = calDesdeISO(iso);
   if (!d) return "";
@@ -14417,7 +14523,12 @@ function desfaseDeFechas(facturas) {
   // verse igual con el modo admin prendido y apagado); lo que cambia es el
   // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
   if (!isoFacturar) return null;
-  const esperada = diaAntesDe(isoFacturar);
+  const fechaFacturar = calDesdeISO(isoFacturar);
+  if (!fechaFacturar) return null;
+  const diasHastaViernes = ({6: 1, 0: 2, 1: 3})[fechaFacturar.getDay()] || 1;
+  const esperadaFecha = new Date(fechaFacturar);
+  esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
+  const esperada = calISO(esperadaFecha);
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
@@ -14435,6 +14546,7 @@ function desfaseDeFechas(facturas) {
 // al abrir cada ventana: la fecha se decide una vez por lote y una vez por
 // factura suelta.
 const fechaDesfaseOk = {previo: "", detalle: ""};
+const motivoFechaDesfase = {previo: "", detalle: ""};
 
 const facturasDeLaVentana = (donde) =>
   (donde === "previo"
@@ -14449,11 +14561,28 @@ function faltaDecidirLaFecha(donde) {
 
 // "Se factura para el día que está puesto, a propósito": deja el aviso a la
 // vista (el hecho sigue siendo cierto) y suelta el botón de llenar.
-function confirmarFechaDesfase(donde) {
+function pedirMotivoFechaDesfase(donde) {
   const d = desfaseDeFechas(facturasDeLaVentana(donde));
-  fechaDesfaseOk[donde] = d ? d.firma : "";
-  if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
-  else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+  if (!d) return;
+  abrirMotivo("fecha_desfasada", "", [], {
+    donde, firma: d.firma,
+    aviso: `La Fecha a facturar se mantiene en ${fechaCortaDelAviso(d.isoFacturar, d.isoFacturar)}. `
+      + "Elige el motivo antes de llenar.",
+  });
+}
+
+function motivoDeFechaParaFactura(pedido_id, parte) {
+  const donde = secuenciaActiva || previoResolver ? "previo" : "detalle";
+  // El detalle se cierra justo antes de llamar a llenar(), por lo que ya no
+  // sirve consultar `facturasDeLaVentana("detalle")`: quedaría vacía y el
+  // motivo elegido se perdería en el request. La fila de la factura sigue en
+  // la lista hasta que el servidor responda, y permite comprobar el desfase
+  // concreto que se está enviando.
+  const fila = filaDeFactura(pedido_id, parte);
+  const d = desfaseDeFechas(fila ? [fila] : []);
+  const firmaConfirmada = fechaDesfaseOk[donde] || "";
+  return d && firmaConfirmada.startsWith(`${d.isoFacturar}|`)
+    ? motivoFechaDesfase[donde] || null : null;
 }
 
 function avisoFechaDelPedido(facturas, donde) {
@@ -14478,39 +14607,27 @@ function avisoFechaDelPedido(facturas, donde) {
   const unaSola = fechas.length === 1;
   // Mover la fecha solo se ofrece cuando arregla TODAS: con parte del lote en
   // regla, correrla dejaría fuera de sitio a las que estaban bien.
-  const cambiar = (todas && distintas.length === 1)
-    ? `<button title="Mueve la Fecha a facturar al `
-      + `día siguiente del pedido. La tasa vuelve a la que corresponda a ese día."
-         onclick="cajitaFechaElegida('${esc(diaDespuesDe(distintas[0]))}')">Facturar `
-      + `para el ${esc(corta(diaDespuesDe(distintas[0])))}</button>`
-    : "";
-  // La otra salida: dejar la fecha donde está. Saltando la puesta a punto de la
-  // fecha el documento NO sale con ella, así que el botón no puede prometerla.
+  const finDeSemana = ["0", "6", "1"].includes(String(calDesdeISO(isoFacturar)?.getDay()));
+  const regla = finDeSemana
+    ? "Los pedidos del viernes se pueden facturar sábado, domingo o lunes."
+    : "Lo usual es facturar al día siguiente del pedido.";
   const confirmar = sinDecidir
-    ? `<button title="Deja la Fecha a facturar como está: se factura para ese `
-      + `día a propósito." onclick="confirmarFechaDesfase('${donde}')">${
-        saltandoPuestaAPunto("fecha") ? "Llenar igual"
-          : `Facturar para el ${esc(corta(isoFacturar))}`}</button>`
+    ? `<button title="La Fecha a facturar se mantiene; pide un motivo antes de llenar."
+         onclick="pedirMotivoFechaDesfase('${donde}')">Indicar motivo</button>`
     : "";
-  const salida = (cambiar || confirmar)
-    ? `<div class="previo-acciones">${cambiar}${confirmar}</div>` : "";
+  const salida = confirmar ? `<div class="previo-acciones">${confirmar}</div>` : "";
   const destino = saltandoPuestaAPunto("fecha")
     ? (unaSola ? "La fecha no se pone: el documento sale"
                : "La fecha no se pone: los documentos salen")
       + " con la que tenga el programa de facturación."
     : (unaSola ? "El documento sale" : "Los documentos salen")
       + " con la fecha de arriba.";
-  // Sin decidir, el botón de llenar está apagado: el aviso dice qué se espera.
-  // Con una sola salida no se "elige" nada: se confirma.
-  const pedido = saltandoPuestaAPunto("fecha") ? " Decide antes de llenar:"
-    : cambiar ? " Elige para qué día se factura:"
-    : " Confirma la fecha antes de llenar:";
-  const cierre = sinDecidir ? destino + pedido
+  const cierre = sinDecidir ? destino + " Indica el motivo antes de llenar:"
     : (unaSola ? "Se llena igual. " : "Se llenan igual. ") + destino;
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
       TRIANGULO_ALERTA}</div><div>${
-      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}: lo normal es `
-    + `facturar al día siguiente del pedido, el ${esc(corta(esperada))}. `
+      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}. ${esc(regla)} `
+    + `Para esa fecha, el pedido usual es del ${esc(corta(esperada))}. `
     + `${esc(cierre)}${salida}</div></div>`;
 }
 
@@ -14689,9 +14806,9 @@ async function arrancarSecuencia(meta) {
   // ya apartadas en otra máquina. Si había menos pendientes que las pedidas,
   // la meta real ya nace más corta y no hay con qué reponer.
   metaPedidaEnFila = meta;
-  // Con "ruta completa" o "todas las rutas" el lote ya se llevó todo lo que
-  // había: si alguna factura resulta ajena, no queda ninguna con que reponerla.
-  reponerEnFila = !completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila;
+  // Con "ruta completa" el lote ya se llevó todo lo que había: si alguna factura
+  // resulta ajena, no queda ninguna con que reponerla.
+  reponerEnFila = !completaEnFila && !rutaCompletaEnFila;
   pedidosFueraEnFila = fueraDelLote;
   descartadasEnFila = [];
   reposicionesEnFila = [];
@@ -14707,6 +14824,7 @@ async function arrancarSecuencia(meta) {
   serieDelLlenadoEnCurso = null;
   rutaDeLaEnCurso = "";
   cambioRutaPendiente = null;
+  cambioBloquePendiente = null;
   corridaResumenPendiente = null;
   iniciarSecuencia();
   vigilarReserva();
@@ -14949,8 +15067,61 @@ function siguienteDeSecuencia() {
   } else {
     serieDelLlenadoEnCurso = null;
   }
+  // Cruce de bloque con papel (2026-08-09): sin ruta elegida el lote numérico
+  // puede pasar de una ruta a la siguiente, y con impresión eso es cambiar el
+  // talonario físico — nunca en silencio (misma regla del 2026-08-05 que ya
+  // gobierna el cambio de ruta con el filtro puesto). Sin papel el cruce sigue
+  // solo: la barra ya dice de qué ruta es cada factura.
+  if (imprimirEnFila() && rutaDeLaEnCurso && ruta !== rutaDeLaEnCurso) {
+    pausarPorCambioDeBloque(ruta, serieDelLlenadoEnCurso || "");
+    return;
+  }
   rutaDeLaEnCurso = ruta;
   llenar(siguiente.pedido_id, siguiente.parte);
+}
+
+// La pausa del cruce: los mismos botones de la barra que usa el cambio de ruta
+// con filtro puesto. Aquí no hay serie que elegir —la del bloque ya se resolvió
+// arriba, y si faltaba la corrida se detuvo antes a pedirla—, así que la
+// decisión es una sola: seguir con el talonario cambiado, o parar.
+function pausarPorCambioDeBloque(ruta, serie) {
+  secuenciaActiva = false;
+  cambioBloquePendiente = {ruta, serie};
+  $("btn-secuencia").style.display = "none";
+  $("btn-detener").style.display = "none";
+  const caja = $("serie-ruta-botones");
+  caja.innerHTML =
+    `<button class="acento" onclick="confirmarCambioDeBloque()">Continuar con `
+    + `la ruta ${esc(etiquetaRutaCorta(ruta))}</button>`
+    + `<button class="peligro" onclick="detenerCambioDeBloque()">Detener el lote</button>`;
+  caja.style.display = "";
+  mensaje(`La ruta ${etiquetaRutaCorta(rutaDeLaEnCurso)} terminó su parte del `
+    + `lote. Sigue la ruta ${etiquetaRutaCorta(ruta)}${serie
+        ? `, con la serie ${serie}` : ""}. Antes de continuar revisa el `
+    + `talonario: la serie y el número de factura deben coincidir con el papel `
+    + `puesto.`, "alerta", false);
+  actualizarModoLlenado();
+}
+
+function confirmarCambioDeBloque() {
+  const pendiente = cambioBloquePendiente;
+  if (!pendiente) return;
+  ocultarBotonesSerieDeRuta();
+  // Confirmado el cruce, la ruta en curso pasa a ser la nueva ANTES de volver a
+  // siguienteDeSecuencia: si no, la misma factura volvería a disparar la pausa.
+  rutaDeLaEnCurso = pendiente.ruta;
+  secuenciaActiva = true;
+  $("btn-detener").style.display = "";
+  siguienteDeSecuencia();
+}
+
+function detenerCambioDeBloque() {
+  const pendiente = cambioBloquePendiente;
+  ocultarBotonesSerieDeRuta();
+  detenerSecuencia(`Llenado en fila terminado: ${hechasEnFila} de `
+    + `${metaEnFila} facturas${pendiente
+        ? ` (paró antes de pasar a la ruta ${etiquetaRutaCorta(pendiente.ruta)})`
+        : ""}. Lo que no se llenó sigue pendiente.`, "exito");
 }
 
 // La serie con la que sale la próxima factura de la corrida, o "" si hay que
@@ -15067,6 +15238,7 @@ function detenerDesdeSerieDeRuta() {
 function ocultarBotonesSerieDeRuta() {
   rutaEsperandoSerie = null;
   cambioRutaPendiente = null;
+  cambioBloquePendiente = null;
   const caja = $("serie-ruta-botones");
   caja.style.display = "none";
   caja.innerHTML = "";
@@ -15969,12 +16141,16 @@ async function cargarAjustes() {
       if (!supervision && tabActiva() === "admin") irATab("ajustes");
     }
     // Rutas y series propias: el mismo permiso que exige su endpoint y que
-    // gobierna el nombre y el vendedor de al lado.
-    $("mi-config-bloque").style.display =
-      tienePermiso("identidad_maquina") ? "" : "none";
-    // Esconder el bloque no alcanza si la ventana que abre está encima.
+    // gobierna el nombre y el vendedor de al lado. Sin ventana que cerrar
+    // (2026-08-09): la caja vive siempre desplegada en el bloque, así que un
+    // refresco la repinta directo salvo que haya algo sin guardar a mitad de
+    // editar — eso se respeta y se deja para el próximo refresco.
+    const puedeConfigPropia = tienePermiso("identidad_maquina");
+    $("mi-config-bloque").style.display = puedeConfigPropia ? "" : "none";
     cerrarConfigEquipoSiSinPermiso();
-    pintarMiConfigRutasSeries();
+    if (puedeConfigPropia
+        && !((configEquipo || {}).origen === "propia" && configEquipoHayCambios()))
+      abrirConfigPropia();
     $("catalogos-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     $("rutas-series-bloque").style.display =
@@ -16211,7 +16387,7 @@ function pintarSerieRegistro(conocidas) {
     todas ? "Serie predeterminada" : "Serie con la que factura";
   const previa = select.value;
   select.innerHTML =
-    `<option value="">${todas ? "— Ninguna —" : "— Elegir… —"}</option>`
+    `<option value="">${todas ? "— Todas —" : "— Elegir… —"}</option>`
     + conocidas.map(s => `<option value="${esc(s)}"
         ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
   select.value = conocidas.includes(previa) ? previa : "";
@@ -16275,6 +16451,33 @@ function pintarBotonSolicitud() {
   $("acceso-falta").style.display = faltas.length ? "" : "none";
 }
 
+// --- La torre movió esta computadora de ambiente (2026-08-08) --------------
+// El ambiente se resuelve al arrancar y no cambia en caliente: cambiarlo a
+// mitad de sesión significaría que un llenado empezado contra un proyecto
+// termine contra otro. El aviso dice qué pasó, qué sigue pasando mientras
+// tanto y qué tiene que hacer el operador. Llevaba un botón "Cerrar el
+// asistente" que no cerraba nada (reportado 2026-08-08): se retiró y el cierre
+// queda a mano hasta que ese botón funcione (endpoint /api/ambiente/aplicar
+// intacto en app.py, hoy sin quien lo llame).
+let ambienteCambioPendiente = null;
+
+function pintarCambioAmbiente(destino) {
+  ambienteCambioPendiente = destino || null;
+  const banda = $("banda-ambiente-cambio");
+  if (!ambienteCambioPendiente) { banda.style.display = "none"; return; }
+  const aProduccion = ambienteCambioPendiente === "produccion";
+  banda.className = aProduccion ? "a-produccion" : "a-pruebas";
+  $("banda-ambiente-cambio-texto").textContent = aProduccion
+    ? "ESTA COMPUTADORA VOLVIÓ A PRODUCCIÓN — lo que se llene aquí sigue sin "
+      + "ser real. Cierra el asistente y vuelve a abrirlo para que el cambio "
+      + "entre."
+    : "ESTA COMPUTADORA PASÓ AL AMBIENTE "
+      + ambienteCambioPendiente.toUpperCase()
+      + " — lo que se llene aquí sigue siendo real. Cierra el asistente y "
+      + "vuelve a abrirlo para que el cambio entre.";
+  banda.style.display = "";
+}
+
 function arrancarSondeoAcceso() {
   if (accesoSondeo) return;
   accesoSondeo = setInterval(sondearAcceso, 5000);
@@ -16302,6 +16505,7 @@ async function sondearAcceso() {
       maquinaDesactivada = !!r.maquina_desactivada;
       pintarDesactivada();
     }
+    if ("ambiente_pendiente" in r) pintarCambioAmbiente(r.ambiente_pendiente);
     // Recién activada: el nombre ya quedó puesto por el servidor, así que se
     // recarga todo y el formulario pide únicamente lo que falta. El mensaje
     // REEMPLAZA al último banner de error (2026-08-06): el "no se pudo
@@ -16636,18 +16840,25 @@ function pintarEquipos() {
     const host = esc(m.dispositivo);
     // Una máquina fuera de servicio no recibe cambios: primero se vuelve a activar.
     const fuera = !m.activa;
+    // Equipos de supervisión: solo los lista el panel de la torre
+    // (2026-08-09). Se ven completos pero protegidos — son la vía de vuelta
+    // si alguien desactiva de más, y su configuración se maneja en su propia
+    // máquina. El backend rechaza igual cualquier POST sobre ellos.
+    const sup = !!m.es_supervision;
+    const titleSup = "Equipo de supervisión: se ve, pero no se toca desde aquí.";
     const titleFuera = "Está fuera de servicio: vuelve a activarla para cambiarle esto.";
-    const attrsFuera = fuera ? ` disabled title="${titleFuera}"` : "";
-    const titleAdmin = fuera
+    const attrsFuera = sup ? ` disabled title="${titleSup}"`
+      : fuera ? ` disabled title="${titleFuera}"` : "";
+    const titleAdmin = sup ? titleSup : fuera
       ? titleFuera
       : (m.es_admin ? "Quitarlo lo deja como Editor."
                     : "Marca esta computadora como Admin.");
-    const titleEditor = fuera
+    const titleEditor = sup ? titleSup : fuera
       ? titleFuera
       : (m.es_admin ? "Lo es por ser Admin."
                     : "Marca esta computadora como Editor.");
-    const adminDisabled = fuera ? " disabled" : "";
-    const editorDisabled = (m.es_admin || fuera) ? " disabled" : "";
+    const adminDisabled = (fuera || sup) ? " disabled" : "";
+    const editorDisabled = (m.es_admin || fuera || sup) ? " disabled" : "";
     // Un admin ya es editor: la casilla va marcada y sin tocar — "admin que
     // no es editor" no existe.
     const editor = asignaAdmin ? `<td class="equipos-roles"><div>
@@ -16659,13 +16870,14 @@ function pintarEquipos() {
                onclick="return onClickRolEquipo(event, '${host}', 'editor')"> Editor</label></div></td>`
     : `<td class="equipos-check">
       <input type="checkbox" ${m.es_editor ? "checked" : ""}${editorDisabled}
-             title="${fuera ? titleFuera
+             title="${sup ? titleSup : fuera ? titleFuera
                             : (m.es_admin ? "Lo es por ser Admin; ese rol lo maneja la supervisión."
                                           : "Marca esta computadora como Editor.")}"
              onclick="return onClickEditorEquipo(event, '${host}')"></td>`;
     const activa = `<td class="equipos-check">
-      <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}
-             title="Al apagarlo, esa computadora queda fuera de servicio."
+      <input type="checkbox" class="switch" ${m.activa ? "checked" : ""}${sup ? " disabled" : ""}
+             title="${sup ? "Un equipo de supervisión no se saca de servicio: siempre queda una vía de vuelta."
+                          : "Al apagarlo, esa computadora queda fuera de servicio."}"
              onclick="return onClickActivaEquipo(event, '${host}')"></td>`;
     // Series, rutas y día del equipo (2026-08-07), cada uno en su columna:
     // series y rutas se leen, el día se cambia ahí mismo —es lo que más se
@@ -16696,6 +16908,7 @@ function pintarEquipos() {
         <span class="equipos-vendedor"${m.vendedor
             ? ` title="Vendedor ${esc(m.vendedor)}"` : ""}>${
           esc(etiquetaVendedorEquipo(m.vendedor))}</span>
+        ${sup ? '<span class="equipos-vendedor">supervisión</span>' : ""}
       </td>
       ${puedeIdentidad ? config : ""}
       ${puedeRol ? editor : ""}
@@ -16960,8 +17173,8 @@ const chipsRutasEquipo = (m) =>
                   veTodasLasRutas(m) ? chipRolTodasLasRutas(m) : null);
 
 const chipRolTodasLasRutas = (m) => m && m.es_admin
-  ? {texto: "Admin", clase: "rol-admin"}
-  : {texto: "Editor", clase: "rol-editor"};
+  ? {texto: "Admin - Todas", clase: "rol-admin"}
+  : {texto: "Editor - Todas", clase: "rol-editor"};
 
 const veTodasLasRutas = (m) => !!(m && (m.es_admin || m.es_editor));
 
@@ -16978,7 +17191,14 @@ const configPropiaConRol = () => ({...(configPropia || {}),
 //   {origen:"solicitud"}  → solicitud de activación (suma nombre y vendedor)
 //   {origen:"propia"}     → AJUSTES → Esta máquina (solo rutas y series: el
 //                           nombre, el vendedor y el día ya tienen su control
-//                           en ese mismo bloque)
+//                           en ese mismo bloque). Desde 2026-08-09 no es una
+//                           ventana ni algo que se abra/colapse: #equipo-config
+//                           se mueve a #mi-config-bloque y queda ahí SIEMPRE
+//                           desplegada (AJUSTES tiene dos secciones y media,
+//                           esto cabe sin esconderse). Cada refresco de
+//                           cargarAjustes() la repinta llamando abrirConfigPropia()
+//                           de nuevo, salvo que haya cambios sin guardar a
+//                           mitad de editar.
 // `datos` es la configuración de partida (la fila del catálogo, o la que pidió
 // la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
 let configEquipo = null;
@@ -17038,17 +17258,36 @@ function abrirConfigSolicitud(dispositivo) {
 // Rutas y series de ESTA computadora, desde AJUSTES → Esta máquina. Reusa la
 // ventana de las demás con las secciones que aquí sobran escondidas: nombre,
 // vendedor y día ya se cambian en el mismo bloque, y dos controles para el
-// mismo dato se desincronizan.
+// mismo dato se desincronizan. No es una ventana ni algo que se abra o
+// colapse (2026-08-09, pedido del usuario): la pestaña AJUSTES tiene dos
+// secciones y media, esta caja cabe siempre desplegada dentro de su bloque.
+// Tampoco tiene Guardar/Cancelar fijos: repintar (recargar datos o guardar)
+// es solo volver a llamar esta función con los datos vigentes.
 function abrirConfigPropia() {
   abrirVentanaConfigEquipo({origen: "propia", datos: configPropiaConRol(),
                             nombreVisible: "esta computadora"});
 }
+
+// Único gatillo para guardar la propia (2026-08-09, pedido del usuario): sin
+// Guardar fijo, cambiar cualquier casilla o desplegable de la caja es lo que
+// hace aparecer "Confirmar cambios" — antes de tocar algo no hay nada que
+// decir ahí. Delegado en #equipo-config porque los checkboxes de la lista se
+// generan de nuevo en cada repintado (no existen todavía al registrar esto).
+$("equipo-config").addEventListener("change", () => {
+  if ((configEquipo || {}).origen !== "propia") return;
+  $("equipo-config-propia-confirmar").style.display =
+    configEquipoHayCambios() ? "" : "none";
+});
 
 function abrirVentanaConfigEquipo(ctx) {
   configEquipo = ctx;
   const {origen, datos, nombreVisible} = ctx;
   const esSolicitud = origen === "solicitud";
   const esPropia = origen === "propia";
+  // La propia se incrusta en su bloque de AJUSTES; las demás siguen en su
+  // ventana modal (#equipo-config-overlay), que es donde vive por defecto.
+  (esPropia ? $("mi-config-bloque") : $("equipo-config-overlay"))
+    .appendChild($("equipo-config"));
   $("equipo-config-titulo").textContent = esPropia
     ? "Rutas y series de esta computadora"
     : `Configuración de ${nombreVisible}`;
@@ -17072,6 +17311,12 @@ function abrirVentanaConfigEquipo(ctx) {
   $("equipo-config").querySelector(".equipo-config-par").style.display =
     esPropia ? "none" : "";
   $("equipo-config-vendedor").style.display = esPropia ? "none" : "";
+  // Sin Guardar/Cancelar fijos en la propia (2026-08-09): el botón de
+  // confirmar arranca oculto en cada repintado — recién aparece si de verdad
+  // se cambia algo (ver actualizarConfirmPropia).
+  $("equipo-config").querySelector(".editor-acciones").style.display =
+    esPropia ? "none" : "";
+  if (esPropia) $("equipo-config-propia-confirmar").style.display = "none";
   // Nombre y vendedor también en una computadora ya activa (2026-08-07,
   // pedido del usuario): esta ventana es TODO lo que se decide de esa
   // máquina, sin volver a la fila por dos campos sueltos.
@@ -17151,7 +17396,7 @@ function abrirVentanaConfigEquipo(ctx) {
   }
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   ctx.firma = firmaConfigEquipo();
-  $("equipo-config-overlay").classList.add("visible");
+  if (!esPropia) $("equipo-config-overlay").classList.add("visible");
 }
 
 const datosConfigEquipo = () => (configEquipo || {}).datos || {};
@@ -17161,7 +17406,14 @@ const datosConfigEquipo = () => (configEquipo || {}).datos || {};
 function pintarNotaRolRutasEquipo(datos, esPropia) {
   const nota = $("equipo-config-rutas-rol-nota");
   const conRol = veTodasLasRutas(datos);
-  $("equipo-config-rutas-todas-caja").classList.toggle("bloqueado", conRol);
+  const caja = $("equipo-config-rutas-todas-caja");
+  const check = $("equipo-config-rutas-todas");
+  caja.classList.toggle("bloqueado", conRol);
+  const titulo = conRol
+    ? "No se puede quitar: ve todas las rutas por su rol (Admin o Editor)." : "";
+  caja.title = titulo;
+  check.title = titulo;
+  if (!titulo) { caja.removeAttribute("title"); check.removeAttribute("title"); }
   if (!conRol) { nota.style.display = "none"; return; }
   const guardadas = Array.isArray(datos.rutas) ? datos.rutas : [];
   const cuales = guardadas.length <= 4
@@ -17218,6 +17470,8 @@ function configEquipoHayCambios() {
 // Intento de cierre (clic afuera o Cancelar): con cambios sin guardar,
 // pregunta antes de descartar; sin cambios, cierra directo. En una solicitud
 // el "Guardar" es la activación, así que el botón de la pregunta lo dice.
+// La propia nunca llega aquí (2026-08-09): sin Cancelar ni overlay que
+// cerrar, solo equipo/solicitud usan esta función.
 function intentarCerrarConfigEquipo() {
   if (!configEquipoHayCambios()) { cerrarConfigEquipo(); return; }
   const esSolicitud = (configEquipo || {}).origen === "solicitud";
@@ -17339,7 +17593,7 @@ function configEquipoPintarSerie(conocidas, preseleccionar) {
   select.style.display = "";
   const previa = preseleccionar !== undefined ? preseleccionar : select.value;
   select.innerHTML =
-    `<option value="">${todas ? "— Ninguna —" : "— Elegir… —"}</option>`
+    `<option value="">${todas ? "— Todas —" : "— Elegir… —"}</option>`
     + conocidas.map(s => `<option value="${esc(s)}"
         ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
   select.value = conocidas.includes(previa) ? previa : "";
@@ -17432,7 +17686,12 @@ function cerrarConfigEquipo() {
 // el candado de su endpoint (403). Se cierra aquí, diciendo por qué, en vez de
 // dejar que el operador lo descubra pulsando Guardar (2026-08-08).
 function cerrarConfigEquipoSiSinPermiso() {
-  if (!configEquipo || !editorVisible("equipo-config-overlay")) return;
+  // La propia ya no vive en el overlay (2026-08-09): editorVisible no la ve,
+  // así que su sola presencia en configEquipo basta — se limpia siempre junto
+  // con el overlay en cerrarConfigEquipo.
+  if (!configEquipo
+      || !(editorVisible("equipo-config-overlay") || configEquipo.origen === "propia"))
+    return;
   if (configEquipo.origen === "equipo") {
     const fila = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
     if (fila && !fila.activa) {
@@ -17446,24 +17705,23 @@ function cerrarConfigEquipoSiSinPermiso() {
   const puede = configEquipo.origen === "solicitud"
     ? accesoGestion : tienePermiso("identidad_maquina");
   if (puede) return;
+  const esPropia = configEquipo.origen === "propia";
   if (confirmSalidaCerrar) confirmSalidaCerrar();
   cerrarConfigEquipo();
   mensaje("Esta computadora dejó de tener permiso para configurar rutas y "
-    + "series: la ventana se cerró sin guardar. Los roles se asignan desde "
-    + "la supervisión.", "alerta");
+    + "series: " + (esPropia ? "la sección se ocultó" : "la ventana se cerró")
+    + " sin guardar. Los roles se asignan desde la supervisión.", "alerta");
 }
 
 // Guardar se confirma (2026-08-07, pedido del usuario): lo que sale de aquí
 // cambia cómo trabaja OTRA computadora en su próximo refresco, y quien lo
 // pulsa no está delante de ella para deshacerlo. El Cancelar de la ventana se
 // esconde mientras dura la pregunta, para no tener dos Cancelar seguidos.
+// La propia guarda por su propio botón (#equipo-config-propia-confirmar →
+// guardarConfigPropia) y nunca llega aquí: Guardar/Cancelar están ocultos
+// para ese origen (2026-08-09). Esta función queda solo para equipo/solicitud.
 function guardarConfigEquipo() {
   if (!configEquipo) return;
-  // La propia NO se confirma: el motivo de la pregunta es que el cambio le
-  // cae a una computadora ajena en su refresco y quien la pulsa no está
-  // delante para deshacerlo. Aquí es esta misma máquina y el efecto se ve en
-  // el acto, igual que el resto de AJUSTES → Esta máquina.
-  if (configEquipo.origen === "propia") { guardarConfigPropia(); return; }
   const esSolicitud = configEquipo.origen === "solicitud";
   const cancelar = $("equipo-config-cancelar");
   cancelar.style.display = "none";
@@ -17476,9 +17734,9 @@ function guardarConfigEquipo() {
 
 // Lo elegido para ESTA computadora entra de una: el servidor devuelve lo que
 // quedó (con una sola opción, la predeterminada se fuerza a esa) y con eso se
-// repintan la barra y el resumen del bloque, sin esperar al próximo refresco.
+// repinta la barra, sin esperar al próximo refresco.
 async function guardarConfigPropia() {
-  const boton = $("equipo-config-guardar");
+  const boton = $("equipo-config-propia-confirmar");
   boton.disabled = true;
   limpiarErroresConfigEquipo();
   try {
@@ -17501,29 +17759,17 @@ async function guardarConfigPropia() {
     const adoptar = rutaPredeterminada
                     && rutaPredeterminada !== rutaSeleccionada;
     if (adoptar) rutaSeleccionada = rutaPredeterminada;
-    pintarMiConfigRutasSeries();
     pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
     pintarSeries();
     if (adoptar) aplicarFiltros();
     if (supOverviewCargado) pintarEquiposSupervision();
-    cerrarConfigEquipo();
+    abrirConfigPropia();   // repinta con lo recién guardado; la caja sigue desplegada
     mensaje("Rutas y series de esta computadora guardadas.", "info");
   } catch (e) {
     marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
   } finally {
     boton.disabled = false;
   }
-}
-
-// Resumen del bloque de AJUSTES → Esta máquina: la misma línea con la que se
-// describen las demás computadoras, sin el día (está justo abajo, con sus dos
-// opciones a la vista).
-function pintarMiConfigRutasSeries() {
-  const el = $("mi-config-resumen");
-  if (!el) return;
-  const m = configPropiaConRol();
-  el.innerHTML = `Series: ${chipsSeriesEquipo(m)}`
-    + ` · Rutas: ${chipsRutasEquipo(m)}`;
 }
 
 // La ventana edita TODO lo de esa computadora: nombre y vendedor por
@@ -22932,6 +23178,15 @@ cargarEstadoSoporte();
 // reales de esta computadora y recién ahí abre la pantalla ya llena con ellos.
 if (new URLSearchParams(window.location.search).get("ver_configuracion") === "1") {
   Promise.all([cargaInicial, ajustesInicial]).then(() => abrirConfigMaquina([], true));
+}
+// Pestaña Equipos de la torre de control (?vista=equipos, 2026-08-09): la
+// misma app, pero en pantalla solo la vista de computadoras de AJUSTES — la
+// torre la embebe para gestionar el parque real aunque el Mac esté en
+// pruebas. Todo lo demás sigue corriendo igual, solo que sin pintarse (el
+// recorte visual lo hace la clase solo-equipos en el CSS).
+if (new URLSearchParams(window.location.search).get("vista") === "equipos") {
+  document.body.classList.add("solo-equipos");
+  ajustesInicial.then(() => cambiarTab("ajustes"));
 }
 </script>
 <!-- Menú de clic derecho de los campos de texto (2026-08-06). Va al final del
