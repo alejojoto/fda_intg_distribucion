@@ -11289,7 +11289,7 @@ function pintarPendientes(familias) {
           ${atrasada ? `title="${TITULO_PEDIDO_VIEJO}"` : ""}>
         <td><b>${esc(f0.pedido_id)}</b></td>
         <td>${celdaCliente(f0)}</td>
-        <td>${esc(f0.ruta || "")}</td>
+        <td>${esc(nombreRuta(f0.ruta || ""))}</td>
         <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
         <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaPendiente(f, true, atrasada)).join("");
@@ -11337,7 +11337,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
     <tr${filaDetalle(f, clases)} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
-      <td>${enFamilia ? "" : esc(f.ruta || "")}</td>
+      <td>${enFamilia ? "" : esc(nombreRuta(f.ruta || ""))}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
@@ -11683,7 +11683,7 @@ function pintarLlenadosPorRevisar(lista) {
         ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
       <td>${celdaCliente(f)}</td>
       <td>${esc((f.fecha_orden_salida || "").slice(0,10))}</td>
-      <td>${esc(f.ruta || "")}</td>
+      <td>${esc(nombreRuta(f.ruta || ""))}</td>
       <td>${quePaso}${(f.tipo === "error" && detalle && ultimaReemision)
         ? `<div class="mut">${esc(ultimaReemision)}</div>` : ""}</td>
       <td${CELDA_ACCIONES}>${acciones}</td>
@@ -11905,7 +11905,7 @@ function pintarProcesadas(familias) {
       <tr class="fam-cabecera">
         <td><b>${esc(f0.pedido_id)}</b></td>
         <td>${celdaCliente(f0)}</td>
-        <td>${esc(f0.ruta || "")}</td>
+        <td>${esc(nombreRuta(f0.ruta || ""))}</td>
         <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
         <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaProcesada(f, true)).join("");
@@ -11961,7 +11961,7 @@ function filaProcesada(f, enFamilia) {
     <tr${filaDetalle(f, enFamilia ? "fam-parte" : "")} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
-      <td>${enFamilia ? "" : esc(f.ruta || "")}</td>
+      <td>${enFamilia ? "" : esc(nombreRuta(f.ruta || ""))}</td>
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.numero_documento || "")}</td>
