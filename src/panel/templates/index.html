@@ -3005,10 +3005,6 @@
         <p class="mut" style="margin:4px 0 10px">Con qué series factura esta
           computadora y qué rutas atiende. Las predeterminadas son con las que
           arranca el panel al abrir.</p>
-        <div class="ajustes-fila">
-          <span class="mut" id="mi-config-resumen"></span>
-          <button class="primario" id="config-propia-boton" onclick="abrirConfigPropia()">Configurar rutas y series</button>
-        </div>
       </div>
       <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
            distinto — de tarde lo que sale al día siguiente, o de mañana lo que
@@ -16070,12 +16066,16 @@ async function cargarAjustes() {
       if (!supervision && tabActiva() === "admin") irATab("ajustes");
     }
     // Rutas y series propias: el mismo permiso que exige su endpoint y que
-    // gobierna el nombre y el vendedor de al lado.
-    $("mi-config-bloque").style.display =
-      tienePermiso("identidad_maquina") ? "" : "none";
-    // Esconder el bloque no alcanza si la ventana que abre está encima.
+    // gobierna el nombre y el vendedor de al lado. Sin ventana que cerrar
+    // (2026-08-09): la caja vive siempre desplegada en el bloque, así que un
+    // refresco la repinta directo salvo que haya algo sin guardar a mitad de
+    // editar — eso se respeta y se deja para el próximo refresco.
+    const puedeConfigPropia = tienePermiso("identidad_maquina");
+    $("mi-config-bloque").style.display = puedeConfigPropia ? "" : "none";
     cerrarConfigEquipoSiSinPermiso();
-    pintarMiConfigRutasSeries();
+    if (puedeConfigPropia
+        && !((configEquipo || {}).origen === "propia" && configEquipoHayCambios()))
+      abrirConfigPropia();
     $("catalogos-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
     $("rutas-series-bloque").style.display =
@@ -17107,11 +17107,14 @@ const configPropiaConRol = () => ({...(configPropia || {}),
 //   {origen:"solicitud"}  → solicitud de activación (suma nombre y vendedor)
 //   {origen:"propia"}     → AJUSTES → Esta máquina (solo rutas y series: el
 //                           nombre, el vendedor y el día ya tienen su control
-//                           en ese mismo bloque). Desde 2026-08-09 no abre en
-//                           #equipo-config-overlay: #equipo-config se mueve a
-//                           #mi-config-bloque y queda incrustada ahí, porque
-//                           una ventana aparte le sobraba a algo que cabe
-//                           dentro de la propia sección.
+//                           en ese mismo bloque). Desde 2026-08-09 no es una
+//                           ventana ni algo que se abra/colapse: #equipo-config
+//                           se mueve a #mi-config-bloque y queda ahí SIEMPRE
+//                           desplegada (AJUSTES tiene dos secciones y media,
+//                           esto cabe sin esconderse). Cada refresco de
+//                           cargarAjustes() la repinta llamando abrirConfigPropia()
+//                           de nuevo, salvo que haya cambios sin guardar a
+//                           mitad de editar.
 // `datos` es la configuración de partida (la fila del catálogo, o la que pidió
 // la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
 let configEquipo = null;
@@ -17171,16 +17174,12 @@ function abrirConfigSolicitud(dispositivo) {
 // Rutas y series de ESTA computadora, desde AJUSTES → Esta máquina. Reusa la
 // ventana de las demás con las secciones que aquí sobran escondidas: nombre,
 // vendedor y día ya se cambian en el mismo bloque, y dos controles para el
-// mismo dato se desincronizan. No abre como ventana aparte (2026-08-09,
-// pedido del usuario): cabe dentro del propio bloque, así que el mismo botón
-// que la abre la cierra si ya está a la vista (mismo patrón que
-// alternarCatalogo), pasando por intentarCerrarConfigEquipo para no perder
-// cambios sin guardar.
+// mismo dato se desincronizan. No es una ventana ni algo que se abra o
+// colapse (2026-08-09, pedido del usuario): la pestaña AJUSTES tiene dos
+// secciones y media, esta caja cabe siempre desplegada dentro de su bloque.
+// Repintar (recargar datos, guardar, cancelar) es solo volver a llamar esta
+// función con los datos vigentes.
 function abrirConfigPropia() {
-  if ((configEquipo || {}).origen === "propia") {
-    intentarCerrarConfigEquipo();
-    return;
-  }
   abrirVentanaConfigEquipo({origen: "propia", datos: configPropiaConRol(),
                             nombreVisible: "esta computadora"});
 }
@@ -17194,8 +17193,6 @@ function abrirVentanaConfigEquipo(ctx) {
   // ventana modal (#equipo-config-overlay), que es donde vive por defecto.
   (esPropia ? $("mi-config-bloque") : $("equipo-config-overlay"))
     .appendChild($("equipo-config"));
-  $("config-propia-boton").textContent = esPropia
-    ? "Cerrar" : "Configurar rutas y series";
   $("equipo-config-titulo").textContent = esPropia
     ? "Rutas y series de esta computadora"
     : `Configuración de ${nombreVisible}`;
@@ -17372,7 +17369,12 @@ function configEquipoHayCambios() {
 // Intento de cierre (clic afuera o Cancelar): con cambios sin guardar,
 // pregunta antes de descartar; sin cambios, cierra directo. En una solicitud
 // el "Guardar" es la activación, así que el botón de la pregunta lo dice.
+// La propia no tiene nada que cerrar (2026-08-09): Cancelar solo descarta lo
+// tecleado y repinta desde lo último guardado, sin preguntar — mismo criterio
+// que el Guardar de la propia: el efecto es sobre esta misma máquina y se ve
+// en el acto.
 function intentarCerrarConfigEquipo() {
+  if ((configEquipo || {}).origen === "propia") { abrirConfigPropia(); return; }
   if (!configEquipoHayCambios()) { cerrarConfigEquipo(); return; }
   const esSolicitud = (configEquipo || {}).origen === "solicitud";
   pedirConfirmSalida({
@@ -17576,13 +17578,8 @@ function marcarErrorConfigEquipo(campo, texto) {
 }
 
 function cerrarConfigEquipo() {
-  const eraPropia = (configEquipo || {}).origen === "propia";
   configEquipo = null;
   $("equipo-config-overlay").classList.remove("visible");
-  if (eraPropia) {
-    $("equipo-config-overlay").appendChild($("equipo-config"));
-    $("config-propia-boton").textContent = "Configurar rutas y series";
-  }
 }
 
 // El rol de esta computadora puede caer con la ventana ya abierta: la
@@ -17610,11 +17607,12 @@ function cerrarConfigEquipoSiSinPermiso() {
   const puede = configEquipo.origen === "solicitud"
     ? accesoGestion : tienePermiso("identidad_maquina");
   if (puede) return;
+  const esPropia = configEquipo.origen === "propia";
   if (confirmSalidaCerrar) confirmSalidaCerrar();
   cerrarConfigEquipo();
   mensaje("Esta computadora dejó de tener permiso para configurar rutas y "
-    + "series: la ventana se cerró sin guardar. Los roles se asignan desde "
-    + "la supervisión.", "alerta");
+    + "series: " + (esPropia ? "la sección se ocultó" : "la ventana se cerró")
+    + " sin guardar. Los roles se asignan desde la supervisión.", "alerta");
 }
 
 // Guardar se confirma (2026-08-07, pedido del usuario): lo que sale de aquí
@@ -17640,7 +17638,7 @@ function guardarConfigEquipo() {
 
 // Lo elegido para ESTA computadora entra de una: el servidor devuelve lo que
 // quedó (con una sola opción, la predeterminada se fuerza a esa) y con eso se
-// repintan la barra y el resumen del bloque, sin esperar al próximo refresco.
+// repinta la barra, sin esperar al próximo refresco.
 async function guardarConfigPropia() {
   const boton = $("equipo-config-guardar");
   boton.disabled = true;
@@ -17665,29 +17663,17 @@ async function guardarConfigPropia() {
     const adoptar = rutaPredeterminada
                     && rutaPredeterminada !== rutaSeleccionada;
     if (adoptar) rutaSeleccionada = rutaPredeterminada;
-    pintarMiConfigRutasSeries();
     pintarRutas(ultimaLista.rutas, ultimaLista.hay_sin_ruta);
     pintarSeries();
     if (adoptar) aplicarFiltros();
     if (supOverviewCargado) pintarEquiposSupervision();
-    cerrarConfigEquipo();
+    abrirConfigPropia();   // repinta con lo recién guardado; la caja sigue desplegada
     mensaje("Rutas y series de esta computadora guardadas.", "info");
   } catch (e) {
     marcarErrorConfigEquipo((e.datos || {}).campo || "", e.message);
   } finally {
     boton.disabled = false;
   }
-}
-
-// Resumen del bloque de AJUSTES → Esta máquina: la misma línea con la que se
-// describen las demás computadoras, sin el día (está justo abajo, con sus dos
-// opciones a la vista).
-function pintarMiConfigRutasSeries() {
-  const el = $("mi-config-resumen");
-  if (!el) return;
-  const m = configPropiaConRol();
-  el.innerHTML = `Series: ${chipsSeriesEquipo(m)}`
-    + ` · Rutas: ${chipsRutasEquipo(m)}`;
 }
 
 // La ventana edita TODO lo de esa computadora: nombre y vendedor por
