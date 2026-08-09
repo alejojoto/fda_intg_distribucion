@@ -10510,7 +10510,8 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
-  fechaDesfaseOk.detalle = "";      // la fecha se decide una vez por factura
+  fechaDesfaseOk.detalle = "";
+  motivoFechaDesfase.detalle = "";
   delete detalleFallos[clave];
   if (sinDetalle) sinDetalleGuardado.add(clave);
   else sinDetalleGuardado.delete(clave);
@@ -10535,7 +10536,8 @@ function abrirDetalleCargando(pedidoId, parte) {
   detalleEdicionHabilitada = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
-  fechaDesfaseOk.detalle = "";      // la fecha se decide una vez por factura
+  fechaDesfaseOk.detalle = "";
+  motivoFechaDesfase.detalle = "";
   delete detalleFallos[clave];
   delete detalleDatos[clave];
   sinDetalleGuardado.delete(clave); // reabrir la vuelve a armar: sí habrá detalle
@@ -12344,6 +12346,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
        // de prueba (sin registro que lo recuerde). La corrida jamás lo manda.
        repetir_confirmado: repetirConfirmado,
        familia_ajena_motivo: motivoFamilia,
+       motivo_fecha_inusual: motivoDeFechaParaFactura(pedido_id, parte),
        autorizar_cancelar: autorizarCancelar});
     // ¿Algo del llenado anterior estorbando en Winledger — documento a medias
     // en la Ficha o una ventana de artículo abierta? El programa NO lo toca sin
@@ -12664,6 +12667,15 @@ let motivoPedido = null;   // {accion, pedido_id, partes} mientras el diálogo e
 // Cada acción trae sus opciones (la última siempre "Otro" con texto libre) y
 // el texto de su botón.
 const ACCIONES_MOTIVO = {
+  fecha_desfasada: {
+    titulo: (_id, _partes, contexto) => `Facturar con fecha distinta — ¿por qué?`,
+    nota: (_id, _partes, contexto) => contexto?.aviso || "",
+    opciones: ["Reemisión de factura",
+               "El pedido quedó pendiente de facturar",
+               "Corrección administrativa"],
+    boton: "Registrar motivo",
+    clase: "primario",
+  },
   // "refacturar" = reabrir y llenar una factura cerrada: reemitir una
   // completada o recuperar una descartada / facturada a mano. Su botón dice
   // "Volver a llenar" como el de la lista (2026-07-23, texto distinto de
@@ -12948,12 +12960,12 @@ async function resolverConAnulacion(pedido_id, parte) {
 
 // `partes` es una lista: normalmente una sola, y varias cuando el operador
 // contesta que sí a la pregunta por las facturas hermanas del pedido.
-function abrirMotivo(accion, pedido_id, partes) {
+function abrirMotivo(accion, pedido_id, partes, contexto = null) {
   const cfg = ACCIONES_MOTIVO[accion];
-  motivoPedido = {accion, pedido_id, partes};
-  $("motivo-titulo").textContent = cfg.titulo(pedido_id, partes);
+  motivoPedido = {accion, pedido_id, partes, contexto};
+  $("motivo-titulo").textContent = cfg.titulo(pedido_id, partes, contexto);
   const nota = typeof cfg.nota === "function"
-    ? cfg.nota(pedido_id, partes) : (cfg.nota || "");
+    ? cfg.nota(pedido_id, partes, contexto) : (cfg.nota || "");
   $("motivo-nota").textContent = nota;
   $("motivo-nota").style.display = nota ? "" : "none";
   $("motivo-opciones").innerHTML =
@@ -12962,7 +12974,6 @@ function abrirMotivo(accion, pedido_id, partes) {
     `<label><input type="radio" name="motivo-refact" value="__otro__">Otro:</label>` +
     `<input type="text" id="motivo-otro" placeholder="Escribe cuál es el motivo" required>`;
   const radios = document.querySelectorAll("input[name=motivo-refact]");
-  radios[0].checked = true;                   // la primera opción
   radios.forEach(r => r.addEventListener("change", () => sincronizarMotivoOtro(true)));
   // Clic en el campo de texto = elegir "Otro" (2026-07-30, pedido del usuario):
   // quien va a escribir el motivo no debería tener que pulsar antes el radio.
@@ -12983,7 +12994,8 @@ function abrirMotivo(accion, pedido_id, partes) {
 // el que se elige "Otro"; el tabIndex mantiene el comportamiento anterior de
 // saltarlo al tabular mientras está bloqueado.
 function sincronizarMotivoOtro(enfocar) {
-  const esOtro = document.querySelector("input[name=motivo-refact]:checked").value === "__otro__";
+  const elegido = document.querySelector("input[name=motivo-refact]:checked");
+  const esOtro = !!elegido && elegido.value === "__otro__";
   const campo = $("motivo-otro");
   campo.readOnly = !esOtro;
   campo.tabIndex = esOtro ? 0 : -1;
@@ -13064,10 +13076,25 @@ function intentarCerrarMotivo() {
 async function confirmarMotivo() {
   if (!motivoPedido) return;
   const elegido = document.querySelector("input[name=motivo-refact]:checked");
+  if (!elegido) {
+    mensaje("Elige o escribe un motivo antes de continuar.", "error");
+    return;
+  }
   const motivo = (!elegido || elegido.value === "__otro__")
     ? $("motivo-otro").value.trim() : elegido.value;
   if (!motivo) { $("motivo-otro").reportValidity(); return; }   // el motivo es obligatorio
-  const {accion, pedido_id, partes} = motivoPedido;
+  const {accion, pedido_id, partes, contexto} = motivoPedido;
+  if (accion === "fecha_desfasada") {
+    const donde = contexto?.donde;
+    const d = donde && desfaseDeFechas(facturasDeLaVentana(donde));
+    if (!d || d.firma !== contexto.firma) { cerrarMotivo(); return; }
+    fechaDesfaseOk[donde] = d.firma;
+    motivoFechaDesfase[donde] = motivo;
+    cerrarMotivo();
+    if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
+    else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+    return;
+  }
   if (accion === "descartar") {
     // Antes de tocar nada: qué otras facturas del pedido quedan sin llenar
     // (la lista todavía está fresca). Si las hay, se pregunta después.
@@ -13754,7 +13781,8 @@ function revisarLotePrevio(meta) {
   previoDescuentosFallo = "";
   previoTocado = false;
   previoAbiertoEn = Date.now();
-  fechaDesfaseOk.previo = "";       // la fecha se decide una vez por lote
+  fechaDesfaseOk.previo = "";
+  motivoFechaDesfase.previo = "";
   pintarPrevioLote();
   // Los descuentos se piden EN PARALELO: la ventana abre con lo que el panel
   // ya tiene en la lista y esa columna se completa sola al llegar la
@@ -14450,16 +14478,12 @@ function botonesSerieRapidos(porBloques) {
     .join("")}</div></div>`;
 }
 
-// --- El pedido no es del día anterior (2026-08-01, pedido del usuario) -------
-// Un pedido se factura al día SIGUIENTE de su orden de salida: llenando para
-// hoy, el pedido es de ayer; para mañana, de hoy. Cuando no calza se dice antes
-// de llenar, porque el documento sale con la fecha a facturar y no con la del
-// pedido. La corrección va en el propio aviso, que es lo que este dato tiene de
-// distinto respecto a la serie o la tasa: no hay nada que escribir, solo mover
-// la fecha al día que le toca a ese pedido.
-// Desde 2026-08-05 (pedido del usuario) no es una sugerencia que se pueda pasar
-// de largo: el botón de llenar queda apagado hasta que el operador elija una de
-// las dos fechas — la que el aviso propone o la que ya está puesta.
+// --- Fecha a facturar y fecha del pedido ------------------------------------
+// La fecha configurada manda siempre: el aviso nunca la cambia ni propone
+// moverla. Normalmente se factura el día siguiente al pedido. La excepción de
+// fin de semana es operativa, no de feriados: un pedido del viernes se puede
+// facturar sábado, domingo o lunes. En cualquier otro cruce se exige un motivo
+// explícito, que queda en el historial de cada factura llenada.
 const diaAntesDe = (iso) => {
   const d = calDesdeISO(iso);
   if (!d) return "";
@@ -14497,7 +14521,12 @@ function desfaseDeFechas(facturas) {
   // verse igual con el modo admin prendido y apagado); lo que cambia es el
   // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
   if (!isoFacturar) return null;
-  const esperada = diaAntesDe(isoFacturar);
+  const fechaFacturar = calDesdeISO(isoFacturar);
+  if (!fechaFacturar) return null;
+  const diasHastaViernes = ({6: 1, 0: 2, 1: 3})[fechaFacturar.getDay()] || 1;
+  const esperadaFecha = new Date(fechaFacturar);
+  esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
+  const esperada = calISO(esperadaFecha);
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
@@ -14515,6 +14544,7 @@ function desfaseDeFechas(facturas) {
 // al abrir cada ventana: la fecha se decide una vez por lote y una vez por
 // factura suelta.
 const fechaDesfaseOk = {previo: "", detalle: ""};
+const motivoFechaDesfase = {previo: "", detalle: ""};
 
 const facturasDeLaVentana = (donde) =>
   (donde === "previo"
@@ -14529,11 +14559,20 @@ function faltaDecidirLaFecha(donde) {
 
 // "Se factura para el día que está puesto, a propósito": deja el aviso a la
 // vista (el hecho sigue siendo cierto) y suelta el botón de llenar.
-function confirmarFechaDesfase(donde) {
+function pedirMotivoFechaDesfase(donde) {
   const d = desfaseDeFechas(facturasDeLaVentana(donde));
-  fechaDesfaseOk[donde] = d ? d.firma : "";
-  if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
-  else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+  if (!d) return;
+  abrirMotivo("fecha_desfasada", "", [], {
+    donde, firma: d.firma,
+    aviso: `La Fecha a facturar se mantiene en ${fechaCortaDelAviso(d.isoFacturar, d.isoFacturar)}. `
+      + "Elige el motivo antes de llenar.",
+  });
+}
+
+function motivoDeFechaParaFactura(pedido_id, parte) {
+  const donde = secuenciaActiva || previoResolver ? "previo" : "detalle";
+  const d = desfaseDeFechas(facturasDeLaVentana(donde));
+  return d && d.firma === fechaDesfaseOk[donde] ? motivoFechaDesfase[donde] : null;
 }
 
 function avisoFechaDelPedido(facturas, donde) {
@@ -14558,39 +14597,27 @@ function avisoFechaDelPedido(facturas, donde) {
   const unaSola = fechas.length === 1;
   // Mover la fecha solo se ofrece cuando arregla TODAS: con parte del lote en
   // regla, correrla dejaría fuera de sitio a las que estaban bien.
-  const cambiar = (todas && distintas.length === 1)
-    ? `<button title="Mueve la Fecha a facturar al `
-      + `día siguiente del pedido. La tasa vuelve a la que corresponda a ese día."
-         onclick="cajitaFechaElegida('${esc(diaDespuesDe(distintas[0]))}')">Facturar `
-      + `para el ${esc(corta(diaDespuesDe(distintas[0])))}</button>`
-    : "";
-  // La otra salida: dejar la fecha donde está. Saltando la puesta a punto de la
-  // fecha el documento NO sale con ella, así que el botón no puede prometerla.
+  const finDeSemana = ["0", "6", "1"].includes(String(calDesdeISO(isoFacturar)?.getDay()));
+  const regla = finDeSemana
+    ? "Los pedidos del viernes se pueden facturar sábado, domingo o lunes."
+    : "Lo usual es facturar al día siguiente del pedido.";
   const confirmar = sinDecidir
-    ? `<button title="Deja la Fecha a facturar como está: se factura para ese `
-      + `día a propósito." onclick="confirmarFechaDesfase('${donde}')">${
-        saltandoPuestaAPunto("fecha") ? "Llenar igual"
-          : `Facturar para el ${esc(corta(isoFacturar))}`}</button>`
+    ? `<button title="La Fecha a facturar se mantiene; pide un motivo antes de llenar."
+         onclick="pedirMotivoFechaDesfase('${donde}')">Indicar motivo</button>`
     : "";
-  const salida = (cambiar || confirmar)
-    ? `<div class="previo-acciones">${cambiar}${confirmar}</div>` : "";
+  const salida = confirmar ? `<div class="previo-acciones">${confirmar}</div>` : "";
   const destino = saltandoPuestaAPunto("fecha")
     ? (unaSola ? "La fecha no se pone: el documento sale"
                : "La fecha no se pone: los documentos salen")
       + " con la que tenga el programa de facturación."
     : (unaSola ? "El documento sale" : "Los documentos salen")
       + " con la fecha de arriba.";
-  // Sin decidir, el botón de llenar está apagado: el aviso dice qué se espera.
-  // Con una sola salida no se "elige" nada: se confirma.
-  const pedido = saltandoPuestaAPunto("fecha") ? " Decide antes de llenar:"
-    : cambiar ? " Elige para qué día se factura:"
-    : " Confirma la fecha antes de llenar:";
-  const cierre = sinDecidir ? destino + pedido
+  const cierre = sinDecidir ? destino + " Indica el motivo antes de llenar:"
     : (unaSola ? "Se llena igual. " : "Se llenan igual. ") + destino;
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
       TRIANGULO_ALERTA}</div><div>${
-      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}: lo normal es `
-    + `facturar al día siguiente del pedido, el ${esc(corta(esperada))}. `
+      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}. ${esc(regla)} `
+    + `Para esa fecha, el pedido usual es del ${esc(corta(esperada))}. `
     + `${esc(cierre)}${salida}</div></div>`;
 }
 
