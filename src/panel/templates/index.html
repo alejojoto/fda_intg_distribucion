@@ -2931,9 +2931,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
   </section>
 
   <section id="sec-ajustes" class="tab-panel" style="display:none">
-   <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
-         #catalogo-overlay / #rutas-overlay): esta vista solo lista los botones
-         que los abren. -->
+   <!-- AJUSTES → Catálogos abre su modal en #catalogo-overlay. -->
     <div id="ajustes-home">
      <!-- Subpestañas de AJUSTES (2026-08-07, pedido del usuario): tres temas que
           no se mezclan — los datos del negocio (iguales en todas las máquinas),
@@ -2961,22 +2959,12 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
          de partir AJUSTES en tres). Cada bloque sigue apareciendo según su
          permiso; si no queda ninguno, cargarAjustes esconde la subpestaña. -->
     <div id="ajustes-vista-catalogos" style="display:none">
-      <!-- Catálogos y Rutas abren cada uno en su propio modal (2026-08-04, ver
-           #catalogo-overlay / #rutas-overlay) — ver
-           pintarBotonesCatalogos/alternarCatalogo y abrirRutasVista/cerrarRutasVista. -->
+      <!-- Catálogos abre su modal en #catalogo-overlay (2026-08-04). -->
       <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
         <h3>Catálogos</h3>
         <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
           códigos usados por programa de facturación.</p>
         <div class="cat-btns" id="cat-btns"></div>
-      </div>
-      <!-- Series por ruta es de Editor/Admin (src/roles.py, permiso
-           ajustes_catalogos): cargarAjustes lo muestra según el rol. -->
-      <div class="ajustes-bloque" id="rutas-series-bloque" style="display:none">
-        <h3>Series por ruta</h3>
-        <p class="mut" style="margin:4px 0 10px">Asigna series a cada ruta para
-          seleccionar automáticamente serie correspondiente al preparar pedidos.</p>
-        <button class="primario" onclick="abrirRutasVista()">Abrir rutas</button>
       </div>
     </div>
     <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
@@ -16210,8 +16198,6 @@ async function cargarAjustes() {
       abrirConfigPropia();
     $("catalogos-bloque").style.display =
       tienePermiso("ajustes_catalogos") ? "" : "none";
-    $("rutas-series-bloque").style.display =
-      tienePermiso("ajustes_catalogos") ? "" : "none";
     pintarEquipos();
     pintarSubtabsAjustes();
     // El overview de ADMIN → Equipos pinta su columna de series/rutas/día de
@@ -16650,12 +16636,11 @@ function puedeVerComputadoras() {
 
 // Qué subpestañas tienen algo que mostrar con los permisos de este rol. La de
 // esta máquina siempre está (nombre, vendedor y día de despacho no se degradan
-// por rol); la de catálogos, solo si alguno de sus dos bloques quedó visible, y
+// por rol); la de catálogos, solo si su bloque quedó visible, y
 // la del corte solo si su único bloque lo está —cargarAjustes ya los decidió
 // antes de llamar aquí—.
 function subtabsAjustesDisponibles() {
-  const hayCatalogos = ["catalogos-bloque", "rutas-series-bloque"]
-    .some(id => $(id).style.display !== "none");
+  const hayCatalogos = $("catalogos-bloque").style.display !== "none";
   return {catalogos: hayCatalogos,
           corte: $("corte-bloque").style.display !== "none",
           equipos: puedeVerComputadoras(), general: true};
