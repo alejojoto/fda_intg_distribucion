@@ -943,6 +943,16 @@
   #equipo-config input[type=text] { width:100%; box-sizing:border-box;
       padding:8px 10px; font-size:13.5px; border:1px solid var(--bor);
       border-radius:6px; }
+  /* Rutas y series de ESTA máquina no necesitan ventana aparte (2026-08-09,
+     pedido del usuario): #equipo-config se mueve por JS dentro de
+     #mi-config-bloque (abrirVentanaConfigEquipo) en vez de abrirse en
+     #equipo-config-overlay, y pierde el aspecto de diálogo flotante. Título e
+     intro se esconden: el bloque ya trae los suyos y repetirlos es ruido. */
+  #mi-config-bloque #equipo-config { background:none; border-radius:0;
+      padding:0; margin-top:0; width:auto; max-height:none;
+      overflow:visible; box-shadow:none; }
+  #mi-config-bloque #equipo-config-titulo,
+  #mi-config-bloque #equipo-config-intro { display:none; }
   .equipo-config-ayuda { margin:2px 0 8px; font-size:12.5px; }
   /* Nombre y vendedor a la par, y "Todas" con su predeterminada en la misma
      línea (2026-08-07, pedido del usuario): la ventana se lee en menos
@@ -2991,7 +3001,7 @@
           arranca el panel al abrir.</p>
         <div class="ajustes-fila">
           <span class="mut" id="mi-config-resumen"></span>
-          <button class="primario" onclick="abrirConfigPropia()">Configurar rutas y series</button>
+          <button class="primario" id="config-propia-boton" onclick="abrirConfigPropia()">Configurar rutas y series</button>
         </div>
       </div>
       <!-- Día de despacho (2026-07-28): cada puesto factura en un momento
@@ -17071,7 +17081,11 @@ const configPropiaConRol = () => ({...(configPropia || {}),
 //   {origen:"solicitud"}  → solicitud de activación (suma nombre y vendedor)
 //   {origen:"propia"}     → AJUSTES → Esta máquina (solo rutas y series: el
 //                           nombre, el vendedor y el día ya tienen su control
-//                           en ese mismo bloque)
+//                           en ese mismo bloque). Desde 2026-08-09 no abre en
+//                           #equipo-config-overlay: #equipo-config se mueve a
+//                           #mi-config-bloque y queda incrustada ahí, porque
+//                           una ventana aparte le sobraba a algo que cabe
+//                           dentro de la propia sección.
 // `datos` es la configuración de partida (la fila del catálogo, o la que pidió
 // la instalación al registrarse) y nunca se escribe: lo elegido se lee del DOM.
 let configEquipo = null;
@@ -17131,8 +17145,16 @@ function abrirConfigSolicitud(dispositivo) {
 // Rutas y series de ESTA computadora, desde AJUSTES → Esta máquina. Reusa la
 // ventana de las demás con las secciones que aquí sobran escondidas: nombre,
 // vendedor y día ya se cambian en el mismo bloque, y dos controles para el
-// mismo dato se desincronizan.
+// mismo dato se desincronizan. No abre como ventana aparte (2026-08-09,
+// pedido del usuario): cabe dentro del propio bloque, así que el mismo botón
+// que la abre la cierra si ya está a la vista (mismo patrón que
+// alternarCatalogo), pasando por intentarCerrarConfigEquipo para no perder
+// cambios sin guardar.
 function abrirConfigPropia() {
+  if ((configEquipo || {}).origen === "propia") {
+    intentarCerrarConfigEquipo();
+    return;
+  }
   abrirVentanaConfigEquipo({origen: "propia", datos: configPropiaConRol(),
                             nombreVisible: "esta computadora"});
 }
@@ -17142,6 +17164,12 @@ function abrirVentanaConfigEquipo(ctx) {
   const {origen, datos, nombreVisible} = ctx;
   const esSolicitud = origen === "solicitud";
   const esPropia = origen === "propia";
+  // La propia se incrusta en su bloque de AJUSTES; las demás siguen en su
+  // ventana modal (#equipo-config-overlay), que es donde vive por defecto.
+  (esPropia ? $("mi-config-bloque") : $("equipo-config-overlay"))
+    .appendChild($("equipo-config"));
+  $("config-propia-boton").textContent = esPropia
+    ? "Cerrar" : "Configurar rutas y series";
   $("equipo-config-titulo").textContent = esPropia
     ? "Rutas y series de esta computadora"
     : `Configuración de ${nombreVisible}`;
@@ -17244,7 +17272,7 @@ function abrirVentanaConfigEquipo(ctx) {
   }
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
   ctx.firma = firmaConfigEquipo();
-  $("equipo-config-overlay").classList.add("visible");
+  if (!esPropia) $("equipo-config-overlay").classList.add("visible");
 }
 
 const datosConfigEquipo = () => (configEquipo || {}).datos || {};
@@ -17522,8 +17550,13 @@ function marcarErrorConfigEquipo(campo, texto) {
 }
 
 function cerrarConfigEquipo() {
+  const eraPropia = (configEquipo || {}).origen === "propia";
   configEquipo = null;
   $("equipo-config-overlay").classList.remove("visible");
+  if (eraPropia) {
+    $("equipo-config-overlay").appendChild($("equipo-config"));
+    $("config-propia-boton").textContent = "Configurar rutas y series";
+  }
 }
 
 // El rol de esta computadora puede caer con la ventana ya abierta: la
@@ -17532,7 +17565,12 @@ function cerrarConfigEquipo() {
 // el candado de su endpoint (403). Se cierra aquí, diciendo por qué, en vez de
 // dejar que el operador lo descubra pulsando Guardar (2026-08-08).
 function cerrarConfigEquipoSiSinPermiso() {
-  if (!configEquipo || !editorVisible("equipo-config-overlay")) return;
+  // La propia ya no vive en el overlay (2026-08-09): editorVisible no la ve,
+  // así que su sola presencia en configEquipo basta — se limpia siempre junto
+  // con el overlay en cerrarConfigEquipo.
+  if (!configEquipo
+      || !(editorVisible("equipo-config-overlay") || configEquipo.origen === "propia"))
+    return;
   if (configEquipo.origen === "equipo") {
     const fila = equipos.find(e => e.dispositivo === configEquipo.dispositivo);
     if (fila && !fila.activa) {
