@@ -4499,13 +4499,6 @@ let completaEnFila = false;       // true = "pedido completo" (siguiente pedido 
 // pendiente de la ruta elegida. Solo existe sin imprimir, con una ruta elegida
 // y fuera de producción (ver rutaCompletaDisponible).
 let rutaCompletaEnFila = false;
-// "todas las rutas" (2026-08-05, pedido del usuario): sin ruta elegida y sin
-// imprimir, el lote se lleva TODO lo pendiente, ruta por ruta — la corrida va
-// por bloques y al cruzar de bloque cambia sola a la serie asignada de la ruta
-// siguiente (o se detiene a pedirla si no tiene). Es lo que vuelve segura una
-// corrida larga sin ruta: la serie ya no puede quedarse pegada de una ruta
-// anterior.
-let todasRutasEnFila = false;
 // --- Corrida por bloques de ruta (2026-08-05) -------------------------------
 // Sin ruta elegida la fila NUNCA mezcla rutas al azar: se ordena por bloques
 // (ver llenablesEnOrdenDeFila) y la serie se resuelve factura por factura con
@@ -4523,6 +4516,11 @@ let rutaEsperandoSerie = null;      // la corrida está detenida pidiendo serie
 // papel NUNCA se cambia de ruta ni de serie en silencio — al agotarse la ruta
 // con cupo pendiente, la corrida se detiene y ofrece continuar o parar.
 let cambioRutaPendiente = null;     // {siguiente, serie} mientras espera la decisión
+// Cruce de bloque de ruta con impresión (2026-08-09): en una corrida SIN ruta
+// elegida el lote puede pasar de una ruta a otra a mitad de camino. Con papel
+// eso es cambiar el talonario, así que la corrida se detiene en el cruce y
+// pregunta. {ruta, serie} de la ruta que viene mientras espera la decisión.
+let cambioBloquePendiente = null;
 // Corrida encadenada de "Llenar en fila" (2026-07-26, PLAN.md pendiente 8):
 // colaEnFila es la fila EXACTA que el lote va a llenar — la que quedó apartada
 // en el estado compartido al arrancar (pendiente 33), así que ninguna otra
@@ -4860,7 +4858,8 @@ function actualizarModoLlenado() {
   // Las esperas de la corrida por rutas (2026-08-05) también son modo llenado:
   // la decisión —serie de una ruta, o continuar con la siguiente— vive en la
   // barra, y soltar el modo aquí escondería justo los botones que la piden.
-  const esperaDeRuta = rutaEsperandoSerie !== null || cambioRutaPendiente !== null;
+  const esperaDeRuta = rutaEsperandoSerie !== null || cambioRutaPendiente !== null
+                       || cambioBloquePendiente !== null;
   const activo = llenando || relanzandoTrasConfirmacion || secuenciaActiva ||
                  esperandoLogin || pausadoPorFallo || esperandoEnvioPlataforma ||
                  llenadoDeOtraVentana || esperaDeRuta;
@@ -13300,37 +13299,30 @@ async function confirmarHermanas() {
 }
 
 // --- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) ---------------
-// Tamaño del lote, como DROPDOWN (pedido del usuario). Las
-// opciones NO son las mismas en los dos modos de impresión: con Imprimir: sí
-// van 1..10 completas y NADA MÁS (2026-07-25, restaurado el 2026-07-26 tras
-// perderse en el cambio del cierre de la corrida) porque el papel obliga a
-// lotes cortos y de tamaño variable — si quedan 7 fichas en la serie, ese 7
-// tiene que agarrarse de un clic. Sin imprimir bastan los atajos 1/5/10.
-// El "otro…" que había ahí (campo libre, sin tope) se retiró el 2026-07-31 a
-// pedido del usuario: un lote largo arriesga pasarse a la serie equivocada, así
-// que 10 es el techo de TODO lote numérico, con ruta elegida o sin ella. Sin
-// imprimir y con una ruta elegida se suma "ruta completa", que llena todas las
-// pendientes de esa ruta (2026-07-30, pedido del usuario) y es la única forma
-// de pasar de 10. La corrida encadena en ambos casos; con "sí" solo cambia que
-// se espera el «Continuar» del operador entre facturas.
+// Tamaño del lote, como DROPDOWN (pedido del usuario). Van 1..10 en los DOS
+// modos de impresión y con ruta elegida o sin ella (2026-08-09, pedido del
+// usuario): antes sin papel solo se ofrecían los atajos 1/5/10 y con papel sin
+// ruta elegida el tope era 1, y ninguna de las dos listas dejaba pedir la
+// cantidad que hacía falta — si quedan 7 fichas en la serie, ese 7 tiene que
+// agarrarse de un clic. El "otro…" que había ahí (campo libre, sin tope) se
+// retiró el 2026-07-31: un lote largo arriesga pasarse a la serie equivocada,
+// así que 10 sigue siendo el techo de TODO lote numérico. Con una ruta elegida
+// se suma "ruta completa", que llena todas las pendientes de esa ruta
+// (2026-07-30, pedido del usuario) y es la única forma de pasar de 10. La
+// corrida encadena en ambos casos; con "sí" solo cambia que se espera el
+// «Continuar» del operador entre facturas.
 const imprimirEnFila = () =>
   document.querySelector('input[name="enfila-imp"]:checked').value === "si";
 
 // "ruta completa" (2026-07-30, pedido del usuario): llenar de un tirón todo lo
 // pendiente de la ruta elegida. Con impresión no aparece (el papel obliga a
 // lotes cortos y de tamaño variable) y sin ruta elegida tampoco: sería "todo lo
-// que haya", que no es lo que se pidió. El gate de la barra (enFilaDisponible)
-// la deja fuera de las máquinas de operación.
+// que haya" — y llenar una ruta entera exige tenerla escogida (2026-08-09,
+// regla del usuario; por eso se retiró "todas las rutas", que era justo eso).
+// El gate de la barra (enFilaDisponible) la deja fuera de las máquinas de
+// operación.
 function rutaCompletaDisponible() {
   return !imprimirEnFila() && rutaSeleccionada !== "" && enFilaDisponible();
-}
-
-// "todas las rutas" (2026-08-05): el espejo de "ruta completa" para cuando NO
-// hay ruta elegida — solo sin imprimir. La corrida va por bloques de ruta y la
-// serie cambia sola al cruzar de bloque (o se pide si la ruta no tiene), así
-// que la corrida larga ya no arriesga salir con la serie equivocada.
-function todasRutasDisponible() {
-  return !imprimirEnFila() && rutaSeleccionada === "" && enFilaDisponible();
 }
 
 // El <select> se reconstruye solo cuando cambia lo que muestra (si "ruta
@@ -13339,10 +13331,9 @@ function todasRutasDisponible() {
 let firmaCantidadesPintada = null;
 function firmaCantidades() {
   // La firma son las opciones mismas (2026-08-05): el menú cambia con la
-  // impresión, la ruta y sus cuentas ("ruta completa", "todas las rutas", el
-  // 1 solo de imprimir sin ruta), y enumerar aquí cada combinación se quedaba
-  // corto — cambiar de ruta con la misma cantidad dejaba el hover nombrando la
-  // anterior, y el tope de imprimir sin ruta ni entraba.
+  // impresión, la ruta y sus cuentas ("ruta completa" y su total), y enumerar
+  // aquí cada combinación se quedaba corto — cambiar de ruta con la misma
+  // cantidad dejaba el hover nombrando la anterior.
   return opcionesDeCantidad().map(o => `${o.valor}|${o.texto}|${o.hover || ""}`).join(";");
 }
 function sincronizarCantidades() {
@@ -13357,9 +13348,10 @@ function sincronizarCantidades() {
 // llenar.
 const HOVER_PEDIDO_COMPLETO = "Llena el siguiente pedido disponible completo, "
   + "sin importar en cuántas facturas esté dividido (cada factura son máx. 25 líneas).";
-const NUMEROS_CON_IMPRESION = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const NUMEROS_SIN_IMPRESION = [1, 5, 10];
-const CANTIDAD_ESTANDAR = 5;
+// La misma lista en los dos modos de impresión (2026-08-09, pedido del
+// usuario): lo que cambia con el papel es la UNIDAD (pedidos sin él, facturas
+// con él), no cuántas se pueden pedir.
+const NUMEROS_EN_FILA = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // Sin imprimir la fila se mide en PEDIDOS, no en facturas (2026-07-31, pedido
 // del usuario): un pedido dividido se llena entero o no se llena, así que
@@ -13400,31 +13392,15 @@ function opcionesDeCantidad() {
   // menú tiene que poder decirla — no puede mostrar una cantidad distinta de la
   // que se va a llenar. Esa es la ÚNICA vía a un número fuera de la lista: a
   // mano no se teclea nada, el tope de lo que se elige son 10 (2026-07-31).
-  // Con impresión y SIN ruta elegida el tope es 1 (2026-08-05, regla del
-  // usuario): con papel una corrida es de una sola ruta — la serie y el
-  // talonario van amarrados a ella —, así que el lote de varias exige elegirla.
-  // "Pedido completo" se queda: sus facturas son de un solo pedido, o sea de
-  // una sola ruta.
-  const numeros = imp
-    ? (rutaSeleccionada !== "" ? NUMEROS_CON_IMPRESION : [1])
-    : NUMEROS_SIN_IMPRESION;
-  const hoverImpSinRuta = imp && rutaSeleccionada === ""
-    ? "Con impresión, más de una factura por corrida solo con una ruta "
-      + "elegida: la serie y el papel van amarrados a la ruta." : "";
-  const numerico = !completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila;
+  // Sin ruta elegida el lote puede cruzar rutas: va por BLOQUES y, con papel,
+  // la corrida se detiene en cada cruce para que el operador cambie el
+  // talonario (2026-08-09) — antes eso se evitaba con un tope de 1, que dejaba
+  // el menú sin nada que ofrecer.
+  const numeros = NUMEROS_EN_FILA;
+  const numerico = !completaEnFila && !rutaCompletaEnFila;
   for (const n of (numerico && !numeros.includes(cantidadEnFila)
                    ? [...numeros, cantidadEnFila].sort((a, b) => a - b) : numeros))
-    ops.push({valor: String(n), texto: unidadEnFila(n),
-              ...(hoverImpSinRuta ? {hover: hoverImpSinRuta} : {})});
-  if (todasRutasDisponible()) {
-    ops.push({
-      valor: "todas",
-      texto: `todas las rutas (${unidadEnFila(unidadesDe(pendientesLlenables()))})`,
-      hover: `Llena todos los pedidos pendientes, ruta por ruta y en orden: `
-           + `cada bloque sale con la serie asignada de su ruta, y si una ruta `
-           + `no tiene serie la corrida se detiene ahí para que la elijas.`,
-    });
-  }
+    ops.push({valor: String(n), texto: unidadEnFila(n)});
   if (rutaCompletaDisponible()) {
     // "(sin ruta)" es un grupo real de pedidos, no la ausencia de filtro: se
     // nombra distinto para que el hover no diga "la ruta __sin_ruta__".
@@ -13447,8 +13423,7 @@ function opcionesDeCantidad() {
 // La opción elegida AHORA, con el mismo valor que llevan los <option>.
 const valorCantidadActual = () =>
   completaEnFila ? "completa"
-  : rutaCompletaEnFila ? "ruta"
-  : todasRutasEnFila ? "todas" : String(cantidadEnFila);
+  : rutaCompletaEnFila ? "ruta" : String(cantidadEnFila);
 
 const opcionesCantidadHtml = () => {
   const actual = valorCantidadActual();
@@ -13464,14 +13439,10 @@ const opcionesCantidadHtml = () => {
 // cantidad mayor traída de un lote de ruta baja a 10.
 function acomodarCantidadAlModo() {
   if (!rutaCompletaDisponible()) rutaCompletaEnFila = false;
-  if (!todasRutasDisponible()) todasRutasEnFila = false;
   // Sin imprimir "pedido completo" no se ofrece porque "1 pedido" es lo mismo:
   // la elección cae en su equivalente exacto, no en el estándar.
   if (completaEnFila && enFilaEnPedidos()) { completaEnFila = false; cantidadEnFila = 1; }
   if (imprimirEnFila() && cantidadEnFila > 10) cantidadEnFila = 10;
-  // Con impresión y sin ruta el tope es 1 (2026-08-05): ver opcionesDeCantidad.
-  if (imprimirEnFila() && rutaSeleccionada === "" && cantidadEnFila > 1)
-    cantidadEnFila = 1;
 }
 
 function pintarCantidades() {
@@ -13493,8 +13464,7 @@ function pintarCantidades() {
 function fijarCantidad(valor) {
   completaEnFila = valor === "completa";
   rutaCompletaEnFila = valor === "ruta";
-  todasRutasEnFila = valor === "todas";
-  if (!completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila)
+  if (!completaEnFila && !rutaCompletaEnFila)
     cantidadEnFila = parseInt(valor, 10);
 }
 
@@ -13666,10 +13636,9 @@ function lanzarEnFila() {
   // sentido enseñar un lote que igual no va a arrancar.
   if (!pendientesLlenables().length) { mensaje("No hay pendientes.", "info"); return; }
   if (completaEnFila) { arrancarSecuencia(familiaDelSiguiente().partes); return; }
-  // Ruta completa / todas las rutas: el lote se lleva TODO lo pendiente (de la
-  // ruta, o de todas por bloques), así que no hay corte que pueda partir un
-  // pedido en dos lotes y nada que preguntar.
-  if (rutaCompletaEnFila || todasRutasEnFila) {
+  // Ruta completa: el lote se lleva TODO lo pendiente de la ruta, así que no hay
+  // corte que pueda partir un pedido en dos lotes y nada que preguntar.
+  if (rutaCompletaEnFila) {
     arrancarSecuencia(pendientesLlenables().length);
     return;
   }
@@ -14325,7 +14294,7 @@ function rehacerPrevioLote() {
 // siguiente). Sin imprimir la numérica viene en pedidos y se traduce aquí.
 function metaDelModo() {
   const hay = pendientesParaLaFila();
-  if (rutaCompletaEnFila || todasRutasEnFila) return hay.length;
+  if (rutaCompletaEnFila) return hay.length;
   if (completaEnFila) return hay.length ? familiaDelSiguiente(hay).partes : 0;
   return facturasDeCantidad(cantidadEnFila, hay);
 }
@@ -14392,17 +14361,13 @@ function previoQuitarSinReponer() {
   rehacerPrevioLote();
 }
 
-// La impresión decide qué cantidades se ofrecen y en qué se cuentan (pedidos sin
-// papel, facturas con él), así que cambiarla puede mover la cantidad vigente: la
-// que el modo nuevo no ofrezca vuelve al estándar (2026-07-31, pedido del
-// usuario) en vez de quedarse como un número suelto que ese modo no lista. La
-// fila se rehace para que lo que está a la vista sea lo que se va a llenar.
+// La impresión ya no cambia QUÉ cantidades se ofrecen (2026-08-09: son 1..10 en
+// los dos modos), pero sí en qué se cuentan (pedidos sin papel, facturas con
+// él) y qué opciones existen aparte del número ("pedido completo", "ruta
+// completa"). La fila se rehace para que lo que está a la vista sea lo que se
+// va a llenar.
 function cambioImpresionEnFila() {
-  const numeros = imprimirEnFila() ? NUMEROS_CON_IMPRESION : NUMEROS_SIN_IMPRESION;
-  if (!completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila
-      && !numeros.includes(cantidadEnFila))
-    cantidadEnFila = CANTIDAD_ESTANDAR;
-  pintarCantidades();          // las cantidades ofrecidas dependen del papel
+  pintarCantidades();          // la unidad y las opciones dependen del papel
   if (previoResolver) rehacerPrevioLote();  // la línea de proceso también cambia
   if (detalleAbierto) pintarVentanaDetalle(detalleAbierto);
 }
@@ -14770,9 +14735,9 @@ async function arrancarSecuencia(meta) {
   // ya apartadas en otra máquina. Si había menos pendientes que las pedidas,
   // la meta real ya nace más corta y no hay con qué reponer.
   metaPedidaEnFila = meta;
-  // Con "ruta completa" o "todas las rutas" el lote ya se llevó todo lo que
-  // había: si alguna factura resulta ajena, no queda ninguna con que reponerla.
-  reponerEnFila = !completaEnFila && !rutaCompletaEnFila && !todasRutasEnFila;
+  // Con "ruta completa" el lote ya se llevó todo lo que había: si alguna factura
+  // resulta ajena, no queda ninguna con que reponerla.
+  reponerEnFila = !completaEnFila && !rutaCompletaEnFila;
   pedidosFueraEnFila = fueraDelLote;
   descartadasEnFila = [];
   reposicionesEnFila = [];
@@ -14788,6 +14753,7 @@ async function arrancarSecuencia(meta) {
   serieDelLlenadoEnCurso = null;
   rutaDeLaEnCurso = "";
   cambioRutaPendiente = null;
+  cambioBloquePendiente = null;
   corridaResumenPendiente = null;
   iniciarSecuencia();
   vigilarReserva();
@@ -15030,8 +14996,61 @@ function siguienteDeSecuencia() {
   } else {
     serieDelLlenadoEnCurso = null;
   }
+  // Cruce de bloque con papel (2026-08-09): sin ruta elegida el lote numérico
+  // puede pasar de una ruta a la siguiente, y con impresión eso es cambiar el
+  // talonario físico — nunca en silencio (misma regla del 2026-08-05 que ya
+  // gobierna el cambio de ruta con el filtro puesto). Sin papel el cruce sigue
+  // solo: la barra ya dice de qué ruta es cada factura.
+  if (imprimirEnFila() && rutaDeLaEnCurso && ruta !== rutaDeLaEnCurso) {
+    pausarPorCambioDeBloque(ruta, serieDelLlenadoEnCurso || "");
+    return;
+  }
   rutaDeLaEnCurso = ruta;
   llenar(siguiente.pedido_id, siguiente.parte);
+}
+
+// La pausa del cruce: los mismos botones de la barra que usa el cambio de ruta
+// con filtro puesto. Aquí no hay serie que elegir —la del bloque ya se resolvió
+// arriba, y si faltaba la corrida se detuvo antes a pedirla—, así que la
+// decisión es una sola: seguir con el talonario cambiado, o parar.
+function pausarPorCambioDeBloque(ruta, serie) {
+  secuenciaActiva = false;
+  cambioBloquePendiente = {ruta, serie};
+  $("btn-secuencia").style.display = "none";
+  $("btn-detener").style.display = "none";
+  const caja = $("serie-ruta-botones");
+  caja.innerHTML =
+    `<button class="acento" onclick="confirmarCambioDeBloque()">Continuar con `
+    + `la ruta ${esc(etiquetaRutaCorta(ruta))}</button>`
+    + `<button class="peligro" onclick="detenerCambioDeBloque()">Detener el lote</button>`;
+  caja.style.display = "";
+  mensaje(`La ruta ${etiquetaRutaCorta(rutaDeLaEnCurso)} terminó su parte del `
+    + `lote. Sigue la ruta ${etiquetaRutaCorta(ruta)}${serie
+        ? `, con la serie ${serie}` : ""}. Antes de continuar revisa el `
+    + `talonario: la serie y el número de factura deben coincidir con el papel `
+    + `puesto.`, "alerta", false);
+  actualizarModoLlenado();
+}
+
+function confirmarCambioDeBloque() {
+  const pendiente = cambioBloquePendiente;
+  if (!pendiente) return;
+  ocultarBotonesSerieDeRuta();
+  // Confirmado el cruce, la ruta en curso pasa a ser la nueva ANTES de volver a
+  // siguienteDeSecuencia: si no, la misma factura volvería a disparar la pausa.
+  rutaDeLaEnCurso = pendiente.ruta;
+  secuenciaActiva = true;
+  $("btn-detener").style.display = "";
+  siguienteDeSecuencia();
+}
+
+function detenerCambioDeBloque() {
+  const pendiente = cambioBloquePendiente;
+  ocultarBotonesSerieDeRuta();
+  detenerSecuencia(`Llenado en fila terminado: ${hechasEnFila} de `
+    + `${metaEnFila} facturas${pendiente
+        ? ` (paró antes de pasar a la ruta ${etiquetaRutaCorta(pendiente.ruta)})`
+        : ""}. Lo que no se llenó sigue pendiente.`, "exito");
 }
 
 // La serie con la que sale la próxima factura de la corrida, o "" si hay que
@@ -15148,6 +15167,7 @@ function detenerDesdeSerieDeRuta() {
 function ocultarBotonesSerieDeRuta() {
   rutaEsperandoSerie = null;
   cambioRutaPendiente = null;
+  cambioBloquePendiente = null;
   const caja = $("serie-ruta-botones");
   caja.style.display = "none";
   caja.innerHTML = "";
