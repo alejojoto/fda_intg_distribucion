@@ -7337,7 +7337,7 @@ function supFechaCorta(valor) {
   const esHoy = fecha.getFullYear() === ahora.getFullYear()
       && fecha.getMonth() === ahora.getMonth() && fecha.getDate() === ahora.getDate();
   if (esHoy) return hora;
-  return fecha.toLocaleDateString([], {day:"2-digit", month:"2-digit"}) + " " + hora;
+  return `${calPad(fecha.getDate())} ${CAL_MESES[fecha.getMonth()]} ${hora}`;
 }
 
 function supNumero(valor) {
@@ -16616,9 +16616,9 @@ let solicitudes = [];
 const fechaAcceso = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
-  return isNaN(d) ? "—" : d.toLocaleString("es-VE",
-    {day: "2-digit", month: "2-digit", year: "numeric",
-     hour: "2-digit", minute: "2-digit"});
+  if (isNaN(d)) return "—";
+  const hora = d.toLocaleTimeString("es-VE", {hour: "2-digit", minute: "2-digit"});
+  return `${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]} ${d.getFullYear()}, ${hora}`;
 };
 
 async function cargarSolicitudesAcceso() {
@@ -22666,7 +22666,7 @@ const calPad = (n) => String(n).padStart(2, "0");
 const calISO = (d) => `${d.getFullYear()}-${calPad(d.getMonth() + 1)}-${calPad(d.getDate())}`;
 const calDMY = (iso) => {
   const d = calDesdeISO(iso);
-  return d ? `${calPad(d.getDate())}/${calPad(d.getMonth() + 1)}/${d.getFullYear()}` : "";
+  return d ? `${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]} ${d.getFullYear()}` : "";
 };
 
 // "aaaa-mm-dd" → Date local, o null si el campo está vacío/a medio teclear.
@@ -23094,7 +23094,8 @@ function borradorFechaAviso(ts) {
   try {
     const d = new Date(ts);
     if (isNaN(d.getTime())) return "";
-    return " (" + d.toLocaleString("es-VE", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}) + ")";
+    const hora = d.toLocaleTimeString("es-VE", {hour: "2-digit", minute: "2-digit"});
+    return ` (${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]}, ${hora})`;
   } catch (_) { return ""; }
 }
 
