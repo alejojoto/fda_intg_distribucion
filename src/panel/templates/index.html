@@ -801,6 +801,10 @@
   /* La línea que el robot reconoció como saltada, marcada donde se ve. */
   #fin-llenado-cuerpo tr.fl-omitida td { background:#fffbeb; color:#b54708; }
   #fin-llenado-cuerpo .fl-motivo { font-size:11px; }
+  /* Entró al segundo intento: la línea está en el documento (nada que
+     arreglar), solo cambió de sitio — por eso informativa y no ámbar. */
+  #fin-llenado-cuerpo tr.fl-al-final td { background:#f0f9ff; color:#075985; }
+  #fin-llenado-cuerpo .fl-final { font-size:11px; }
   #fin-llenado-acciones { display:flex; gap:8px; margin-top:8px; }
   #mensaje.error { background:#fee4e2; color:var(--err); }
   #mensaje.info { background:#e0eaff; color:#1d4ed8; }
@@ -5383,6 +5387,16 @@ function pintarResumenFinal() {
   const {omitidas, llenadas, pedidas, lineas} = resumenFinal;
   const claves = Object.keys(omitidas || {});
   const chequeo = $("fin-llenado-chequeo");
+  // Lo que no entró cuando le tocaba y sí entró al reintentarlo quedó de
+  // ÚLTIMO en el documento (2026-08-10): la tabla ya sale en el orden REAL, y
+  // esto lo dice con palabras — el desajuste contra el pedido es lo primero
+  // que se nota al compararlos.
+  const alFinal = lineas.filter(l => l.al_final);
+  const una = alFinal.length === 1;
+  const notaOrden = !alFinal.length ? ""
+    : ` ${una ? "Una línea no entró cuando le tocaba y se agregó"
+              : `${alFinal.length} líneas no entraron cuando les tocaba y se agregaron`}`
+      + " al final: el orden no coincide con el del pedido.";
   if (claves.length) {
     const cuales = claves.map(c => {
       const i = lineas.findIndex(l => (l.codigo || "") === c);
@@ -5391,25 +5405,27 @@ function pintarResumenFinal() {
     chequeo.classList.add("alerta");
     chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: parece que se `
       + `${claves.length === 1 ? "saltó" : "saltaron"} ${cuales}. Revisa el documento `
-      + `o vuelve a llenar.`;
+      + `o vuelve a llenar.` + notaOrden;
   } else if (pedidas && llenadas !== pedidas) {
     chequeo.classList.add("alerta");
-    chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: revisa el documento.`;
+    chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: revisa el documento.`
+      + notaOrden;
   } else {
     chequeo.classList.remove("alerta");
-    chequeo.textContent = llenadas === 1
+    chequeo.textContent = (llenadas === 1
       ? "La única línea del pedido entró al documento."
-      : `Las ${llenadas} líneas del pedido entraron al documento.`;
+      : `Las ${llenadas} líneas del pedido entraron al documento.`) + notaOrden;
   }
   $("fin-llenado-cuerpo").innerHTML = !lineas.length ? ""
     : `<table><thead><tr><th></th><th>Producto</th>
          <th class="vp-num">Cantidad</th><th class="vp-num">Descuento</th>
        </tr></thead><tbody>${lineas.map((l, i) => {
         const motivo = omitidas && omitidas[l.codigo];
-        return `<tr${motivo ? ` class="fl-omitida"` : ""}>
+        return `<tr${motivo ? ` class="fl-omitida"` : l.al_final ? ` class="fl-al-final"` : ""}>
           <td class="det-num">${i + 1}</td>
           <td>${esc(l.producto || l.codigo || "")}${
-            motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>` : ""}</td>
+            motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>`
+            : l.al_final ? `<div class="fl-final">Se agregó al final: no entró cuando le tocaba.</div>` : ""}</td>
           <td class="vp-num">${fmtCantidad(l.cantidad)}</td>
           <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
@@ -16430,7 +16446,7 @@ function pintarSerieRegistro(conocidas) {
     todas ? "Serie predeterminada" : "Serie con la que factura";
   const previa = select.value;
   select.innerHTML =
-    `<option value="">${todas ? "— Todas —" : "— Elegir… —"}</option>`
+    `<option value="">— Elegir… —</option>`
     + conocidas.map(s => `<option value="${esc(s)}"
         ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
   select.value = conocidas.includes(previa) ? previa : "";
@@ -17635,7 +17651,7 @@ function configEquipoPintarSerie(conocidas, preseleccionar) {
   select.style.display = "";
   const previa = preseleccionar !== undefined ? preseleccionar : select.value;
   select.innerHTML =
-    `<option value="">${todas ? "— Todas —" : "— Elegir… —"}</option>`
+    `<option value="">— Elegir… —</option>`
     + conocidas.map(s => `<option value="${esc(s)}"
         ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
   select.value = conocidas.includes(previa) ? previa : "";
