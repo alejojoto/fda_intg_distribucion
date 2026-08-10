@@ -8513,8 +8513,12 @@ const TITULO_PEDIDO_VIEJO =
 const TITULO_DIA_VIEJO =
   "Órdenes viejas: pedidos de este día que siguen sin facturar.";
 
-// "Hoy" / "Ayer" / "07 agosto" (con año solo si no es el actual, como en
-// avisoFechaDelPedido) / "Sin fecha registrada" para lo que llegó sin dato.
+// Índice de getDay(): 0 = domingo.
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves",
+                     "viernes", "sábado"];
+
+// "Hoy" / "Ayer" / "viernes 07 agosto" (con año solo si no es el actual, como
+// en avisoFechaDelPedido) / "Sin fecha registrada" para lo que llegó sin dato.
 // El mes va con nombre y no en "07/08": esa forma se leía como un rango
 // "del 7 al 8" (2026-08-10, confusión real de una operadora).
 function etiquetaSeparadorFecha(iso, hoy, ayer) {
@@ -8523,7 +8527,7 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
   if (iso === ayer) return "Ayer";
   const d = calDesdeISO(iso);
   if (!d) return iso;
-  const diaMes = `${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]}`;
+  const diaMes = `${DIAS_SEMANA[d.getDay()]} ${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]}`;
   return iso.slice(0, 4) === hoy.slice(0, 4) ? diaMes : `${diaMes} ${d.getFullYear()}`;
 }
 
