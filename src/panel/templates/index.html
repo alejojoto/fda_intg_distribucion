@@ -8489,10 +8489,22 @@ const ayerComoISO = () => {
   return calISO(d);
 };
 
-// Atrasado = ni hoy ni ayer, con fecha real (2026-08-02): se resalta —
-// separador y fila— para que un pedido olvidado o un caso de EN REVISIÓN que
-// lleva mucho tiempo esperando no se pierda al fondo de la lista.
-const esFechaAtrasada = (iso, hoy, ayer) => !!iso && iso !== hoy && iso !== ayer;
+// El día de gracia es el HÁBIL anterior, no el del calendario (2026-08-10,
+// regla del usuario): se factura el día siguiente al pedido y el fin de semana
+// no se factura, así que el pedido del viernes sigue vigente el lunes y recién
+// el martes queda viejo. Misma excepción operativa que desfaseDeFechas(): de
+// fin de semana, no de feriados (un feriado no mueve la fecha, solo la tasa).
+const diaDeGraciaISO = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return calISO(d);
+};
+
+// Atrasado = anterior al día de gracia, con fecha real (2026-08-02): se
+// resalta —separador y fila— para que un pedido olvidado o un caso de EN
+// REVISIÓN que lleva mucho tiempo esperando no se pierda al fondo de la lista.
+const esFechaAtrasada = (iso, gracia) => !!iso && iso < gracia;
 
 // El color dice que algo pasa; el hover dice qué (2026-08-07, pedido del
 // usuario). La fila habla de UN pedido y la franja del día, de todos los suyos.
@@ -8519,19 +8531,19 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
 function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
-  const hoy = hoyComoISO(), ayer = ayerComoISO();
+  const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
   let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
   let html = "";
   for (const item of items) {
     const iso = (fechaDe(item) || "").slice(0, 10);
     if (iso !== diaAnterior) {
       diaAnterior = iso;
-      const atrasada = esFechaAtrasada(iso, hoy, ayer);
+      const atrasada = esFechaAtrasada(iso, gracia);
       html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
         + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
         + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer))}</td></tr>`;
     }
-    html += render(item, esFechaAtrasada(iso, hoy, ayer));
+    html += render(item, esFechaAtrasada(iso, gracia));
   }
   return html;
 }
