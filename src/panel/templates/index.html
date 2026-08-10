@@ -801,6 +801,10 @@
   /* La línea que el robot reconoció como saltada, marcada donde se ve. */
   #fin-llenado-cuerpo tr.fl-omitida td { background:#fffbeb; color:#b54708; }
   #fin-llenado-cuerpo .fl-motivo { font-size:11px; }
+  /* Entró al segundo intento: la línea está en el documento (nada que
+     arreglar), solo cambió de sitio — por eso informativa y no ámbar. */
+  #fin-llenado-cuerpo tr.fl-al-final td { background:#f0f9ff; color:#075985; }
+  #fin-llenado-cuerpo .fl-final { font-size:11px; }
   #fin-llenado-acciones { display:flex; gap:8px; margin-top:8px; }
   #mensaje.error { background:#fee4e2; color:var(--err); }
   #mensaje.info { background:#e0eaff; color:#1d4ed8; }
@@ -5397,6 +5401,9 @@ function pintarResumenFinal() {
     chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: revisa el documento.`;
   } else {
     chequeo.classList.remove("alerta");
+    // Lo que entró al segundo intento NO se repite aquí (2026-08-10): ya lo
+    // dijo el aviso de arriba una vez, y la línea sale marcada al final de la
+    // lista. El documento quedó bien llenado; con eso basta.
     chequeo.textContent = llenadas === 1
       ? "La única línea del pedido entró al documento."
       : `Las ${llenadas} líneas del pedido entraron al documento.`;
@@ -5406,10 +5413,11 @@ function pintarResumenFinal() {
          <th class="vp-num">Cantidad</th><th class="vp-num">Descuento</th>
        </tr></thead><tbody>${lineas.map((l, i) => {
         const motivo = omitidas && omitidas[l.codigo];
-        return `<tr${motivo ? ` class="fl-omitida"` : ""}>
+        return `<tr${motivo ? ` class="fl-omitida"` : l.al_final ? ` class="fl-al-final"` : ""}>
           <td class="det-num">${i + 1}</td>
           <td>${esc(l.producto || l.codigo || "")}${
-            motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>` : ""}</td>
+            motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>`
+            : l.al_final ? `<div class="fl-final">Se agregó al final: no entró cuando le tocaba.</div>` : ""}</td>
           <td class="vp-num">${fmtCantidad(l.cantidad)}</td>
           <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
@@ -8481,10 +8489,22 @@ const ayerComoISO = () => {
   return calISO(d);
 };
 
-// Atrasado = ni hoy ni ayer, con fecha real (2026-08-02): se resalta —
-// separador y fila— para que un pedido olvidado o un caso de EN REVISIÓN que
-// lleva mucho tiempo esperando no se pierda al fondo de la lista.
-const esFechaAtrasada = (iso, hoy, ayer) => !!iso && iso !== hoy && iso !== ayer;
+// El día de gracia es el HÁBIL anterior, no el del calendario (2026-08-10,
+// regla del usuario): se factura el día siguiente al pedido y el fin de semana
+// no se factura, así que el pedido del viernes sigue vigente el lunes y recién
+// el martes queda viejo. Misma excepción operativa que desfaseDeFechas(): de
+// fin de semana, no de feriados (un feriado no mueve la fecha, solo la tasa).
+const diaDeGraciaISO = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return calISO(d);
+};
+
+// Atrasado = anterior al día de gracia, con fecha real (2026-08-02): se
+// resalta —separador y fila— para que un pedido olvidado o un caso de EN
+// REVISIÓN que lleva mucho tiempo esperando no se pierda al fondo de la lista.
+const esFechaAtrasada = (iso, gracia) => !!iso && iso < gracia;
 
 // El color dice que algo pasa; el hover dice qué (2026-08-07, pedido del
 // usuario). La fila habla de UN pedido y la franja del día, de todos los suyos.
@@ -8511,19 +8531,19 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
 function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
-  const hoy = hoyComoISO(), ayer = ayerComoISO();
+  const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
   let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
   let html = "";
   for (const item of items) {
     const iso = (fechaDe(item) || "").slice(0, 10);
     if (iso !== diaAnterior) {
       diaAnterior = iso;
-      const atrasada = esFechaAtrasada(iso, hoy, ayer);
+      const atrasada = esFechaAtrasada(iso, gracia);
       html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
         + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
         + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer))}</td></tr>`;
     }
-    html += render(item, esFechaAtrasada(iso, hoy, ayer));
+    html += render(item, esFechaAtrasada(iso, gracia));
   }
   return html;
 }
@@ -12231,6 +12251,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // por si 'detalle' viniera vacío — la rama de abajo es la que manda cuando
     // la fase es esta, y ahí el detalle dice QUÉ falta.
     pide_maximizar: `Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.`,
+    // Falta el foco (2026-08-10): Windows no le devuelve el primer plano al
+    // asistente y sin él no puede teclear. Antes el llenado moría a los pocos
+    // segundos y la factura quedaba a medias; ahora espera el clic, sin plazo.
+    pide_foco: `Haz clic en la ventana del programa de facturación: el llenado sigue solo en cuanto esté al frente.`,
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
@@ -12239,7 +12263,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
                               "pregunta_trancon", "preparando_datos",
-                              "pide_maximizar"];
+                              "pide_maximizar", "pide_foco"];
   const pollFase = setInterval(async () => {
     try {
       const f = await api("/api/fase_llenado");
@@ -12267,6 +12291,12 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // también actúa el operador, no el programa).
         mensaje(`Van ${f.papel.impresas} impresiones seguidas: revisa que el papel siga alineado antes de continuar.`,
                 "alerta", false);
+      else if (llenando && !$("btn-stop").disabled && f.fase === "pide_foco")
+        // Ámbar y sin punto giratorio: el llenado está parado esperando UN clic
+        // del operador. La acción va primero — el detalle técnico de qué paso
+        // se quedó sin foco no le sirve para actuar.
+        mensaje("Haz clic en la ventana del programa de facturación: perdió el primer plano "
+                + "y el llenado sigue solo en cuanto lo recupere.", "alerta", false);
       else if (llenando && !$("btn-stop").disabled && f.fase === "pide_maximizar")
         // Ámbar y sin punto giratorio: falta pantalla y el llenado está parado
         // esperando al operador, no trabajando. El detalle dice QUÉ no se ve.
@@ -16429,11 +16459,9 @@ function pintarSerieRegistro(conocidas) {
   $("acceso-series-predet-rotulo").textContent =
     todas ? "Serie predeterminada" : "Serie con la que factura";
   const previa = select.value;
-  select.innerHTML =
-    `<option value="">${todas ? "— Todas —" : "— Elegir… —"}</option>`
-    + conocidas.map(s => `<option value="${esc(s)}"
+  select.innerHTML = conocidas.map(s => `<option value="${esc(s)}"
         ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
-  select.value = conocidas.includes(previa) ? previa : "";
+  select.value = conocidas.includes(previa) ? previa : conocidas[0];
 }
 
 // La predeterminada que viaja en la solicitud ('' = ninguna). Con una sola
@@ -17634,11 +17662,9 @@ function configEquipoPintarSerie(conocidas, preseleccionar) {
   campo.style.display = "";
   select.style.display = "";
   const previa = preseleccionar !== undefined ? preseleccionar : select.value;
-  select.innerHTML =
-    `<option value="">${todas ? "— Todas —" : "— Elegir… —"}</option>`
-    + conocidas.map(s => `<option value="${esc(s)}"
+  select.innerHTML = conocidas.map(s => `<option value="${esc(s)}"
         ${s === previa ? "selected" : ""}>${esc(s)}</option>`).join("");
-  select.value = conocidas.includes(previa) ? previa : "";
+  select.value = conocidas.includes(previa) ? previa : conocidas[0];
 }
 
 // Lo elegido en la ventana: "*" con "Todas", si no la lista canónica. En
