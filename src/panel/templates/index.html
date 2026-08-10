@@ -17975,7 +17975,7 @@ async function guardarDiaDespacho(dia) {
 function pintarCorte() {
   const inp = $("corte-fecha");
   const vig = $("corte-vigente");
-  if (vig) vig.textContent = corteProduccion ? calDMY(corteProduccion) : "sin fijar";
+  if (vig) vig.textContent = corteProduccion ? calDMYSemana(corteProduccion) : "sin fijar";
   if (inp) inp.min = corteProduccion || "";
   pintarBotonCorte();
 }
@@ -22699,6 +22699,12 @@ const calISO = (d) => `${d.getFullYear()}-${calPad(d.getMonth() + 1)}-${calPad(d
 const calDMY = (iso) => {
   const d = calDesdeISO(iso);
   return d ? `${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]} ${d.getFullYear()}` : "";
+};
+// Igual, con el día de la semana delante ("miércoles 29 julio 2026"): para la
+// fecha de corte fijada, que se compara de memoria contra el día de trabajo.
+const calDMYSemana = (iso) => {
+  const d = calDesdeISO(iso);
+  return d ? `${DIAS_SEMANA[d.getDay()]} ${calDMY(iso)}` : "";
 };
 
 // "aaaa-mm-dd" → Date local, o null si el campo está vacío/a medio teclear.
