@@ -5387,16 +5387,6 @@ function pintarResumenFinal() {
   const {omitidas, llenadas, pedidas, lineas} = resumenFinal;
   const claves = Object.keys(omitidas || {});
   const chequeo = $("fin-llenado-chequeo");
-  // Lo que no entró cuando le tocaba y sí entró al reintentarlo quedó de
-  // ÚLTIMO en el documento (2026-08-10): la tabla ya sale en el orden REAL, y
-  // esto lo dice con palabras — el desajuste contra el pedido es lo primero
-  // que se nota al compararlos.
-  const alFinal = lineas.filter(l => l.al_final);
-  const una = alFinal.length === 1;
-  const notaOrden = !alFinal.length ? ""
-    : ` ${una ? "Una línea no entró cuando le tocaba y se agregó"
-              : `${alFinal.length} líneas no entraron cuando les tocaba y se agregaron`}`
-      + " al final: el orden no coincide con el del pedido.";
   if (claves.length) {
     const cuales = claves.map(c => {
       const i = lineas.findIndex(l => (l.codigo || "") === c);
@@ -5405,16 +5395,18 @@ function pintarResumenFinal() {
     chequeo.classList.add("alerta");
     chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: parece que se `
       + `${claves.length === 1 ? "saltó" : "saltaron"} ${cuales}. Revisa el documento `
-      + `o vuelve a llenar.` + notaOrden;
+      + `o vuelve a llenar.`;
   } else if (pedidas && llenadas !== pedidas) {
     chequeo.classList.add("alerta");
-    chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: revisa el documento.`
-      + notaOrden;
+    chequeo.textContent = `Se escribieron ${llenadas} de ${pedidas} líneas: revisa el documento.`;
   } else {
     chequeo.classList.remove("alerta");
-    chequeo.textContent = (llenadas === 1
+    // Lo que entró al segundo intento NO se repite aquí (2026-08-10): ya lo
+    // dijo el aviso de arriba una vez, y la línea sale marcada al final de la
+    // lista. El documento quedó bien llenado; con eso basta.
+    chequeo.textContent = llenadas === 1
       ? "La única línea del pedido entró al documento."
-      : `Las ${llenadas} líneas del pedido entraron al documento.`) + notaOrden;
+      : `Las ${llenadas} líneas del pedido entraron al documento.`;
   }
   $("fin-llenado-cuerpo").innerHTML = !lineas.length ? ""
     : `<table><thead><tr><th></th><th>Producto</th>
@@ -12247,6 +12239,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // por si 'detalle' viniera vacío — la rama de abajo es la que manda cuando
     // la fase es esta, y ahí el detalle dice QUÉ falta.
     pide_maximizar: `Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.`,
+    // Falta el foco (2026-08-10): Windows no le devuelve el primer plano al
+    // asistente y sin él no puede teclear. Antes el llenado moría a los pocos
+    // segundos y la factura quedaba a medias; ahora espera el clic, sin plazo.
+    pide_foco: `Haz clic en la ventana del programa de facturación: el llenado sigue solo en cuanto esté al frente.`,
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
@@ -12255,7 +12251,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
                               "pregunta_trancon", "preparando_datos",
-                              "pide_maximizar"];
+                              "pide_maximizar", "pide_foco"];
   const pollFase = setInterval(async () => {
     try {
       const f = await api("/api/fase_llenado");
@@ -12283,6 +12279,12 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // también actúa el operador, no el programa).
         mensaje(`Van ${f.papel.impresas} impresiones seguidas: revisa que el papel siga alineado antes de continuar.`,
                 "alerta", false);
+      else if (llenando && !$("btn-stop").disabled && f.fase === "pide_foco")
+        // Ámbar y sin punto giratorio: el llenado está parado esperando UN clic
+        // del operador. La acción va primero — el detalle técnico de qué paso
+        // se quedó sin foco no le sirve para actuar.
+        mensaje("Haz clic en la ventana del programa de facturación: perdió el primer plano "
+                + "y el llenado sigue solo en cuanto lo recupere.", "alerta", false);
       else if (llenando && !$("btn-stop").disabled && f.fase === "pide_maximizar")
         // Ámbar y sin punto giratorio: falta pantalla y el llenado está parado
         // esperando al operador, no trabajando. El detalle dice QUÉ no se ve.
