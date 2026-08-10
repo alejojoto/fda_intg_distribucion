@@ -827,6 +827,11 @@
   .ajustes-bloque { padding:14px; border-bottom:1px solid #e2e6ec; }
   .ajustes-bloque h3 { margin:0 0 10px; font-size:13.5px; }
   .ajustes-fila { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  /* La fecha de corte vigente, aparte del selector (2026-08-10, pedido del
+     usuario): el campo se usa para elegir a dónde moverla, así que mientras se
+     teclea una fecha nueva deja de decir cuál es la que rige hoy. */
+  .corte-vigente { margin:0 0 10px; font-size:12.5px; }
+  .corte-vigente b { font-size:13.5px; }
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
@@ -2979,13 +2984,19 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div id="ajustes-vista-corte" style="display:none">
       <div class="ajustes-bloque" id="corte-bloque" style="display:none">
         <h3>Fecha de corte de producción</h3>
-        <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
-          ofrecen en ninguna parte: son los que se facturaron a mano antes de
-          arrancar con el asistente. Muévela hacia adelante a medida que avance
-          la implantación, para que los días viejos que ya no se van a llenar
-          dejen de estorbar en pendientes y en revisión. Vale para todos los
-          equipos: cada uno la toma en su próximo refresco.</p>
+        <p class="mut">Solo se muestran los pedidos pendientes de esta fecha en
+          adelante: los anteriores no se descargan ni aparecen en ninguna parte,
+          son los que se facturaron a mano antes de arrancar con el asistente.
+          Muévela hacia adelante a medida que avance la implantación, para que
+          los días viejos que ya no se van a llenar dejen de estorbar en
+          pendientes y en revisión. Solo avanza: no puede llevarse a un día
+          anterior al fijado, para no volver a ofrecer pedidos ya facturados.
+          Vale para todos los equipos: cada uno la toma en su próximo
+          refresco.</p>
+        <p class="corte-vigente">Fecha fijada ahora:
+          <b id="corte-vigente">—</b></p>
         <div class="ajustes-fila">
+          <label for="corte-fecha">Mover a</label>
           <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
           <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
         </div>
@@ -16253,7 +16264,7 @@ async function cargarAjustes() {
     // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
     // guardado en opcionesPrueba.
     pintarCargaEnCurso();
-    pintarBotonCorte();
+    pintarCorte();
     refrescarVistasModoPrueba();
     return true;
   } catch (e) {
@@ -17960,11 +17971,27 @@ async function guardarDiaDespacho(dia) {
   }
 }
 
+// El corte solo AVANZA (2026-08-10, pedido del usuario): el campo arranca
+// topado en la fecha vigente, así el calendario propio apaga los días
+// anteriores y la flecha ▼ frena ahí — si se sube cuatro días, se puede volver
+// a bajar hasta el corte y ni un día más. Llevarlo hacia atrás reofrecería
+// pedidos que ya se facturaron a mano, que es justo lo que el corte evita.
+// El botón se deshabilita igual por si la fecha llega tecleada (el min del
+// input no impide escribir un valor menor, solo lo marca inválido).
+function pintarCorte() {
+  const inp = $("corte-fecha");
+  const vig = $("corte-vigente");
+  if (vig) vig.textContent = corteProduccion ? calDMY(corteProduccion) : "sin fijar";
+  if (inp) inp.min = corteProduccion || "";
+  pintarBotonCorte();
+}
+
 function pintarBotonCorte() {
   const inp = $("corte-fecha");
   const btn = $("corte-btn");
   if (!inp || !btn) return;
-  btn.disabled = !inp.value || inp.value === corteProduccion;
+  btn.disabled = !inp.value || inp.value === corteProduccion
+              || (!!corteProduccion && inp.value < corteProduccion);
 }
 
 // Confirmación en dos pasos con el confirmar DESPLAZADO (pedido del usuario
@@ -17980,14 +18007,16 @@ function pedirCambioCorte() {
   if (!inp || !btn || !caja) return;
   const nueva = inp.value;
   if (!nueva || nueva === corteProduccion) return;
-  const vigente = corteProduccion || "";
-  const haciaAtras = !!vigente && nueva < vigente;
-  const finRango = haciaAtras
-    ? (() => { const d = calDesdeISO(vigente); d.setDate(d.getDate() - 1); return calISO(d); })()
-    : nueva;
-  const aviso = haciaAtras
-    ? `El corte se mueve hacia atrás: los pedidos del ${calDMY(nueva)} al ${calDMY(finRango)} vuelven a ofrecerse como pendientes en todos los equipos. Si alguno ya se facturó a mano, puede terminar facturado dos veces.`
-    : `Los pedidos anteriores al ${calDMY(nueva)} dejan de aparecer en todos los equipos. Los que ya se llenaron siguen en PROCESADAS.`;
+  // Hacia atrás no se mueve (ver pintarCorte): el campo ya lo impide, esto
+  // atrapa la fecha tecleada a mano, que el min del input no bloquea.
+  if (corteProduccion && nueva < corteProduccion) {
+    inp.value = corteProduccion;
+    pintarCorte();
+    mensaje(`El corte solo se mueve hacia adelante: no puede quedar antes del ${calDMY(corteProduccion)}.`,
+            "alerta");
+    return;
+  }
+  const aviso = `Los pedidos anteriores al ${calDMY(nueva)} dejan de aparecer en todos los equipos. Los que ya se llenaron siguen en PROCESADAS.`;
   let cerrado = false;
   const reponer = () => {
     if (cerrado) return;
@@ -17997,12 +18026,12 @@ function pedirCambioCorte() {
     caja.innerHTML = "";
     caja.className = "";
     caja.style.display = "none";
-    pintarBotonCorte();
+    pintarCorte();
   };
-  caja.className = haciaAtras ? "aviso-sensible" : "";
+  caja.className = "";
   caja.style.display = "";
   caja.innerHTML = `
-    <div style="margin:0 0 8px" class="${haciaAtras ? "" : "mut"}">${esc(aviso)}</div>
+    <div style="margin:0 0 8px" class="mut">${esc(aviso)}</div>
     <div class="confirmar-borrar">
       <button class="cb-si ok" id="corte-conf-si" disabled>Sí, mover el corte al ${esc(calDMY(nueva))}</button>
       <button class="cb-no" id="corte-conf-no">Cancelar</button>
