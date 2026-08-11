@@ -1195,6 +1195,7 @@
   .contacto-whatsapp-fila { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .contacto-numero { width:130px; }
   .contacto-otro { width:100%; max-width:280px; }
+  .contacto-aviso { margin:6px 0 0; font-size:12px; }
   .ticket-dato { display:flex; gap:10px; line-height:1.7; }
   .ticket-dato > span:first-child { color:#5a6472; flex:none; width:150px; }
   .ticket-dato > span:last-child { min-width:0; overflow-wrap:anywhere; }
@@ -8896,6 +8897,8 @@ async function abrirDiagnosticoSync() {
 
 const CONTACTO_STORAGE_KEY = "fda_contacto_soporte";
 const CONTACTO_SOPORTE_DEFAULT = {metodo:"", correo:"", prefijo:"", numero:"", otro:""};
+// De dos en dos, cada código junto al de su pareja.
+const CONTACTO_PREFIJOS = ["0412", "0422", "0414", "0424", "0416", "0426"];
 let contactoSoporte = cargarContactoSoporte();
 let contactoMontado = {ticket:false, soporte:false};
 
@@ -8940,16 +8943,17 @@ function htmlFormularioContacto(pref) {
       <div class="contacto-whatsapp-fila">
         <select id="${pref}-contacto-prefijo" class="contacto-prefijo">
           <option value="">Código</option>
-          <option value="0412">0412</option><option value="0414">0414</option>
-          <option value="0416">0416</option><option value="0422">0422</option>
-          <option value="0424">0424</option><option value="0426">0426</option>
+          ${CONTACTO_PREFIJOS.map(c => `<option value="${c}">${c}</option>`).join("")}
           <option value="otro">Otro…</option>
         </select>
-        <input id="${pref}-contacto-numero" class="contacto-numero" inputmode="numeric"
-               maxlength="9">
+        <!-- Sin maxlength a propósito: el dígito de más tiene que llegar para
+             poder decir en el momento que sobra. Lo recorta el JS. -->
+        <input id="${pref}-contacto-numero" class="contacto-numero" inputmode="numeric">
         <input id="${pref}-contacto-otro" class="contacto-otro"
                maxlength="24" style="display:none">
       </div>
+      <div id="${pref}-contacto-aviso" class="desc-error contacto-aviso"
+           style="display:none"></div>
     </div>
   </div>`;
 }
@@ -8969,6 +8973,43 @@ function contactoSincronizar(pref) {
     otro: otro ? otro.value.trim() : (contactoSoporte.otro || ""),
   };
   guardarContactoSoporte();
+}
+
+function contactoAviso(pref, texto) {
+  const caja = $(`${pref}-contacto-aviso`);
+  if (!caja) return;
+  caja.textContent = texto || "";
+  caja.style.display = texto ? "" : "none";
+}
+
+// El campo del número acepta 7 dígitos y ni uno más: el octavo no entra y se
+// dice en el momento por qué, en vez de dejarlo pasar hasta que se pulse
+// Enviar. Un número completo pegado de otro lado (04142749092) no se recorta
+// a la brava: se reparte entre el código y los 7 dígitos.
+function contactoNumeroTecleado(pref) {
+  const nodo = $(`${pref}-contacto-numero`);
+  const prefijo = $(`${pref}-contacto-prefijo`);
+  if (!nodo) return;
+  const digitos = (nodo.value || "").replace(/\D/g, "");
+  let sobra = false;
+  let valor = digitos;
+  if (digitos.length > 7) {
+    const codigoPegado = digitos.length === 11 && digitos.startsWith("0")
+      ? digitos.slice(0, 4)
+      : (digitos.length === 10 && digitos.startsWith("4") ? "0" + digitos.slice(0, 3) : "");
+    if (codigoPegado && CONTACTO_PREFIJOS.includes(codigoPegado) && prefijo) {
+      prefijo.value = codigoPegado;
+      valor = digitos.slice(-7);
+    } else {
+      valor = digitos.slice(0, 7);
+      sobra = true;
+    }
+  }
+  if (nodo.value !== valor) nodo.value = valor;
+  contactoAviso(pref, sobra
+    ? "Después del código van 7 dígitos. Si tu número es de otro país, elige Otro…"
+    : "");
+  contactoSincronizar(pref);
 }
 
 // Los radios se leen por su id y no por selector: $ en esta página es
@@ -9023,13 +9064,17 @@ function montarFormularioContacto(pref) {
     contenedor.querySelectorAll(`input[name="${pref}-contacto-metodo"]`)
       .forEach((nodo) => {
         nodo.addEventListener("change", () => {
+          contactoAviso(pref, "");
           contactoSincronizar(pref);
           contactoActualizar(pref);
         });
       });
     $(`${pref}-contacto-correo`)?.addEventListener("input", () => contactoSincronizar(pref));
-    $(`${pref}-contacto-prefijo`)?.addEventListener("change", () => contactoSincronizar(pref));
-    $(`${pref}-contacto-numero`)?.addEventListener("input", () => contactoSincronizar(pref));
+    $(`${pref}-contacto-prefijo`)?.addEventListener("change", () => {
+      contactoAviso(pref, "");
+      contactoSincronizar(pref);
+    });
+    $(`${pref}-contacto-numero`)?.addEventListener("input", () => contactoNumeroTecleado(pref));
     $(`${pref}-contacto-otro`)?.addEventListener("input", () => contactoSincronizar(pref));
     contactoMontado[pref] = true;
   }
@@ -9235,6 +9280,7 @@ function abrirSoporteRemoto() {
   if ($("soporte-overlay").classList.contains("visible")) { cerrarSoporte(); return; }
   errorSoporte("");
   pintarSoporte();
+  contactoAviso("soporte", "");
   $("soporte-overlay").classList.add("visible");
   // La comprobación de verdad (¿está el programa? ¿cuál es el número?) puede
   // tardar segundos: la ventana se abre YA con lo último sabido y se repinta
@@ -9408,6 +9454,7 @@ function abrirTicket() {
   campo.value = ticketBorrador;
   campo.disabled = false;
   montarFormularioContacto("ticket");
+  contactoAviso("ticket", "");
   contactoHabilitar("ticket", true);
   $("ticket-error").style.display = "none";
   $("ticket-ok").style.display = "none";
