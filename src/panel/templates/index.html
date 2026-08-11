@@ -16406,6 +16406,7 @@ async function cargarAjustes() {
     $("vendedor-info").textContent =
       d.espejo_activo ? "nube: conectada" : "nube: sin conexión";
     pintarDiaDespacho(d.dia_despacho);
+    articulosPorRevisar = d.articulos_por_revisar || 0;
     pintarBotonesCatalogos();
     corteProduccion = d.corte_produccion || "";
     $("corte-fecha").value = corteProduccion;
@@ -18935,6 +18936,32 @@ const CATALOGOS = {
       f.origen === "manual" ? ` <button onclick="confirmarBorrar(this, () => eliminarFeriado(${i}))">Eliminar</button>` : ""}${
       f.ajustado ? ` <button onclick="confirmarBorrar(this, () => restaurarFeriado(${i}), 'Confirmar restaurar')">Restaurar</button>` : ""}`,
   },
+  // Solo lectura: esta lista la llena y la vacía el propio llenado
+  // (src/db/articulos_revision.py, 2026-08-11, pedido del usuario). Cada
+  // código que el programa de facturación no aceptó —sin precio, código que
+  // no existe, un aviso que no se supo leer— queda anotado aquí hasta que
+  // vuelva a entrar en un documento. Con algo anotado, la lista de PENDIENTES
+  // del modo prueba trae un pedido con esos códigos y nada más, para
+  // reintentarlos sin volver a llenar el catálogo entero.
+  articulos_revision: {
+    titulo: "Artículos por revisar",
+    descripcion: "Códigos que el programa de facturación no aceptó al llenar: "
+      + "no llegaron al documento y hay que arreglarlos de ese lado. Salen de "
+      + "esta lista solos, en cuanto un llenado los acepta.",
+    // Sin `campos` ni `clave`: no hay editor que abrir (soloLectura).
+    soloLectura: true,
+    columnas: [
+      {campo: "nombre", etiqueta: "Artículo", origenDato: "winledger"},
+      {campo: "codigo_articulo", etiqueta: "Código artículo", origenDato: "winledger"},
+      // La empresa importa: un artículo sin precio en la de prueba puede
+      // tenerlo en la real, así que el motivo se lee distinto según dónde salió.
+      {campo: "motivo", etiqueta: "Qué pasó",
+       valor: (f) => f.empresa === "999" ? `${f.motivo} (en la empresa de prueba)` : f.motivo},
+      {campo: "fecha_detectado", etiqueta: "Desde",
+       valor: (f) => supFechaCorta(f.fecha_detectado)},
+    ],
+    acciones: (f, i) => ` <button onclick="confirmarBorrar(this, () => quitarArticuloRevision(${i}), 'Confirmar quitar')">Quitar</button>`,
+  },
   descuentos: {
     titulo: "Descuentos (locales — mecánica PENDIENTE FDA)",
     singular: "descuento",
@@ -18992,10 +19019,12 @@ function cerrarRutasVista() {
   $("rutas-overlay").classList.remove("visible");
 }
 
-const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
+const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados",
+                           "articulos_revision"];
 
 let catalogoActual = null;       // tipo abierto en la vista
 let catalogoFilas = [];          // filas del catálogo abierto
+let articulosPorRevisar = 0;     // artículos que el programa no aceptó (AJUSTES)
 let catClientesTab = "clientes"; // pestaña del catálogo de clientes: clientes | revisar
 let editorFila = null;           // fila en edición (null = nueva)
 let feriadoAnio = null;          // año elegido en Feriados (null = el en curso)
@@ -19004,10 +19033,34 @@ let clienteEnEdicion = null;     // código del cliente abierto en su vista de
                                  // edición ("" = grupo sin código; null = listado)
 
 function pintarBotonesCatalogos() {
-  $("cat-btns").innerHTML = CATALOGOS_AJUSTES.map(tipo =>
-    `<button class="${tipo === catalogoActual ? "acento" : ""}"
-             onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}</button>`
-  ).join("");
+  // Los artículos por revisar solo tienen botón cuando hay alguno: es una
+  // lista de problemas, y en cero no hay nada que abrir.
+  $("cat-btns").innerHTML = CATALOGOS_AJUSTES
+    .filter(tipo => tipo !== "articulos_revision" || articulosPorRevisar > 0)
+    .map(tipo =>
+      `<button class="${tipo === catalogoActual ? "acento" : ""}"
+               onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}${
+        tipo === "articulos_revision" ? ` (${articulosPorRevisar})` : ""}</button>`
+    ).join("");
+}
+
+// Sacar un artículo a mano de la lista por revisar. Lo normal es que salga
+// solo (el llenado que lo acepta lo borra); esto es para el código que ya no
+// se factura y por eso no va a volver a probarse nunca.
+async function quitarArticuloRevision(i) {
+  const f = catalogoFilas[i];
+  if (!f) return;
+  try {
+    await api("/api/catalogo/articulos-revision/eliminar",
+              {codigo_articulo: f.codigo_articulo});
+  } catch (e) {
+    mensaje(e.message, "error");
+    return;
+  }
+  await abrirCatalogo("articulos_revision");
+  articulosPorRevisar = catalogoFilas.length;
+  if (!articulosPorRevisar) cerrarCatalogo();   // sin filas no queda lista que mirar
+  else pintarBotonesCatalogos();
 }
 
 // El mismo botón que abre un catálogo lo cierra (feedback 2026-07-29): poder
@@ -19378,7 +19431,8 @@ function onClickSwitchActivo(ev, alConfirmar, etiqueta) {
 // Sistemas de origen presentes en un catálogo, en el orden en que aparecen.
 function origenesDeCatalogo(def) {
   const vistos = [];
-  for (const c of [...def.campos, ...(def.columnas || [])]) {
+  // Un catálogo de solo lectura no declara `campos` (no tiene editor).
+  for (const c of [...(def.campos || []), ...(def.columnas || [])]) {
     if (c.origenDato && !vistos.includes(c.origenDato)) vistos.push(c.origenDato);
   }
   return vistos;
@@ -19458,8 +19512,8 @@ async function abrirCatalogo(tipo, prefill) {
                 onclick="limpiarBuscador('cat-filtro', function(){paginacion.catalogo.pagina=1;pintarFilasCatalogo();})">&times;</button></span>
           ${def.cabeceraExtra ? def.cabeceraExtra(d) : ""}
           <span class="mut" id="cat-conteo"></span>
-          <button class="primario" style="margin-left:auto"
-                  onclick="abrirEditor(null)">Agregar ${esc(def.singular)}</button>
+          ${def.soloLectura ? "" : `<button class="primario" style="margin-left:auto"
+                  onclick="abrirEditor(null)">Agregar ${esc(def.singular)}</button>`}
         </div>
         <div style="overflow-x:auto"><table id="t-catalogo">
           ${def.agrupado ? "" : `<thead><tr>${columnas.map(c => `<th>${
@@ -19525,15 +19579,19 @@ function pintarFilasCatalogo() {
     // Solo las celdas con un control propio cortan el clic de la fila: sobre un
     // punto informativo o una celda vacía, pulsar sigue abriendo el editor.
     const acciones = def.acciones ? def.acciones(f, i) : "";
+    // Una lista de solo lectura no abre editor: no hay nada que corregir aquí
+    // dentro (lo que hay que arreglar está en el programa de facturación).
     return cabecera + `
-    <tr class="abre-editor${def.atenuarInactivas && !f.activo ? " fila-inactiva" : ""}"${
+    <tr class="${def.soloLectura ? "" : "abre-editor"}${
+      def.atenuarInactivas && !f.activo ? " fila-inactiva" : ""}"${
       (def.acciones || def.toggleActivo) ? ` data-fila-idx="${i}"` : ""}
-        title="Clic para editar este ${esc(def.singular)}" onclick="abrirEditor(${i})">
+        ${def.soloLectura ? "" : `title="Clic para editar este ${esc(def.singular)}"
+        onclick="abrirEditor(${i})"`}>
       ${columnas.map(c => c.tipo === "checkbox"
           ? `<td${def.toggleActivo ? CELDA_ACCIONES : ""}>${
               def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i),
                 def.etiquetaToggle ? def.etiquetaToggle(f) : "") : puntoEstado(f[c.campo])}</td>`
-          : `<td>${esc(f[c.campo] ?? "")}</td>`).join("")}
+          : `<td>${esc(c.valor ? c.valor(f) : (f[c.campo] ?? ""))}</td>`).join("")}
       ${def.acciones ? `<td${acciones ? CELDA_ACCIONES : ""}>${acciones}</td>` : ""}
     </tr>` + ((def.acciones || def.toggleActivo)
       ? `<tr class="fila-aviso-error" data-fila-idx="${i}" style="display:none"><td colspan="${nCols}"></td></tr>`
