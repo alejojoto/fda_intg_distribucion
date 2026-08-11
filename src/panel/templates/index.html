@@ -16935,6 +16935,10 @@ let accesoGestion = false;
 // pintarSubtabsAjustes cae a la primera que el rol sí tenga.
 let subtabAjustes = "equipos";
 let solicitudes = [];
+// true solo cuando /api/acceso/equipos respondió bien: sin el registro a la
+// mano no se esconde ninguna computadora de la tabla (mejor de más que ocultar
+// por un error de red).
+let solicitudesCargadas = false;
 
 const fechaAcceso = (iso) => {
   if (!iso) return "—";
@@ -16947,6 +16951,7 @@ const fechaAcceso = (iso) => {
 async function cargarSolicitudesAcceso() {
   if (!accesoGestion) {
     solicitudes = [];
+    solicitudesCargadas = false;
     $("solicitudes-error").textContent = "";
     pintarSolicitudes();
     return;
@@ -16954,13 +16959,18 @@ async function cargarSolicitudesAcceso() {
   try {
     const r = await api("/api/acceso/equipos");
     solicitudes = r.equipos || [];
+    solicitudesCargadas = true;
     $("solicitudes-error").style.display = "none";
   } catch (e) {
     solicitudes = [];
+    solicitudesCargadas = false;
     $("solicitudes-error").textContent = e.message;
     $("solicitudes-error").style.display = "";
   }
   pintarSolicitudes();
+  // La tabla de Computadoras esconde las olvidadas comparando contra este
+  // registro: se repinta con el dato recién traído (p. ej. justo tras Olvidar).
+  pintarEquipos();
 }
 
 const VISTAS_AJUSTES = {
@@ -17216,7 +17226,20 @@ function pintarEquipos() {
   const puedeIdentidad = tienePermiso("identidad_maquina");
   const puedeRol = tienePermiso("gestionar_editores");
   const puedeActivar = tienePermiso("activar_maquinas");
-  if ((!puedeIdentidad && !puedeRol && !puedeActivar) || !equipos.length) {
+  // Una computadora OLVIDADA no se lista (2026-08-12, pedido del usuario): su
+  // ficha queda en la nube —nombre, vendedor, rutas— para cuando vuelva a
+  // registrarse, pero dejarla aquí con su interruptor a la vista la hacía
+  // parecer reactivable con un clic, y volver exige registro + aprobación.
+  // Se esconde solo con el registro de acceso ya cargado; sin él (red caída,
+  // sin permiso de gestión) la tabla sale completa, como siempre.
+  let visibles = equipos;
+  if (solicitudesCargadas) {
+    const registradas = new Set(solicitudes.map(
+      s => (s.dispositivo || "").trim().toLowerCase()));
+    visibles = equipos.filter(m => m.es_supervision
+      || registradas.has((m.dispositivo || "").trim().toLowerCase()));
+  }
+  if ((!puedeIdentidad && !puedeRol && !puedeActivar) || !visibles.length) {
     bloque.style.display = "none";
     $("equipos-lista").innerHTML = "";
     return;
@@ -17229,7 +17252,7 @@ function pintarEquipos() {
   // con esta tabla y quedaron solo en esta. Con "ver como" en un rol menor
   // se ve la versión acotada, fiel a lo que ve ese rol.
   const asignaAdmin = esSupervisionEfectiva();
-  const filas = equipos.map(m => {
+  const filas = visibles.map(m => {
     const host = esc(m.dispositivo);
     // Una máquina fuera de servicio no recibe cambios: primero se vuelve a activar.
     const fuera = !m.activa;
