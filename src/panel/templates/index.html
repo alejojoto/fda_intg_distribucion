@@ -12166,14 +12166,19 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // o el rearmado de una reapertura vieja): casi nunca se ve, pero cuando
     // pasa la barra dice qué se espera en vez de un "Preparando…" quieto.
     preparando_datos: `Actualizando los datos de ${refFactura(pedido_id, parte)}…`,
-    conectando: `Buscando la ventana del programa de facturación…`,
-    entorno: `Ajustando fecha, serie y tasa para ${refFactura(pedido_id, parte)}…`,
+    // Los dos extremos del llenado son los tramos donde el operador espera sin
+    // ver moverse nada en pantalla, y el texto tiene que decirle que eso ES el
+    // trabajo, no una traba (2026-08-11, pedido del usuario): al entrar, que se
+    // está dejando todo en orden ANTES de escribir; al salir, que se está
+    // comprobando lo escrito. Entre medio las líneas se ven solas.
+    conectando: `Entrando al programa de facturación…`,
+    entorno: `Dejando todo listo para ${refFactura(pedido_id, parte)}: fecha, tasa y serie…`,
     lineas: `Llenando ${refFactura(pedido_id, parte)}…`,
     // Líneas ya escritas, releyendo grid/totales/fecha/tasa/serie antes de
     // cerrar (2026-08-05): sin esto la barra seguía diciendo "Llenando…"
     // durante este tramo, en cualquier modo (llenado suelto, en fila con o
     // sin imprimir — el resumen posterior, si lo hay, llega recién después).
-    verificando: `Verificando ${refFactura(pedido_id, parte)}…`,
+    verificando: `Comprobando que ${refFactura(pedido_id, parte)} haya quedado completa y correcta…`,
     // Paso de cierre (CONTRATOS.md 3.1, act. 2026-07-29): tras las líneas, y
     // solo en modo prueba, el cargador Acepta el documento y —con "Imprimir:
     // sí"— espera aquí entre facturas. El mensaje enuncia el estado; la acción
@@ -12248,7 +12253,11 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // (espera de la impresión, pausa), no el programa. Con la pausa PEDIDA
         // y el llenado todavía andando se anuncia que va a parar: si no, pulsar
         // ⏸ parecería no hacer nada mientras termina el paso en curso.
-        mensaje(enFilaPrefijo() + TEXTO_FASE[f.fase]
+        // El 'detalle' manda cuando la fase trae uno (2026-08-11): dentro de la
+        // puesta a punto hay pasos largos —cancelar el documento sin terminar—
+        // que el texto genérico de la fase no distingue, y son justo los que
+        // parecen colgados desde afuera.
+        mensaje(enFilaPrefijo() + (f.detalle || TEXTO_FASE[f.fase])
                 + (pausaPedida && f.fase !== "pausado"
                    ? " Pausa pedida: se detiene al terminar el paso en curso." : ""),
                 "info",
