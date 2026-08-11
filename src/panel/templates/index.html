@@ -1192,9 +1192,7 @@
   .contacto-metodos { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .contacto-metodos label { display:inline-flex; align-items:center; gap:4px; }
   .contacto-bloque-sub { margin-top:2px; }
-  .contacto-whatsapp-fila { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .contacto-numero { width:130px; }
-  .contacto-otro { width:100%; max-width:280px; }
+  .contacto-campo { width:100%; max-width:280px; }
   .contacto-aviso { margin:6px 0 0; font-size:12px; }
   .ticket-dato { display:flex; gap:10px; line-height:1.7; }
   .ticket-dato > span:first-child { color:#5a6472; flex:none; width:150px; }
@@ -8907,9 +8905,9 @@ async function abrirDiagnosticoSync() {
 // ---------------------------------------------------------------------------
 
 const CONTACTO_STORAGE_KEY = "fda_contacto_soporte";
-const CONTACTO_SOPORTE_DEFAULT = {metodo:"", correo:"", prefijo:"", numero:"", otro:""};
-// De dos en dos, cada código junto al de su pareja.
-const CONTACTO_PREFIJOS = ["0412", "0422", "0414", "0424", "0416", "0426"];
+// El número vive en UN campo que arranca en "04" (lo venezolano es lo normal
+// aquí); borrando el 04 el campo pasa a "+" para un número de otro país.
+const CONTACTO_SOPORTE_DEFAULT = {metodo:"", correo:"", numero:"04"};
 let contactoSoporte = cargarContactoSoporte();
 let contactoMontado = {ticket:false, soporte:false};
 
@@ -8917,12 +8915,20 @@ function cargarContactoSoporte() {
   try {
     const datos = JSON.parse(localStorage.getItem(CONTACTO_STORAGE_KEY) || "{}");
     if (!datos || typeof datos !== "object") return {...CONTACTO_SOPORTE_DEFAULT};
+    let numero = typeof datos.numero === "string" ? datos.numero : "";
+    // Guardado por el formulario anterior (código en un selector aparte y un
+    // campo "otro" para internacionales): se juntan en el campo único.
+    if (datos.prefijo === "otro" && typeof datos.otro === "string" && datos.otro) {
+      numero = datos.otro;
+    } else if (typeof datos.prefijo === "string" && /^04\d\d$/.test(datos.prefijo)) {
+      // El campo viejo llevaba solo los 7 dígitos de después del código.
+      const local = numero.replace(/\D/g, "");
+      if (local && local.length <= 7) numero = datos.prefijo + local;
+    }
     return {
       metodo: typeof datos.metodo === "string" ? datos.metodo : "",
       correo: typeof datos.correo === "string" ? datos.correo : "",
-      prefijo: typeof datos.prefijo === "string" ? datos.prefijo : "",
-      numero: typeof datos.numero === "string" ? datos.numero : "",
-      otro: typeof datos.otro === "string" ? datos.otro : "",
+      numero: numero || "04",
     };
   } catch (_) {
     return {...CONTACTO_SOPORTE_DEFAULT};
@@ -8947,22 +8953,15 @@ function htmlFormularioContacto(pref) {
         <span>WhatsApp</span></label>
     </div>
     <div id="${pref}-contacto-caja-correo" class="contacto-bloque-sub">
-      <input type="email" id="${pref}-contacto-correo" class="contacto-otro"
+      <input type="email" id="${pref}-contacto-correo" class="contacto-campo"
              maxlength="200" placeholder="nombre@dominio.com">
     </div>
     <div id="${pref}-contacto-caja-whatsapp" class="contacto-bloque-sub">
-      <div class="contacto-whatsapp-fila">
-        <select id="${pref}-contacto-prefijo" class="contacto-prefijo">
-          <option value="">Código</option>
-          ${CONTACTO_PREFIJOS.map(c => `<option value="${c}">${c}</option>`).join("")}
-          <option value="otro">Otro…</option>
-        </select>
-        <!-- Sin maxlength a propósito: el dígito de más tiene que llegar para
-             poder decir en el momento que sobra. Lo recorta el JS. -->
-        <input id="${pref}-contacto-numero" class="contacto-numero" inputmode="numeric">
-        <input id="${pref}-contacto-otro" class="contacto-otro"
-               maxlength="24" style="display:none">
-      </div>
+      <!-- Un solo campo, arranca en 04. El 04 y el + se portan como UNA tecla:
+           borrar el 04 deja el + para un número de otro país, y borrar el +
+           devuelve el 04. Sin maxlength: el tope (y su aviso al teclear) lo
+           pone contactoNumeroTecleado según el modo. -->
+      <input id="${pref}-contacto-numero" class="contacto-campo" inputmode="tel">
       <div id="${pref}-contacto-aviso" class="desc-error contacto-aviso"
            style="display:none"></div>
     </div>
@@ -8971,17 +8970,11 @@ function htmlFormularioContacto(pref) {
 
 function contactoSincronizar(pref) {
   const correo = $(`${pref}-contacto-correo`);
-  const prefijo = $(`${pref}-contacto-prefijo`);
   const numero = $(`${pref}-contacto-numero`);
-  const otro = $(`${pref}-contacto-otro`);
-  const metodo = contactoMetodoMarcado(pref);
   contactoSoporte = {
-    ...contactoSoporte,
-    metodo,
+    metodo: contactoMetodoMarcado(pref),
     correo: correo ? correo.value.trim() : (contactoSoporte.correo || ""),
-    prefijo: prefijo ? prefijo.value : (contactoSoporte.prefijo || ""),
-    numero: numero ? numero.value.trim() : (contactoSoporte.numero || ""),
-    otro: otro ? otro.value.trim() : (contactoSoporte.otro || ""),
+    numero: numero ? numero.value.trim() : (contactoSoporte.numero || "04"),
   };
   guardarContactoSoporte();
 }
@@ -8993,33 +8986,59 @@ function contactoAviso(pref, texto) {
   caja.style.display = texto ? "" : "none";
 }
 
-// El campo del número acepta 7 dígitos y ni uno más: el octavo no entra y se
-// dice en el momento por qué, en vez de dejarlo pasar hasta que se pulse
-// Enviar. Un número completo pegado de otro lado (04142749092) no se recorta
-// a la brava: se reparte entre el código y los 7 dígitos.
-function contactoNumeroTecleado(pref) {
+// El campo único del número. Nunca queda vacío: vive en modo 04 (venezolano,
+// 11 dígitos) o en modo + (internacional, hasta 15 después del +), y el 04 y
+// el + se portan como UNA tecla — borrar el 04 deja el + de una, borrar el +
+// devuelve el 04. El tope de dígitos avisa al teclear, no al enviar.
+function contactoNumeroTecleado(pref, ev) {
   const nodo = $(`${pref}-contacto-numero`);
-  const prefijo = $(`${pref}-contacto-prefijo`);
   if (!nodo) return;
-  const digitos = (nodo.value || "").replace(/\D/g, "");
-  let sobra = false;
-  let valor = digitos;
-  if (digitos.length > 7) {
-    const codigoPegado = digitos.length === 11 && digitos.startsWith("0")
-      ? digitos.slice(0, 4)
-      : (digitos.length === 10 && digitos.startsWith("4") ? "0" + digitos.slice(0, 3) : "");
-    if (codigoPegado && CONTACTO_PREFIJOS.includes(codigoPegado) && prefijo) {
-      prefijo.value = codigoPegado;
-      valor = digitos.slice(-7);
+  const borrando = !!(ev && typeof ev.inputType === "string"
+                      && ev.inputType.startsWith("delete"));
+  let valor = String(nodo.value || "").replace(/[^0-9+]/g, "");
+  let aviso = "";
+  if (borrando && valor === "0") valor = "+";      // se llevó el 04 entero
+  if (valor === "") valor = "04";                  // y borrar el + devuelve el 04
+  if (valor.includes("+")) {
+    let d = valor.replace(/\D/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    if (d.startsWith("0")) {
+      // Ningún código de país empieza por 0: "+04…" es un venezolano tecleado
+      // con el + puesto — se atiende abajo como 04.
+      valor = d;
     } else {
-      valor = digitos.slice(0, 7);
-      sobra = true;
+      if (d.length > 15) {
+        d = d.slice(0, 15);
+        aviso = "Después del + van máximo 15 dígitos.";
+      }
+      valor = "+" + d;
+    }
+  }
+  if (!valor.includes("+")) {
+    let d = valor.replace(/\D/g, "");
+    if (d.startsWith("00")) {
+      d = d.slice(2);
+      if (d.length > 15) {
+        d = d.slice(0, 15);
+        aviso = "Después del + van máximo 15 dígitos.";
+      }
+      valor = "+" + d;
+    } else {
+      // Tecleó su 04 encima del 04 puesto (ningún número real empieza 0404).
+      while (d.startsWith("0404")) d = d.slice(2);
+      if (d && !d.startsWith("0")) d = "0" + d;
+      // El prefijo no se parte: un borrado a la mitad lo restaura.
+      if (d && d !== "0" && !d.startsWith("04")) d = "04" + d.slice(1);
+      if (d.length > 11) {
+        d = d.slice(0, 11);
+        aviso = "Un número venezolano lleva 11 dígitos. Si es de otro país, "
+              + "borra el 04 para escribirlo con +.";
+      }
+      valor = d || "04";
     }
   }
   if (nodo.value !== valor) nodo.value = valor;
-  contactoAviso(pref, sobra
-    ? "Después del código van 7 dígitos. Si tu número es de otro país, elige Otro…"
-    : "");
+  contactoAviso(pref, aviso);
   contactoSincronizar(pref);
 }
 
@@ -9037,21 +9056,11 @@ function contactoActualizar(pref) {
   const metodo = (contactoSoporte && contactoSoporte.metodo) || "";
   if (correoCaja) correoCaja.style.display = metodo === "correo" ? "" : "none";
   if (whatsappCaja) whatsappCaja.style.display = metodo === "whatsapp" ? "" : "none";
-  const prefijo = $(`${pref}-contacto-prefijo`);
-  const numero = $(`${pref}-contacto-numero`);
-  const otro = $(`${pref}-contacto-otro`);
-  if (prefijo && numero && otro) {
-    const esOtro = prefijo.value === "otro";
-    numero.style.display = esOtro ? "none" : "";
-    otro.style.display = esOtro ? "" : "none";
-  }
 }
 
 function contactoRellenar(pref) {
   const correo = $(`${pref}-contacto-correo`);
-  const prefijo = $(`${pref}-contacto-prefijo`);
   const numero = $(`${pref}-contacto-numero`);
-  const otro = $(`${pref}-contacto-otro`);
   const radioCorreo = $(`${pref}-contacto-metodo-correo`);
   const radioWhatsapp = $(`${pref}-contacto-metodo-whatsapp`);
   if (radioCorreo) radioCorreo.checked = (contactoSoporte.metodo === "correo");
@@ -9061,9 +9070,7 @@ function contactoRellenar(pref) {
   // el mismo texto le manda el cursor al final a quien está tecleando.
   const poner = (nodo, valor) => { if (nodo && nodo.value !== valor) nodo.value = valor; };
   poner(correo, contactoSoporte.correo || "");
-  poner(prefijo, contactoSoporte.prefijo || "");
-  poner(numero, contactoSoporte.numero || "");
-  poner(otro, contactoSoporte.otro || "");
+  poner(numero, contactoSoporte.numero || "04");
   contactoActualizar(pref);
 }
 
@@ -9081,12 +9088,8 @@ function montarFormularioContacto(pref) {
         });
       });
     $(`${pref}-contacto-correo`)?.addEventListener("input", () => contactoSincronizar(pref));
-    $(`${pref}-contacto-prefijo`)?.addEventListener("change", () => {
-      contactoAviso(pref, "");
-      contactoSincronizar(pref);
-    });
-    $(`${pref}-contacto-numero`)?.addEventListener("input", () => contactoNumeroTecleado(pref));
-    $(`${pref}-contacto-otro`)?.addEventListener("input", () => contactoSincronizar(pref));
+    $(`${pref}-contacto-numero`)?.addEventListener("input",
+      (ev) => contactoNumeroTecleado(pref, ev));
     contactoMontado[pref] = true;
   }
   contactoRellenar(pref);
@@ -9101,13 +9104,8 @@ function contactoHabilitar(pref, habilitar) {
 function contactoFoco(pref) {
   const met = contactoMetodoMarcado(pref);
   if (!met) { const radio = $(`${pref}-contacto-metodo-correo`); if (radio) radio.focus(); return; }
-  if (met === "correo") { const nodo = $(`${pref}-contacto-correo`); if (nodo) nodo.focus(); return; }
-  const prefijo = $(`${pref}-contacto-prefijo`);
-  if (!prefijo || !prefijo.value) { if (prefijo) prefijo.focus(); return; }
-  const otro = $(`${pref}-contacto-otro`);
-  if (prefijo && prefijo.value === "otro" && otro) { otro.focus(); return; }
-  const numero = $(`${pref}-contacto-numero`);
-  if (numero) numero.focus();
+  const nodo = $(met === "correo" ? `${pref}-contacto-correo` : `${pref}-contacto-numero`);
+  if (nodo) nodo.focus();
 }
 
 function contactoLeer(pref) {
@@ -9124,44 +9122,29 @@ function contactoLeer(pref) {
     return {metodo, valor: correo};
   }
   if (metodo === "whatsapp") {
-    const prefijo = ($(`${pref}-contacto-prefijo`) || {}).value || "";
-    if (!prefijo) return {error: "Elige el código de tu número."};
-    if (prefijo === "otro") {
-      const otro = ($(`${pref}-contacto-otro`) || {}).value || "";
-      const limpio = otro.replace(/[\s\-.()]/g, "");
-      let valor = limpio;
-      if (!valor) return {error: "Falta el número de WhatsApp."};
-      if (valor.startsWith("00")) valor = `+${valor.slice(2)}`;
-      if (valor.startsWith("+")) {
-        if (!/^\+[0-9]+$/.test(valor) || valor.length < 9 || valor.length > 16) {
-          return {
-            error: "Ese número no está completo. Escríbelo con el signo + y el "
-                 + "código de tu país.",
-          };
-        }
-        // El valor se guarda sin 0 de sobra: al copiarlo/pegarlo en WhatsApp debe salir ya
-        // con formato internacional y listo para aceptar la llamada.
-        return {metodo, valor};
+    const v = (contactoSoporte.numero || "").trim();
+    const d = v.replace(/\D/g, "");
+    // "04" y "+" solos son el arranque de los dos modos, no un número.
+    if (!v || v === "04" || v === "+")
+      return {error: "Falta el número de WhatsApp."};
+    if (v.startsWith("+")) {
+      if (d.length < 8 || d.length > 15) {
+        return {
+          error: "Ese número no está completo. Escríbelo con el signo + y el "
+               + "código de tu país.",
+        };
       }
-      if (/^[0-9]{11}$/.test(valor) && valor.startsWith("0"))
-        return {metodo, valor: `+58${valor.slice(1)}`};
-      if (/^[0-9]{10}$/.test(valor) && valor.startsWith("4"))
-        return {metodo, valor: `+58${valor}`};
-      return {
-        error: "Ese número no está completo. Un número venezolano lleva 11 "
-             + "dígitos: el código y 7 más. Si es de otro país, elige Otro… y "
-             + "escríbelo con el signo + y el código de tu país.",
-      };
+      // Sin el 0 y con el +: es lo que se copia y se pega en WhatsApp desde
+      // otro país, y con el 0 delante no se puede marcar.
+      return {metodo, valor: `+${d}`};
     }
-    const numero = (($(`${pref}-contacto-numero`) || {}).value || "").replace(/\D/g, "");
-    if (numero.length !== 7) {
-      return {
-        error: "Ese número no está completo. Un número venezolano lleva 11 "
-             + "dígitos: el código y 7 más. Si es de otro país, elige Otro… y "
-             + "escríbelo con el signo + y el código de tu país.",
-      };
-    }
-    return {metodo, valor: `+58${String(prefijo).slice(1)}${numero}`};
+    if (d.length === 11 && d.startsWith("0"))
+      return {metodo, valor: `+58${d.slice(1)}`};
+    return {
+      error: "Ese número no está completo. Un número venezolano lleva 11 "
+           + "dígitos. Si es de otro país, borra el 04 y escríbelo con el "
+           + "signo + y el código de tu país.",
+    };
   }
   return {error: "Elige cómo prefieres que te contactemos: correo o WhatsApp."};
 }
