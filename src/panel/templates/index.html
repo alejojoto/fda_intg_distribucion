@@ -8539,7 +8539,11 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // vista al scrollear. Con una página que no arranca en el primer ítem de la
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
-function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
+// `sufijoDe(iso)`, opcional, agrega texto al rótulo del día (el conteo de
+// PROCESADAS para Editor/Admin) — por eso se repite igual si la página
+// arranca a mitad del día: siempre dice el total, no lo que quedó visible.
+function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render,
+                                     sufijoDe = null) {
   const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
   let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
   let html = "";
@@ -8550,7 +8554,8 @@ function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
       const atrasada = esFechaAtrasada(iso, gracia);
       html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
         + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
-        + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer))}</td></tr>`;
+        + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer)
+                                          + (sufijoDe ? sufijoDe(iso) : ""))}</td></tr>`;
     }
     html += render(item, esFechaAtrasada(iso, gracia));
   }
@@ -11913,7 +11918,32 @@ const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 const fechaDeFamiliaProcesada = (partes) =>
   partes.reduce((max, p) => ((p.fecha_cierre || "") > max ? (p.fecha_cierre || "") : max), "");
 
+// Conteo por día para Editor/Admin (2026-08-11, pedido del usuario): cuántos
+// pedidos se procesaron cada día y cuántas facturas salieron con documento
+// (lista o facturada a mano). En los primeros días de operación sirve para
+// cotejar contra los tickets que entraron. Se agrupa por día de PROCESAMIENTO
+// —el mismo del separador—, así lo facturado hoy con fecha de mañana suma
+// junto a lo de hoy; y se cuenta sobre la lista completa, no la página, para
+// que la franja diga el total del día aunque el día siga en otra página.
+function conteosProcesadasPorDia() {
+  const conteos = {};
+  for (const partes of agruparFamilias(procesadasParaTabla())) {
+    const iso = (fechaDeFamiliaProcesada(partes) || "").slice(0, 10);
+    const c = conteos[iso] || (conteos[iso] = {pedidos: 0, facturas: 0});
+    c.pedidos += 1;
+    c.facturas += partes.filter(p => p.estado === "completada"
+                                     || p.estado === "facturada_a_mano").length;
+  }
+  return conteos;
+}
+
 function pintarProcesadas(familias) {
+  const conteos = tienePermiso("conteo_procesadas_dia") && conteosProcesadasPorDia();
+  const sufijo = conteos ? (iso) => {
+    const c = conteos[iso];
+    return c ? ` — ${c.pedidos} pedido${c.pedidos === 1 ? "" : "s"}, `
+             + `${c.facturas} factura${c.facturas === 1 ? "" : "s"}` : "";
+  } : null;
   $("t-procesadas").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
     familias, fechaDeFamiliaProcesada, 12, (partes) => {
       const f0 = partes[0];
@@ -11926,7 +11956,8 @@ function pintarProcesadas(familias) {
         <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
         <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaProcesada(f, true)).join("");
-    }
+    },
+    sufijo
   ) || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
