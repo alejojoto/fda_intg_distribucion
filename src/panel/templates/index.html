@@ -1184,6 +1184,17 @@
   #ticket-resumen { background:#f6f8fb; border:1px solid #e2e6ec; border-radius:8px;
                     padding:10px 12px; margin:12px 0 0; font-size:12px; }
   #ticket-resumen h4 { margin:0 0 6px; font-size:12px; }
+  #ticket-contacto, #soporte-contacto { margin:10px 0; }
+  /* Mismo tono y tamaño que .editor-campo: el bloque va pegado al "¿Qué
+     ocurrió?" y con la letra por omisión se veía como otra cosa. */
+  .contacto-seccion { display:flex; flex-direction:column; gap:8px;
+                      font-size:12px; color:var(--mut); }
+  .contacto-metodos { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .contacto-metodos label { display:inline-flex; align-items:center; gap:4px; }
+  .contacto-bloque-sub { margin-top:2px; }
+  .contacto-whatsapp-fila { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .contacto-numero { width:130px; }
+  .contacto-otro { width:100%; max-width:280px; }
   .ticket-dato { display:flex; gap:10px; line-height:1.7; }
   .ticket-dato > span:first-child { color:#5a6472; flex:none; width:150px; }
   .ticket-dato > span:last-child { min-width:0; overflow-wrap:anywhere; }
@@ -3389,7 +3400,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <div id="sup-tickets-lista" style="display:none">
           <div class="sup-tabla-scroll"><table id="sup-tickets-tabla" class="sup-tabla">
             <thead><tr>
-              <th>Ticket</th><th>Fecha</th><th>Equipo</th><th>Mensaje</th>
+              <th>Ticket</th><th>Fecha</th><th>Equipo</th><th>Contacto</th><th>Mensaje</th>
               <th>Estado</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -3508,6 +3519,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <textarea id="ticket-mensaje" rows="4" maxlength="4000"
                 placeholder="Qué estabas haciendo y qué salió mal."></textarea>
     </div>
+    <div id="ticket-contacto"></div>
     <div id="ticket-resumen"></div>
     <div id="ticket-error" class="desc-error" style="display:none"></div>
     <div id="ticket-ok" style="display:none"></div>
@@ -3529,6 +3541,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
   <div id="soporte-caja">
     <h3>Soporte remoto</h3>
     <div id="soporte-cuerpo"></div>
+    <div id="soporte-contacto"></div>
     <div id="soporte-error" style="display:none"></div>
     <div class="editor-acciones" id="soporte-acciones"></div>
   </div>
@@ -7348,7 +7361,8 @@ function supSoporteEquipo(equipo) {
   }
   let html = `<div class="sup-nube-lineas">${partes.join("")}</div>`;
   if (equipo.rustdesk_id)
-    html += `<div class="sup-numero-acceso sop-numero">${esc(equipo.rustdesk_id)}</div>`;
+    html += `<div class="sup-numero-acceso sop-numero">${esc(equipo.rustdesk_id)} `
+      + `${botonCopiar(equipo.rustdesk_id, "Copiar número de acceso")}</div>`;
   if (equipo.soporte_ticket)
     html += `<div class="sup-estado-nota atrasada">solicitud ${
       esc(equipo.soporte_ticket)}</div>`;
@@ -7737,6 +7751,13 @@ function supExtracto(texto) {
   return limpio.length > 120 ? limpio.slice(0, 117) + "…" : limpio;
 }
 
+function ticketContactoInfo(ticket) {
+  const ctx = (ticket && ticket.contexto && ticket.contexto.contacto) || {};
+  const valor = String(ticket?.contacto_valor || ctx.valor || "").trim();
+  const metodo = String(ticket?.contacto_metodo || ctx.metodo || "").trim();
+  return {metodo, valor};
+}
+
 function pintarFiltrosTickets() {
   $("sup-ticket-filtros").querySelectorAll(".sup-ticket-filtro").forEach(b =>
     b.classList.toggle("activa", b.dataset.estado === supTicketFiltro));
@@ -7744,19 +7765,24 @@ function pintarFiltrosTickets() {
 
 function pintarTicketsSupervision() {
   const cuerpo = $("sup-tickets-tabla").querySelector("tbody");
-  cuerpo.innerHTML = supTickets.length ? supTickets.map(t => `<tr>
-    <td><b>${esc(t.id || "—")}</b>${
-      t.tipo === "soporte_remoto"
-        ? `<div class="sup-estado-nota">solicitud remota</div>` : ""}</td>
-    <td>${esc(supFechaCorta(t.creado_en))}</td>
-    <td>${esc(t.maquina || t.dispositivo || "—")}${
-      t.rustdesk_id
-        ? `<div class="sup-numero-acceso mut">acceso ${esc(t.rustdesk_id)}</div>` : ""}</td>
-    <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
-    <td>${supEstadoTicket(t.estado)}</td>
-    <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
-  </tr>`).join("")
-    : `<tr><td colspan="6" class="sup-lista-vacia">No hay tickets en este filtro.</td></tr>`;
+  cuerpo.innerHTML = supTickets.length ? supTickets.map((t) => {
+    const contacto = ticketContactoInfo(t);
+    return `<tr>
+      <td><b>${esc(t.id || "—")}</b>${
+        t.tipo === "soporte_remoto"
+          ? `<div class="sup-estado-nota">solicitud remota</div>` : ""}</td>
+      <td>${esc(supFechaCorta(t.creado_en))}</td>
+      <td>${esc(t.maquina || t.dispositivo || "—")}${
+        t.rustdesk_id
+          ? `<div class="sup-numero-acceso mut">acceso ${esc(t.rustdesk_id)} `
+              + `${botonCopiar(t.rustdesk_id, "Copiar número de acceso")}</div>` : ""}</td>
+      <td>${esc(contacto.valor || "—")}${botonCopiar(contacto.valor, "Copiar contacto")}</td>
+      <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
+      <td>${supEstadoTicket(t.estado)}</td>
+      <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
+    </tr>`;
+  }).join("")
+    : `<tr><td colspan="7" class="sup-lista-vacia">No hay tickets en este filtro.</td></tr>`;
   $("sup-tickets-mas").style.display = supTicketsTotal > supTickets.length ? "" : "none";
 }
 
@@ -7876,6 +7902,7 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         <div class="sup-dato"><span>Número de acceso:</span>${
           equipo.rustdesk_id
             ? `<span class="sup-numero-acceso">${esc(equipo.rustdesk_id)}</span>`
+              + `${botonCopiar(equipo.rustdesk_id, "Copiar número de acceso")}`
             : "—"}</div>
         ${equipo.soporte_ticket ? `<div class="sup-dato"><span>Solicitud pendiente:</span>
           <b>${esc(equipo.soporte_ticket)}</b></div>` : ""}
@@ -8042,6 +8069,9 @@ async function abrirDetalleTicketSupervision(id) {
   try {
     const d = await api("/api/supervision/tickets/" + encodeURIComponent(id));
     const ticket = d.ticket || {};
+    const contacto = ticketContactoInfo(ticket);
+    const accionContacto = contacto.metodo === "correo" ? "Escribir correo"
+      : contacto.metodo === "whatsapp" ? "Abrir WhatsApp" : "";
     supTicketAbierto = ticket;
     $("sup-ticket-titulo").textContent = "Ticket " + (ticket.id || id);
     $("sup-ticket-cuerpo").innerHTML = `
@@ -8058,7 +8088,10 @@ async function abrirDetalleTicketSupervision(id) {
           <!-- El número con el que se entra: lo primero que se necesita de una
                solicitud remota, así que va arriba y seleccionable. -->
           ${ticket.rustdesk_id ? `<div class="sup-dato"><span>Número de acceso:</span>
-            <span class="sup-numero-acceso">${esc(ticket.rustdesk_id)}</span></div>` : ""}
+            <span class="sup-numero-acceso">${esc(ticket.rustdesk_id)}</span>${botonCopiar(ticket.rustdesk_id, "Copiar número de acceso")}</div>` : ""}
+          ${contacto.valor ? `<div class="sup-dato"><span>Contacto:</span>
+            <span>${esc(contacto.valor)}</span>${botonCopiar(contacto.valor, "Copiar contacto")}
+            ${accionContacto ? `<button type="button" onclick="abrirContactoTicket()">${accionContacto}</button>` : ""}</div>` : ""}
         </div>
       </div>
       <div class="sup-detalle-seccion"><h4>Mensaje</h4>
@@ -8075,6 +8108,66 @@ async function abrirDetalleTicketSupervision(id) {
   } catch (e) {
     $("sup-ticket-cuerpo").innerHTML = `<div class="desc-error">${esc(e.message)}</div>`;
   }
+}
+
+function abrirContactoTicket() {
+  if (!supTicketAbierto) return;
+  const contacto = ticketContactoInfo(supTicketAbierto);
+  if (!contacto.valor) return mensaje("No hay un contacto para este ticket.", "error");
+
+  if (contacto.metodo === "correo") {
+    const asunto = `Soporte del asistente — ticket ${supTicketAbierto.id || "—"}`;
+    const cuerpo = `Hola,\n`
+      + `Te escribo por el ticket ${supTicketAbierto.id || "—"} registrado el `
+      + `${supFechaCorta(supTicketAbierto.creado_en)} desde ${supTicketAbierto.maquina || supTicketAbierto.dispositivo || "este equipo"}.\n\n`;
+    // Se usa Gmail web en vez de mailto para no mezclar este caso con el correo
+    // por omisión del sistema operativo.
+    return abrirEnlaceExterno(
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contacto.valor)}`
+      + `&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
+    );
+  }
+
+  if (contacto.metodo === "whatsapp") {
+    const texto = `Te escribo por el ticket ${supTicketAbierto.id || "—"} registrado el `
+      + `${supFechaCorta(supTicketAbierto.creado_en)} desde ${supTicketAbierto.maquina || supTicketAbierto.dispositivo || "este equipo"}.`;
+    return abrirEnlaceExterno(
+      `https://wa.me/${String(contacto.valor || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(texto)}`
+    );
+  }
+
+  return mensaje("Ese ticket no tiene un método de contacto válido.", "error");
+}
+
+async function abrirEnlaceExterno(url) {
+  const mensajeError = "No se pudo abrir el enlace.";
+  let abierto = false;
+
+  if (window.pywebview) {
+    try {
+      await api("/api/abrir-enlace", {url});
+      abierto = true;
+    } catch (e) {
+      mensaje(e.message || mensajeError, "error");
+      return;
+    }
+  } else {
+    try {
+      const win = window.open(url, "_blank", "noopener");
+      if (win) abierto = true;
+    } catch (_) {}
+    if (!abierto) {
+      try {
+        await api("/api/abrir-enlace", {url});
+        abierto = true;
+      } catch (e) {
+        mensaje(e.message || mensajeError, "error");
+        return;
+      }
+    }
+  }
+
+  if (!abierto) mensaje(mensajeError, "error");
 }
 
 function supTicketCoincideFiltro(ticket) {
@@ -8801,6 +8894,222 @@ async function abrirDiagnosticoSync() {
 // ventana con un botón.
 // ---------------------------------------------------------------------------
 
+const CONTACTO_STORAGE_KEY = "fda_contacto_soporte";
+const CONTACTO_SOPORTE_DEFAULT = {metodo:"", correo:"", prefijo:"", numero:"", otro:""};
+let contactoSoporte = cargarContactoSoporte();
+let contactoMontado = {ticket:false, soporte:false};
+
+function cargarContactoSoporte() {
+  try {
+    const datos = JSON.parse(localStorage.getItem(CONTACTO_STORAGE_KEY) || "{}");
+    if (!datos || typeof datos !== "object") return {...CONTACTO_SOPORTE_DEFAULT};
+    return {
+      metodo: typeof datos.metodo === "string" ? datos.metodo : "",
+      correo: typeof datos.correo === "string" ? datos.correo : "",
+      prefijo: typeof datos.prefijo === "string" ? datos.prefijo : "",
+      numero: typeof datos.numero === "string" ? datos.numero : "",
+      otro: typeof datos.otro === "string" ? datos.otro : "",
+    };
+  } catch (_) {
+    return {...CONTACTO_SOPORTE_DEFAULT};
+  }
+}
+
+function guardarContactoSoporte() {
+  try { localStorage.setItem(CONTACTO_STORAGE_KEY, JSON.stringify(contactoSoporte)); } catch (_) {}
+}
+
+function htmlFormularioContacto(pref) {
+  return `<div class="contacto-seccion">
+    <!-- El título del grupo va sin atributo for: con él, un clic ahí
+         marcaría "Correo" sin que nadie lo eligiera. -->
+    <label>¿Cómo prefieres que te contactemos? (obligatorio)</label>
+    <div class="contacto-metodos">
+      <label><input type="radio" id="${pref}-contacto-metodo-correo"
+                    name="${pref}-contacto-metodo" value="correo">
+        <span>Correo</span></label>
+      <label><input type="radio" id="${pref}-contacto-metodo-whatsapp"
+                    name="${pref}-contacto-metodo" value="whatsapp">
+        <span>WhatsApp</span></label>
+    </div>
+    <div id="${pref}-contacto-caja-correo" class="contacto-bloque-sub">
+      <input type="email" id="${pref}-contacto-correo" class="contacto-otro"
+             maxlength="200" placeholder="nombre@dominio.com">
+    </div>
+    <div id="${pref}-contacto-caja-whatsapp" class="contacto-bloque-sub">
+      <div class="contacto-whatsapp-fila">
+        <select id="${pref}-contacto-prefijo" class="contacto-prefijo">
+          <option value="">Código</option>
+          <option value="0412">0412</option><option value="0414">0414</option>
+          <option value="0416">0416</option><option value="0422">0422</option>
+          <option value="0424">0424</option><option value="0426">0426</option>
+          <option value="otro">Otro…</option>
+        </select>
+        <input id="${pref}-contacto-numero" class="contacto-numero" inputmode="numeric"
+               maxlength="9" placeholder="274 9092">
+        <input id="${pref}-contacto-otro" class="contacto-otro"
+               maxlength="24" placeholder="+49 170 1234567" style="display:none">
+      </div>
+    </div>
+  </div>`;
+}
+
+function contactoSincronizar(pref) {
+  const correo = $(`${pref}-contacto-correo`);
+  const prefijo = $(`${pref}-contacto-prefijo`);
+  const numero = $(`${pref}-contacto-numero`);
+  const otro = $(`${pref}-contacto-otro`);
+  const metodo = contactoMetodoMarcado(pref);
+  contactoSoporte = {
+    ...contactoSoporte,
+    metodo,
+    correo: correo ? correo.value.trim() : (contactoSoporte.correo || ""),
+    prefijo: prefijo ? prefijo.value : (contactoSoporte.prefijo || ""),
+    numero: numero ? numero.value.trim() : (contactoSoporte.numero || ""),
+    otro: otro ? otro.value.trim() : (contactoSoporte.otro || ""),
+  };
+  guardarContactoSoporte();
+}
+
+// Los radios se leen por su id y no por selector: $ en esta página es
+// getElementById, así que un `input[name=…]:checked` devolvería null siempre.
+function contactoMetodoMarcado(pref) {
+  if (($(`${pref}-contacto-metodo-correo`) || {}).checked) return "correo";
+  if (($(`${pref}-contacto-metodo-whatsapp`) || {}).checked) return "whatsapp";
+  return "";
+}
+
+function contactoActualizar(pref) {
+  const correoCaja = $(`${pref}-contacto-caja-correo`);
+  const whatsappCaja = $(`${pref}-contacto-caja-whatsapp`);
+  const metodo = (contactoSoporte && contactoSoporte.metodo) || "";
+  if (correoCaja) correoCaja.style.display = metodo === "correo" ? "" : "none";
+  if (whatsappCaja) whatsappCaja.style.display = metodo === "whatsapp" ? "" : "none";
+  const prefijo = $(`${pref}-contacto-prefijo`);
+  const numero = $(`${pref}-contacto-numero`);
+  const otro = $(`${pref}-contacto-otro`);
+  if (prefijo && numero && otro) {
+    const esOtro = prefijo.value === "otro";
+    numero.style.display = esOtro ? "none" : "";
+    otro.style.display = esOtro ? "" : "none";
+  }
+}
+
+function contactoRellenar(pref) {
+  const correo = $(`${pref}-contacto-correo`);
+  const prefijo = $(`${pref}-contacto-prefijo`);
+  const numero = $(`${pref}-contacto-numero`);
+  const otro = $(`${pref}-contacto-otro`);
+  const radioCorreo = $(`${pref}-contacto-metodo-correo`);
+  const radioWhatsapp = $(`${pref}-contacto-metodo-whatsapp`);
+  if (radioCorreo) radioCorreo.checked = (contactoSoporte.metodo === "correo");
+  if (radioWhatsapp) radioWhatsapp.checked = (contactoSoporte.metodo === "whatsapp");
+  // Solo se escribe el campo que de verdad cambió: la ventana de soporte se
+  // repinta sola cuando llega el estado del programa, y reasignar .value con
+  // el mismo texto le manda el cursor al final a quien está tecleando.
+  const poner = (nodo, valor) => { if (nodo && nodo.value !== valor) nodo.value = valor; };
+  poner(correo, contactoSoporte.correo || "");
+  poner(prefijo, contactoSoporte.prefijo || "");
+  poner(numero, contactoSoporte.numero || "");
+  poner(otro, contactoSoporte.otro || "");
+  contactoActualizar(pref);
+}
+
+function montarFormularioContacto(pref) {
+  const contenedor = $(`${pref}-contacto`);
+  if (!contenedor) return;
+  if (!contactoMontado[pref]) {
+    contenedor.innerHTML = htmlFormularioContacto(pref);
+    contenedor.querySelectorAll(`input[name="${pref}-contacto-metodo"]`)
+      .forEach((nodo) => {
+        nodo.addEventListener("change", () => {
+          contactoSincronizar(pref);
+          contactoActualizar(pref);
+        });
+      });
+    $(`${pref}-contacto-correo`)?.addEventListener("input", () => contactoSincronizar(pref));
+    $(`${pref}-contacto-prefijo`)?.addEventListener("change", () => contactoSincronizar(pref));
+    $(`${pref}-contacto-numero`)?.addEventListener("input", () => contactoSincronizar(pref));
+    $(`${pref}-contacto-otro`)?.addEventListener("input", () => contactoSincronizar(pref));
+    contactoMontado[pref] = true;
+  }
+  contactoRellenar(pref);
+}
+
+function contactoHabilitar(pref, habilitar) {
+  const contenedor = $(`${pref}-contacto`);
+  if (!contenedor) return;
+  contenedor.querySelectorAll("input,select").forEach((nodo) => { nodo.disabled = !habilitar; });
+}
+
+function contactoFoco(pref) {
+  const met = contactoMetodoMarcado(pref);
+  if (!met) { const radio = $(`${pref}-contacto-metodo-correo`); if (radio) radio.focus(); return; }
+  if (met === "correo") { const nodo = $(`${pref}-contacto-correo`); if (nodo) nodo.focus(); return; }
+  const prefijo = $(`${pref}-contacto-prefijo`);
+  if (!prefijo || !prefijo.value) { if (prefijo) prefijo.focus(); return; }
+  const otro = $(`${pref}-contacto-otro`);
+  if (prefijo && prefijo.value === "otro" && otro) { otro.focus(); return; }
+  const numero = $(`${pref}-contacto-numero`);
+  if (numero) numero.focus();
+}
+
+function contactoLeer(pref) {
+  contactoSincronizar(pref);
+  const metodo = contactoSoporte.metodo || "";
+  if (!metodo) return {error: "Elige cómo prefieres que te contactemos: correo o WhatsApp."};
+  if (metodo === "correo") {
+    const correo = (contactoSoporte.correo || "").trim().toLowerCase();
+    contactoSoporte.correo = correo;
+    if (!correo) return {error: "Falta el correo."};
+    if (!/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(correo)) {
+      return {error: "Ese correo no parece completo. Ejemplo: nombre@dominio.com"};
+    }
+    return {metodo, valor: correo};
+  }
+  if (metodo === "whatsapp") {
+    const prefijo = ($(`${pref}-contacto-prefijo`) || {}).value || "";
+    if (!prefijo) return {error: "Elige el código de tu número."};
+    if (prefijo === "otro") {
+      const otro = ($(`${pref}-contacto-otro`) || {}).value || "";
+      const limpio = otro.replace(/[\s\-.()]/g, "");
+      let valor = limpio;
+      if (!valor) return {error: "Falta el número de WhatsApp."};
+      if (valor.startsWith("00")) valor = `+${valor.slice(2)}`;
+      if (valor.startsWith("+")) {
+        if (!/^\+[0-9]+$/.test(valor) || valor.length < 9 || valor.length > 16) {
+          return {
+            error: "Ese número no está completo. Escríbelo con el signo + y el código de "
+                 + "su país (ejemplo: +49 170 1234567).",
+          };
+        }
+        // El valor se guarda sin 0 de sobra: al copiarlo/pegarlo en WhatsApp debe salir ya
+        // con formato internacional y listo para aceptar la llamada.
+        return {metodo, valor};
+      }
+      if (/^[0-9]{11}$/.test(valor) && valor.startsWith("0"))
+        return {metodo, valor: `+58${valor.slice(1)}`};
+      if (/^[0-9]{10}$/.test(valor) && valor.startsWith("4"))
+        return {metodo, valor: `+58${valor}`};
+      return {
+        error: "Ese número no está completo. Un número venezolano lleva 11 dígitos: 0414 "
+             + "seguido de 7 más (ejemplo: 0414 274 9092). Si es de otro país, elige "
+             + "Otro… y escríbelo con el signo + y su código.",
+      };
+    }
+    const numero = (($(`${pref}-contacto-numero`) || {}).value || "").replace(/\D/g, "");
+    if (numero.length !== 7) {
+      return {
+        error: "Ese número no está completo. Un número venezolano lleva 11 dígitos: 0414 "
+             + "seguido de 7 más (ejemplo: 0414 274 9092). Si es de otro país, elige "
+             + "Otro… y escríbelo con el signo + y su código.",
+      };
+    }
+    return {metodo, valor: `+58${String(prefijo).slice(1)}${numero}`};
+  }
+  return {error: "Elige cómo prefieres que te contactemos: correo o WhatsApp."};
+}
+
 // Último estado que mandó el servidor: {programa, numero, solicitud, ...}.
 let soporte = {programa: {}, numero: "", solicitud: null};
 let soporteEnVuelo = false;
@@ -8849,9 +9158,11 @@ function pintarSoporte() {
   const cuerpo = $("soporte-cuerpo");
   const acciones = $("soporte-acciones");
   const prog = soporte.programa || {};
+  const contContacto = $("soporte-contacto");
   const cerrar = `<button data-preseleccionado type="button" onclick="cerrarSoporte()">Cerrar</button>`;
 
   if (soporteHaySolicitud()) {
+    if (contContacto) contContacto.style.display = "none";
     const numero = soporte.solicitud.rustdesk_id || soporte.numero || "";
     cuerpo.innerHTML =
         `<div class="sop-caja-ok"><b>Soporte técnico solicitado</b><br>`
@@ -8874,6 +9185,11 @@ function pintarSoporte() {
   }
 
   if (prog.comprobado && !prog.disponible) {
+    if (contContacto) {
+      contContacto.style.display = "";
+      montarFormularioContacto("soporte");
+      contactoActualizar("soporte");
+    }
     cuerpo.innerHTML =
         `<div class="sop-caja-falta">En esta computadora falta el programa de `
       + `soporte remoto.</div>`
@@ -8889,6 +9205,11 @@ function pintarSoporte() {
     return;
   }
 
+  if (contContacto) {
+    contContacto.style.display = "";
+    montarFormularioContacto("soporte");
+    contactoActualizar("soporte");
+  }
   cuerpo.innerHTML =
       `<p>Al pedir soporte queda registrada una solicitud con los datos de esta `
     + `computadora y se abre el programa de soporte remoto.</p>`
@@ -8947,9 +9268,19 @@ async function conBotonOcupado(btn, rotulo, tarea) {
 }
 
 function pedirSoporte(btn) {
+  if (soporteHaySolicitud()) return;
+  const contacto = contactoLeer("soporte");
+  if (contacto.error) {
+    errorSoporte(contacto.error);
+    contactoFoco("soporte");
+    return;
+  }
   return conBotonOcupado(btn, "Pidiendo soporte…", async () => {
     try {
-      aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+      aplicarEstadoSoporte(await api("/api/soporte/solicitud", {
+        contacto_metodo: contacto.metodo,
+        contacto_valor: contacto.valor,
+      }));
     } catch (e) {
       // El servidor manda el estado hasta cuando falla (p. ej. falta el
       // programa): se aplica igual, así la ventana pasa sola a ofrecer la
@@ -8961,6 +9292,13 @@ function pedirSoporte(btn) {
 }
 
 function instalarSoporte(btn) {
+  if (soporteHaySolicitud()) return;
+  const contacto = contactoLeer("soporte");
+  if (contacto.error) {
+    errorSoporte(contacto.error);
+    contactoFoco("soporte");
+    return;
+  }
   return conBotonOcupado(btn, "Descargando…", async () => {
     aplicarEstadoSoporte(await api("/api/soporte/instalar-remoto", {}));
     // Comprobación automática de que quedó disponible: si no, no se pide nada
@@ -8969,7 +9307,10 @@ function instalarSoporte(btn) {
     if (!(soporte.programa || {}).disponible)
       throw new Error("El programa se descargó pero todavía no está disponible. "
                       + "Vuelve a intentar.");
-    aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+    aplicarEstadoSoporte(await api("/api/soporte/solicitud", {
+      contacto_metodo: contacto.metodo,
+      contacto_valor: contacto.valor,
+    }));
   });
 }
 
@@ -9066,6 +9407,8 @@ function abrirTicket() {
   const campo = $("ticket-mensaje");
   campo.value = ticketBorrador;
   campo.disabled = false;
+  montarFormularioContacto("ticket");
+  contactoHabilitar("ticket", true);
   $("ticket-error").style.display = "none";
   $("ticket-ok").style.display = "none";
   const enviar = $("ticket-enviar");
@@ -9092,6 +9435,13 @@ async function enviarTicket() {
     $("ticket-mensaje").focus();
     return;
   }
+  const contacto = contactoLeer("ticket");
+  if (contacto.error) {
+    error.textContent = contacto.error;
+    error.style.display = "";
+    contactoFoco("ticket");
+    return;
+  }
   ticketEnVuelo = true;
   ticketBorrador = texto;
   error.style.display = "none";
@@ -9103,6 +9453,8 @@ async function enviarTicket() {
       id: ticketId,
       mensaje: texto,
       informe: $("diag-sync-texto").textContent,
+      contacto_metodo: contacto.metodo,
+      contacto_valor: contacto.valor,
     });
     mostrarTicketCreado(r.id);
   } catch (e) {
@@ -9130,6 +9482,7 @@ function mostrarTicketCreado(id) {
   $("ticket-enviar").style.display = "none";
   $("ticket-copiar-id").style.display = "";
   $("ticket-cancelar").textContent = "Cerrar";
+  contactoHabilitar("ticket", false);
 }
 
 // Copiado que también funciona sin permiso de portapapeles (http): cae a un
@@ -9201,6 +9554,16 @@ function copiarInformeSync(btn) {
 
 function copiarIdTicket(btn) {
   return copiarConAviso(btn, ticketCreado || ticketId || "", "Copiar número");
+}
+
+function copiarDato(btn) {
+  return copiarConAviso(btn, btn.dataset.copiar || "", btn.dataset.rotulo || "Copiar");
+}
+
+function botonCopiar(valor, titulo) {
+  if (!valor) return "";
+  return `<button type="button" class="copiar-pedido" data-copiar="${esc(valor)}"`
+    + ` title="${esc(titulo || "Copiar")}" onclick="copiarDato(this)">Copiar</button>`;
 }
 
 // El número de pedido del título del detalle (2026-08-06, pedido del usuario):
