@@ -8946,9 +8946,9 @@ function htmlFormularioContacto(pref) {
           <option value="otro">Otro…</option>
         </select>
         <input id="${pref}-contacto-numero" class="contacto-numero" inputmode="numeric"
-               maxlength="9" placeholder="274 9092">
+               maxlength="9">
         <input id="${pref}-contacto-otro" class="contacto-otro"
-               maxlength="24" placeholder="+49 170 1234567" style="display:none">
+               maxlength="24" style="display:none">
       </div>
     </div>
   </div>`;
@@ -9079,8 +9079,8 @@ function contactoLeer(pref) {
       if (valor.startsWith("+")) {
         if (!/^\+[0-9]+$/.test(valor) || valor.length < 9 || valor.length > 16) {
           return {
-            error: "Ese número no está completo. Escríbelo con el signo + y el código de "
-                 + "su país (ejemplo: +49 170 1234567).",
+            error: "Ese número no está completo. Escríbelo con el signo + y el "
+                 + "código de su país.",
           };
         }
         // El valor se guarda sin 0 de sobra: al copiarlo/pegarlo en WhatsApp debe salir ya
@@ -9092,17 +9092,17 @@ function contactoLeer(pref) {
       if (/^[0-9]{10}$/.test(valor) && valor.startsWith("4"))
         return {metodo, valor: `+58${valor}`};
       return {
-        error: "Ese número no está completo. Un número venezolano lleva 11 dígitos: 0414 "
-             + "seguido de 7 más (ejemplo: 0414 274 9092). Si es de otro país, elige "
-             + "Otro… y escríbelo con el signo + y su código.",
+        error: "Ese número no está completo. Un número venezolano lleva 11 "
+             + "dígitos: el código y 7 más. Si es de otro país, elige Otro… y "
+             + "escríbelo con el signo + y su código.",
       };
     }
     const numero = (($(`${pref}-contacto-numero`) || {}).value || "").replace(/\D/g, "");
     if (numero.length !== 7) {
       return {
-        error: "Ese número no está completo. Un número venezolano lleva 11 dígitos: 0414 "
-             + "seguido de 7 más (ejemplo: 0414 274 9092). Si es de otro país, elige "
-             + "Otro… y escríbelo con el signo + y su código.",
+        error: "Ese número no está completo. Un número venezolano lleva 11 "
+             + "dígitos: el código y 7 más. Si es de otro país, elige Otro… y "
+             + "escríbelo con el signo + y su código.",
       };
     }
     return {metodo, valor: `+58${String(prefijo).slice(1)}${numero}`};
