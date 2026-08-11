@@ -19080,15 +19080,17 @@ let clienteEnEdicion = null;     // código del cliente abierto en su vista de
                                  // edición ("" = grupo sin código; null = listado)
 
 function pintarBotonesCatalogos() {
-  // Los artículos por revisar solo tienen botón cuando hay alguno: es una
-  // lista de problemas, y en cero no hay nada que abrir.
-  $("cat-btns").innerHTML = CATALOGOS_AJUSTES
-    .filter(tipo => tipo !== "articulos_revision" || articulosPorRevisar > 0)
-    .map(tipo =>
-      `<button class="${tipo === catalogoActual ? "acento" : ""}"
-               onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}${
-        tipo === "articulos_revision" ? ` (${articulosPorRevisar})` : ""}</button>`
-    ).join("");
+  // Los artículos por revisar tienen su botón SIEMPRE, como los cuatro de al
+  // lado (2026-08-11, corregido el mismo día): esta fila es un menú, no un
+  // estado, y esconder la entrada cuando la lista está vacía deja sin forma de
+  // saber que existe — se lee como que no funcionó. El número solo aparece
+  // cuando hay algo que atender.
+  $("cat-btns").innerHTML = CATALOGOS_AJUSTES.map(tipo =>
+    `<button class="${tipo === catalogoActual ? "acento" : ""}"
+             onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}${
+      tipo === "articulos_revision" && articulosPorRevisar > 0
+        ? ` (${articulosPorRevisar})` : ""}</button>`
+  ).join("");
 }
 
 // Sacar un artículo a mano de la lista por revisar. Lo normal es que salga
