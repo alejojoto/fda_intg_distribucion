@@ -8544,20 +8544,26 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // vista al scrollear. Con una página que no arranca en el primer ítem de la
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
-function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render) {
+// `resaltarAntiguas` en falso deja el separador en su gris de siempre: el
+// ámbar avisa de trabajo que se está olvidando, y en una lista donde ya no
+// queda nada por hacer (PROCESADAS) alarma sin motivo (2026-08-11, pedido del
+// usuario).
+function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render,
+                                     resaltarAntiguas = true) {
   const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
+  const esAntigua = (iso) => resaltarAntiguas && esFechaAtrasada(iso, gracia);
   let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
   let html = "";
   for (const item of items) {
     const iso = (fechaDe(item) || "").slice(0, 10);
     if (iso !== diaAnterior) {
       diaAnterior = iso;
-      const atrasada = esFechaAtrasada(iso, gracia);
+      const atrasada = esAntigua(iso);
       html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
         + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
         + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer))}</td></tr>`;
     }
-    html += render(item, esFechaAtrasada(iso, gracia));
+    html += render(item, esAntigua(iso));
   }
   return html;
 }
@@ -11910,9 +11916,10 @@ const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 // Separadores por fecha/hora de PROCESAMIENTO (2026-08-02): la lista ya viene
 // del backend ordenada por ese mismo instante, descendente — lo más reciente
 // primero (_ordenar_procesadas) — así que agrupar por día es solo detectar
-// cuándo cambia, sin reordenar nada. Sin resaltado de "atrasada": a
-// diferencia de PENDIENTES y EN REVISIÓN, aquí no queda nada pendiente que se
-// esté olvidando. El instante de la familia es el más reciente de sus partes,
+// cuándo cambia, sin reordenar nada. Sin resaltado de "atrasada" ni en la fila
+// ni en el separador: a diferencia de PENDIENTES y EN REVISIÓN, aquí no queda
+// nada pendiente que se esté olvidando, y el ámbar en una lista ya resuelta
+// alarma sin motivo. El instante de la familia es el más reciente de sus partes,
 // igual que en el backend (_instante_familia) — una familia sin ninguna parte
 // procesada (facturada a mano, nunca llenada) cae en "Sin fecha registrada".
 const fechaDeFamiliaProcesada = (partes) =>
@@ -11931,7 +11938,8 @@ function pintarProcesadas(familias) {
         <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
         <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaProcesada(f, true)).join("");
-    }
+    },
+    false
   ) || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
