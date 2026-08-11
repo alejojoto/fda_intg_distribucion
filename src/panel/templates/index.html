@@ -9080,7 +9080,7 @@ function contactoLeer(pref) {
         if (!/^\+[0-9]+$/.test(valor) || valor.length < 9 || valor.length > 16) {
           return {
             error: "Ese número no está completo. Escríbelo con el signo + y el "
-                 + "código de su país.",
+                 + "código de tu país.",
           };
         }
         // El valor se guarda sin 0 de sobra: al copiarlo/pegarlo en WhatsApp debe salir ya
@@ -9094,7 +9094,7 @@ function contactoLeer(pref) {
       return {
         error: "Ese número no está completo. Un número venezolano lleva 11 "
              + "dígitos: el código y 7 más. Si es de otro país, elige Otro… y "
-             + "escríbelo con el signo + y su código.",
+             + "escríbelo con el signo + y el código de tu país.",
       };
     }
     const numero = (($(`${pref}-contacto-numero`) || {}).value || "").replace(/\D/g, "");
@@ -9102,7 +9102,7 @@ function contactoLeer(pref) {
       return {
         error: "Ese número no está completo. Un número venezolano lleva 11 "
              + "dígitos: el código y 7 más. Si es de otro país, elige Otro… y "
-             + "escríbelo con el signo + y su código.",
+             + "escríbelo con el signo + y el código de tu país.",
       };
     }
     return {metodo, valor: `+58${String(prefijo).slice(1)}${numero}`};
