@@ -14834,7 +14834,11 @@ function desfaseDeFechas(facturas) {
   esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
   const esperada = calISO(esperadaFecha);
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
-  const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
+  // Los pedidos de PRUEBA tampoco (2026-08-11, pedido del usuario): son
+  // sintéticos, su fecha es la del día en que se armaron y no hay nada que
+  // justificar — se llenan sin que el panel pida decidir nada.
+  const fechas = facturas.filter(f => !(f || {}).de_prueba)
+                         .map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
   const desfasadas = fechas.filter(f => f !== esperada);
   if (!desfasadas.length) return null;
