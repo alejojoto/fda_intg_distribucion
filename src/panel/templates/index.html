@@ -16489,8 +16489,10 @@ async function cargarAjustes() {
     $("vendedor-info").textContent =
       d.espejo_activo ? "nube: conectada" : "nube: sin conexión";
     pintarDiaDespacho(d.dia_despacho);
-    articulosPorRevisar = d.articulos_por_revisar || 0;
     pintarBotonesCatalogos();
+    // Lo pendiente de cada catálogo (sección bajo los botones): se carga
+    // aparte y sin bloquear el resto de AJUSTES.
+    cargarRevisionCatalogos();
     corteProduccion = d.corte_produccion || "";
     $("corte-fecha").value = corteProduccion;
     // Cierre asistido de implantación (ASISTENTE_PRUEBA_IMPLANTACION en ESTA
@@ -18881,6 +18883,11 @@ const CATALOGOS = {
   productos: {
     titulo: "Productos",
     singular: "producto",
+    // Con pestaña "Por revisar" (2026-08-11, pedido del usuario — el patrón
+    // de Clientes): los artículos que el programa de facturación rechazó al
+    // llenar (src/db/articulos_revision.py) se ven aquí adentro, y la barra
+    // de pestañas solo aparece cuando hay alguno.
+    conRevision: true,
     // Obligatorio real: pt_id y codigo_articulo (ver `campos`). descripcion y
     // nombre se completan solos y son opcionales de corregir a mano.
     descripcion: "Cruza el producto del pedido (PT_id) con su código de "
@@ -19019,32 +19026,6 @@ const CATALOGOS = {
       f.origen === "manual" ? ` <button onclick="confirmarBorrar(this, () => eliminarFeriado(${i}))">Eliminar</button>` : ""}${
       f.ajustado ? ` <button onclick="confirmarBorrar(this, () => restaurarFeriado(${i}), 'Confirmar restaurar')">Restaurar</button>` : ""}`,
   },
-  // Solo lectura: esta lista la llena y la vacía el propio llenado
-  // (src/db/articulos_revision.py, 2026-08-11, pedido del usuario). Cada
-  // código que el programa de facturación no aceptó —sin precio, código que
-  // no existe, un aviso que no se supo leer— queda anotado aquí hasta que
-  // vuelva a entrar en un documento. Con algo anotado, la lista de PENDIENTES
-  // del modo prueba trae un pedido con esos códigos y nada más, para
-  // reintentarlos sin volver a llenar el catálogo entero.
-  articulos_revision: {
-    titulo: "Artículos por revisar",
-    descripcion: "Códigos que el programa de facturación no aceptó al llenar: "
-      + "no llegaron al documento y hay que arreglarlos de ese lado. Salen de "
-      + "esta lista solos, en cuanto un llenado los acepta.",
-    // Sin `campos` ni `clave`: no hay editor que abrir (soloLectura).
-    soloLectura: true,
-    columnas: [
-      {campo: "nombre", etiqueta: "Artículo", origenDato: "winledger"},
-      {campo: "codigo_articulo", etiqueta: "Código artículo", origenDato: "winledger"},
-      // La empresa importa: un artículo sin precio en la de prueba puede
-      // tenerlo en la real, así que el motivo se lee distinto según dónde salió.
-      {campo: "motivo", etiqueta: "Qué pasó",
-       valor: (f) => f.empresa === "999" ? `${f.motivo} (en la empresa de prueba)` : f.motivo},
-      {campo: "fecha_detectado", etiqueta: "Desde",
-       valor: (f) => supFechaCorta(f.fecha_detectado)},
-    ],
-    acciones: (f, i) => ` <button onclick="confirmarBorrar(this, () => quitarArticuloRevision(${i}), 'Confirmar quitar')">Quitar</button>`,
-  },
   descuentos: {
     titulo: "Descuentos (locales — mecánica PENDIENTE FDA)",
     singular: "descuento",
@@ -19102,12 +19083,12 @@ function cerrarRutasVista() {
   $("rutas-overlay").classList.remove("visible");
 }
 
-const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados",
-                           "articulos_revision"];
+const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
 
 let catalogoActual = null;       // tipo abierto en la vista
 let catalogoFilas = [];          // filas del catálogo abierto
-let articulosPorRevisar = 0;     // artículos que el programa no aceptó (AJUSTES)
+let catalogoPorRevisar = [];     // artículos que el programa no aceptó (viaja con productos)
+let catProductosTab = "productos"; // pestaña del catálogo de productos: productos | revisar
 let catClientesTab = "clientes"; // pestaña del catálogo de clientes: clientes | revisar
 let editorFila = null;           // fila en edición (null = nueva)
 let feriadoAnio = null;          // año elegido en Feriados (null = el en curso)
@@ -19116,36 +19097,31 @@ let clienteEnEdicion = null;     // código del cliente abierto en su vista de
                                  // edición ("" = grupo sin código; null = listado)
 
 function pintarBotonesCatalogos() {
-  // Los artículos por revisar tienen su botón SIEMPRE, como los cuatro de al
-  // lado (2026-08-11, corregido el mismo día): esta fila es un menú, no un
-  // estado, y esconder la entrada cuando la lista está vacía deja sin forma de
-  // saber que existe — se lee como que no funcionó. El número solo aparece
-  // cuando hay algo que atender.
+  // Los artículos que el programa rechazó ya no tienen botón propio aquí
+  // (2026-08-11, mismo día): viven como pestaña "Por revisar" DENTRO de
+  // Productos —el patrón de Clientes— y en la sección conjunta de abajo.
   $("cat-btns").innerHTML = CATALOGOS_AJUSTES.map(tipo =>
     `<button class="${tipo === catalogoActual ? "acento" : ""}"
-             onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}${
-      tipo === "articulos_revision" && articulosPorRevisar > 0
-        ? ` (${articulosPorRevisar})` : ""}</button>`
+             onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}</button>`
   ).join("");
 }
 
 // Sacar un artículo a mano de la lista por revisar. Lo normal es que salga
 // solo (el llenado que lo acepta lo borra); esto es para el código que ya no
-// se factura y por eso no va a volver a probarse nunca.
-async function quitarArticuloRevision(i) {
-  const f = catalogoFilas[i];
-  if (!f) return;
+// se factura y por eso no va a volver a probarse nunca. Sirve igual desde la
+// pestaña de Productos que desde la sección conjunta: repinta las dos.
+async function quitarArticuloRevision(codigo) {
   try {
     await api("/api/catalogo/articulos-revision/eliminar",
-              {codigo_articulo: f.codigo_articulo});
+              {codigo_articulo: codigo});
   } catch (e) {
     mensaje(e.message, "error");
     return;
   }
-  await abrirCatalogo("articulos_revision");
-  articulosPorRevisar = catalogoFilas.length;
-  if (!articulosPorRevisar) cerrarCatalogo();   // sin filas no queda lista que mirar
-  else pintarBotonesCatalogos();
+  // Recargar el catálogo trae la lista fresca (viaja con productos); si el
+  // catálogo no está abierto solo se refresca la sección.
+  if (catalogoActual === "productos") await abrirCatalogo("productos");
+  cargarRevisionCatalogos();
 }
 
 // El mismo botón que abre un catálogo lo cierra (feedback 2026-07-29): poder
@@ -19164,6 +19140,9 @@ function cerrarCatalogo() {
   clienteEnEdicion = null;
   $("catalogo-vista").innerHTML = "";
   pintarBotonesCatalogos();
+  // Lo que se resolvió adentro (una entrada completada, un Quitar) tiene que
+  // verse al salir: la sección Por revisar se repinta con datos frescos.
+  cargarRevisionCatalogos();
 }
 
 // --- AJUSTES: Rutas (serie por ruta, 2026-08-02) ----------------------------
@@ -19516,8 +19495,7 @@ function onClickSwitchActivo(ev, alConfirmar, etiqueta) {
 // Sistemas de origen presentes en un catálogo, en el orden en que aparecen.
 function origenesDeCatalogo(def) {
   const vistos = [];
-  // Un catálogo de solo lectura no declara `campos` (no tiene editor).
-  for (const c of [...(def.campos || []), ...(def.columnas || [])]) {
+  for (const c of [...def.campos, ...(def.columnas || [])]) {
     if (c.origenDato && !vistos.includes(c.origenDato)) vistos.push(c.origenDato);
   }
   return vistos;
@@ -19562,10 +19540,18 @@ async function abrirCatalogo(tipo, prefill) {
     const filtroPrevio = mismoCatalogo && $("cat-filtro") ? $("cat-filtro").value : "";
     catalogoActual = tipo;
     catalogoFilas = d.filas;
+    // Los artículos que el programa rechazó viajan con el catálogo de
+    // productos (ver catalogos.listar_catalogo): alimentan su pestaña
+    // "Por revisar".
+    catalogoPorRevisar = d.por_revisar || [];
     // No se oculta aquí: tras guardar una fila se restaura la ventana del cliente.
     clienteEnEdicion = null;     // abrir un catálogo siempre vuelve al listado
     // paginar() recorta sola la página si el catálogo encogió y quedó fuera de rango.
-    if (!mismoCatalogo) { paginacion.catalogo.pagina = 1; catClientesTab = "clientes"; }
+    if (!mismoCatalogo) {
+      paginacion.catalogo.pagina = 1;
+      catClientesTab = "clientes";
+      catProductosTab = "productos";
+    }
     pintarBotonesCatalogos();
     $("catalogo-overlay").classList.add("visible");
     // Esta vista es la de AJUSTES; Descuentos tiene su propia pestaña y su
@@ -19590,22 +19576,18 @@ async function abrirCatalogo(tipo, prefill) {
         ${def.descripcion ? `<p class="mut" style="margin:0 0 10px">${esc(def.descripcion)}</p>` : ""}
         ${leyenda ? `<div class="orig-leyenda">${leyenda}</div>` : ""}
         ${d.aviso ? `<p class="detalle-error" style="margin:0 0 8px">${esc(d.aviso)}</p>` : ""}
-        ${def.agrupado ? '<div id="cat-pestanas"></div>' : ""}
+        ${def.agrupado || def.conRevision ? '<div id="cat-pestanas"></div>' : ""}
         <div class="cat-cabecera" style="padding:0 0 10px">
           <span class="buscador"><input type="text" id="cat-filtro" placeholder="filtrar…" value="${esc(filtroPrevio)}" oninput="paginacion.catalogo.pagina=1;pintarFilasCatalogo()">
             <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
                 onclick="limpiarBuscador('cat-filtro', function(){paginacion.catalogo.pagina=1;pintarFilasCatalogo();})">&times;</button></span>
           ${def.cabeceraExtra ? def.cabeceraExtra(d) : ""}
           <span class="mut" id="cat-conteo"></span>
-          ${def.soloLectura ? "" : `<button class="primario" style="margin-left:auto"
-                  onclick="abrirEditor(null)">Agregar ${esc(def.singular)}</button>`}
+          <button class="primario" style="margin-left:auto"
+                  onclick="abrirEditor(null)">Agregar ${esc(def.singular)}</button>
         </div>
         <div style="overflow-x:auto"><table id="t-catalogo">
-          ${def.agrupado ? "" : `<thead><tr>${columnas.map(c => `<th>${
-            c.origenDato
-              ? `<span class="orig-punto ${c.origenDato}" title="${esc(ORIGENES[c.origenDato].titulo)}"></span>`
-              : ""}${esc(c.etiqueta)}</th>`).join("")}${
-            def.acciones ? "<th></th>" : ""}</tr></thead>`}
+          ${def.agrupado ? "" : theadCatalogo(columnas, !!def.acciones)}
           <tbody></tbody>
         </table></div>
         <div class="paginador" id="pag-catalogo"></div>
@@ -19627,6 +19609,17 @@ function pintarFilasCatalogo() {
   const def = CATALOGOS[catalogoActual];
   const filtro = ($("cat-filtro").value || "").toLowerCase();
   if (def.agrupado) { pintarClientesAgrupados(filtro); return; }
+  if (def.conRevision) {
+    pintarPestanasRevision();
+    if (catProductosTab === "revisar") {
+      pintarArticulosPorRevisarCatalogo(filtro);
+      return;
+    }
+    // Volver de la pestaña Por revisar dejó la tabla con las columnas de esa
+    // lista: se restauran las del catálogo antes de repintar las filas.
+    $("t-catalogo").innerHTML =
+      theadCatalogo(columnasCatalogo(def), !!def.acciones) + "<tbody></tbody>";
+  }
   const columnas = columnasCatalogo(def);
   const coincidentes = catalogoFilas
     .map((f, i) => [f, i])
@@ -19664,19 +19657,15 @@ function pintarFilasCatalogo() {
     // Solo las celdas con un control propio cortan el clic de la fila: sobre un
     // punto informativo o una celda vacía, pulsar sigue abriendo el editor.
     const acciones = def.acciones ? def.acciones(f, i) : "";
-    // Una lista de solo lectura no abre editor: no hay nada que corregir aquí
-    // dentro (lo que hay que arreglar está en el programa de facturación).
     return cabecera + `
-    <tr class="${def.soloLectura ? "" : "abre-editor"}${
-      def.atenuarInactivas && !f.activo ? " fila-inactiva" : ""}"${
+    <tr class="abre-editor${def.atenuarInactivas && !f.activo ? " fila-inactiva" : ""}"${
       (def.acciones || def.toggleActivo) ? ` data-fila-idx="${i}"` : ""}
-        ${def.soloLectura ? "" : `title="Clic para editar este ${esc(def.singular)}"
-        onclick="abrirEditor(${i})"`}>
+        title="Clic para editar este ${esc(def.singular)}" onclick="abrirEditor(${i})">
       ${columnas.map(c => c.tipo === "checkbox"
           ? `<td${def.toggleActivo ? CELDA_ACCIONES : ""}>${
               def.toggleActivo ? switchActivo(f[c.campo], def.toggleActivo(i),
                 def.etiquetaToggle ? def.etiquetaToggle(f) : "") : puntoEstado(f[c.campo])}</td>`
-          : `<td>${esc(c.valor ? c.valor(f) : (f[c.campo] ?? ""))}</td>`).join("")}
+          : `<td>${esc(f[c.campo] ?? "")}</td>`).join("")}
       ${def.acciones ? `<td${acciones ? CELDA_ACCIONES : ""}>${acciones}</td>` : ""}
     </tr>` + ((def.acciones || def.toggleActivo)
       ? `<tr class="fila-aviso-error" data-fila-idx="${i}" style="display:none"><td colspan="${nCols}"></td></tr>`
@@ -19836,6 +19825,164 @@ function catCambiarPestana(id) {
   catClientesTab = id;
   paginacion.catalogo.pagina = 1;
   pintarFilasCatalogo();
+}
+
+// La cabecera de la tabla del catálogo. Extraída de abrirCatalogo porque la
+// pestaña Por revisar de Productos trae columnas propias y repinta la tabla
+// entera al alternar entre pestañas.
+function theadCatalogo(columnas, conAcciones) {
+  return `<thead><tr>${columnas.map(c => `<th>${
+    c.origenDato
+      ? `<span class="orig-punto ${c.origenDato}" title="${esc(ORIGENES[c.origenDato].titulo)}"></span>`
+      : ""}${esc(c.etiqueta)}</th>`).join("")}${
+    conAcciones ? "<th></th>" : ""}</tr></thead>`;
+}
+
+// --- Artículos que el programa de facturación rechazó (2026-08-11) ----------
+// La pestaña "Por revisar" de Productos y la sección conjunta bajo los
+// botones de Catálogos pintan la misma lista (src/db/articulos_revision.py);
+// estas son las piezas que comparten.
+const COLUMNAS_ARTICULOS_REVISION = [
+  {etiqueta: "Artículo", origenDato: "winledger"},
+  {etiqueta: "Código artículo", origenDato: "winledger"},
+  {etiqueta: "Qué pasó"},
+  {etiqueta: "Desde"},
+];
+
+// El motivo dice dónde salió cuando importa: un artículo sin precio en la
+// empresa de prueba puede tenerlo en la real.
+const motivoArticuloRevision = (f) =>
+  f.empresa === "999" ? `${f.motivo} (en la empresa de prueba)` : (f.motivo || "");
+
+function filaArticuloRevision(f) {
+  return `<tr>
+    <td>${esc(f.nombre || f.codigo_articulo)}</td>
+    <td>${esc(f.codigo_articulo)}</td>
+    <td>${esc(motivoArticuloRevision(f))}</td>
+    <td>${supFechaCorta(f.fecha_detectado)}</td>
+    <td><button onclick="confirmarBorrar(this, () => quitarArticuloRevision('${esc(f.codigo_articulo)}'), 'Confirmar quitar')">Quitar</button></td>
+  </tr>`;
+}
+
+// Pestañas del catálogo de Productos, el mismo reparto que Clientes: sin
+// nada por revisar la barra sobra y se oculta.
+function pintarPestanasRevision() {
+  const n = catalogoPorRevisar.length;
+  if (!n) catProductosTab = "productos";
+  const pestana = (id, txt, cuenta, st) => `<button class="desc-subtab ${st}${
+    catProductosTab === id ? " activa" : ""}" onclick="catCambiarPestanaProductos('${id}')">${
+    txt}<span class="cuenta">${cuenta}</span></button>`;
+  $("cat-pestanas").innerHTML = n
+    ? `<div class="desc-subtabs" style="margin:0 0 10px">${
+        pestana("productos", "Productos", catalogoFilas.length, "st-vigentes")}${
+        pestana("revisar", "Por revisar", n, "st-revisar")}</div>`
+    : "";
+}
+
+function catCambiarPestanaProductos(id) {
+  catProductosTab = id;
+  paginacion.catalogo.pagina = 1;
+  pintarFilasCatalogo();
+}
+
+// La pestaña Por revisar de Productos: la lista completa, sin paginar (son
+// pocos) y con el filtro de arriba aplicado igual que a las demás filas.
+function pintarArticulosPorRevisarCatalogo(filtro) {
+  const filas = catalogoPorRevisar.filter(f => !filtro ||
+    [f.codigo_articulo, f.nombre, f.motivo]
+      .some(v => String(v ?? "").toLowerCase().includes(filtro)));
+  const catFiltroActivo = hayFiltroActivo("catalogo");
+  $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${
+    filas.length} artículo(s) por revisar</span> ${chipFiltroActivo(catFiltroActivo)}`;
+  $("pag-catalogo").innerHTML = "";
+  $("t-catalogo").innerHTML = theadCatalogo(COLUMNAS_ARTICULOS_REVISION, true)
+    + `<tbody>
+      <tr class="grupo"><td colspan="5"><div class="mut" style="font-weight:400; max-width:62ch">El
+        programa de facturación no aceptó estos códigos al llenar (el motivo
+        está en su fila): se corrigen de ese lado y salen solos en cuanto un
+        llenado los acepta. Quitar es para el que ya no se factura.</div></td></tr>
+      ${filas.map(filaArticuloRevision).join("")
+        || '<tr><td colspan="5" class="mut">Sin artículos que coincidan.</td></tr>'}</tbody>`;
+}
+
+// --- Sección "Por revisar" bajo los botones de Catálogos (2026-08-11) -------
+// Junta lo pendiente de cada catálogo —entradas de clientes sin resolver y
+// artículos rechazados por el programa— sin tener que abrir cada uno para
+// saber si hay algo. Cada lista sigue viéndose también dentro de su catálogo.
+let revisionCatalogos = {clientes: [], articulos: []};
+let revisionTab = null;   // pestaña activa de la sección: clientes | articulos
+
+async function cargarRevisionCatalogos() {
+  if (!tienePermiso("ajustes_catalogos")) return;
+  // Las dos listas en paralelo; si una falla, la sección muestra la otra y
+  // no molesta con errores — es un resumen, no una acción del operador.
+  const [cli, art] = await Promise.all([
+    api("/api/catalogo/clientes").catch(() => null),
+    api("/api/catalogo/articulos_revision").catch(() => null),
+  ]);
+  revisionCatalogos.clientes = ((cli && cli.filas) || [])
+    .filter(f => faltaDeEntrada(f))
+    .sort((a, b) => (b.pedidos_esperando || 0) - (a.pedidos_esperando || 0));
+  revisionCatalogos.articulos = (art && art.filas) || [];
+  pintarRevisionCatalogos();
+}
+
+function pintarRevisionCatalogos() {
+  const caja = $("cat-revision");
+  const cli = revisionCatalogos.clientes, art = revisionCatalogos.articulos;
+  if (!cli.length && !art.length) {
+    caja.style.display = "none";
+    caja.innerHTML = "";
+    return;
+  }
+  if ((revisionTab === "clientes" && !cli.length)
+      || (revisionTab === "articulos" && !art.length)) revisionTab = null;
+  if (!revisionTab) revisionTab = cli.length ? "clientes" : "articulos";
+  const pestana = (id, txt, n) => n ? `<button class="desc-subtab st-revisar${
+    revisionTab === id ? " activa" : ""}" onclick="revisionCambiarPestana('${id}')">${
+    txt}<span class="cuenta">${n}</span></button>` : "";
+  const tabla = revisionTab === "clientes"
+    ? `<table><thead><tr><th>Cliente o sucursal</th><th>Qué falta</th></tr></thead>
+       <tbody>${cli.map(filaClientePorRevisar).join("")}</tbody></table>`
+    : `<table>${theadCatalogo(COLUMNAS_ARTICULOS_REVISION, true)}
+       <tbody>${art.map(filaArticuloRevision).join("")}</tbody></table>`;
+  caja.innerHTML = `
+    <h3 style="margin-top:16px">Por revisar</h3>
+    <div class="desc-subtabs" style="margin:6px 0 10px">${
+      pestana("clientes", "Clientes", cli.length)}${
+      pestana("articulos", "Productos", art.length)}</div>
+    <div style="overflow-x:auto">${tabla}</div>`;
+  caja.style.display = "";
+}
+
+function revisionCambiarPestana(id) {
+  revisionTab = id;
+  pintarRevisionCatalogos();
+}
+
+function filaClientePorRevisar(f) {
+  const esperando = f.pedidos_esperando
+    ? ` <span class="badge-espera" title="Hasta que esta entrada no esté completa, ${
+        f.pedidos_esperando === 1 ? "esa factura no sale" : "esas facturas no salen"}.">${
+        f.pedidos_esperando === 1 ? "1 pedido esperando"
+          : `${f.pedidos_esperando} pedidos esperando`}</span>`
+    : "";
+  return `<tr class="abre-editor" title="Clic para completar esta entrada"
+      onclick="abrirClientePorRevisar('${esc(f.cliente_id)}')">
+    <td>${esc(f.sucursal_nombre || "(nombre no llegó)")}${esperando}<div class="mut">${
+      esc(f.cliente_id)}</div></td>
+    <td><span style="color:var(--warn)">${esc(faltaDeEntrada(f))}</span></td>
+  </tr>`;
+}
+
+// Abre la misma ficha que el "Por revisar" del catálogo de clientes: esta
+// sección es solo otro camino hasta la misma entrada.
+async function abrirClientePorRevisar(clienteId) {
+  if (await abrirCatalogo("clientes") === false) return;
+  catClientesTab = "revisar";
+  pintarFilasCatalogo();
+  const idx = catalogoFilas.findIndex(f => f.cliente_id === clienteId);
+  if (idx >= 0) abrirEditor(idx);
 }
 
 // `opciones.suelta` = la fila NO cuelga de un cliente (entrada por resolver o
