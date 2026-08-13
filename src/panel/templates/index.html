@@ -11944,6 +11944,25 @@ const CASOS_REVISION = [
       titulo: pr.descripcion || pr.pt_id,
     })),
   },
+  // El programa rechazó ESTE código al llenar (2026-08-13, pedido del usuario:
+  // "debe haber consistencia en que se trate como los demás pedidos cuando
+  // falta algo"). Aquí el panel no puede crear nada —el precio se pone en el
+  // programa de facturación—, así que su acción es la misma que la del cliente
+  // que ya se creó allá: avisar que ya está listo y devolver el pedido a la
+  // cola. Si el código sigue mal, el próximo llenado lo marca otra vez.
+  {
+    prefijo: "El programa de facturación no pudo facturar",
+    objeto: (p) => (p.productos_rechazados || []).map(pr =>
+      `<b>Producto:</b> ${esc(pr.descripcion || pr.codigo)}
+       <div class="mut">${esc(pr.codigo)} · ${esc(pr.motivo)}</div>`).join("")
+      || "<b>Producto</b>",
+    detalle: "El programa de facturación rechazó ese código al llenar, así que "
+      + "esa línea no entraría al documento. Se arregla allá —normalmente es "
+      + "ponerle precio— y aquí se pulsa «Ya tiene precio».",
+    botones: (p, i) => [
+      `<button class="acento" onclick="marcarProductoArreglado(${i})">Ya tiene precio</button>`,
+    ],
+  },
   {
     prefijo: "Pedido con campo de error",
     objeto: () => "Dato dañado en AppSheet",
@@ -12257,6 +12276,26 @@ async function marcarCruceCreado(i) {
   avisarTrabajando("Devolviendo el pedido a la cola…");
   try {
     await api("/api/revision/cruce-rechazado/limpiar", {cliente_id: p.cliente_id});
+    await cargar();
+    mensaje("El pedido vuelve a la cola de facturas.", "info");
+  } catch (e) {
+    mensaje(e.message, "error");
+  }
+}
+
+// "Ya tiene precio" (2026-08-13): el operador acaba de arreglar el producto en
+// el programa de facturación, así que su código sale de la lista de rechazados
+// y el pedido vuelve a la cola. Gemelo de "Ya está creado" de los clientes: no
+// se comprueba nada aquí — si el código sigue sin precio, el próximo llenado
+// lo marca de nuevo solo.
+async function marcarProductoArreglado(i) {
+  const p = listaRevisionVisible[i];
+  if (!p || !(p.productos_rechazados || []).length) return;
+  avisarTrabajando("Devolviendo el pedido a la cola…");
+  try {
+    for (const pr of p.productos_rechazados) {
+      await api("/api/catalogo/articulos-revision/eliminar", {codigo_articulo: pr.codigo});
+    }
     await cargar();
     mensaje("El pedido vuelve a la cola de facturas.", "info");
   } catch (e) {
