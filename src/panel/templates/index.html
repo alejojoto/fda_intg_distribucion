@@ -2969,6 +2969,12 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
           códigos usados por programa de facturación.</p>
         <div class="cat-btns" id="cat-btns"></div>
+        <!-- Resumen de lo pendiente por catálogo (2026-08-13, pedido del
+             usuario: "afuera solo salga algo tipo por revisar en tal
+             categoría: tanto"): una línea con el conteo por catálogo; el
+             detalle vive DENTRO de cada uno, en su pestaña Por revisar, y
+             pulsar el número abre esa pestaña. Se oculta sin pendientes. -->
+        <div id="cat-revision" style="display:none; margin-top:10px"></div>
       </div>
     </div>
     <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
@@ -16194,6 +16200,9 @@ async function cargarAjustes() {
       d.espejo_activo ? "nube: conectada" : "nube: sin conexión";
     pintarDiaDespacho(d.dia_despacho);
     pintarBotonesCatalogos();
+    // Lo pendiente de cada catálogo (sección bajo los botones): se carga
+    // aparte y sin bloquear el resto de AJUSTES.
+    cargarRevisionCatalogos();
     corteProduccion = d.corte_produccion || "";
     $("corte-fecha").value = corteProduccion;
     // Cierre asistido de implantación (ASISTENTE_PRUEBA_IMPLANTACION en ESTA
@@ -18589,6 +18598,11 @@ const CATALOGOS = {
   productos: {
     titulo: "Productos",
     singular: "producto",
+    // Con pestaña "Por revisar" (2026-08-11, pedido del usuario — el patrón
+    // de Clientes): los artículos que el programa de facturación rechazó al
+    // llenar (src/db/articulos_revision.py) se ven aquí adentro, y la barra
+    // de pestañas solo aparece cuando hay alguno.
+    conRevision: true,
     // Obligatorio real: pt_id y codigo_articulo (ver `campos`). descripcion y
     // nombre se completan solos y son opcionales de corregir a mano.
     descripcion: "Cruza el producto del pedido (PT_id) con su código de "
@@ -18788,6 +18802,8 @@ const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
 
 let catalogoActual = null;       // tipo abierto en la vista
 let catalogoFilas = [];          // filas del catálogo abierto
+let catalogoPorRevisar = [];     // artículos que el programa no aceptó (viaja con productos)
+let catProductosTab = "productos"; // pestaña del catálogo de productos: productos | revisar
 let catClientesTab = "clientes"; // pestaña del catálogo de clientes: clientes | revisar
 let editorFila = null;           // fila en edición (null = nueva)
 let feriadoAnio = null;          // año elegido en Feriados (null = el en curso)
@@ -18796,10 +18812,31 @@ let clienteEnEdicion = null;     // código del cliente abierto en su vista de
                                  // edición ("" = grupo sin código; null = listado)
 
 function pintarBotonesCatalogos() {
+  // Los artículos que el programa rechazó ya no tienen botón propio aquí
+  // (2026-08-11, mismo día): viven como pestaña "Por revisar" DENTRO de
+  // Productos —el patrón de Clientes— y en la sección conjunta de abajo.
   $("cat-btns").innerHTML = CATALOGOS_AJUSTES.map(tipo =>
     `<button class="${tipo === catalogoActual ? "acento" : ""}"
              onclick="alternarCatalogo('${tipo}')">${esc(CATALOGOS[tipo].titulo)}</button>`
   ).join("");
+}
+
+// Sacar un artículo a mano de la lista por revisar. Lo normal es que salga
+// solo (el llenado que lo acepta lo borra); esto es para el código que ya no
+// se factura y por eso no va a volver a probarse nunca. Sirve igual desde la
+// pestaña de Productos que desde la sección conjunta: repinta las dos.
+async function quitarArticuloRevision(codigo) {
+  try {
+    await api("/api/catalogo/articulos-revision/eliminar",
+              {codigo_articulo: codigo});
+  } catch (e) {
+    mensaje(e.message, "error");
+    return;
+  }
+  // Recargar el catálogo trae la lista fresca (viaja con productos); si el
+  // catálogo no está abierto solo se refresca la sección.
+  if (catalogoActual === "productos") await abrirCatalogo("productos");
+  cargarRevisionCatalogos();
 }
 
 // El mismo botón que abre un catálogo lo cierra (feedback 2026-07-29): poder
@@ -18818,6 +18855,9 @@ function cerrarCatalogo() {
   clienteEnEdicion = null;
   $("catalogo-vista").innerHTML = "";
   pintarBotonesCatalogos();
+  // Lo que se resolvió adentro (una entrada completada, un Quitar) tiene que
+  // verse al salir: la sección Por revisar se repinta con datos frescos.
+  cargarRevisionCatalogos();
 }
 
 // --- AJUSTES: Rutas (serie por ruta, 2026-08-02) ----------------------------
@@ -19215,10 +19255,18 @@ async function abrirCatalogo(tipo, prefill) {
     const filtroPrevio = mismoCatalogo && $("cat-filtro") ? $("cat-filtro").value : "";
     catalogoActual = tipo;
     catalogoFilas = d.filas;
+    // Los artículos que el programa rechazó viajan con el catálogo de
+    // productos (ver catalogos.listar_catalogo): alimentan su pestaña
+    // "Por revisar".
+    catalogoPorRevisar = d.por_revisar || [];
     // No se oculta aquí: tras guardar una fila se restaura la ventana del cliente.
     clienteEnEdicion = null;     // abrir un catálogo siempre vuelve al listado
     // paginar() recorta sola la página si el catálogo encogió y quedó fuera de rango.
-    if (!mismoCatalogo) { paginacion.catalogo.pagina = 1; catClientesTab = "clientes"; }
+    if (!mismoCatalogo) {
+      paginacion.catalogo.pagina = 1;
+      catClientesTab = "clientes";
+      catProductosTab = "productos";
+    }
     pintarBotonesCatalogos();
     $("catalogo-overlay").classList.add("visible");
     // Esta vista es la de AJUSTES; Descuentos tiene su propia pestaña y su
@@ -19243,7 +19291,7 @@ async function abrirCatalogo(tipo, prefill) {
         ${def.descripcion ? `<p class="mut" style="margin:0 0 10px">${esc(def.descripcion)}</p>` : ""}
         ${leyenda ? `<div class="orig-leyenda">${leyenda}</div>` : ""}
         ${d.aviso ? `<p class="detalle-error" style="margin:0 0 8px">${esc(d.aviso)}</p>` : ""}
-        ${def.agrupado ? '<div id="cat-pestanas"></div>' : ""}
+        ${def.agrupado || def.conRevision ? '<div id="cat-pestanas"></div>' : ""}
         <div class="cat-cabecera" style="padding:0 0 10px">
           <span class="buscador"><input type="text" id="cat-filtro" placeholder="filtrar…" value="${esc(filtroPrevio)}" oninput="paginacion.catalogo.pagina=1;pintarFilasCatalogo()">
             <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar filtro"
@@ -19254,11 +19302,7 @@ async function abrirCatalogo(tipo, prefill) {
                   onclick="abrirEditor(null)">Agregar ${esc(def.singular)}</button>
         </div>
         <div style="overflow-x:auto"><table id="t-catalogo">
-          ${def.agrupado ? "" : `<thead><tr>${columnas.map(c => `<th>${
-            c.origenDato
-              ? `<span class="orig-punto ${c.origenDato}" title="${esc(ORIGENES[c.origenDato].titulo)}"></span>`
-              : ""}${esc(c.etiqueta)}</th>`).join("")}${
-            def.acciones ? "<th></th>" : ""}</tr></thead>`}
+          ${def.agrupado ? "" : theadCatalogo(columnas, !!def.acciones)}
           <tbody></tbody>
         </table></div>
         <div class="paginador" id="pag-catalogo"></div>
@@ -19280,6 +19324,17 @@ function pintarFilasCatalogo() {
   const def = CATALOGOS[catalogoActual];
   const filtro = ($("cat-filtro").value || "").toLowerCase();
   if (def.agrupado) { pintarClientesAgrupados(filtro); return; }
+  if (def.conRevision) {
+    pintarPestanasRevision();
+    if (catProductosTab === "revisar") {
+      pintarArticulosPorRevisarCatalogo(filtro);
+      return;
+    }
+    // Volver de la pestaña Por revisar dejó la tabla con las columnas de esa
+    // lista: se restauran las del catálogo antes de repintar las filas.
+    $("t-catalogo").innerHTML =
+      theadCatalogo(columnasCatalogo(def), !!def.acciones) + "<tbody></tbody>";
+  }
   const columnas = columnasCatalogo(def);
   const coincidentes = catalogoFilas
     .map((f, i) => [f, i])
@@ -19484,6 +19539,133 @@ function pintarClientesAgrupados(filtro) {
 function catCambiarPestana(id) {
   catClientesTab = id;
   paginacion.catalogo.pagina = 1;
+  pintarFilasCatalogo();
+}
+
+// La cabecera de la tabla del catálogo. Extraída de abrirCatalogo porque la
+// pestaña Por revisar de Productos trae columnas propias y repinta la tabla
+// entera al alternar entre pestañas.
+function theadCatalogo(columnas, conAcciones) {
+  return `<thead><tr>${columnas.map(c => `<th>${
+    c.origenDato
+      ? `<span class="orig-punto ${c.origenDato}" title="${esc(ORIGENES[c.origenDato].titulo)}"></span>`
+      : ""}${esc(c.etiqueta)}</th>`).join("")}${
+    conAcciones ? "<th></th>" : ""}</tr></thead>`;
+}
+
+// --- Artículos que el programa de facturación rechazó (2026-08-11) ----------
+// La pestaña "Por revisar" de Productos y la sección conjunta bajo los
+// botones de Catálogos pintan la misma lista (src/db/articulos_revision.py);
+// estas son las piezas que comparten.
+const COLUMNAS_ARTICULOS_REVISION = [
+  {etiqueta: "Artículo", origenDato: "winledger"},
+  {etiqueta: "Código artículo", origenDato: "winledger"},
+  {etiqueta: "Qué pasó"},
+  {etiqueta: "Desde"},
+];
+
+// El motivo dice dónde salió cuando importa: un artículo sin precio en la
+// empresa de prueba puede tenerlo en la real.
+const motivoArticuloRevision = (f) =>
+  f.empresa === "999" ? `${f.motivo} (en la empresa de prueba)` : (f.motivo || "");
+
+function filaArticuloRevision(f) {
+  return `<tr>
+    <td>${esc(f.nombre || f.codigo_articulo)}</td>
+    <td>${esc(f.codigo_articulo)}</td>
+    <td>${esc(motivoArticuloRevision(f))}</td>
+    <td>${supFechaCorta(f.fecha_detectado)}</td>
+    <td><button onclick="confirmarBorrar(this, () => quitarArticuloRevision('${esc(f.codigo_articulo)}'), 'Confirmar quitar')">Quitar</button></td>
+  </tr>`;
+}
+
+// Pestañas del catálogo de Productos, el mismo reparto que Clientes: sin
+// nada por revisar la barra sobra y se oculta.
+function pintarPestanasRevision() {
+  const n = catalogoPorRevisar.length;
+  if (!n) catProductosTab = "productos";
+  const pestana = (id, txt, cuenta, st) => `<button class="desc-subtab ${st}${
+    catProductosTab === id ? " activa" : ""}" onclick="catCambiarPestanaProductos('${id}')">${
+    txt}<span class="cuenta">${cuenta}</span></button>`;
+  $("cat-pestanas").innerHTML = n
+    ? `<div class="desc-subtabs" style="margin:0 0 10px">${
+        pestana("productos", "Productos", catalogoFilas.length, "st-vigentes")}${
+        pestana("revisar", "Por revisar", n, "st-revisar")}</div>`
+    : "";
+}
+
+function catCambiarPestanaProductos(id) {
+  catProductosTab = id;
+  paginacion.catalogo.pagina = 1;
+  pintarFilasCatalogo();
+}
+
+// La pestaña Por revisar de Productos: la lista completa, sin paginar (son
+// pocos) y con el filtro de arriba aplicado igual que a las demás filas.
+function pintarArticulosPorRevisarCatalogo(filtro) {
+  const filas = catalogoPorRevisar.filter(f => !filtro ||
+    [f.codigo_articulo, f.nombre, f.motivo]
+      .some(v => String(v ?? "").toLowerCase().includes(filtro)));
+  const catFiltroActivo = hayFiltroActivo("catalogo");
+  $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${
+    filas.length} artículo(s) por revisar</span> ${chipFiltroActivo(catFiltroActivo)}`;
+  $("pag-catalogo").innerHTML = "";
+  $("t-catalogo").innerHTML = theadCatalogo(COLUMNAS_ARTICULOS_REVISION, true)
+    + `<tbody>
+      <tr class="grupo"><td colspan="5"><div class="mut" style="font-weight:400; max-width:62ch">El
+        programa de facturación no aceptó estos códigos al llenar (el motivo
+        está en su fila): se corrigen de ese lado y salen solos en cuanto un
+        llenado los acepta. Quitar es para el que ya no se factura.</div></td></tr>
+      ${filas.map(filaArticuloRevision).join("")
+        || '<tr><td colspan="5" class="mut">Sin artículos que coincidan.</td></tr>'}</tbody>`;
+}
+
+// --- Sección "Por revisar" bajo los botones de Catálogos (2026-08-11) -------
+// Junta lo pendiente de cada catálogo —entradas de clientes sin resolver y
+// artículos rechazados por el programa— sin tener que abrir cada uno para
+// saber si hay algo. Cada lista sigue viéndose también dentro de su catálogo.
+let revisionCatalogos = {clientes: [], articulos: []};
+
+async function cargarRevisionCatalogos() {
+  if (!tienePermiso("ajustes_catalogos")) return;
+  // Las dos listas en paralelo; si una falla, la sección muestra la otra y
+  // no molesta con errores — es un resumen, no una acción del operador.
+  const [cli, art] = await Promise.all([
+    api("/api/catalogo/clientes").catch(() => null),
+    api("/api/catalogo/articulos_revision").catch(() => null),
+  ]);
+  revisionCatalogos.clientes = ((cli && cli.filas) || [])
+    .filter(f => faltaDeEntrada(f))
+    .sort((a, b) => (b.pedidos_esperando || 0) - (a.pedidos_esperando || 0));
+  revisionCatalogos.articulos = (art && art.filas) || [];
+  pintarRevisionCatalogos();
+}
+
+function pintarRevisionCatalogos() {
+  const caja = $("cat-revision");
+  const cli = revisionCatalogos.clientes, art = revisionCatalogos.articulos;
+  if (!cli.length && !art.length) {
+    caja.style.display = "none";
+    caja.innerHTML = "";
+    return;
+  }
+  // Solo el resumen (2026-08-13, pedido del usuario): el detalle vive DENTRO
+  // de cada catálogo, en su pestaña Por revisar — aquí basta saber que hay
+  // algo y en cuál; pulsar el número abre esa pestaña.
+  const parte = (tipo, txt, n) => n ? `<button class="desc-subtab st-revisar"
+      onclick="abrirRevisionDe('${tipo}')">${txt}<span class="cuenta">${n}</span></button>` : "";
+  caja.innerHTML = `<span class="mut">Por revisar en</span> ${
+    parte("clientes", "Clientes", cli.length)} ${
+    parte("productos", "Productos", art.length)}`;
+  caja.style.display = "";
+}
+
+// Abre el catálogo directamente en su pestaña Por revisar: el resumen de
+// arriba es solo la puerta, el detalle se atiende adentro.
+async function abrirRevisionDe(tipo) {
+  if (await abrirCatalogo(tipo) === false) return;
+  if (tipo === "clientes") catClientesTab = "revisar";
+  else catProductosTab = "revisar";
   pintarFilasCatalogo();
 }
 
