@@ -2984,13 +2984,12 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
           códigos usados por programa de facturación.</p>
         <div class="cat-btns" id="cat-btns"></div>
-        <!-- Lo pendiente de cada catálogo, junto (2026-08-11, pedido del
-             usuario): una pestaña por catálogo con algo por revisar — las
-             entradas de clientes sin resolver y los artículos que el programa
-             de facturación rechazó — sin tener que abrir cada catálogo para
-             saber si hay algo. Se oculta cuando no hay nada (sin UI ociosa);
-             cada lista sigue viéndose también dentro de su catálogo. -->
-        <div id="cat-revision" style="display:none"></div>
+        <!-- Resumen de lo pendiente por catálogo (2026-08-13, pedido del
+             usuario: "afuera solo salga algo tipo por revisar en tal
+             categoría: tanto"): una línea con el conteo por catálogo; el
+             detalle vive DENTRO de cada uno, en su pestaña Por revisar, y
+             pulsar el número abre esa pestaña. Se oculta sin pendientes. -->
+        <div id="cat-revision" style="display:none; margin-top:10px"></div>
       </div>
     </div>
     <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
@@ -19917,7 +19916,6 @@ function pintarArticulosPorRevisarCatalogo(filtro) {
 // artículos rechazados por el programa— sin tener que abrir cada uno para
 // saber si hay algo. Cada lista sigue viéndose también dentro de su catálogo.
 let revisionCatalogos = {clientes: [], articulos: []};
-let revisionTab = null;   // pestaña activa de la sección: clientes | articulos
 
 async function cargarRevisionCatalogos() {
   if (!tienePermiso("ajustes_catalogos")) return;
@@ -19942,54 +19940,24 @@ function pintarRevisionCatalogos() {
     caja.innerHTML = "";
     return;
   }
-  if ((revisionTab === "clientes" && !cli.length)
-      || (revisionTab === "articulos" && !art.length)) revisionTab = null;
-  if (!revisionTab) revisionTab = cli.length ? "clientes" : "articulos";
-  const pestana = (id, txt, n) => n ? `<button class="desc-subtab st-revisar${
-    revisionTab === id ? " activa" : ""}" onclick="revisionCambiarPestana('${id}')">${
-    txt}<span class="cuenta">${n}</span></button>` : "";
-  const tabla = revisionTab === "clientes"
-    ? `<table><thead><tr><th>Cliente o sucursal</th><th>Qué falta</th></tr></thead>
-       <tbody>${cli.map(filaClientePorRevisar).join("")}</tbody></table>`
-    : `<table>${theadCatalogo(COLUMNAS_ARTICULOS_REVISION, true)}
-       <tbody>${art.map(filaArticuloRevision).join("")}</tbody></table>`;
-  caja.innerHTML = `
-    <h3 style="margin-top:16px">Por revisar</h3>
-    <div class="desc-subtabs" style="margin:6px 0 10px">${
-      pestana("clientes", "Clientes", cli.length)}${
-      pestana("articulos", "Productos", art.length)}</div>
-    <div style="overflow-x:auto">${tabla}</div>`;
+  // Solo el resumen (2026-08-13, pedido del usuario): el detalle vive DENTRO
+  // de cada catálogo, en su pestaña Por revisar — aquí basta saber que hay
+  // algo y en cuál; pulsar el número abre esa pestaña.
+  const parte = (tipo, txt, n) => n ? `<button class="desc-subtab st-revisar"
+      onclick="abrirRevisionDe('${tipo}')">${txt}<span class="cuenta">${n}</span></button>` : "";
+  caja.innerHTML = `<span class="mut">Por revisar en</span> ${
+    parte("clientes", "Clientes", cli.length)} ${
+    parte("productos", "Productos", art.length)}`;
   caja.style.display = "";
 }
 
-function revisionCambiarPestana(id) {
-  revisionTab = id;
-  pintarRevisionCatalogos();
-}
-
-function filaClientePorRevisar(f) {
-  const esperando = f.pedidos_esperando
-    ? ` <span class="badge-espera" title="Hasta que esta entrada no esté completa, ${
-        f.pedidos_esperando === 1 ? "esa factura no sale" : "esas facturas no salen"}.">${
-        f.pedidos_esperando === 1 ? "1 pedido esperando"
-          : `${f.pedidos_esperando} pedidos esperando`}</span>`
-    : "";
-  return `<tr class="abre-editor" title="Clic para completar esta entrada"
-      onclick="abrirClientePorRevisar('${esc(f.cliente_id)}')">
-    <td>${esc(f.sucursal_nombre || "(nombre no llegó)")}${esperando}<div class="mut">${
-      esc(f.cliente_id)}</div></td>
-    <td><span style="color:var(--warn)">${esc(faltaDeEntrada(f))}</span></td>
-  </tr>`;
-}
-
-// Abre la misma ficha que el "Por revisar" del catálogo de clientes: esta
-// sección es solo otro camino hasta la misma entrada.
-async function abrirClientePorRevisar(clienteId) {
-  if (await abrirCatalogo("clientes") === false) return;
-  catClientesTab = "revisar";
+// Abre el catálogo directamente en su pestaña Por revisar: el resumen de
+// arriba es solo la puerta, el detalle se atiende adentro.
+async function abrirRevisionDe(tipo) {
+  if (await abrirCatalogo(tipo) === false) return;
+  if (tipo === "clientes") catClientesTab = "revisar";
+  else catProductosTab = "revisar";
   pintarFilasCatalogo();
-  const idx = catalogoFilas.findIndex(f => f.cliente_id === clienteId);
-  if (idx >= 0) abrirEditor(idx);
 }
 
 // `opciones.suelta` = la fila NO cuelga de un cliente (entrada por resolver o
