@@ -19383,6 +19383,15 @@ function faltaDeEntrada(f) {
   if (!f || esClientePrueba(f)) return "";
   if (esEntradaNueva(f)) return "Falta decir qué es";
   if (!(f.codigo_cliente_winledger || "").trim()) return "Falta el código de cliente";
+  // El programa de facturación mostró un aviso al llenar con esta entrada
+  // (2026-08-13, pedido del usuario): entra a Por revisar como SUGERENCIA —
+  // el aviso literal viaja en rechazo_detalle y lo pinta la fila. Se sale
+  // corrigiendo la ficha, o con «Ya está creado» desde EN REVISIÓN si el
+  // código estaba bien y lo que faltaba era darlo de alta en el programa.
+  if (f.rechazo_campo) {
+    return `El programa no aceptó el código de ${
+      f.rechazo_campo === "sucursal" ? "sucursal" : "cliente"}`;
+  }
   // El código de SUCURSAL no entra aquí (regla del usuario 2026-07-31): el
   // programa de facturación deja facturar sin él y solo lo exige en los
   // clientes que de verdad tienen sucursales. Si lo exige y falta, ese rechazo
@@ -19992,7 +20001,8 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // saben qué son y solo les falta un código. Desde 2026-08-01 eso ya no rotula
   // un botón —la fila entera abre el editor— sino el texto de su hover.
   const accion = !falta ? "editar esta sucursal"
-    : falta === "Falta decir qué es" ? "clasificar esta entrada" : "completar esta entrada";
+    : falta === "Falta decir qué es" ? "clasificar esta entrada"
+    : f.rechazo_campo ? "corregir esta entrada" : "completar esta entrada";
   // Toggle de un clic, solo dentro de la ficha del cliente (2026-07-30): la
   // lista general (2026-08-04) ya no trae columna "Activo", esa función se ve
   // por cliente.
@@ -20015,7 +20025,9 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
       ? ` class="abre-editor" title="Clic para ${accion}" onclick="abrirEditor(${i})"` : ""}>
     <td style="padding-left:26px">${nombre}${marcaEsperando}${suelta
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
-        ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}</td>
+        ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}${
+        f.rechazo_campo && f.rechazo_detalle
+        ? `<div class="mut" style="max-width:62ch">${esc(f.rechazo_detalle)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
     ${conToggleActivo ? `<td${CELDA_ACCIONES}>${celdaActivo}</td>` : ""}
     <td${borrarDefinitivo ? CELDA_ACCIONES : ""}>${borrarDefinitivo}</td>
