@@ -509,6 +509,14 @@
   tr.sep-fecha:hover td { background:#eef1f6; }
   tr.sep-fecha.sep-fecha-antigua td { background:#f2d488; color:#6b4e00; }
   tr.sep-fecha.sep-fecha-antigua:hover td { background:#f2d488; }
+  /* PROCESADAS (2026-08-13, pedido del usuario): ahí el separador nunca se
+     pinta de ámbar (nada quedó pendiente), y el gris se perdía contra la
+     tabla. Azul de la cabecera —la familia estructural de la app, la misma de
+     .chip.facturada_a_mano— y no verde: la franja agrupa un día, no dice que
+     el día haya salido bien; dentro del grupo conviven completadas, errores y
+     descartadas, cada una con su chip. */
+  #t-procesadas tr.sep-fecha td { background:#c3d4f2; color:#243b6b;
+                                  border-bottom-color:#a8bfe8; }
   /* Filas de un grupo atrasado (2026-08-08, pedido del usuario): amarillo
      suave, visible contra el blanco pero sin el tono resaltador que cansa la
      vista. El separador de fecha comparte la familia ámbar, un paso más
