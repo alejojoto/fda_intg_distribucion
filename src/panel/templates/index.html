@@ -2067,23 +2067,23 @@
   .etiqueta-estado.rechazado, .etiqueta-estado.desactivado {
       border-color:#c0483c; color:#95352b; background:#fdeeec; }
   #tasa-overlay, #docencurso-overlay, #repetida-overlay,
-  #trancon-overlay, #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay,
+  #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay,
   #babymix-overlay {
                        position:fixed; inset:0; background:rgba(29,36,51,.45);
                        display:none; z-index:20; align-items:flex-start; justify-content:center; }
   #tasa-overlay.visible, #docencurso-overlay.visible,
-  #repetida-overlay.visible, #trancon-overlay.visible,
+  #repetida-overlay.visible,
   #configmaq-overlay.visible, #lineas-omitidas-overlay.visible,
   #previo-overlay.visible, #babymix-overlay.visible { display:flex; }
-  #tasa-caja, #docencurso-caja, #repetida-caja, #trancon-caja,
+  #tasa-caja, #docencurso-caja, #repetida-caja,
   #configmaq-caja, #lineas-omitidas-caja, #previo-caja, #babymix-caja {
                     background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                     width:min(480px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #tasa-caja h3, #docencurso-caja h3, #repetida-caja h3,
-  #trancon-caja h3, #configmaq-caja h3, #lineas-omitidas-caja h3,
+  #configmaq-caja h3, #lineas-omitidas-caja h3,
   #previo-caja h3, #babymix-caja h3 { margin:0 0 10px; font-size:14px; }
   #tasa-caja p, #docencurso-caja p, #repetida-caja p,
-  #trancon-caja p, #configmaq-caja p, #lineas-omitidas-caja p,
+  #configmaq-caja p, #lineas-omitidas-caja p,
   #babymix-caja p { margin:0 0 12px; font-size:13.5px; }
   /* Revisión previa de la corrida (2026-07-30): lleva una tabla con el lote
      entero, así que no cabe en los 480 px de los demás avisos. Grande a
@@ -2231,11 +2231,11 @@
      esté abierto (crecerVentanaPorModal). El scroll es la red de seguridad
      por si el alto que hace falta no cabe en la pantalla. */
   body.modo-llenado #tasa-overlay, body.modo-llenado #docencurso-overlay,
-  body.modo-llenado #repetida-overlay, body.modo-llenado #trancon-overlay,
+  body.modo-llenado #repetida-overlay,
   body.modo-llenado #configmaq-overlay, body.modo-llenado #babymix-overlay,
   body.modo-llenado #lineas-omitidas-overlay { overflow-y:auto; }
   body.modo-llenado #tasa-caja, body.modo-llenado #docencurso-caja,
-  body.modo-llenado #repetida-caja, body.modo-llenado #trancon-caja,
+  body.modo-llenado #repetida-caja,
   body.modo-llenado #configmaq-caja, body.modo-llenado #lineas-omitidas-caja,
   body.modo-llenado #babymix-caja {
                     margin-top:10px; width:min(700px, 96vw); padding:14px 16px; }
@@ -3317,15 +3317,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
               Ver el detalle técnico de los errores</label>
           </div>
         </div>
-        <div class="prueba-grupo">
-          <span class="rotulo-grupo">Diagnóstico</span>
-          <div class="ajustes-fila">
-            <label class="desc-todos"
-                   title="El próximo Llenar simula la Ficha pegada: cierra el programa de facturación a la fuerza y lo vuelve a abrir. Temporal — se elimina al validar ese camino.">
-              <input type="checkbox" id="prueba-simular-pegado" onchange="guardarOpcionesPrueba()">
-              Probar destranque (cerrar y reabrir el programa)</label>
-          </div>
-        </div>
       </div>
       <!-- El interruptor "En vivo" (producción real sí/no, 2026-07-26) se
            RETIRÓ el 2026-07-29: nunca llegó a gobernar nada — quién puede
@@ -4340,26 +4331,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
   </div>
 </div>
 
-<!-- Winledger trancado (2026-07-28, regla del usuario): el asistente ya NO
-     cierra el programa por su cuenta. Reconoce el trancón, para sin tocar nada
-     y pregunta aquí — el reconocimiento se disparó alguna vez sin trancón real,
-     y cerrar Winledger de golpe se lleva por delante lo que hubiera abierto.
-     SIN cierre por clic afuera, como el aviso del documento sin terminar: sale
-     cuando el operador no lo espera, así que la única salida son sus botones. -->
-<div id="trancon-overlay">
-  <div id="trancon-caja">
-    <h3>Parece que el programa de facturación se trancó</h3>
-    <p id="trancon-detalle"></p>
-    <p>Reiniciarlo cierra el programa de facturación y lo abre de nuevo: lo que
-       hubiera a medio llenar se pierde y tendrás que iniciar sesión otra vez.</p>
-    <div class="editor-acciones">
-      <button class="primario" onclick="responderTrancon(true)">Reiniciar el programa</button>
-      <button data-preseleccionado onclick="responderTrancon(false)"
-              title="El llenado se detiene aquí y el programa de facturación queda exactamente como está: revísalo tú.">No tocar nada</button>
-    </div>
-  </div>
-</div>
-
 <!-- Faltaron líneas en el documento (2026-07-29, decisión del usuario): el
      llenado puede saltarse renglones (artículo sin precio, código
      inexistente, cantidad 0, un aviso que no reconoce) y seguir — el
@@ -4592,16 +4563,6 @@ let pedidosFueraEnFila = [];
 let descartadasEnFila = [];       // claves "id|parte" que resultaron ajenas
 let reposicionesEnFila = [];      // resumen para el final de la corrida
 let rondasReposicion = 0;
-// Destranques (Winledger cerrado y reabierto solo) ocurridos a mitad de la
-// corrida actual, pendientes de mostrarse en el mensaje final (2026-07-26):
-// cada entrada es un texto ya armado, listo para el status bar.
-let destranquesEnFila = [];
-// Cuántas veces destrancó CADA factura en esta corrida (2026-07-26). Tras un
-// destranque la corrida vuelve a la misma factura (sigue pendiente y de
-// primera): sin tope, un trancón que se repite la mataría y reabriría en
-// bucle. Al segundo, la corrida se pausa y decide el operador.
-let destranquesPorFactura = {};
-const TOPE_DESTRANQUES_FACTURA = 2;
 // Espera del login de Winledger (2026-07-23): si el operador da Llenar antes
 // de abrir la app o iniciar sesión, el panel NO da error — espera aquí y
 // reanuda solo. Solo se entra como consecuencia de un Llenar (nunca aparece
@@ -5650,41 +5611,6 @@ function resolverDocEnCurso(cancelarloYContinuar) {
     resolverDocEnCursoPromesa(cancelarloYContinuar);
     resolverDocEnCursoPromesa = null;
   }
-}
-
-// Aviso «parece que Winledger se trancó» (2026-07-28). No es una promesa como
-// los otros dos: el llenado está CONGELADO en el servidor esperando la
-// respuesta (fase 'pregunta_trancon'), así que el aviso lo abre el sondeo de
-// fase y cada botón contesta por su endpoint. Si el llenado sale de esa fase
-// por otro lado (Detener, o la respuesta desde otra pestaña), el mismo sondeo
-// lo cierra.
-let tranconAbierto = false;
-let tranconRespondido = false;   // ya se contestó: no reabrir con la fase vieja
-function abrirTrancon(detalle) {
-  if (tranconAbierto || tranconRespondido) return;   // el sondeo repite cada 600 ms
-  tranconAbierto = true;
-  $("trancon-detalle").textContent =
-    detalle || "El programa dejó de responder en pleno llenado.";
-  $("trancon-overlay").classList.add("visible");
-  crecerVentanaPorModal("trancon-caja");
-}
-function cerrarTrancon() {
-  if (!tranconAbierto) return;
-  tranconAbierto = false;
-  $("trancon-overlay").classList.remove("visible");
-  replantarCajaFlotante();
-}
-async function responderTrancon(reiniciar) {
-  // El servidor tarda hasta 200 ms en salir de la fase: sin esta marca, el
-  // sondeo siguiente vería 'pregunta_trancon' todavía y reabriría el aviso
-  // recién contestado. Se limpia sola cuando la fase cambia.
-  tranconRespondido = true;
-  cerrarTrancon();
-  mensaje(reiniciar
-    ? "Reiniciando el programa de facturación: se cierra y se abre de nuevo…"
-    : "Sin cambios: el programa de facturación quedó como está.", "info", reiniciar);
-  try { await api("/api/responder_trancon", {reiniciar: reiniciar}); }
-  catch (e) { mensaje("No se pudo responder el aviso: " + e.message, "error"); }
 }
 
 // Aviso "faltaron líneas en el documento" al terminar un llenado (2026-07-29,
@@ -12297,10 +12223,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // por si 'detalle' viniera vacío — la rama especial de abajo es la que
     // manda cuando la fase es esta (usa "alerta" y el detalle si lo hay).
     esperando_popup: `Cierra el aviso que salió en el programa de facturación para continuar`,
-    // Winledger parece trancado: el programa no lo cierra solo — el aviso de
-    // arriba tiene la decisión y esto es lo que queda en la barra detrás.
-    pregunta_trancon: `Parece que el programa de facturación se trancó: responde el aviso.`,
-    reiniciando: `Reiniciando el programa de facturación: se cierra y se abre de nuevo…`,
     // Falta pantalla (2026-08-08): algo que el llenado necesita quedó fuera de
     // la vista (la Ficha cortada, o el Aceptar del Detalle). Texto de respaldo
     // por si 'detalle' viniera vacío — la rama de abajo es la que manda cuando
@@ -12317,7 +12239,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // aquí por lo mismo (aún no se toca Winledger), pero es el programa quien
   // trabaja: el spinner se maneja aparte, abajo.
   const FASES_DEL_OPERADOR = ["pausado", "esperando_impresion", "esperando_popup",
-                              "pregunta_trancon", "preparando_datos",
+                              "preparando_datos",
                               "pide_maximizar", "pide_foco"];
   const pollFase = setInterval(async () => {
     try {
@@ -12331,10 +12253,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       if (f.avance && f.avance.total) ultimoAvanceLlenado = f.avance;
       pintarInfoLlenado();
       pintarTituloVentana();
-      // Trancón: el llenado quedó congelado esperando el sí/no de reiniciar
-      // Winledger. El aviso sale (y se va) siguiendo la fase del servidor.
-      if (f.fase === "pregunta_trancon") abrirTrancon(f.detalle);
-      else { tranconRespondido = false; cerrarTrancon(); }
       const tocaPapel = f.fase === "esperando_impresion" && f.papel && f.papel.toca;
       // No pisar "Deteniendo…": con el stop pedido, btn-stop queda deshabilitado.
       if (llenando && !$("btn-stop").disabled && f.fase === "esperando_popup")
@@ -12389,14 +12307,13 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       btnContinuar.title = tocaPapel
         ? "Confirma que revisaste el papel: la cuenta vuelve a cero y la corrida sigue."
         : "Sigue con la siguiente factura de la corrida.";
-      // ⏸ no aplica en la espera de la impresión, en la pregunta del trancón ni
+      // ⏸ no aplica en la espera de la impresión ni
       // mientras se pide maximizar: ahí el llenado YA está parado esperando al
       // operador, así que pausar no adelantaría nada (queja del usuario
       // 2026-07-27). Tampoco con un stop ya pedido.
       $("btn-pausa").style.display =
         (llenando && !$("btn-stop").disabled
          && f.fase !== "esperando_impresion"
-         && f.fase !== "pregunta_trancon"
          && f.fase !== "pide_maximizar") ? "" : "none";
       // El interruptor de la pausa vive en el servidor: si el llenado está
       // pausado, el botón lo dice aunque esta pestaña no haya sido la que lo
@@ -12586,34 +12503,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
           `${refFacturaUbicable(pedido_id, parte)} se llenó a mano y salió de la cola del lote.`);
       }
       return "exito";
-    } else if (r.destranque && secuenciaActiva && !r.primer_llenado_sesion) {
-      // Destranque a mitad de una corrida ya en marcha (no es la primera
-      // factura de la sesión: no hay riesgo de haber pisado trabajo manual
-      // ajeno). Winledger ya se reabrió solo, así que no hace falta pausar
-      // toda la corrida: se sigue con las demás pendientes (el siguiente
-      // intento, si Winledger todavía pide login, cae solo en el sondeo
-      // esperarLogin/sin_login que ya existe) y el aviso se acumula para el
-      // mensaje final, para no interrumpir la vista en vivo (2026-07-26).
-      destranquesEnFila.push(conDetalleTecnico(
-        `${refFacturaUbicable(pedido_id, parte)}: ${r.error}`, r.detalle));
-      // Tope por factura (2026-07-26): la corrida vuelve a la que destrancó,
-      // así que un trancón que se repite en la misma factura cerraría y
-      // reabriría Winledger sin fin. Al segundo se pausa: el problema ya no es
-      // un percance suelto y lo decide el operador.
-      const claveDestranque = `${pedido_id}|${parte}`;
-      destranquesPorFactura[claveDestranque] =
-        (destranquesPorFactura[claveDestranque] || 0) + 1;
-      if (destranquesPorFactura[claveDestranque] >= TOPE_DESTRANQUES_FACTURA) {
-        // El "cuántas veces se cerró y reabrió" lo cuenta la nota de
-        // destranques que este mismo mensaje arrastra: aquí solo la decisión.
-        pausarSecuenciaPorFallo(
-          `${refFacturaUbicable(pedido_id, parte)} volvió a trancar el programa de facturación y quedó ` +
-          `sin llenar. La corrida se detiene aquí para no repetir el ciclo de ` +
-          `cerrar y reabrir sobre la misma factura: reintenta o cancela.`);
-        return "destranque";
-      }
-      continuarEnFila = true;
-      return "destranque";
     } else {
       // Sin número de línea no se inventa una (2026-08-01): todo lo que falla
       // antes del detalle —el cliente que no autocompletó, la puesta a punto—
@@ -12625,12 +12514,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
           + `en la línea ${r.linea_fallida}: ${r.error}.`
         : `Falló el llenado de ${refFacturaUbicable(pedido_id, parte)}: ${r.error}`,
         r.detalle);
-      // Destranque en el PRIMER llenado de la sesión (2026-07-26): podría
-      // haber pisado trabajo manual ajeno que ya estuviera abierto en
-      // Winledger antes de que el asistente tocara nada — se avisa aparte.
-      const advertencia = (r.destranque && r.primer_llenado_sesion)
-        ? " Si tenías otro trabajo sin guardar abierto en el programa de facturación, revísalo: el asistente lo cerró de golpe."
-        : "";
       // La factura quedó en "Llenados por revisar" (EN REVISIÓN): el panel
       // salta allá al cerrar el llenado — o al terminar la corrida, si es que
       // está corriendo una.
@@ -12638,9 +12521,9 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       // En "Llenar en fila" la barra se queda con Reintentar / Cancelar; en un
       // llenado suelto, el mensaje de siempre y la factura con sus botones.
       if (secuenciaActiva)
-        pausarSecuenciaPorFallo(`${fallo}${advertencia} Reintenta o cancela aquí mismo, en la barra.`);
+        pausarSecuenciaPorFallo(`${fallo} Reintenta o cancela aquí mismo, en la barra.`);
       else
-        mensaje(`${fallo}${advertencia} Quedó EN REVISIÓN para reintentar o descartar.`, "error");
+        mensaje(`${fallo} Quedó EN REVISIÓN para reintentar o descartar.`, "error");
       return "error";
     }
   } catch (e) {
@@ -12718,10 +12601,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     }
   } finally {
     clearInterval(pollFase);
-    // Con el sondeo apagado ya nadie cerraría el aviso del trancón: si el
-    // llenado terminó con él en pantalla (nadie respondió y venció la espera
-    // del servidor), se cierra aquí — el mensaje del error dice qué pasó.
-    cerrarTrancon();
     $("btn-ya-imprimi").style.display = "none";
     llenando = false;
     faseActual = null;        // antes de marcarLlenando: de ahí sale el título
@@ -14945,8 +14824,6 @@ async function arrancarSecuencia(meta) {
   rondasReposicion = 0;
   hechasEnFila = 0;
   ultimaLlenadaEnFila = null;
-  destranquesEnFila = [];
-  destranquesPorFactura = {};
   // Corrida nueva, decisiones de serie nuevas (2026-08-05): las temporales de
   // una corrida anterior no sobreviven — fueron "solo por esta corrida".
   seriesTemporalesCorrida = {};
@@ -15526,23 +15403,6 @@ function detenerCambioDeRuta() {
     + `${cantidadEnFila} facturas (la ruta se quedó sin pendientes).`, "exito");
 }
 
-// Vuelca los destranques acumulados de la corrida (si hay) en un sufijo de
-// texto para el mensaje final, y limpia el acumulador. "" si no hubo ninguno.
-function notaDestranquesEnFila() {
-  if (!destranquesEnFila.length) return "";
-  const n = destranquesEnFila.length;
-  const detalle = destranquesEnFila.join(" · ");
-  destranquesEnFila = [];
-  // El texto NO promete que quedaron pendientes (2026-07-26): la corrida
-  // vuelve sola a la factura que destrancó, así que puede haber quedado lista
-  // en el reintento — o seguir pendiente si se detuvo antes. Lo que sí es
-  // cierto siempre: nunca se retoma un documento a medias, se llena completa.
-  return ` Aviso: durante esta corrida el programa de facturación se cerró y volvió a abrir ` +
-         `solo ${n === 1 ? "una vez" : n + " veces"} por un trancón (${detalle}). ` +
-         `${n === 1 ? "Esa factura se llena completa de nuevo" : "Esas facturas se llenan completas de nuevo"}: ` +
-         `revisa en la lista cómo ${n === 1 ? "quedó" : "quedaron"}.`;
-}
-
 // `tipo` solo lo pasa el final limpio de la corrida ("exito", verde): sin él
 // el resumen salía en el azul de siempre y pisaba el verde de la última
 // factura, como si algo hubiera cambiado a peor al terminar.
@@ -15554,7 +15414,7 @@ function detenerSecuencia(texto, tipo) {
   corridaResumenPendiente = null;
   $("btn-secuencia").style.display = "";
   $("btn-detener").style.display = "none";
-  const nota = notaDestranquesEnFila() + notaLoteEnFila();
+  const nota = notaLoteEnFila();
   const texto2 = nota ? `${texto || "Secuencia detenida."}${nota}` : texto;
   if (texto2) mensaje(texto2, nota ? "alerta" : (tipo || "info"));
   // Sin texto no hay mensaje() que repinte — se recalcula aquí para que el
@@ -15666,7 +15526,7 @@ function pausarSecuenciaPorFallo(texto) {
   $("btn-cancelar-fila").style.display = "";
   const faltan = Math.max(0, metaEnFila - hechasEnFila - 1);
   if (texto)
-    mensaje(texto + notaDestranquesEnFila() + notaLoteEnFila() + (faltan
+    mensaje(texto + notaLoteEnFila() + (faltan
       ? ` Las ${faltan} que faltan siguen apartadas para esta máquina hasta ` +
         `que reintentes o canceles.`
       : ""), "error");
@@ -15707,7 +15567,7 @@ function cancelarEnFila() {
   mensaje((irARevisionAlTerminar
     ? "Cancelado. La factura quedó EN REVISIÓN."
     : "Cancelado. La factura quedó en pendientes.")
-    + notaDestranquesEnFila() + notaLoteEnFila(), "info");
+    + notaLoteEnFila(), "info");
   liberarReservas();
   saltarARevisionSiTocaba();
 }
@@ -15859,8 +15719,6 @@ function pintarBanderasPrueba() {
     if ($("prueba-saltar-fecha").checked) saltos.push("fecha");
     if ($("prueba-saltar-serie").checked) saltos.push("serie");
     if (saltos.length) ind.push("sin " + saltos.join("/"));
-    if ($("prueba-simular-pegado").checked)
-      ind.push("probar destranque (cerrar y reabrir)");
     ind.push("sin registro real");
     partes.push("PRUEBA AISLADA — " + ind.join(" · "));
   }
@@ -16019,8 +15877,7 @@ function pintarOpcionesPrueba(op) {
     // El número lo repone SIEMPRE el backend: si lo tecleado no era válido no
     // se guardó, y el campo tiene que volver a lo que de verdad quedó puesto.
     $("prueba-recortar-n").value = op.recortar_n;
-    $("prueba-simular-pegado").checked = !!op.simular_cierre_pegado;
-    $("prueba-saltar-tasa").checked = !!op.saltar_tasa;
+      $("prueba-saltar-tasa").checked = !!op.saltar_tasa;
     $("prueba-saltar-fecha").checked = !!op.saltar_fecha;
     $("prueba-saltar-serie").checked = !!op.saltar_serie;
     $("prueba-ver-tecnico").checked = !!op.ver_detalle_tecnico;
@@ -16043,7 +15900,7 @@ function pintarOpcionesPrueba(op) {
   // El canal quedó FUERA de esta lista (2026-07-29): con el modo admin apagado
   // hay que poder volver de la vista de producción a Dev sin prenderlo otra vez.
   for (const id of ["prueba-emp-999", "prueba-emp-001", "prueba-cuanto-completa",
-                    "prueba-cuanto-recorte", "prueba-simular-pegado",
+                    "prueba-cuanto-recorte",
                     "prueba-ver-tecnico"]) {
     $(id).disabled = !modoAdmin || !modoImplantacion;
   }
@@ -16073,7 +15930,6 @@ async function guardarOpcionesPrueba() {
       empresa: $("prueba-emp-001").checked ? "001" : "999",
       recortar: $("prueba-cuanto-recorte").checked,
       recortar_n: $("prueba-recortar-n").value,
-      simular_cierre_pegado: $("prueba-simular-pegado").checked,
       // En la 999 los saltos se muestran forzados; NO se guarda ese forzado
       // para no pisar lo que el usuario dejó configurado para la 001.
       saltar_tasa: (es999 || estaba999) ? !!g.saltar_tasa : $("prueba-saltar-tasa").checked,
