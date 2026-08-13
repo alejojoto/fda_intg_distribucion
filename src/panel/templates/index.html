@@ -472,10 +472,17 @@
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; cursor:pointer; }
   /* Misma franja que la de conflictos pero informativa, no de emergencia: no
-     hay nada que resolver ni a dónde ir, así que ni rojo ni clickeable. */
-  #aviso-version-nueva { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
+     hay nada que resolver ni a dónde ir, así que ni rojo ni clickeable.
+     Con `.urge` (2026-08-13) pasa a ámbar: ahí ya no solo informa — esta
+     computadora está trabajando con datos que no llegaron, y cerrarla y
+     abrirla es lo que lo arregla. Mismo ámbar del rompe-vidrio, que es el
+     otro caso de "no hay nada roto, pero alguien tiene que hacer algo". */
+  #aviso-reinicio { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; }
+  #aviso-reinicio.urge { background:#fff4e0; color:#7a4a00;
+                     border-left:5px solid #d98300; }
+  #aviso-reinicio div + div { margin-top:6px; }
   /* Rompe-vidrio puesto (2026-08-07): ámbar y no rojo — no hay nada roto, hay
      una puerta abierta a conciencia. Se ve en TODAS las pestañas y no se
      puede cerrar: el día que se olvide puesto, esta franja es lo único que
@@ -2769,11 +2776,13 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     </div>
   </div>
 
-  <!-- Versión nueva ya descargada (2026-08-07): el vigía del panel la bajó en
-       segundo plano; aplicarla es del arranque, así que esto solo informa. Va
-       antes que la de conflictos a propósito: si las dos están, la que pide
-       acción tiene que quedar pegada a la lista. -->
-  <div id="aviso-version-nueva" style="display:none"></div>
+  <!-- Hace falta cerrar y volver a abrir (2026-08-13, general; nació el
+       2026-08-07 como aviso de versión nueva). Un solo lugar para todos los
+       motivos: la versión ya descargada que aplica el arranque, y los cambios
+       que esta versión no supo leer y quedaron esperando. Va antes que la de
+       conflictos a propósito: si las dos están, la que pide acción sobre las
+       facturas tiene que quedar pegada a la lista. -->
+  <div id="aviso-reinicio" style="display:none"></div>
 
   <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
        este no lo dispara nada que haya pasado en esta computadora — es un
@@ -10215,7 +10224,7 @@ async function latido() {
   fallosLatido = 0;
   msPrimerSilencio = null;
   if (!salud || salud.app !== "asistente-fda") return;   // otro programa tomó el puerto
-  pintarAvisoVersionNueva(salud.version_nueva);
+  pintarAvisoReinicio(salud.reinicio, salud.version_nueva);
   if (pidPanel === null) {
     pidPanel = salud.pid;
     return;
@@ -10244,14 +10253,27 @@ async function latido() {
 
 // Cuántos commits trae la versión nueva no le dice nada a quien opera: solo
 // importa que hay una y qué tiene que hacer para tenerla.
-function pintarAvisoVersionNueva(info) {
-  const caja = $("aviso-version-nueva");
+// Aviso ÚNICO de "cierra y vuelve a abrir" (2026-08-13, pedido del usuario).
+// Antes solo existía el de versión nueva; ahora el servidor manda todos los
+// motivos juntos (src/panel/reinicio.py) para que no se acumule una franja por
+// cada cosa que aparezca. Dos tonos: azul cuando solo informa (hay versión
+// descargada, nada anda mal) y ámbar cuando esta computadora está trabajando
+// con datos incompletos — ahí sí hay algo que el reinicio arregla.
+// `version_nueva` se sigue aceptando para no depender del orden de despliegue:
+// una página vieja contra un panel nuevo, o al revés, no se queda sin aviso.
+function pintarAvisoReinicio(estado, versionNueva) {
+  const caja = $("aviso-reinicio");
   if (!caja) return;
-  const hay = !!(info && info.hay);
-  caja.style.display = hay ? "" : "none";
-  if (hay) caja.textContent =
-    "Hay una versión nueva del asistente, ya descargada. Se aplica cuando "
-    + "cierres y vuelvas a abrir el programa.";
+  const motivos = (estado && estado.motivos) || (versionNueva && versionNueva.hay
+    ? [{texto: "Hay una versión nueva del asistente, ya descargada. Se aplica "
+              + "cuando cierres y vuelvas a abrir el programa.", urgente: false}]
+    : []);
+  caja.style.display = motivos.length ? "" : "none";
+  caja.classList.toggle("urge", motivos.some(m => m.urgente));
+  if (!motivos.length) return;
+  // Lo urgente primero: si las dos cosas están, la que pide acción manda.
+  const ordenados = [...motivos].sort((a, b) => (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+  caja.innerHTML = ordenados.map(m => `<div>${esc(m.texto)}</div>`).join("");
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
