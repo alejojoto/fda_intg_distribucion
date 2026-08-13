@@ -10766,6 +10766,24 @@ const chipPorRevisar = (f) =>
     ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
     : "";
 
+// Esta factura trae productos que el programa YA rechazó antes (2026-08-13,
+// pedido del usuario: avisar antes de llenar, sabiendo que lo más probable es
+// que vuelvan a quedar fuera). No bloquea nada — se llena igual si el operador
+// quiere; lo que lo resuelve de verdad es ponerles precio en el programa de
+// facturación. El detalle de cuáles va en el hover: en la fila solo cabe el
+// número, y la lista completa vive en AJUSTES → Catálogos → Productos.
+const chipRechazados = (f) => {
+  const cuantos = (f.productos_rechazados || []).length;
+  if (!cuantos) return "";
+  const cuales = f.productos_rechazados.map(p => p.descripcion).join(", ");
+  return ` <span class="chip por-revisar" title="${esc(
+    `El programa de facturación ya rechazó ${cuantos === 1 ? "este producto" : "estos productos"}: `
+    + `${cuales}. Lo más probable es que vuelvan a quedar fuera del documento. `
+    + "Se puede llenar igual; para que entren, hay que ponerles precio en el "
+    + "programa de facturación.")}">${
+    cuantos === 1 ? "1 producto sin precio" : `${cuantos} productos sin precio`}</span>`;
+};
+
 // El pedido traía un producto en varias líneas: se factura una sola con la
 // cantidad total (el programa de facturación no admite el mismo artículo
 // repetido en un documento). El monto no cambia; se avisa porque el número de
@@ -11728,7 +11746,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
-      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
+      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
