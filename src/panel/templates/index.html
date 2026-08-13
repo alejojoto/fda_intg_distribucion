@@ -11465,9 +11465,17 @@ function filaLineaDetalle(d, l) {
   // documento no tiene.
   const omitida = l.omitida
     ? `<div class="det-nota alerta">No entró al documento: ${esc(l.omitida)}.</div>` : "";
+  // El programa ya rechazó este código en un llenado anterior (2026-08-13): la
+  // marca de la fila dice cuántos, y aquí es donde el operador viene a ver
+  // CUÁLES. No se pinta si la línea ya trae su propio "no entró": ahí eso ya
+  // pasó y decirlo dos veces es ruido.
+  const rechazado = (!l.omitida && l.rechazado_antes)
+    ? `<div class="det-nota alerta">El programa de facturación ya lo rechazó antes (${
+        esc(l.rechazado_antes)}): lo más probable es que no entre. Se llena igual; para
+        que entre, hay que arreglarlo en el programa de facturación.</div>` : "";
   if (!detalleEdicionActiva(d)) return `
     <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
-      <td class="det-num">${l.n}</td><td>${producto}${omitida}</td>
+      <td class="det-num">${l.n}</td><td>${producto}${omitida}${rechazado}</td>
       <td>${fmtCantidad(l.cantidad)}${l.ajustada
         || (l.ajuste && (l.ajuste.cantidad !== undefined || l.ajuste.descuento_pct !== undefined))
         ? ` <span class="chip ajustada">a mano</span>` : ""}</td>
@@ -11494,7 +11502,7 @@ function filaLineaDetalle(d, l) {
   return `
     <tr>
       <td class="det-num">${l.n}</td>
-      <td>${producto}</td>
+      <td>${producto}${rechazado}</td>
       <td>
         <input type="text" inputmode="decimal" class="det-cant" value="${l.cantidad}"
                oninput="cantValidar(this)"
