@@ -8540,8 +8540,8 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
 // `sufijoDe(iso)`, opcional, agrega texto al rótulo del día (el conteo de
-// PROCESADAS para Editor/Admin) — por eso se repite igual si la página
-// arranca a mitad del día: siempre dice el total, no lo que quedó visible.
+// PROCESADAS) — por eso se repite igual si la página arranca a mitad del día:
+// siempre dice el total, no lo que quedó visible.
 function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render,
                                      sufijoDe = null) {
   const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
@@ -11918,7 +11918,8 @@ const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 const fechaDeFamiliaProcesada = (partes) =>
   partes.reduce((max, p) => ((p.fecha_cierre || "") > max ? (p.fecha_cierre || "") : max), "");
 
-// Conteo por día para Editor/Admin (2026-08-11, pedido del usuario): cuántos
+// Conteo por día, lo ve cualquiera (2026-08-11; sin rol desde 2026-08-13, a
+// pedido del usuario: también los operadores y los editores): cuántos
 // pedidos se procesaron cada día y cuántas facturas salieron con documento
 // (lista o facturada a mano). En los primeros días de operación sirve para
 // cotejar contra los tickets que entraron. Se agrupa por día de PROCESAMIENTO
@@ -11938,12 +11939,12 @@ function conteosProcesadasPorDia() {
 }
 
 function pintarProcesadas(familias) {
-  const conteos = tienePermiso("conteo_procesadas_dia") && conteosProcesadasPorDia();
-  const sufijo = conteos ? (iso) => {
+  const conteos = conteosProcesadasPorDia();
+  const sufijo = (iso) => {
     const c = conteos[iso];
     return c ? ` — ${c.pedidos} pedido${c.pedidos === 1 ? "" : "s"}, `
              + `${c.facturas} factura${c.facturas === 1 ? "" : "s"}` : "";
-  } : null;
+  };
   $("t-procesadas").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
     familias, fechaDeFamiliaProcesada, 12, (partes) => {
       const f0 = partes[0];
