@@ -2845,7 +2845,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        CAMPOS_BUSQUEDA en app.py); las fechas Desde/Hasta son SOLO de PROCESADAS
        (PENDIENTES se muestra siempre completa) y por eso solo se ven en esa tab
        (ver cambiarTab). Arrancan ocultas porque la tab inicial es PENDIENTES.
-       PROCESADAS estándar trae solo los últimos 30 días (recorte del backend);
+       PROCESADAS estándar trae solo los días recientes (recorte del backend);
        al llegar al final de la lista se extiende sola con el resto del
        histórico (ver cambiarPagina), y un rango Desde/Hasta consulta ese tramo
        exacto, tan atrás como se quiera. -->
@@ -6726,21 +6726,23 @@ function quitarFiltros() {
 
 // --- PROCESADAS: histórico progresivo (2026-07-23; por escalones 2026-07-28) -
 // Ya no hay botón de "Buscar en histórico". La vista estándar trae solo los
-// últimos 30 días (recorte del backend); cuando el operador llega al final de
-// la lista y el backend avisa que queda algo más viejo
-// (hay_procesadas_mas_antiguas), el panel ENSANCHA la ventana un escalón y
-// sigue paginando — ver cambiarPagina. Un rango Desde/Hasta consulta ese tramo
-// exacto, tan atrás como se quiera (si sale vacío, se ve como el estado normal
-// "nada registrado"). Cualquier cambio de filtro (fecha, ruta, buscador,
-// casilla de máquina) reinicia la vista a lo reciente; "Limpiar fechas" (solo
-// en PROCESADAS) borra el rango y la deja como al abrir.
+// últimos días recientes (recorte del backend, VENTANA_PROCESADAS_DIAS);
+// cuando el operador llega al final de la lista y el backend avisa que queda
+// algo más viejo (hay_procesadas_mas_antiguas), el panel ENSANCHA la ventana
+// un escalón y sigue paginando — ver cambiarPagina. Un rango Desde/Hasta
+// consulta ese tramo exacto, tan atrás como se quiera (si sale vacío, se ve
+// como el estado normal "nada registrado"). Cualquier cambio de filtro (fecha,
+// ruta, buscador, casilla de máquina) reinicia la vista a lo reciente;
+// "Limpiar fechas" (solo en PROCESADAS) borra el rango y la deja como al abrir.
 //
 // Por escalones y no de un tirón: la ventana pedida se queda puesta y el sondeo
 // del estado compartido recarga la lista cada vez que otra laptop cierra una
 // factura. Bajar el histórico completo dejaba esas recargas arrastrando años de
 // facturas (medido: 11 MB con 25.000 pedidos). Así, el que consulta algo viejo
-// solo paga hasta donde llegó.
-const ESCALONES_PROCESADAS = [90, 365, 0];   // días; 0 = sin recorte
+// solo paga hasta donde llegó. El primer escalón (30) existe desde que la
+// ventana estándar bajó a 3 días (2026-08-22): del tramo reciente se crece
+// por pasos, no de un salto a 90.
+const ESCALONES_PROCESADAS = [30, 90, 365, 0];   // días; 0 = sin recorte
 let procesadasEscalon = -1;                  // -1 = la ventana estándar del servidor
 
 // Días que viajan en la consulta: vacío deja la ventana estándar del backend.
@@ -6770,7 +6772,7 @@ function aplicarFiltros(textoTrabajando) {
     return Promise.resolve();
   }
   // Una consulta nueva arranca por lo reciente: se colapsa el histórico ya
-  // bajado (si el operador venía extendido, vuelve a los últimos 30 días).
+  // bajado (si el operador venía extendido, vuelve a la ventana estándar).
   procesadasEscalon = -1;
   paginacion.pendientes.pagina = 1;
   paginacion.revision.pagina = 1;
@@ -8724,7 +8726,12 @@ async function cargar(conservarScroll = false) {
       rutaPredetAplicada = true;
       if (rutaPredeterminada && rutaSeleccionada !== rutaPredeterminada) {
         rutaSeleccionada = rutaPredeterminada;
-        return cargar(conservarScroll);   // recarga ya filtrada (el guard evita el bucle)
+        // Si el servidor ya armó ESTA respuesta con la predeterminada (lo
+        // hace solo en máquinas sujetas a rutas), basta adoptar el valor: la
+        // recarga traería lo mismo y la apertura pagaba el payload dos veces.
+        if (d.ruta_aplicada !== rutaPredeterminada) {
+          return cargar(conservarScroll);   // recarga ya filtrada (el guard evita el bucle)
+        }
       }
     }
     // Sin ruta guardada en una máquina que exige una: se elige sola (ver
@@ -23946,10 +23953,10 @@ pintarAvisoFecha();   // normalmente no pinta nada: el día de despacho suele te
 // escritos a mano (fecha a facturar, vigencia de descuentos). Va después de
 // poner el valor inicial de arriba.
 decorarCamposFecha();
-// El campo Desde arranca vacío: la ventana estándar de 30 días de PROCESADAS
-// la recorta el backend (VENTANA_PROCESADAS_DIAS en app.py), no un valor
-// precargado aquí (retirado 2026-07-20: parecía un filtro pegado y lo viejo
-// viajaba igual al navegador al limpiarlo).
+// El campo Desde arranca vacío: la ventana estándar de PROCESADAS la recorta
+// el backend (VENTANA_PROCESADAS_DIAS en app.py), no un valor precargado aquí
+// (retirado 2026-07-20: parecía un filtro pegado y lo viejo viajaba igual al
+// navegador al limpiarlo).
 mensaje("", "");   // estado inicial: barra oculta
 // Aviso de carga (2026-07-22): la primera lectura tarda unos segundos (Supabase
 // + la hoja de kg) y hasta que llega la tabla decía "Sin facturas pendientes",
