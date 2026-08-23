@@ -68,9 +68,6 @@
       <input type="number" name="fallar_en_linea" min="0" value="{{ escenario.fallar_en_linea }}"></label>
     <label>Control que no responde (timeout) en la línea
       <input type="number" name="timeout_en_linea" min="0" value="{{ escenario.timeout_en_linea }}"></label>
-    <label>Trancón (pregunta si reiniciar) en la línea
-      <input type="number" name="trancon_en_linea" min="0" value="{{ escenario.trancon_en_linea }}">
-      <span class="ayuda">la respuesta se da en el aviso del panel</span></label>
     <label>Aviso del programa (popup) en la línea
       <input type="number" name="popup_en_linea" min="0" value="{{ escenario.popup_en_linea }}">
       que se cierra solo a los
@@ -119,7 +116,7 @@
 </form>
 
 <script>
-const NUMERICOS = ["fallar_en_linea", "timeout_en_linea", "trancon_en_linea",
+const NUMERICOS = ["fallar_en_linea", "timeout_en_linea",
                    "popup_en_linea", "popup_segundos", "omitir_lineas",
                    "segundos_por_linea"];
 
