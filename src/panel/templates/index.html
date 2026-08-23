@@ -11493,6 +11493,23 @@ const CASOS_REVISION = [
       titulo: pr.descripcion || pr.pt_id,
     })),
   },
+  // Producto desactivado a mano en el catálogo (2026-08-22). Aquí no hay nada
+  // que crear ni que arreglar del otro lado: alguien decidió que ese producto
+  // no se factura, así que la única salida es reactivarlo — y el botón la trae
+  // resuelta, sin mandar a nadie al catálogo.
+  {
+    prefijo: "Producto(s) desactivado(s)",
+    objeto: (p) => (p.productos_desactivados || []).map(pr =>
+      `<b>Producto:</b> ${esc(pr.descripcion || pr.pt_id)}
+       <div class="mut">${esc(pr.codigo || pr.pt_id)} · ${esc(pr.presentacion)}</div>`).join("")
+      || "<b>Producto</b>",
+    detalle: "Ese producto está desactivado en el catálogo, así que no se "
+      + "factura. Si volvió a venderse, se reactiva aquí y el pedido regresa a "
+      + "la cola; si no, el pedido se factura a mano.",
+    botones: (p, i) => [
+      `<button class="acento" onclick="reactivarProductoDesdeRevision(${i})">Reactivar el producto</button>`,
+    ],
+  },
   {
     prefijo: "Pedido con campo de error",
     objeto: () => "Dato dañado en AppSheet",
@@ -11808,6 +11825,25 @@ async function marcarCruceCreado(i) {
     await api("/api/revision/cruce-rechazado/limpiar", {cliente_id: p.cliente_id});
     await cargar();
     mensaje("El pedido vuelve a la cola de facturas.", "info");
+  } catch (e) {
+    mensaje(e.message, "error");
+  }
+}
+
+// "Reactivar el producto" (2026-08-22): deshace la desactivación que frena al
+// pedido. Lo que lo frenaba es una marca de este panel, así que al quitarla el
+// pedido vuelve solo a la cola.
+async function reactivarProductoDesdeRevision(i) {
+  const p = listaRevisionVisible[i];
+  if (!p || !(p.productos_desactivados || []).length) return;
+  avisarTrabajando("Devolviendo el pedido a la cola…");
+  try {
+    for (const pr of p.productos_desactivados) {
+      await api("/api/catalogo/productos/activo",
+                {pt_id: pr.pt_id, presentacion: pr.presentacion, activo: 1});
+    }
+    await cargar();
+    mensaje("El producto vuelve a facturarse y el pedido a la cola de facturas.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
@@ -18507,7 +18543,16 @@ const CATALOGOS = {
       {campo: "presentacion", etiqueta: "Presentación", origenDato: "winledger"},
       {campo: "codigo_articulo", etiqueta: "Código artículo", origenDato: "winledger"},
       {campo: "nombre", etiqueta: "Artículo en facturación", origenDato: "winledger"},
+      {campo: "activo", etiqueta: "Activo", tipo: "checkbox"},
     ],
+    // Activar/desactivar sin abrir el editor (2026-08-22): un producto
+    // desactivado deja de facturarse y el pedido que lo traiga sale a
+    // revisión. No borra nada — de eso se trata: es la salida para el producto
+    // que ya no se vende, con vuelta atrás.
+    toggleActivo: (i) => `alternarProducto(${i})`,
+    etiquetaToggle: (f) => f.activo
+      ? "Confirmar: deja de facturarse" : "Confirmar: vuelve a facturarse",
+    atenuarInactivas: true,
   },
   vendedores: {
     titulo: "Vendedores",
@@ -18685,14 +18730,22 @@ function pintarBotonesCatalogos() {
   ).join("");
 }
 
-// Sacar un artículo a mano de la lista por revisar. Lo normal es que salga
-// solo (el llenado que lo acepta lo borra); esto es para el código que ya no
-// se factura y por eso no va a volver a probarse nunca. Sirve igual desde la
-// pestaña de Productos que desde la sección conjunta: repinta las dos.
-async function quitarArticuloRevision(codigo) {
+// "Desactivar" (2026-08-22, pedido del usuario: el "Quitar" de antes no dejaba
+// claro qué se llevaba por delante). Nada se borra: el producto queda inactivo
+// en el catálogo —reversible desde la pestaña Productos— y su código sale de
+// la lista por revisar, porque la decisión ya está tomada y no hay nada que
+// repasar. Sirve igual desde la pestaña de Productos que desde la sección
+// conjunta: repinta las dos.
+async function desactivarArticuloRevision(codigo) {
   try {
-    await api("/api/catalogo/articulos-revision/eliminar",
-              {codigo_articulo: codigo});
+    const r = await api("/api/catalogo/articulos-revision/desactivar",
+                        {codigo_articulo: codigo});
+    // Sin fila en el catálogo no hay nada que desactivar: el código sale de la
+    // lista igual, pero decirlo evita que parezca que quedó frenado algo.
+    mensaje((r.desactivados || []).length
+      ? "Producto desactivado: deja de facturarse hasta que lo reactives."
+      : "Ese código sale de la lista. No hay ningún producto del catálogo "
+        + "cruzado con él, así que no había nada que desactivar.", "info");
   } catch (e) {
     mensaje(e.message, "error");
     return;
@@ -19428,18 +19481,13 @@ const COLUMNAS_ARTICULOS_REVISION = [
   {etiqueta: "Desde"},
 ];
 
-// El motivo dice dónde salió cuando importa: un artículo sin precio en la
-// empresa de prueba puede tenerlo en la real.
-const motivoArticuloRevision = (f) =>
-  f.empresa === "999" ? `${f.motivo} (en la empresa de prueba)` : (f.motivo || "");
-
 function filaArticuloRevision(f) {
   return `<tr>
     <td>${esc(f.nombre || f.codigo_articulo)}</td>
     <td>${esc(f.codigo_articulo)}</td>
-    <td>${esc(motivoArticuloRevision(f))}</td>
+    <td>${esc(f.motivo || "")}</td>
     <td>${supFechaCorta(f.fecha_detectado)}</td>
-    <td><button onclick="confirmarBorrar(this, () => quitarArticuloRevision('${esc(f.codigo_articulo)}'), 'Confirmar quitar')">Quitar</button></td>
+    <td><button onclick="confirmarSinQuitar(this, () => desactivarArticuloRevision('${esc(f.codigo_articulo)}'), 'Confirmar: desactivar')">Desactivar</button></td>
   </tr>`;
 }
 
@@ -19479,7 +19527,10 @@ function pintarArticulosPorRevisarCatalogo(filtro) {
       <tr class="grupo"><td colspan="5"><div class="mut" style="font-weight:400; max-width:62ch">El
         programa de facturación no aceptó estos códigos al llenar (el motivo
         está en su fila): se corrigen de ese lado y salen solos en cuanto un
-        llenado los acepta. Quitar es para el que ya no se factura.</div></td></tr>
+        llenado los acepta. Desactivar es para el que ya no se factura: el
+        producto queda inactivo en el catálogo —no se borra nada, se reactiva
+        desde la pestaña Productos— y el pedido que lo traiga sale a
+        revisión.</div></td></tr>
       ${filas.map(filaArticuloRevision).join("")
         || '<tr><td colspan="5" class="mut">Sin artículos que coincidan.</td></tr>'}</tbody>`;
 }
@@ -22682,6 +22733,27 @@ function avisoFilaCatalogo(idx, msg) {
 // Activa/desactiva un vendedor del catálogo (2026-07-29). Los códigos de
 // vendedor no se borran —son los del ERP—, se apagan: el desactivado sale del
 // selector "Vendedor de esta máquina" en todos los equipos.
+// Un producto desactivado no se factura: el pedido que lo traiga sale a
+// revisión (src/facturacion/clasificacion.py). Se reactiva desde el mismo
+// switch, y ahí el pedido vuelve solo a la cola.
+async function alternarProducto(indice) {
+  const f = catalogoFilas[indice];
+  try {
+    const r = await api("/api/catalogo/productos/activo", {
+      pt_id: f.pt_id,
+      presentacion: f.presentacion,
+      activo: f.activo ? 0 : 1,
+    });
+    mensaje(r.aviso || `${f.descripcion || f.pt_id}: ${
+      f.activo ? "desactivado, deja de facturarse"
+               : "activado, vuelve a facturarse"}.`, r.aviso ? "error" : "info");
+    await abrirCatalogo("productos");
+    cargar();   // el pedido frenado por ese producto entra o sale de revisión
+  } catch (e) {
+    avisoFilaCatalogo(indice, "No se pudo cambiar el producto: " + e.message);
+  }
+}
+
 async function alternarVendedor(indice) {
   const f = catalogoFilas[indice];
   try {
