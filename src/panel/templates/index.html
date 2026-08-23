@@ -20019,16 +20019,11 @@ const COLUMNAS_ARTICULOS_REVISION = [
   {etiqueta: "Desde"},
 ];
 
-// El motivo dice dónde salió cuando importa: un artículo sin precio en la
-// empresa de prueba puede tenerlo en la real.
-const motivoArticuloRevision = (f) =>
-  f.empresa === "999" ? `${f.motivo} (en la empresa de prueba)` : (f.motivo || "");
-
 function filaArticuloRevision(f) {
   return `<tr>
     <td>${esc(f.nombre || f.codigo_articulo)}</td>
     <td>${esc(f.codigo_articulo)}</td>
-    <td>${esc(motivoArticuloRevision(f))}</td>
+    <td>${esc(f.motivo || "")}</td>
     <td>${supFechaCorta(f.fecha_detectado)}</td>
     <td><button onclick="confirmarSinQuitar(this, () => desactivarArticuloRevision('${esc(f.codigo_articulo)}'), 'Confirmar: desactivar')">Desactivar</button></td>
   </tr>`;
