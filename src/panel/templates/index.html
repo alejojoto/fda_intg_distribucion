@@ -472,10 +472,17 @@
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; cursor:pointer; }
   /* Misma franja que la de conflictos pero informativa, no de emergencia: no
-     hay nada que resolver ni a dónde ir, así que ni rojo ni clickeable. */
-  #aviso-version-nueva { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
+     hay nada que resolver ni a dónde ir, así que ni rojo ni clickeable.
+     Con `.urge` (2026-08-13) pasa a ámbar: ahí ya no solo informa — esta
+     computadora está trabajando con datos que no llegaron, y cerrarla y
+     abrirla es lo que lo arregla. Mismo ámbar del rompe-vidrio, que es el
+     otro caso de "no hay nada roto, pero alguien tiene que hacer algo". */
+  #aviso-reinicio { background:#e8f0fe; color:#1a3d7c; border-radius:8px;
                      padding:10px 14px; margin-bottom:10px; font-size:13.5px;
                      font-weight:600; }
+  #aviso-reinicio.urge { background:#fff4e0; color:#7a4a00;
+                     border-left:5px solid #d98300; }
+  #aviso-reinicio div + div { margin-top:6px; }
   /* Rompe-vidrio puesto (2026-08-07): ámbar y no rojo — no hay nada roto, hay
      una puerta abierta a conciencia. Se ve en TODAS las pestañas y no se
      puede cerrar: el día que se olvide puesto, esta franja es lo único que
@@ -835,6 +842,11 @@
   .ajustes-bloque { padding:14px; border-bottom:1px solid #e2e6ec; }
   .ajustes-bloque h3 { margin:0 0 10px; font-size:13.5px; }
   .ajustes-fila { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  /* La fecha de corte vigente, aparte del selector (2026-08-10, pedido del
+     usuario): el campo se usa para elegir a dónde moverla, así que mientras se
+     teclea una fecha nueva deja de decir cuál es la que rige hoy. */
+  .corte-vigente { margin:0 0 10px; font-size:12.5px; }
+  .corte-vigente b { font-size:13.5px; }
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
@@ -2754,11 +2766,13 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     </div>
   </div>
 
-  <!-- Versión nueva ya descargada (2026-08-07): el vigía del panel la bajó en
-       segundo plano; aplicarla es del arranque, así que esto solo informa. Va
-       antes que la de conflictos a propósito: si las dos están, la que pide
-       acción tiene que quedar pegada a la lista. -->
-  <div id="aviso-version-nueva" style="display:none"></div>
+  <!-- Hace falta cerrar y volver a abrir (2026-08-13, general; nació el
+       2026-08-07 como aviso de versión nueva). Un solo lugar para todos los
+       motivos: la versión ya descargada que aplica el arranque, y los cambios
+       que esta versión no supo leer y quedaron esperando. Va antes que la de
+       conflictos a propósito: si las dos están, la que pide acción sobre las
+       facturas tiene que quedar pegada a la lista. -->
+  <div id="aviso-reinicio" style="display:none"></div>
 
   <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
        este no lo dispara nada que haya pasado en esta computadora — es un
@@ -2821,7 +2835,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        CAMPOS_BUSQUEDA en app.py); las fechas Desde/Hasta son SOLO de PROCESADAS
        (PENDIENTES se muestra siempre completa) y por eso solo se ven en esa tab
        (ver cambiarTab). Arrancan ocultas porque la tab inicial es PENDIENTES.
-       PROCESADAS estándar trae solo los últimos 30 días (recorte del backend);
+       PROCESADAS estándar trae solo los días recientes (recorte del backend);
        al llegar al final de la lista se extiende sola con el resto del
        histórico (ver cambiarPagina), y un rango Desde/Hasta consulta ese tramo
        exacto, tan atrás como se quiera. -->
@@ -2993,13 +3007,13 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div id="ajustes-vista-corte" style="display:none">
       <div class="ajustes-bloque" id="corte-bloque" style="display:none">
         <h3>Fecha de corte de producción</h3>
-        <p class="mut">Los pedidos anteriores a esta fecha no se descargan ni se
-          ofrecen en ninguna parte: son los que se facturaron a mano antes de
-          arrancar con el asistente. Muévela hacia adelante a medida que avance
-          la implantación, para que los días viejos que ya no se van a llenar
-          dejen de estorbar en pendientes y en revisión. Vale para todos los
-          equipos: cada uno la toma en su próximo refresco.</p>
+        <p class="mut">Solo se muestran los pedidos pendientes de esta fecha en
+          adelante; los anteriores no aparecen en ninguna parte. Solo avanza:
+          no vuelve atrás. Vale para todos los equipos.</p>
+        <p class="corte-vigente">Fecha fijada ahora:
+          <b id="corte-vigente">—</b></p>
         <div class="ajustes-fila">
+          <label for="corte-fecha">Mover a</label>
           <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
           <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
         </div>
@@ -5406,13 +5420,10 @@ function pintarResumenFinal() {
 // decisiones posibles, en el orden en que se toman — rehacerla, darla por
 // buena, o dejarla para después. Sin líneas saltadas no hay nada que decidir y
 // la botonera se queda como estaba.
-// Rehacerla es reemitir el documento que acaba de salir: mismo permiso que el
-// "Volver a llenar" de PROCESADAS (reabrir_factura, 2026-08-05). Sin él las
-// salidas que quedan son darla por buena o dejarla en revisión, y con líneas
-// saltadas la nota dice que reemitirla es de un editor — quien factura no se
-// queda pensando que el documento incompleto no tiene arreglo.
+// Rehacerla es reemitir el documento que acaba de salir, y no pide rol
+// (2026-08-24, pedido del usuario): quien factura ve el documento incompleto y
+// lo rehace ahí mismo.
 function pintarAccionesResumen(hayOmitidas) {
-  const puedeReabrir = tienePermiso("reabrir_factura");
   // En corrida (2026-08-05): el resumen es la pausa de "en fila" con
   // impresión (una por factura, ver corridaResumenPendiente), y el botón
   // normal de la corrida (#btn-detener) queda escondido en modo llenado —
@@ -5424,18 +5435,17 @@ function pintarAccionesResumen(hayOmitidas) {
   const detener = enCorrida
     ? `<button class="peligro" onclick="detenerLoteDesdeResumen()">Detener el lote</button>` : "";
   $("fin-llenado-acciones").innerHTML = hayOmitidas
-    ? `${puedeReabrir ? `<button class="primario" onclick="volverALlenarDesdeResumen()"
-         title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel.">Volver a intentar</button>` : ""}
-       <button${puedeReabrir ? "" : ` class="primario"`} onclick="procesadaDesdeResumen()"
+    ? `<button class="primario" onclick="volverALlenarDesdeResumen()"
+         title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel.">Volver a intentar</button>
+       <button onclick="procesadaDesdeResumen()"
          title="El documento queda como salió: la factura no pasa por EN REVISIÓN.">Marcar como procesada</button>
        <button onclick="listoEnvioPlataforma()"
-         title="Vuelve el panel y la factura espera en EN REVISIÓN para decidir después.">Dejar en revisión</button>
-       ${puedeReabrir ? "" : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`}`
+         title="Vuelve el panel y la factura espera en EN REVISIÓN para decidir después.">Dejar en revisión</button>`
     : `<button class="primario" onclick="listoEnvioPlataforma()"
          title="${enCorrida ? "Sigue con la siguiente factura de la corrida."
                              : "La factura quedó despachada: vuelve el panel completo."}">${
          enCorrida ? "Listo, sigue la corrida" : "Listo"}</button>
-       ${(puedeReabrir && !enCorrida) ? `<button onclick="volverALlenarDesdeResumen()"
+       ${!enCorrida ? `<button onclick="volverALlenarDesdeResumen()"
          title="Reabre esta factura para emitir el documento de nuevo.">Volver a llenar</button>` : ""}
        ${detener}`;
 }
@@ -6700,21 +6710,23 @@ function quitarFiltros() {
 
 // --- PROCESADAS: histórico progresivo (2026-07-23; por escalones 2026-07-28) -
 // Ya no hay botón de "Buscar en histórico". La vista estándar trae solo los
-// últimos 30 días (recorte del backend); cuando el operador llega al final de
-// la lista y el backend avisa que queda algo más viejo
-// (hay_procesadas_mas_antiguas), el panel ENSANCHA la ventana un escalón y
-// sigue paginando — ver cambiarPagina. Un rango Desde/Hasta consulta ese tramo
-// exacto, tan atrás como se quiera (si sale vacío, se ve como el estado normal
-// "nada registrado"). Cualquier cambio de filtro (fecha, ruta, buscador,
-// casilla de máquina) reinicia la vista a lo reciente; "Limpiar fechas" (solo
-// en PROCESADAS) borra el rango y la deja como al abrir.
+// últimos días recientes (recorte del backend, VENTANA_PROCESADAS_DIAS);
+// cuando el operador llega al final de la lista y el backend avisa que queda
+// algo más viejo (hay_procesadas_mas_antiguas), el panel ENSANCHA la ventana
+// un escalón y sigue paginando — ver cambiarPagina. Un rango Desde/Hasta
+// consulta ese tramo exacto, tan atrás como se quiera (si sale vacío, se ve
+// como el estado normal "nada registrado"). Cualquier cambio de filtro (fecha,
+// ruta, buscador, casilla de máquina) reinicia la vista a lo reciente;
+// "Limpiar fechas" (solo en PROCESADAS) borra el rango y la deja como al abrir.
 //
 // Por escalones y no de un tirón: la ventana pedida se queda puesta y el sondeo
 // del estado compartido recarga la lista cada vez que otra laptop cierra una
 // factura. Bajar el histórico completo dejaba esas recargas arrastrando años de
 // facturas (medido: 11 MB con 25.000 pedidos). Así, el que consulta algo viejo
-// solo paga hasta donde llegó.
-const ESCALONES_PROCESADAS = [90, 365, 0];   // días; 0 = sin recorte
+// solo paga hasta donde llegó. El primer escalón (30) existe desde que la
+// ventana estándar bajó a 3 días (2026-08-22): del tramo reciente se crece
+// por pasos, no de un salto a 90.
+const ESCALONES_PROCESADAS = [30, 90, 365, 0];   // días; 0 = sin recorte
 let procesadasEscalon = -1;                  // -1 = la ventana estándar del servidor
 
 // Días que viajan en la consulta: vacío deja la ventana estándar del backend.
@@ -6744,7 +6756,7 @@ function aplicarFiltros(textoTrabajando) {
     return Promise.resolve();
   }
   // Una consulta nueva arranca por lo reciente: se colapsa el histórico ya
-  // bajado (si el operador venía extendido, vuelve a los últimos 30 días).
+  // bajado (si el operador venía extendido, vuelve a la ventana estándar).
   procesadasEscalon = -1;
   paginacion.pendientes.pagina = 1;
   paginacion.revision.pagina = 1;
@@ -8479,25 +8491,30 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // vista al scrollear. Con una página que no arranca en el primer ítem de la
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
+// `resaltarAntiguas` en falso deja el separador en su gris de siempre: el
+// ámbar avisa de trabajo que se está olvidando, y en una lista donde ya no
+// queda nada por hacer (PROCESADAS) alarma sin motivo (2026-08-11, pedido del
+// usuario).
 // `sufijoDe(iso)`, opcional, agrega texto al rótulo del día (el conteo de
 // PROCESADAS) — por eso se repite igual si la página arranca a mitad del día:
 // siempre dice el total, no lo que quedó visible.
 function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render,
-                                     sufijoDe = null) {
+                                     resaltarAntiguas = true, sufijoDe = null) {
   const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
+  const esAntigua = (iso) => resaltarAntiguas && esFechaAtrasada(iso, gracia);
   let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
   let html = "";
   for (const item of items) {
     const iso = (fechaDe(item) || "").slice(0, 10);
     if (iso !== diaAnterior) {
       diaAnterior = iso;
-      const atrasada = esFechaAtrasada(iso, gracia);
+      const atrasada = esAntigua(iso);
       html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
         + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
         + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer)
                                           + (sufijoDe ? sufijoDe(iso) : ""))}</td></tr>`;
     }
-    html += render(item, esFechaAtrasada(iso, gracia));
+    html += render(item, esAntigua(iso));
   }
   return html;
 }
@@ -8613,7 +8630,12 @@ async function cargar(conservarScroll = false) {
       rutaPredetAplicada = true;
       if (rutaPredeterminada && rutaSeleccionada !== rutaPredeterminada) {
         rutaSeleccionada = rutaPredeterminada;
-        return cargar(conservarScroll);   // recarga ya filtrada (el guard evita el bucle)
+        // Si el servidor ya armó ESTA respuesta con la predeterminada (lo
+        // hace solo en máquinas sujetas a rutas), basta adoptar el valor: la
+        // recarga traería lo mismo y la apertura pagaba el payload dos veces.
+        if (d.ruta_aplicada !== rutaPredeterminada) {
+          return cargar(conservarScroll);   // recarga ya filtrada (el guard evita el bucle)
+        }
       }
     }
     // Sin ruta guardada en una máquina que exige una: se elige sola (ver
@@ -9812,7 +9834,7 @@ async function latido() {
   fallosLatido = 0;
   msPrimerSilencio = null;
   if (!salud || salud.app !== "asistente-fda") return;   // otro programa tomó el puerto
-  pintarAvisoVersionNueva(salud.version_nueva);
+  pintarAvisoReinicio(salud.reinicio, salud.version_nueva);
   if (pidPanel === null) {
     pidPanel = salud.pid;
     return;
@@ -9841,14 +9863,27 @@ async function latido() {
 
 // Cuántos commits trae la versión nueva no le dice nada a quien opera: solo
 // importa que hay una y qué tiene que hacer para tenerla.
-function pintarAvisoVersionNueva(info) {
-  const caja = $("aviso-version-nueva");
+// Aviso ÚNICO de "cierra y vuelve a abrir" (2026-08-13, pedido del usuario).
+// Antes solo existía el de versión nueva; ahora el servidor manda todos los
+// motivos juntos (src/panel/reinicio.py) para que no se acumule una franja por
+// cada cosa que aparezca. Dos tonos: azul cuando solo informa (hay versión
+// descargada, nada anda mal) y ámbar cuando esta computadora está trabajando
+// con datos incompletos — ahí sí hay algo que el reinicio arregla.
+// `version_nueva` se sigue aceptando para no depender del orden de despliegue:
+// una página vieja contra un panel nuevo, o al revés, no se queda sin aviso.
+function pintarAvisoReinicio(estado, versionNueva) {
+  const caja = $("aviso-reinicio");
   if (!caja) return;
-  const hay = !!(info && info.hay);
-  caja.style.display = hay ? "" : "none";
-  if (hay) caja.textContent =
-    "Hay una versión nueva del asistente, ya descargada. Se aplica cuando "
-    + "cierres y vuelvas a abrir el programa.";
+  const motivos = (estado && estado.motivos) || (versionNueva && versionNueva.hay
+    ? [{texto: "Hay una versión nueva del asistente, ya descargada. Se aplica "
+              + "cuando cierres y vuelvas a abrir el programa.", urgente: false}]
+    : []);
+  caja.style.display = motivos.length ? "" : "none";
+  caja.classList.toggle("urge", motivos.some(m => m.urgente));
+  if (!motivos.length) return;
+  // Lo urgente primero: si las dos cosas están, la que pide acción manda.
+  const ordenados = [...motivos].sort((a, b) => (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+  caja.innerHTML = ordenados.map(m => `<div>${esc(m.texto)}</div>`).join("");
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
@@ -10181,13 +10216,12 @@ const botonPrellenado = (f, etiqueta, clase) =>
     etiqueta}</button>`;
 
 // "Volver a llenar" reabre un documento fiscal YA CERRADO: emite uno nuevo y
-// el anterior queda anulado en papel. Es de Editor/Admin (2026-08-05, regla
-// del usuario; permiso reabrir_factura en src/roles.py). Sin el permiso la
-// fila no se queda muda: dice a quién le toca, igual que la nota del editor
-// de catálogos en EN REVISIÓN.
-const botonVolverALlenar = (f) => tienePermiso("reabrir_factura")
-  ? `<button onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`
-  : `<span class="mut" title="Emitir otra vez un documento ya cerrado lo hace un editor.">Volver a llenar: lo hace un editor</span>`;
+// el anterior queda anulado en papel. No pide rol (2026-08-24, pedido del
+// usuario; entre el 2026-08-05 y esa fecha era del permiso reabrir_factura, ya
+// retirado de src/roles.py): lo hace cualquiera que esté facturando. El
+// motivo obligatorio y la nota de reemisión siguen siendo el rastro.
+const botonVolverALlenar = (f) =>
+  `<button onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`;
 
 function accionesDeFila(f) {
   const id = esc(f.pedido_id);
@@ -10340,6 +10374,24 @@ const chipPorRevisar = (f) =>
   f.revision_pendiente
     ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
     : "";
+
+// Esta factura trae productos que el programa YA rechazó antes (2026-08-13,
+// pedido del usuario: avisar antes de llenar, sabiendo que lo más probable es
+// que vuelvan a quedar fuera). No bloquea nada — se llena igual si el operador
+// quiere; lo que lo resuelve de verdad es ponerles precio en el programa de
+// facturación. El detalle de cuáles va en el hover: en la fila solo cabe el
+// número, y la lista completa vive en AJUSTES → Catálogos → Productos.
+const chipRechazados = (f) => {
+  const cuantos = (f.productos_rechazados || []).length;
+  if (!cuantos) return "";
+  const cuales = f.productos_rechazados.map(p => p.descripcion).join(", ");
+  return ` <span class="chip por-revisar" title="${esc(
+    `El programa de facturación ya rechazó ${cuantos === 1 ? "este producto" : "estos productos"}: `
+    + `${cuales}. Lo más probable es que vuelvan a quedar fuera del documento. `
+    + "Se puede llenar igual; para que entren, hay que ponerles precio en el "
+    + "programa de facturación.")}">${
+    cuantos === 1 ? "1 producto sin precio" : `${cuantos} productos sin precio`}</span>`;
+};
 
 // El pedido traía un producto en varias líneas: se factura una sola con la
 // cantidad total (el programa de facturación no admite el mismo artículo
@@ -10709,19 +10761,15 @@ function llenadoDirecto(f) {
 // prellenado cuando la acción aterriza.
 function reabrirDesdeDetalle(f) {
   if (!f) return null;
-  // Reabrir una cerrada es de Editor/Admin (permiso reabrir_factura): sin él
-  // el pie se queda sin botón, como en cualquier fila que no tenga acción.
-  // "Llenar igual" es otra cosa (quitar un candado, no reemitir) y no se toca.
-  const puedeReabrir = tienePermiso("reabrir_factura");
+  // Reabrir una cerrada dejó de pedir rol el 2026-08-24 (pedido del usuario).
   // Llenándose en otra máquina: tampoco desde aquí (ver accionesDeFila).
   if (f.remota && f.llenandose_ahora) return null;
   if (f.remota)
     return f.refacturable
-      ? (puedeReabrir ? {texto: "Volver a llenar", abrir: volverAFacturar} : null)
+      ? {texto: "Volver a llenar", abrir: volverAFacturar}
       : ["reservada", "llenando", "error_llenado"].includes(f.estado)
         ? {texto: "Llenar igual", abrir: tomarIgual}
         : null;
-  if (!puedeReabrir) return null;
   // La que cerró con líneas de menos se reintenta sin preguntar nada
   // (2026-08-01, pedido del usuario): el porqué ya está registrado, igual que
   // en su fila de EN REVISIÓN y en el resumen de fin de llenado.
@@ -10992,9 +11040,7 @@ function contenidoDetalle(clave) {
           discrepancia de despacho, una corrección u otra excepción real.</div>`)
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
-      : tienePermiso("reabrir_factura")
-        ? `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`
-        : `<div class="det-nota">Esta factura ya está cerrada. Volver a llenarla emite un documento nuevo, y eso lo hace un editor.</div>`;
+      : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
   return `
     ${nota}
     <table><thead><tr>
@@ -11022,9 +11068,17 @@ function filaLineaDetalle(d, l) {
   // documento no tiene.
   const omitida = l.omitida
     ? `<div class="det-nota alerta">No entró al documento: ${esc(l.omitida)}.</div>` : "";
+  // El programa ya rechazó este código en un llenado anterior (2026-08-13): la
+  // marca de la fila dice cuántos, y aquí es donde el operador viene a ver
+  // CUÁLES. No se pinta si la línea ya trae su propio "no entró": ahí eso ya
+  // pasó y decirlo dos veces es ruido.
+  const rechazado = (!l.omitida && l.rechazado_antes)
+    ? `<div class="det-nota alerta">El programa de facturación ya lo rechazó antes (${
+        esc(l.rechazado_antes)}): lo más probable es que no entre. Se llena igual; para
+        que entre, hay que arreglarlo en el programa de facturación.</div>` : "";
   if (!detalleEdicionActiva(d)) return `
     <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
-      <td class="det-num">${l.n}</td><td>${producto}${omitida}</td>
+      <td class="det-num">${l.n}</td><td>${producto}${omitida}${rechazado}</td>
       <td>${fmtCantidad(l.cantidad)}${l.ajustada
         || (l.ajuste && (l.ajuste.cantidad !== undefined || l.ajuste.descuento_pct !== undefined))
         ? ` <span class="chip ajustada">a mano</span>` : ""}</td>
@@ -11051,7 +11105,7 @@ function filaLineaDetalle(d, l) {
   return `
     <tr>
       <td class="det-num">${l.n}</td>
-      <td>${producto}</td>
+      <td>${producto}${rechazado}</td>
       <td>
         <input type="text" inputmode="decimal" class="det-cant" value="${l.cantidad}"
                oninput="cantValidar(this)"
@@ -11303,7 +11357,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
-      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
+      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
@@ -11493,10 +11547,29 @@ const CASOS_REVISION = [
       titulo: pr.descripcion || pr.pt_id,
     })),
   },
-  // Producto desactivado a mano en el catálogo (2026-08-22). Aquí no hay nada
-  // que crear ni que arreglar del otro lado: alguien decidió que ese producto
-  // no se factura, así que la única salida es reactivarlo — y el botón la trae
-  // resuelta, sin mandar a nadie al catálogo.
+  // El programa rechazó ESTE código al llenar (2026-08-13, pedido del usuario:
+  // "debe haber consistencia en que se trate como los demás pedidos cuando
+  // falta algo"). Aquí el panel no puede crear nada —el precio se pone en el
+  // programa de facturación—, así que su acción es la misma que la del cliente
+  // que ya se creó allá: avisar que ya está listo y devolver el pedido a la
+  // cola. Si el código sigue mal, el próximo llenado lo marca otra vez.
+  {
+    prefijo: "El programa de facturación no pudo facturar",
+    objeto: (p) => (p.productos_rechazados || []).map(pr =>
+      `<b>Producto:</b> ${esc(pr.descripcion || pr.codigo)}
+       <div class="mut">${esc(pr.codigo)} · ${esc(pr.motivo)}</div>`).join("")
+      || "<b>Producto</b>",
+    detalle: "El programa de facturación rechazó ese código al llenar, así que "
+      + "esa línea no entraría al documento. Se arregla allá —normalmente es "
+      + "ponerle precio— y aquí se pulsa «Ya tiene precio».",
+    botones: (p, i) => [
+      `<button class="acento" onclick="marcarProductoArreglado(${i})">Ya tiene precio</button>`,
+    ],
+  },
+  // Producto desactivado a mano en el catálogo (2026-08-22). A diferencia del
+  // rechazo de arriba, aquí no hay nada que arreglar del otro lado: alguien
+  // decidió que ese producto no se factura, así que la única salida es
+  // reactivarlo — y el botón la trae resuelta, sin mandar a nadie al catálogo.
   {
     prefijo: "Producto(s) desactivado(s)",
     objeto: (p) => (p.productos_desactivados || []).map(pr =>
@@ -11612,23 +11685,18 @@ function pintarLlenadosPorRevisar(lista) {
       ? `<div class="mut">Si hay que corregir un catálogo, lo hace un editor: desde este equipo no se puede.</div>`
       : "";
     // El "Reintentar" de las líneas omitidas reabre un documento YA CERRADO y
-    // emite uno nuevo: pide el mismo permiso que el "Volver a llenar" de
-    // PROCESADAS (reabrir_factura, 2026-08-05). Sin él quedan las otras dos
-    // salidas —darla por buena o descartarla— y la nota dice a quién le toca.
-    const botonReemitirOmitidas = tienePermiso("reabrir_factura")
-      ? `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
-           onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
-      : "";
+    // emite uno nuevo: igual que el "Volver a llenar" de PROCESADAS, ya no
+    // pide rol (2026-08-24, pedido del usuario).
+    const botonReemitirOmitidas =
+      `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
+         onclick="reintentarOmitidas('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`;
     // El mismo botón para la ajena, con UNA diferencia: pregunta el motivo
     // (volverAFacturar). El documento que se anula salió en otro equipo y el
     // papel lo tiene alguien más, así que aquí sí hace falta decir por qué —
     // en la propia el renglón ya lo dice (qué línea no entró).
-    const botonReemitirOmitidasAjena = tienePermiso("reabrir_factura")
-      ? `<button class="acento" title="Emite aquí un documento nuevo con todas las líneas; el que salió incompleto en ese equipo queda anulado en papel."
-           onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`
-      : "";
-    const notaReemitir = tienePermiso("reabrir_factura") ? ""
-      : `<div class="mut">Emitir el documento otra vez lo hace un editor.</div>`;
+    const botonReemitirOmitidasAjena =
+      `<button class="acento" title="Emite aquí un documento nuevo con todas las líneas; el que salió incompleto en ese equipo queda anulado en papel."
+         onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`;
     // El conflicto ignora la rama remota a propósito: resolverlo es cosa del
     // PERMISO (botonesResolverConflicto), no de cuál máquina tiene la fila.
     const acciones = f.tipo === "conflicto"
@@ -11647,7 +11715,7 @@ function pintarLlenadosPorRevisar(lista) {
              <button title="El documento queda como salió: sale de esta lista en todos los equipos y se queda entre las procesadas, con el rastro de qué faltó."
                onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
              <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>
-             <div class="mut">El documento salió en '${esc(f.maquina || "otra máquina")}'</div>${notaReemitir}`)
+             <div class="mut">El documento salió en '${esc(f.maquina || "otra máquina")}'</div>`)
       : f.tipo === "error"
       ? `${botonPrellenado(f, "Reintentar", "acento")}
          ${botonEditarCliente}
@@ -11655,7 +11723,7 @@ function pintarLlenadosPorRevisar(lista) {
       : `${botonReemitirOmitidas}
          <button title="El documento queda como salió: sale de esta lista y se queda entre las procesadas, con el rastro de qué faltó."
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
-         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>${notaReemitir}`;
+         <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`;
     return `
     <tr${filaDetalle(f, atrasada ? "fila-atrasada" : "")}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
@@ -11830,9 +11898,29 @@ async function marcarCruceCreado(i) {
   }
 }
 
+// "Ya tiene precio" (2026-08-13): el operador acaba de arreglar el producto en
+// el programa de facturación, así que su código sale de la lista de rechazados
+// y el pedido vuelve a la cola. Gemelo de "Ya está creado" de los clientes: no
+// se comprueba nada aquí — si el código sigue sin precio, el próximo llenado
+// lo marca de nuevo solo.
+async function marcarProductoArreglado(i) {
+  const p = listaRevisionVisible[i];
+  if (!p || !(p.productos_rechazados || []).length) return;
+  avisarTrabajando("Devolviendo el pedido a la cola…");
+  try {
+    for (const pr of p.productos_rechazados) {
+      await api("/api/catalogo/articulos-revision/eliminar", {codigo_articulo: pr.codigo});
+    }
+    await cargar();
+    mensaje("El pedido vuelve a la cola de facturas.", "info");
+  } catch (e) {
+    mensaje(e.message, "error");
+  }
+}
+
 // "Reactivar el producto" (2026-08-22): deshace la desactivación que frena al
-// pedido. Lo que lo frenaba es una marca de este panel, así que al quitarla el
-// pedido vuelve solo a la cola.
+// pedido. Gemelo de "Ya tiene precio", pero aquí sí se sabe que el pedido queda
+// libre — lo que lo frenaba es una marca de este panel, no algo del otro lado.
 async function reactivarProductoDesdeRevision(i) {
   const p = listaRevisionVisible[i];
   if (!p || !(p.productos_desactivados || []).length) return;
@@ -11886,9 +11974,10 @@ const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 // Separadores por fecha/hora de PROCESAMIENTO (2026-08-02): la lista ya viene
 // del backend ordenada por ese mismo instante, descendente — lo más reciente
 // primero (_ordenar_procesadas) — así que agrupar por día es solo detectar
-// cuándo cambia, sin reordenar nada. Sin resaltado de "atrasada": a
-// diferencia de PENDIENTES y EN REVISIÓN, aquí no queda nada pendiente que se
-// esté olvidando. El instante de la familia es el más reciente de sus partes,
+// cuándo cambia, sin reordenar nada. Sin resaltado de "atrasada" ni en la fila
+// ni en el separador: a diferencia de PENDIENTES y EN REVISIÓN, aquí no queda
+// nada pendiente que se esté olvidando, y el ámbar en una lista ya resuelta
+// alarma sin motivo. El instante de la familia es el más reciente de sus partes,
 // igual que en el backend (_instante_familia) — una familia sin ninguna parte
 // procesada (facturada a mano, nunca llenada) cae en "Sin fecha registrada".
 const fechaDeFamiliaProcesada = (partes) =>
@@ -11934,7 +12023,7 @@ function pintarProcesadas(familias) {
         <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaProcesada(f, true)).join("");
     },
-    sufijo
+    false, sufijo
   ) || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
@@ -14531,7 +14620,11 @@ function desfaseDeFechas(facturas) {
   esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
   const esperada = calISO(esperadaFecha);
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
-  const fechas = facturas.map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
+  // Los pedidos de PRUEBA tampoco (2026-08-11, pedido del usuario): son
+  // sintéticos, su fecha es la del día en que se armaron y no hay nada que
+  // justificar — se llenan sin que el panel pida decidir nada.
+  const fechas = facturas.filter(f => !(f || {}).de_prueba)
+                         .map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
   const desfasadas = fechas.filter(f => f !== esperada);
   if (!desfasadas.length) return null;
@@ -16194,7 +16287,7 @@ async function cargarAjustes() {
     // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
     // guardado en opcionesPrueba.
     pintarCargaEnCurso();
-    pintarBotonCorte();
+    pintarCorte();
     refrescarVistasModoPrueba();
     return true;
   } catch (e) {
@@ -17924,11 +18017,27 @@ async function guardarDiaDespacho(dia) {
   }
 }
 
+// El corte solo AVANZA (2026-08-10, pedido del usuario): el campo arranca
+// topado en la fecha vigente, así el calendario propio apaga los días
+// anteriores y la flecha ▼ frena ahí — si se sube cuatro días, se puede volver
+// a bajar hasta el corte y ni un día más. Llevarlo hacia atrás reofrecería
+// pedidos que ya se facturaron a mano, que es justo lo que el corte evita.
+// El botón se deshabilita igual por si la fecha llega tecleada (el min del
+// input no impide escribir un valor menor, solo lo marca inválido).
+function pintarCorte() {
+  const inp = $("corte-fecha");
+  const vig = $("corte-vigente");
+  if (vig) vig.textContent = corteProduccion ? calDMYSemana(corteProduccion) : "sin fijar";
+  if (inp) inp.min = corteProduccion || "";
+  pintarBotonCorte();
+}
+
 function pintarBotonCorte() {
   const inp = $("corte-fecha");
   const btn = $("corte-btn");
   if (!inp || !btn) return;
-  btn.disabled = !inp.value || inp.value === corteProduccion;
+  btn.disabled = !inp.value || inp.value === corteProduccion
+              || (!!corteProduccion && inp.value < corteProduccion);
 }
 
 // Confirmación en dos pasos con el confirmar DESPLAZADO (pedido del usuario
@@ -17944,14 +18053,16 @@ function pedirCambioCorte() {
   if (!inp || !btn || !caja) return;
   const nueva = inp.value;
   if (!nueva || nueva === corteProduccion) return;
-  const vigente = corteProduccion || "";
-  const haciaAtras = !!vigente && nueva < vigente;
-  const finRango = haciaAtras
-    ? (() => { const d = calDesdeISO(vigente); d.setDate(d.getDate() - 1); return calISO(d); })()
-    : nueva;
-  const aviso = haciaAtras
-    ? `El corte se mueve hacia atrás: los pedidos del ${calDMY(nueva)} al ${calDMY(finRango)} vuelven a ofrecerse como pendientes en todos los equipos. Si alguno ya se facturó a mano, puede terminar facturado dos veces.`
-    : `Los pedidos anteriores al ${calDMY(nueva)} dejan de aparecer en todos los equipos. Los que ya se llenaron siguen en PROCESADAS.`;
+  // Hacia atrás no se mueve (ver pintarCorte): el campo ya lo impide, esto
+  // atrapa la fecha tecleada a mano, que el min del input no bloquea.
+  if (corteProduccion && nueva < corteProduccion) {
+    inp.value = corteProduccion;
+    pintarCorte();
+    mensaje(`El corte solo se mueve hacia adelante: no puede quedar antes del ${calDMY(corteProduccion)}.`,
+            "alerta");
+    return;
+  }
+  const aviso = `Los pedidos anteriores al ${calDMY(nueva)} dejan de aparecer en todos los equipos. Los que ya se llenaron siguen en PROCESADAS.`;
   let cerrado = false;
   const reponer = () => {
     if (cerrado) return;
@@ -17961,12 +18072,12 @@ function pedirCambioCorte() {
     caja.innerHTML = "";
     caja.className = "";
     caja.style.display = "none";
-    pintarBotonCorte();
+    pintarCorte();
   };
-  caja.className = haciaAtras ? "aviso-sensible" : "";
+  caja.className = "";
   caja.style.display = "";
   caja.innerHTML = `
-    <div style="margin:0 0 8px" class="${haciaAtras ? "" : "mut"}">${esc(aviso)}</div>
+    <div style="margin:0 0 8px" class="mut">${esc(aviso)}</div>
     <div class="confirmar-borrar">
       <button class="cb-si ok" id="corte-conf-si" disabled>Sí, mover el corte al ${esc(calDMY(nueva))}</button>
       <button class="cb-no" id="corte-conf-no">Cancelar</button>
@@ -19001,6 +19112,15 @@ function faltaDeEntrada(f) {
   if (!f || esClientePrueba(f)) return "";
   if (esEntradaNueva(f)) return "Falta decir qué es";
   if (!(f.codigo_cliente_winledger || "").trim()) return "Falta el código de cliente";
+  // El programa de facturación mostró un aviso al llenar con esta entrada
+  // (2026-08-13, pedido del usuario): entra a Por revisar como SUGERENCIA —
+  // el aviso literal viaja en rechazo_detalle y lo pinta la fila. Se sale
+  // corrigiendo la ficha, o con «Ya está creado» desde EN REVISIÓN si el
+  // código estaba bien y lo que faltaba era darlo de alta en el programa.
+  if (f.rechazo_campo) {
+    return `El programa no aceptó el código de ${
+      f.rechazo_campo === "sucursal" ? "sucursal" : "cliente"}`;
+  }
   // El código de SUCURSAL no entra aquí (regla del usuario 2026-07-31): el
   // programa de facturación deja facturar sin él y solo lo exige en los
   // clientes que de verdad tienen sucursales. Si lo exige y falta, ese rechazo
@@ -19608,7 +19728,8 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
   // saben qué son y solo les falta un código. Desde 2026-08-01 eso ya no rotula
   // un botón —la fila entera abre el editor— sino el texto de su hover.
   const accion = !falta ? "editar esta sucursal"
-    : falta === "Falta decir qué es" ? "clasificar esta entrada" : "completar esta entrada";
+    : falta === "Falta decir qué es" ? "clasificar esta entrada"
+    : f.rechazo_campo ? "corregir esta entrada" : "completar esta entrada";
   // Toggle de un clic, solo dentro de la ficha del cliente (2026-07-30): la
   // lista general (2026-08-04) ya no trae columna "Activo", esa función se ve
   // por cliente.
@@ -19631,7 +19752,9 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
       ? ` class="abre-editor" title="Clic para ${accion}" onclick="abrirEditor(${i})"` : ""}>
     <td style="padding-left:26px">${nombre}${marcaEsperando}${suelta
         ? `<div class="mut">${esc(f.cliente_id)}</div>` : ""}${falta
-        ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}</td>
+        ? `<div class="mut" style="color:var(--warn)">${esc(falta)}</div>` : ""}${
+        f.rechazo_campo && f.rechazo_detalle
+        ? `<div class="mut" style="max-width:62ch">${esc(f.rechazo_detalle)}</div>` : ""}</td>
     <td>${esc(f.codigo_sucursal_winledger || "")}</td>
     ${conToggleActivo ? `<td${CELDA_ACCIONES}>${celdaActivo}</td>` : ""}
     <td${borrarDefinitivo ? CELDA_ACCIONES : ""}>${borrarDefinitivo}</td>
@@ -22730,9 +22853,6 @@ function avisoFilaCatalogo(idx, msg) {
   aviso.scrollIntoView({block: "nearest"});
 }
 
-// Activa/desactiva un vendedor del catálogo (2026-07-29). Los códigos de
-// vendedor no se borran —son los del ERP—, se apagan: el desactivado sale del
-// selector "Vendedor de esta máquina" en todos los equipos.
 // Un producto desactivado no se factura: el pedido que lo traiga sale a
 // revisión (src/facturacion/clasificacion.py). Se reactiva desde el mismo
 // switch, y ahí el pedido vuelve solo a la cola.
@@ -22754,6 +22874,9 @@ async function alternarProducto(indice) {
   }
 }
 
+// Activa/desactiva un vendedor del catálogo (2026-07-29). Los códigos de
+// vendedor no se borran —son los del ERP—, se apagan: el desactivado sale del
+// selector "Vendedor de esta máquina" en todos los equipos.
 async function alternarVendedor(indice) {
   const f = catalogoFilas[indice];
   try {
@@ -22849,6 +22972,12 @@ const calISO = (d) => `${d.getFullYear()}-${calPad(d.getMonth() + 1)}-${calPad(d
 const calDMY = (iso) => {
   const d = calDesdeISO(iso);
   return d ? `${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]} ${d.getFullYear()}` : "";
+};
+// Igual, con el día de la semana delante ("miércoles 29 julio 2026"): para la
+// fecha de corte fijada, que se compara de memoria contra el día de trabajo.
+const calDMYSemana = (iso) => {
+  const d = calDesdeISO(iso);
+  return d ? `${DIAS_SEMANA[d.getDay()]} ${calDMY(iso)}` : "";
 };
 
 // "aaaa-mm-dd" → Date local, o null si el campo está vacío/a medio teclear.
@@ -23401,10 +23530,10 @@ pintarAvisoFecha();   // normalmente no pinta nada: el día de despacho suele te
 // escritos a mano (fecha a facturar, vigencia de descuentos). Va después de
 // poner el valor inicial de arriba.
 decorarCamposFecha();
-// El campo Desde arranca vacío: la ventana estándar de 30 días de PROCESADAS
-// la recorta el backend (VENTANA_PROCESADAS_DIAS en app.py), no un valor
-// precargado aquí (retirado 2026-07-20: parecía un filtro pegado y lo viejo
-// viajaba igual al navegador al limpiarlo).
+// El campo Desde arranca vacío: la ventana estándar de PROCESADAS la recorta
+// el backend (VENTANA_PROCESADAS_DIAS en app.py), no un valor precargado aquí
+// (retirado 2026-07-20: parecía un filtro pegado y lo viejo viajaba igual al
+// navegador al limpiarlo).
 mensaje("", "");   // estado inicial: barra oculta
 // Aviso de carga (2026-07-22): la primera lectura tarda unos segundos (Supabase
 // + la hoja de kg) y hasta que llega la tabla decía "Sin facturas pendientes",
