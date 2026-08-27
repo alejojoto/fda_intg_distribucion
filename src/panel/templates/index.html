@@ -11301,8 +11301,13 @@ function avisoPendientesVacio() {
   const otras = Object.entries(porRuta)
     .filter(([r, n]) => r !== rutaSeleccionada && n > 0)
     .sort((a, b) => b[1] - a[1]);
+  // La coletilla "con estos filtros" solo es cierta si hay alguno puesto
+  // (2026-08-27, pedido del usuario): sin filtro insinúa que algo esconde
+  // facturas que en realidad no existen.
   if (!rutaSeleccionada || !otras.length)
-    return "Sin facturas pendientes con estos filtros.";
+    return hayFiltroActivo("pendientes")
+      ? "Sin facturas pendientes con estos filtros."
+      : "Sin facturas pendientes.";
   const total = otras.reduce((t, [, n]) => t + n, 0);
   const cuantas = total === 1 ? "queda 1 factura" : `quedan ${total} facturas`;
   const botones = otras.map(([r, n]) => `<button onclick="cambioRuta('${esc(r)}')"
