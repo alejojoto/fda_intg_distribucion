@@ -842,11 +842,6 @@
   .ajustes-bloque { padding:14px; border-bottom:1px solid #e2e6ec; }
   .ajustes-bloque h3 { margin:0 0 10px; font-size:13.5px; }
   .ajustes-fila { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  /* La fecha de corte vigente, aparte del selector (2026-08-10, pedido del
-     usuario): el campo se usa para elegir a dónde moverla, así que mientras se
-     teclea una fecha nueva deja de decir cuál es la que rige hoy. */
-  .corte-vigente { margin:0 0 10px; font-size:12.5px; }
-  .corte-vigente b { font-size:13.5px; }
   /* Las demás computadoras, en una sola tabla (2026-08-05): nombre, vendedor
      y las casillas de rol y de servicio comparten fila, así se lee de un
      vistazo qué es cada equipo en vez de repetir su nombre en dos bloques. */
@@ -2969,9 +2964,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <button type="button" id="ajustes-subtab-catalogos"
               class="desc-subtab st-vigentes"
               onclick="mostrarSubtabAjustes('catalogos')">Catálogos</button>
-      <button type="button" id="ajustes-subtab-corte"
-              class="desc-subtab st-revisar"
-              onclick="mostrarSubtabAjustes('corte')">Fecha de corte</button>
       <button type="button" id="ajustes-subtab-equipos"
               class="desc-subtab st-proximas activa"
               onclick="mostrarSubtabAjustes('equipos')">Otras computadoras<span
@@ -2997,27 +2989,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
              detalle vive DENTRO de cada uno, en su pestaña Por revisar, y
              pulsar el número abre esa pestaña. Se oculta sin pendientes. -->
         <div id="cat-revision" style="display:none; margin-top:10px"></div>
-      </div>
-    </div>
-    <!-- Fecha de corte de producción (2026-07-31; movida de ADMIN a AJUSTES
-         el 2026-08-05 y sacada de Catálogos a subpestaña propia el 2026-08-08,
-         pedido del usuario): la cambian la supervisión y los equipos con rol
-         Admin (permiso corte_produccion). Decide qué ve TODO el mundo —
-         cambiar el corte es operación real, no un dato de catálogo. -->
-    <div id="ajustes-vista-corte" style="display:none">
-      <div class="ajustes-bloque" id="corte-bloque" style="display:none">
-        <h3>Fecha de corte de producción</h3>
-        <p class="mut">Solo se muestran los pedidos pendientes de esta fecha en
-          adelante; los anteriores no aparecen en ninguna parte. Solo avanza:
-          no vuelve atrás. Vale para todos los equipos.</p>
-        <p class="corte-vigente">Fecha fijada ahora:
-          <b id="corte-vigente">—</b></p>
-        <div class="ajustes-fila">
-          <label for="corte-fecha">Mover a</label>
-          <input type="date" id="corte-fecha" data-tope-hoy onchange="pintarBotonCorte()">
-          <button id="corte-btn" onclick="pedirCambioCorte()">Cambiar la fecha de corte</button>
-        </div>
-        <div id="corte-confirma" style="display:none"></div>
       </div>
     </div>
     <div id="ajustes-vista-general">
@@ -4636,10 +4607,6 @@ let configPropia = null;
 // Si a ESTA computadora la sacaron de servicio desde otra: el panel se tapa
 // entero con el aviso hasta que la vuelvan a activar.
 let maquinaDesactivada = false;
-// Fecha vigente del corte de producción; la repinta /api/ajustes y la usa el
-// control de ADMIN para saber si hay algo que cambiar.
-let corteProduccion = "";
-
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -9620,6 +9587,10 @@ function editorVisible(id) {
 function registrarEntidadesCambiadas(entidades) {
   for (const entidad of entidades || []) {
     let acciones = ACCIONES_POR_ENTIDAD[entidad] || [];
+    // La fecha de corte dejó de moverse desde el panel (2026-08-25) y su fila
+    // sigue viva en la nube: si un equipo viejo la toca, el delta llega igual.
+    // Esta rama se queda para que ese caso repinte las listas y no solo
+    // AJUSTES — cuesta una recarga y evita quedar enseñando pedidos viejos.
     if (entidad === "ajustes:fecha_corte_produccion")
       acciones = ["principal", "ajustes"];
     else if (entidad.startsWith("ajustes:"))
@@ -11330,8 +11301,13 @@ function avisoPendientesVacio() {
   const otras = Object.entries(porRuta)
     .filter(([r, n]) => r !== rutaSeleccionada && n > 0)
     .sort((a, b) => b[1] - a[1]);
+  // La coletilla "con estos filtros" solo es cierta si hay alguno puesto
+  // (2026-08-27, pedido del usuario): sin filtro insinúa que algo esconde
+  // facturas que en realidad no existen.
   if (!rutaSeleccionada || !otras.length)
-    return "Sin facturas pendientes con estos filtros.";
+    return hayFiltroActivo("pendientes")
+      ? "Sin facturas pendientes con estos filtros."
+      : "Sin facturas pendientes.";
   const total = otras.reduce((t, [, n]) => t + n, 0);
   const cuantas = total === 1 ? "queda 1 factura" : `quedan ${total} facturas`;
   const botones = otras.map(([r, n]) => `<button onclick="cambioRuta('${esc(r)}')"
@@ -16196,8 +16172,6 @@ async function cargarAjustes() {
     // Lo pendiente de cada catálogo (sección bajo los botones): se carga
     // aparte y sin bloquear el resto de AJUSTES.
     cargarRevisionCatalogos();
-    corteProduccion = d.corte_produccion || "";
-    $("corte-fecha").value = corteProduccion;
     // Cierre asistido de implantación (ASISTENTE_PRUEBA_IMPLANTACION en ESTA
     // máquina): habilita el borrado definitivo de datos de prueba y demás usos
     // de modoImplantacion. Se lee de /api/ajustes.
@@ -16239,9 +16213,6 @@ async function cargarAjustes() {
     // como" en otro rol se esconden, que es justo lo que se quiere comprobar.
     const supervision = esMaquinaAdmin && esSupervisionEfectiva();
     $("ajustes-admin-bloque").style.display = supervision ? "" : "none";
-    // El corte vive en AJUSTES desde 2026-08-05: lo ven supervisión y Admin.
-    $("corte-bloque").style.display =
-      tienePermiso("corte_produccion") ? "" : "none";
     // AJUSTES entera es de Editor/Admin (2026-08-07, pedido del usuario): al
     // usuario general no le queda nada que tocar ahí —nombre, vendedor y día
     // de facturación son fijos para él, se los pone quien instala el equipo—
@@ -16287,7 +16258,6 @@ async function cargarAjustes() {
     // Después de pintarOpcionesPrueba: la comparación necesita el canal ya
     // guardado en opcionesPrueba.
     pintarCargaEnCurso();
-    pintarCorte();
     refrescarVistasModoPrueba();
     return true;
   } catch (e) {
@@ -16695,7 +16665,6 @@ async function cargarSolicitudesAcceso() {
 
 const VISTAS_AJUSTES = {
   catalogos: ["ajustes-vista-catalogos", "ajustes-subtab-catalogos"],
-  corte:     ["ajustes-vista-corte",     "ajustes-subtab-corte"],
   equipos:   ["ajustes-vista-equipos",   "ajustes-subtab-equipos"],
   general:   ["ajustes-vista-general",   "ajustes-subtab-general"],
 };
@@ -16717,13 +16686,11 @@ function puedeVerComputadoras() {
 
 // Qué subpestañas tienen algo que mostrar con los permisos de este rol. La de
 // esta máquina siempre está (nombre, vendedor y día de despacho no se degradan
-// por rol); la de catálogos, solo si su bloque quedó visible, y
-// la del corte solo si su único bloque lo está —cargarAjustes ya los decidió
-// antes de llamar aquí—.
+// por rol); la de catálogos, solo si su bloque quedó visible —cargarAjustes ya
+// lo decidió antes de llamar aquí—.
 function subtabsAjustesDisponibles() {
   const hayCatalogos = $("catalogos-bloque").style.display !== "none";
   return {catalogos: hayCatalogos,
-          corte: $("corte-bloque").style.display !== "none",
           equipos: puedeVerComputadoras(), general: true};
 }
 
@@ -18017,103 +17984,6 @@ async function guardarDiaDespacho(dia) {
   }
 }
 
-// El corte solo AVANZA (2026-08-10, pedido del usuario): el campo arranca
-// topado en la fecha vigente, así el calendario propio apaga los días
-// anteriores y la flecha ▼ frena ahí — si se sube cuatro días, se puede volver
-// a bajar hasta el corte y ni un día más. Llevarlo hacia atrás reofrecería
-// pedidos que ya se facturaron a mano, que es justo lo que el corte evita.
-// El botón se deshabilita igual por si la fecha llega tecleada (el min del
-// input no impide escribir un valor menor, solo lo marca inválido).
-function pintarCorte() {
-  const inp = $("corte-fecha");
-  const vig = $("corte-vigente");
-  if (vig) vig.textContent = corteProduccion ? calDMYSemana(corteProduccion) : "sin fijar";
-  if (inp) inp.min = corteProduccion || "";
-  pintarBotonCorte();
-}
-
-function pintarBotonCorte() {
-  const inp = $("corte-fecha");
-  const btn = $("corte-btn");
-  if (!inp || !btn) return;
-  btn.disabled = !inp.value || inp.value === corteProduccion
-              || (!!corteProduccion && inp.value < corteProduccion);
-}
-
-// Confirmación en dos pasos con el confirmar DESPLAZADO (pedido del usuario
-// 2026-07-31). A propósito no usa confirmarBorrar ni confirmarSinQuitar: esos
-// ponen el "Confirmar" justo donde estaba el botón que se acaba de pulsar, y
-// acá lo que se busca es que ninguna repetición de clics en el mismo punto
-// pueda mover el corte. El botón original se queda en su sitio, deshabilitado:
-// ocultarlo encogería la fila y subiría el confirmar hacia el cursor.
-function pedirCambioCorte() {
-  const inp = $("corte-fecha");
-  const btn = $("corte-btn");
-  const caja = $("corte-confirma");
-  if (!inp || !btn || !caja) return;
-  const nueva = inp.value;
-  if (!nueva || nueva === corteProduccion) return;
-  // Hacia atrás no se mueve (ver pintarCorte): el campo ya lo impide, esto
-  // atrapa la fecha tecleada a mano, que el min del input no bloquea.
-  if (corteProduccion && nueva < corteProduccion) {
-    inp.value = corteProduccion;
-    pintarCorte();
-    mensaje(`El corte solo se mueve hacia adelante: no puede quedar antes del ${calDMY(corteProduccion)}.`,
-            "alerta");
-    return;
-  }
-  const aviso = `Los pedidos anteriores al ${calDMY(nueva)} dejan de aparecer en todos los equipos. Los que ya se llenaron siguen en PROCESADAS.`;
-  let cerrado = false;
-  const reponer = () => {
-    if (cerrado) return;
-    cerrado = true;
-    clearTimeout(tHabilitar);
-    clearTimeout(tVuelta);
-    caja.innerHTML = "";
-    caja.className = "";
-    caja.style.display = "none";
-    pintarCorte();
-  };
-  caja.className = "";
-  caja.style.display = "";
-  caja.innerHTML = `
-    <div style="margin:0 0 8px" class="mut">${esc(aviso)}</div>
-    <div class="confirmar-borrar">
-      <button class="cb-si ok" id="corte-conf-si" disabled>Sí, mover el corte al ${esc(calDMY(nueva))}</button>
-      <button class="cb-no" id="corte-conf-no">Cancelar</button>
-    </div>`;
-  btn.disabled = true;
-  const si = $("corte-conf-si");
-  const no = $("corte-conf-no");
-  const tHabilitar = setTimeout(() => { si.disabled = false; }, 400);   // retardo anti doble-clic
-  const tVuelta = setTimeout(reponer, 7000);   // confirmación olvidada = clic accidental esperando
-  no.onclick = reponer;
-  si.onclick = async () => {
-    clearTimeout(tHabilitar);
-    clearTimeout(tVuelta);
-    si.disabled = true;
-    no.disabled = true;
-    mensaje("Cambiando la fecha de corte…", "info", true);
-    let r;
-    try {
-      r = await api("/api/ajustes/corte-produccion", {fecha: nueva});
-    } catch (e) {
-      reponer();
-      mensaje("No se pudo cambiar la fecha de corte: " + e.message, "error");
-      return;
-    }
-    corteProduccion = r.corte_produccion || "";
-    inp.value = corteProduccion;
-    // El resultado se anuncia con las listas ya rehechas: el corte cambia qué
-    // pedidos se ofrecen, y decir "listo" con los viejos todavía en pantalla
-    // se leería como que no pasó nada.
-    try { await cargar(); } catch (e) { /* cargar() ya avisa su propio fallo */ }
-    reponer();
-    mensaje(`Corte de producción movido al ${calDMY(corteProduccion)}.`
-            + (r.aviso ? ` ${r.aviso}` : ""), r.aviso ? "alerta" : "exito");
-  };
-}
-
 // Versión estable del parque (2026-07-31 como "modo viejo", selector desde
 // 2026-08-05): ajuste de TODAS las computadoras de producción, no de este
 // equipo. Se guarda compartido y cada máquina lo aplica al reabrir el
@@ -18219,9 +18089,7 @@ function maquinaSinGuardar() {
 }
 
 function ajustesCompartidosSinGuardar() {
-  const corte = $("corte-fecha");
-  const cortePendiente = !!corte && corte.value !== (corteProduccion || "");
-  return maquinaSinGuardar() || cortePendiente;
+  return maquinaSinGuardar();
 }
 
 // Las pestañas de arriba pasan por aquí y no por cambiarTab directo: salir de
@@ -22973,13 +22841,6 @@ const calDMY = (iso) => {
   const d = calDesdeISO(iso);
   return d ? `${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]} ${d.getFullYear()}` : "";
 };
-// Igual, con el día de la semana delante ("miércoles 29 julio 2026"): para la
-// fecha de corte fijada, que se compara de memoria contra el día de trabajo.
-const calDMYSemana = (iso) => {
-  const d = calDesdeISO(iso);
-  return d ? `${DIAS_SEMANA[d.getDay()]} ${calDMY(iso)}` : "";
-};
-
 // "aaaa-mm-dd" → Date local, o null si el campo está vacío/a medio teclear.
 // Se arma por partes (no new Date(iso)) porque el string ISO pelado lo
 // interpreta el navegador como UTC y en Venezuela eso corre un día atrás.
