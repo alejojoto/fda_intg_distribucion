@@ -6495,6 +6495,10 @@ function pintarAvisoFecha() {
 // reponga la del día anterior si no hay ninguna que corresponda al nuevo.
 function cambioFechaFacturar() {
   pintarAvisoFecha();
+  // El ámbar de PENDIENTES se mide contra esta fecha: sin repintar, la lista
+  // seguiría marcando los días que correspondían a la fecha anterior.
+  if ((ultimaLista.pendientes || []).length)
+    pintarPendientes(paginarFamilias("pendientes", ultimaLista.pendientes));
   // El descuento de cada línea depende del día del documento: un detalle
   // abierto se queda mostrando los % de la fecha anterior si no se recarga.
   refrescarDetalleAbierto();
@@ -8524,6 +8528,19 @@ const TITULO_PEDIDO_VIEJO =
 const TITULO_DIA_VIEJO =
   "Órdenes viejas: pedidos de este día que siguen sin facturar.";
 
+// Cada lista se pinta en ámbar por su propio motivo, así que el criterio viaja
+// como parámetro (2026-08-28). `arma()` se llama UNA vez por pintado —la fecha
+// de hoy, o la Fecha a facturar, se leen una sola vez— y devuelve el predicado
+// `(iso, item)` que decide separador y fila. Este es el de las listas de
+// espera: lo que lleva días sin resolverse.
+const RESALTADO_ESPERA_LARGA = {
+  tituloDia: TITULO_DIA_VIEJO,
+  arma: () => {
+    const gracia = diaDeGraciaISO();
+    return (iso) => esFechaAtrasada(iso, gracia);
+  },
+};
+
 // Índice de getDay(): 0 = domingo.
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves",
                      "viernes", "sábado"];
@@ -8550,30 +8567,29 @@ function etiquetaSeparadorFecha(iso, hoy, ayer) {
 // vista al scrollear. Con una página que no arranca en el primer ítem de la
 // lista completa (paginación), el primer grupo siempre lleva su separador —
 // no hay forma de saber, ni falta, qué quedó en la página anterior.
-// `resaltarAntiguas` en falso deja el separador en su gris de siempre: el
-// ámbar avisa de trabajo que se está olvidando, y en una lista donde ya no
-// queda nada por hacer (PROCESADAS) alarma sin motivo (2026-08-11, pedido del
-// usuario).
+// `resaltado` en nulo deja el separador en su gris de siempre: el ámbar avisa
+// de trabajo que se está olvidando, y en una lista donde ya no queda nada por
+// hacer (PROCESADAS) alarma sin motivo (2026-08-11, pedido del usuario).
 // `sufijoDe(iso)`, opcional, agrega texto al rótulo del día (el conteo de
 // PROCESADAS) — por eso se repite igual si la página arranca a mitad del día:
 // siempre dice el total, no lo que quedó visible.
 function pintarConSeparadoresDeFecha(items, fechaDe, colspan, render,
-                                     resaltarAntiguas = true, sufijoDe = null) {
-  const hoy = hoyComoISO(), ayer = ayerComoISO(), gracia = diaDeGraciaISO();
-  const esAntigua = (iso) => resaltarAntiguas && esFechaAtrasada(iso, gracia);
+                                     resaltado = RESALTADO_ESPERA_LARGA, sufijoDe = null) {
+  const hoy = hoyComoISO(), ayer = ayerComoISO();
+  const esAntigua = resaltado ? resaltado.arma() : () => false;
   let diaAnterior;   // distinto de cualquier resultado real: fuerza el separador del primero
   let html = "";
   for (const item of items) {
     const iso = (fechaDe(item) || "").slice(0, 10);
     if (iso !== diaAnterior) {
       diaAnterior = iso;
-      const atrasada = esAntigua(iso);
+      const atrasada = esAntigua(iso, item);
       html += `<tr class="sep-fecha${atrasada ? " sep-fecha-antigua" : ""}"`
-        + `${atrasada ? ` title="${TITULO_DIA_VIEJO}"` : ""}>`
+        + `${atrasada ? ` title="${resaltado.tituloDia}"` : ""}>`
         + `<td colspan="${colspan}">${esc(etiquetaSeparadorFecha(iso, hoy, ayer)
                                           + (sufijoDe ? sufijoDe(iso) : ""))}</td></tr>`;
     }
-    html += render(item, esAntigua(iso));
+    html += render(item, esAntigua(iso, item));
   }
   return html;
 }
@@ -10886,8 +10902,10 @@ const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 // familia).
 // Una fila atrasada estrena el hover con lo suyo (2026-08-07): se reconoce por
 // la clase que ya le llega, así ninguno de sus llamadores tiene que repetirlo.
-function filaDetalle(f, clases = "") {
-  const viejo = clases.includes("fila-atrasada") ? `${TITULO_PEDIDO_VIEJO} ` : "";
+// `tituloAtraso` es el motivo del ámbar en esa lista: por qué está resaltada lo
+// sabe quien la pinta, no esta función (2026-08-28).
+function filaDetalle(f, clases = "", tituloAtraso = TITULO_PEDIDO_VIEJO) {
+  const viejo = clases.includes("fila-atrasada") ? `${tituloAtraso} ` : "";
   return ` class="${(clases + " abre-detalle").trim()}"`
     + ` title="${viejo}Clic para ver el detalle del pedido"`
     + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
@@ -11657,6 +11675,27 @@ function clienteEnLinea(f) {
 // nunca. La página y el pintado tienen que leerse en el mismo sentido.
 const fechaDeFamilia = (partes) => partes[0].fecha_orden_salida;
 
+// El ámbar de PENDIENTES = esta factura va a pedir un motivo por su fecha
+// (2026-08-28, pedido del usuario). El criterio es el MISMO de
+// desfaseDeFechas() —lo usual es facturar el pedido del día anterior, con el
+// salto del fin de semana— y ya no "hace más de dos días", que dejaba en
+// blanco pedidos que igual iban a frenar al operador con el aviso: con la
+// Fecha a facturar en hoy, el pedido de ayer se ve normal y todo lo demás
+// —el de hoy mismo incluido— se ve venir desde la lista. Los sintéticos de
+// prueba se llenan sin preguntar nada, así que tampoco se pintan.
+const TITULO_DIA_FECHA_INUSUAL =
+  "Pedidos de un día que no corresponde a la Fecha a facturar: al llenarlos se pide un motivo.";
+const TITULO_PEDIDO_FECHA_INUSUAL =
+  "Este pedido no es del día que corresponde a la Fecha a facturar: al llenarlo se pide un motivo.";
+const RESALTADO_FECHA_A_FACTURAR = {
+  tituloDia: TITULO_DIA_FECHA_INUSUAL,
+  arma: () => {
+    const esperada = fechaDePedidoEsperada($("f-fecha-facturar").value);
+    return (iso, partes) => !!esperada && !!iso && iso !== esperada
+                            && !(partes[0] || {}).de_prueba;
+  },
+};
+
 function pintarPendientes(familias) {
   $("t-pendientes").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
     familias, fechaDeFamilia, 8, (partes, atrasada) => {
@@ -11666,14 +11705,15 @@ function pintarPendientes(familias) {
       if (partes.length === 1 && !(f0.total_partes > 1)) return filaPendiente(f0, false, atrasada);
       return `
       <tr class="fam-cabecera${atrasada ? " fila-atrasada" : ""}"
-          ${atrasada ? `title="${TITULO_PEDIDO_VIEJO}"` : ""}>
+          ${atrasada ? `title="${TITULO_PEDIDO_FECHA_INUSUAL}"` : ""}>
         <td><b>${esc(f0.pedido_id)}</b></td>
         <td>${celdaCliente(f0)}</td>
         <td>${esc(nombreRuta(f0.ruta || ""))}</td>
         <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
         <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaPendiente(f, true, atrasada)).join("");
-    }
+    },
+    RESALTADO_FECHA_A_FACTURAR
   ) || `<tr><td colspan="8" class="mut">${avisoPendientesVacio()}</td></tr>`;
 }
 
@@ -11719,7 +11759,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
   const clases = [enFamilia ? "fam-parte" : "", atrasada ? "fila-atrasada" : ""]
     .filter(Boolean).join(" ");
   return `
-    <tr${filaDetalle(f, clases)} data-factura-key="${clave}">
+    <tr${filaDetalle(f, clases, TITULO_PEDIDO_FECHA_INUSUAL)} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
       <td>${enFamilia ? "" : esc(nombreRuta(f.ruta || ""))}</td>
@@ -12392,7 +12432,7 @@ function pintarProcesadas(familias) {
         <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaProcesada(f, true)).join("");
     },
-    false, sufijo
+    null, sufijo
   ) || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
@@ -14984,6 +15024,19 @@ const TRIANGULO_ALERTA =
 // El desfase se calcula aparte del aviso porque también lo necesitan los
 // botones de llenar, que se pintan ANTES que los avisos y no pueden leerlo del
 // HTML ya pintado.
+// Fecha de pedido que corresponde a una fecha a facturar: el día anterior,
+// salvo el salto del fin de semana (sábado, domingo y lunes facturan el pedido
+// del viernes). La comparten el aviso y el ámbar de PENDIENTES: es la misma
+// regla y tiene que decidir igual en los dos sitios.
+function fechaDePedidoEsperada(isoFacturar) {
+  const fechaFacturar = calDesdeISO(isoFacturar);
+  if (!fechaFacturar) return "";
+  const diasHastaViernes = ({6: 1, 0: 2, 1: 3})[fechaFacturar.getDay()] || 1;
+  const esperadaFecha = new Date(fechaFacturar);
+  esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
+  return calISO(esperadaFecha);
+}
+
 function desfaseDeFechas(facturas) {
   const isoFacturar = $("f-fecha-facturar").value;
   // Sin fecha puesta no hay contra qué comparar. Saltando la puesta a punto de
@@ -14991,12 +15044,8 @@ function desfaseDeFechas(facturas) {
   // verse igual con el modo admin prendido y apagado); lo que cambia es el
   // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
   if (!isoFacturar) return null;
-  const fechaFacturar = calDesdeISO(isoFacturar);
-  if (!fechaFacturar) return null;
-  const diasHastaViernes = ({6: 1, 0: 2, 1: 3})[fechaFacturar.getDay()] || 1;
-  const esperadaFecha = new Date(fechaFacturar);
-  esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
-  const esperada = calISO(esperadaFecha);
+  const esperada = fechaDePedidoEsperada(isoFacturar);
+  if (!esperada) return null;
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   // Los pedidos de PRUEBA tampoco (2026-08-11, pedido del usuario): son
   // sintéticos, su fecha es la del día en que se armaron y no hay nada que
