@@ -2827,9 +2827,10 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
 
   <!-- Buscador compartido entre PENDIENTES, PROCESADAS y EN REVISIÓN (desde
        2026-07-21 barre las columnas de la fila, no solo el cliente: ver
-       CAMPOS_BUSQUEDA en app.py); las fechas Desde/Hasta son SOLO de PROCESADAS
-       (PENDIENTES se muestra siempre completa) y por eso solo se ven en esa tab
-       (ver cambiarTab). Arrancan ocultas porque la tab inicial es PENDIENTES.
+       CAMPOS_BUSQUEDA en app.py); las fechas Desde/Hasta recortan PENDIENTES y
+       PROCESADAS por la fecha del pedido (en PENDIENTES desde 2026-08-31,
+       pedido del usuario) y se esconden en EN REVISIÓN, que no se filtra
+       nunca (ver cambiarTab).
        PROCESADAS estándar trae solo los días recientes (recorte del backend);
        al llegar al final de la lista se extiende sola con el resto del
        histórico (ver cambiarPagina), y un rango Desde/Hasta consulta ese tramo
@@ -2854,11 +2855,13 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <button type="button" class="x-limpiar" tabindex="-1" title="Limpiar búsqueda"
             onclick="limpiarBuscador('f-buscar', aplicarFiltros)">&times;</button>
       </span></div>
-    <!-- data-tope-hoy (2026-07-21): Desde y Hasta filtran lo YA procesado, así
-         que no tienen para dónde ir hacia adelante — el tope se pone en el día
-         de hoy (ver aplicarTopeHoy; se refresca al abrir el calendario, por si
-         el panel quedó abierto de un día para otro). -->
-    <div class="campo" id="campo-desde" style="display:none">Desde<span class="campo-fecha con-x">
+    <!-- data-tope-hoy (2026-07-21): en PROCESADAS, Desde y Hasta filtran lo YA
+         procesado, así que no tienen para dónde ir hacia adelante — el tope se
+         pone en el día de hoy (ver aplicarTopeHoy; se refresca al abrir el
+         calendario, por si el panel quedó abierto de un día para otro). En
+         PENDIENTES el tope se suelta: lo que sale mañana se factura hoy, así
+         que ahí sí hay pedidos por delante del calendario. -->
+    <div class="campo" id="campo-desde">Desde<span class="campo-fecha con-x">
         <span class="campo-fecha-caja">
           <input type="date" id="f-desde" data-tope-hoy onchange="actualizarXFecha('f-desde'); sincronizarRangosFecha(); aplicarFiltros()">
           <button type="button" class="x-fecha" tabindex="-1" title="Limpiar fecha"
@@ -2869,7 +2872,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
           <button type="button" tabindex="-1" title="Un día menos" onclick="pasoFecha('f-desde', -1)">&#9660;</button>
         </span>
       </span></div>
-    <div class="campo" id="campo-hasta" style="display:none">Hasta<span class="campo-fecha con-x">
+    <div class="campo" id="campo-hasta">Hasta<span class="campo-fecha con-x">
         <span class="campo-fecha-caja">
           <input type="date" id="f-hasta" data-tope-hoy onchange="actualizarXFecha('f-hasta'); sincronizarRangosFecha(); aplicarFiltros()">
           <button type="button" class="x-fecha" tabindex="-1" title="Limpiar fecha"
@@ -2881,8 +2884,8 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         </span>
       </span></div>
     <!-- Único botón que sobrevive: limpia SOLO las fechas (no toca el buscador),
-         y solo aparece en PROCESADAS junto a los campos de fecha (ver cambiarTab). -->
-    <button type="button" id="btn-limpiar-fechas" style="display:none"
+         y acompaña a los campos de fecha donde estos se ven (ver cambiarTab). -->
+    <button type="button" id="btn-limpiar-fechas"
             onclick="limpiarFechas()">Limpiar fechas</button>
     <!-- PROCESADAS muestra también lo que llenaron las otras laptops (columna
          Máquina); esta casilla recorta la lista a lo llenado aquí. Es el
@@ -6528,10 +6531,10 @@ let maquinaSeleccionada = "";
 // sitios a la vez: la barra de filtros teñida con el campo culpable marcado, el
 // aviso de arriba con lo que filtra y su ×, y el conteo del pie en ámbar.
 //
-// Qué cuenta como filtro depende de la tab: PENDIENTES y EN REVISIÓN solo
-// filtran por buscador y ruta — las fechas y "Llenadas en esta máquina" son exclusivas
-// de PROCESADAS (ver cambiarTab). Cada entrada trae ya el nombre del filtro que
-// la quita, porque el aviso los ofrece uno por uno.
+// Qué cuenta como filtro depende de la tab: EN REVISIÓN no filtra nunca,
+// PENDIENTES filtra por buscador, ruta y fechas, y PROCESADAS suma a eso el
+// recorte por máquina (ver cambiarTab). Cada entrada trae ya el nombre del
+// filtro que la quita, porque el aviso los ofrece uno por uno.
 //
 // La ruta PREDETERMINADA de esta máquina no cuenta (2026-07-31, pedido del
 // usuario): quien fija su ruta con ★ trabaja siempre esa y ver el aviso en
@@ -6547,10 +6550,10 @@ function filtrosActivos(tab) {
   if (buscar) activos.push({cual: "buscar", texto: `Buscar: ${buscar}`});
   if (rutaFiltrando()) activos.push({cual: "ruta", texto: `Ruta: ${
     rutaSeleccionada === "__sin_ruta__" ? "(sin ruta)" : nombreRuta(rutaSeleccionada)}`});
+  const dma = (iso) => iso.split("-").reverse().join("/");
+  if ($("f-desde").value) activos.push({cual: "desde", texto: `Desde: ${dma($("f-desde").value)}`});
+  if ($("f-hasta").value) activos.push({cual: "hasta", texto: `Hasta: ${dma($("f-hasta").value)}`});
   if (tab === "procesadas") {
-    const dma = (iso) => iso.split("-").reverse().join("/");
-    if ($("f-desde").value) activos.push({cual: "desde", texto: `Desde: ${dma($("f-desde").value)}`});
-    if ($("f-hasta").value) activos.push({cual: "hasta", texto: `Hasta: ${dma($("f-hasta").value)}`});
     if ($("f-solo-aqui").checked) activos.push({cual: "solo_aqui", texto: "Llenadas en esta máquina"});
     if (maquinaSeleccionada)
       activos.push({cual: "maquina", texto: `Máquina: ${nombreMaquinaFiltro(maquinaSeleccionada)}`});
@@ -8140,26 +8143,31 @@ function cambiarTab(tab) {
     if (btn) btn.classList.toggle("activa", t === tab);
     $("sec-" + t).style.display = t === tab ? "" : "none";
   }
-  // El buscador aplica (y se ve) en PENDIENTES y PROCESADAS; las fechas
-  // Desde/Hasta y el botón de histórico son exclusivos de PROCESADAS —
-  // PENDIENTES muestra siempre todas sus facturas, sin recorte por fecha
-  // (2026-07-20).
+  // El buscador y las fechas Desde/Hasta aplican (y se ven) en PENDIENTES y
+  // PROCESADAS: las dos listas se recortan por la fecha del pedido
+  // (PENDIENTES desde 2026-08-31, pedido del usuario). El filtro por máquina
+  // sigue siendo solo de PROCESADAS — la máquina se asigna al procesar, así
+  // que en PENDIENTES no hay nada que filtrar por ahí.
   //
   // EN REVISIÓN no tiene barra (2026-08-05, decisión del usuario): esa lista
   // debería estar en poco o nada, así que filtrarla no aporta y sí engaña —
   // un pedido escondido por un filtro se lee como "no queda ninguno por
-  // revisar". El servidor tampoco recorta esas dos listas (ver /api/facturas).
+  // revisar". El servidor tampoco recorta esa lista (ver /api/facturas).
   $("filtros-barra").style.display =
     (tab === "pendientes" || tab === "procesadas") ? "" : "none";
-  const fechasVisibles = tab === "procesadas" ? "" : "none";
+  const fechasVisibles = (tab === "pendientes" || tab === "procesadas") ? "" : "none";
   $("campo-desde").style.display = fechasVisibles;
   $("campo-hasta").style.display = fechasVisibles;
   $("btn-limpiar-fechas").style.display = fechasVisibles;
+  // El tope Hoy depende de la tab (ver topeFechasFiltro): se recalcula aquí
+  // para que cambiar de lista no deje puesto el de la anterior.
+  aplicarTopeHoy();
+  sincronizarRangosFecha();
   // "Llenadas en esta máquina" y el dropdown de equipo son de PROCESADAS (la
   // única lista con facturas de otras laptops) y excluyentes por rol: los dos
   // los pinta mostrarCampoMaquina.
   mostrarCampoMaquina();
-  // Cambiar de tab cambia QUÉ filtra (las fechas y la casilla solo cuentan en
+  // Cambiar de tab cambia QUÉ filtra (la casilla y el equipo solo cuentan en
   // PROCESADAS): el aviso se repinta con los de la tab que queda a la vista.
   pintarEstadoFiltros();
   reaplicarFiltroDeLaTab(tab);   // la lista que se abre sale ya recortada
@@ -22919,12 +22927,12 @@ function fijarTopeFecha(inp, attr, val) {
 }
 
 function sincronizarRangosFecha() {
-  const hoy = calISO(new Date());
+  const hoy = topeFechasFiltro();
   for (const {desde: idD, hasta: idH} of RANGOS_FECHA) {
     const desde = $(idD), hasta = $(idH);
     if (!desde || !hasta) continue;   // rango no presente en esta vista
-    const topeHoyDesde = desde.dataset.topeHoy !== undefined ? hoy : null;
-    const topeHoyHasta = hasta.dataset.topeHoy !== undefined ? hoy : null;
+    const topeHoyDesde = (desde.dataset.topeHoy !== undefined && hoy) ? hoy : null;
+    const topeHoyHasta = (hasta.dataset.topeHoy !== undefined && hoy) ? hoy : null;
     // Hasta: no antes del Desde; conserva su tope Hoy si es data-tope-hoy.
     fijarTopeFecha(hasta, "min", desde.value || "");
     fijarTopeFecha(hasta, "max", topeHoyHasta || "");
@@ -22935,14 +22943,21 @@ function sincronizarRangosFecha() {
   }
 }
 
-// Tope "hoy" de los campos marcados con data-tope-hoy (Desde/Hasta): filtran
-// lo ya procesado, así que no hay nada que buscar hacia adelante. Se refresca
-// cada vez que se abre un calendario porque el panel puede quedar abierto de
-// un día para otro y el tope de ayer dejaría hoy fuera.
+// Tope "hoy" de los campos marcados con data-tope-hoy (Desde/Hasta). En
+// PROCESADAS filtran lo ya procesado, así que no hay nada que buscar hacia
+// adelante; en PENDIENTES sí lo hay (lo que despacha mañana se factura hoy),
+// y con el tope puesto esos pedidos quedaban fuera del alcance del rango. Se
+// refresca cada vez que se abre un calendario y al cambiar de tab, porque el
+// panel puede quedar abierto de un día para otro y el tope de ayer dejaría
+// hoy fuera.
+function topeFechasFiltro() {
+  return tabActiva() === "pendientes" ? "" : calISO(new Date());
+}
+
 function aplicarTopeHoy() {
-  const hoy = calISO(new Date());
+  const tope = topeFechasFiltro();
   document.querySelectorAll("input[type=date][data-tope-hoy]")
-          .forEach(c => { c.max = hoy; });
+          .forEach(c => { if (tope) c.max = tope; else c.removeAttribute("max"); });
 }
 
 // Atajo del botón del medio, según a dónde mire el campo (2026-07-21):
@@ -23433,7 +23448,7 @@ async function borradorContinuar() {
 
 pintarSeries();    // el campo Serie arranca con las opciones (lógica por definir)
 pintarCantidades();   // bloque "Llenar en fila": arranca en 5 sin imprimir
-aplicarTopeHoy();  // Desde/Hasta no aceptan fechas futuras
+aplicarTopeHoy();  // en PROCESADAS, Desde/Hasta no aceptan fechas futuras
 $("f-fecha-facturar").value = {{ fecha_facturar_sugerida | tojson }};
 pintarAvisoFecha();   // normalmente no pinta nada: el día de despacho suele tener tasa propia
 // Controles ▲/▼ de los campos de fecha del HTML estático que no los traen
