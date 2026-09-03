@@ -6511,6 +6511,48 @@ function cambioFechaFacturar() {
   aplicarTasaBCV();   // repone la que corresponde al nuevo día (o deja vacío + alerta)
 }
 
+// Cambio de día con el panel abierto (2026-09-03). "Fecha a facturar" se
+// pintaba una sola vez, con la que trajo el render: un panel que amanecía
+// abierto seguía ofreciendo la de ayer y PENDIENTES marcaba en ámbar todo lo
+// del día nuevo hasta que alguien recargaba. El disparador NO es la medianoche
+// sino la fecha del equipo, porque hay máquinas donde el operador la mueve a
+// mano (el programa de facturación factura con la fecha del sistema) y ahí un
+// temporizador a las 00:00 no se enteraría. Comparar dos textos cada medio
+// minuto no cuesta red ni trabajo, y cubre además volver de suspender la
+// computadora, que descuadra cualquier temporizador largo.
+let fechaFacturarAuto = "";   // lo último que el panel puso SOLO en el campo
+
+function ponerFechaFacturarAuto(iso) {
+  fechaFacturarAuto = iso || "";
+  $("f-fecha-facturar").value = fechaFacturarAuto;
+}
+
+function vigilarDiaDeLaMaquina() {
+  // Sin una fecha puesta por el panel no hay nada que seguir: esto repone la
+  // que el panel eligió, no inventa una donde el render no mandó ninguna.
+  if (!fechaFacturarAuto) return;
+  const sugerida = fechaDespacho();
+  if (sugerida === fechaFacturarAuto) return;
+  // Con un llenado en curso la barra no se toca: la fecha del campo es la que
+  // viaja al documento. Sin marcar nada, el próximo tic lo vuelve a intentar.
+  if (llenando || secuenciaActiva || esperandoLogin) return;
+  const campo = $("f-fecha-facturar");
+  // Con el campo en foco el operador puede estar tecleando una fecha: entre
+  // tecla y tecla el valor está a medias y pisarlo le cambiaría lo escrito.
+  if (document.activeElement === campo) return;
+  const aMano = campo.value !== fechaFacturarAuto;
+  fechaFacturarAuto = sugerida;   // el día nuevo queda registrado, se pise el campo o no
+  if (aMano) return;   // la fecha que eligió el operador es suya: no se le pisa
+  campo.value = sugerida;
+  cambioFechaFacturar();   // aviso del día, ámbar de PENDIENTES y tasa del día nuevo
+}
+setInterval(vigilarDiaDeLaMaquina, 30 * 1000);
+// Al volver a la ventana no se espera el tic: quien vuelve a mirar la barra es
+// justo quien está por facturar.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) vigilarDiaDeLaMaquina();
+});
+
 // 20 por defecto en todas las tablas; sin opciones de 50/500 porque el
 // render de tantas filas se siente lento en la máquina Windows (feedback 2026-07-19).
 const paginacion = {
@@ -12637,7 +12679,7 @@ function llenarConTasaDelAviso() {
 function llenarParaDespachoDesdeAviso() {
   const l = llenadoEsperandoTasa;
   cerrarAvisoTasa();
-  $("f-fecha-facturar").value = fechaDespacho();
+  ponerFechaFacturarAuto(fechaDespacho());
   cambioFechaFacturar();
   if (l) llenar(l.pedido_id, l.parte, l.autorizarCancelar);
 }
@@ -18435,7 +18477,7 @@ async function guardarDiaDespacho(dia) {
   try {
     const r = await api("/api/ajustes/dia-despacho", {dia});
     pintarDiaDespacho(r.dia_despacho);
-    $("f-fecha-facturar").value = r.fecha_facturar_sugerida;
+    ponerFechaFacturarAuto(r.fecha_facturar_sugerida);
     cambioFechaFacturar();
   } catch (e) {
     pintarDiaDespacho(anterior);   // el radio no se queda marcando lo que no se guardó
@@ -18712,7 +18754,7 @@ async function guardarConfigMaquina() {
     if (dia !== diaDespacho || configPendiente.includes("dia_despacho")) {
       const r = await api("/api/ajustes/dia-despacho", {dia});
       pintarDiaDespacho(r.dia_despacho);
-      $("f-fecha-facturar").value = r.fecha_facturar_sugerida;
+      ponerFechaFacturarAuto(r.fecha_facturar_sugerida);
       cambioFechaFacturar();
       configPendiente = r.configuracion_pendiente || [];
     }
@@ -23851,7 +23893,7 @@ async function borradorContinuar() {
 pintarSeries();    // el campo Serie arranca con las opciones (lógica por definir)
 pintarCantidades();   // bloque "Llenar en fila": arranca en 5 sin imprimir
 aplicarTopeHoy();  // en PROCESADAS, Desde/Hasta no aceptan fechas futuras
-$("f-fecha-facturar").value = {{ fecha_facturar_sugerida | tojson }};
+ponerFechaFacturarAuto({{ fecha_facturar_sugerida | tojson }});
 pintarAvisoFecha();   // normalmente no pinta nada: el día de despacho suele tener tasa propia
 // Controles ▲/▼ de los campos de fecha del HTML estático que no los traen
 // escritos a mano (fecha a facturar, vigencia de descuentos). Va después de
