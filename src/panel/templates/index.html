@@ -524,6 +524,17 @@
      descartadas, cada una con su chip. */
   #t-procesadas tr.sep-fecha td { background:#c3d4f2; color:#243b6b;
                                   border-bottom-color:#a8bfe8; }
+  /* Factura con un cambio a mano (2026-09-10, pedido del usuario): la fila
+     queda marcada de forma PERMANENTE, para que el cambio no se pierda de
+     vista al cerrar la ventana del pedido. Lila mientras ese cambio no se haya
+     llenado —todavía puede deshacerse— y verde apagado (el mismo del chip "a
+     mano") cuando ya salió en un documento. La franja de la izquierda va
+     además del fondo: una fila atrasada pinta el suyo encima, y ahí sigue
+     siendo la franja la que dice que esa factura lleva algo cambiado. */
+  tr.fila-cambio-sin-llenar td { background:#f3e8fd; }
+  tr.fila-cambio-sin-llenar td:first-child { box-shadow:inset 4px 0 0 #7e3ff2; }
+  tr.fila-cambiada td { background:#eaf6ec; }
+  tr.fila-cambiada td:first-child { box-shadow:inset 4px 0 0 #2e7d32; }
   /* Filas de un grupo atrasado (2026-08-08, pedido del usuario): amarillo
      suave, visible contra el blanco pero sin el tono resaltador que cansa la
      vista. El separador de fecha comparte la familia ámbar, un paso más
@@ -10359,6 +10370,13 @@ const chipDespacho = (f) =>
 // Líneas con cantidad o descuento puestos a mano en el detalle (2026-07-29).
 // Una factura tocada a última hora no se puede llenar sin que se note: el chip
 // dice cuántas líneas llevan algo distinto de lo que calculó el sistema.
+// El color permanente de la fila (2026-09-10, pedido del usuario): una factura
+// con un cambio a mano se reconoce sin abrirla, y no es lo mismo la que todavía
+// espera a llenarse con ese cambio que la que ya salió con él.
+const claseCambio = (f) =>
+  f.ajustes_sin_llenar ? "fila-cambio-sin-llenar"
+  : f.ajustes_manuales ? "fila-cambiada" : "";
+
 const chipAjustes = (f) =>
   f.ajustes_manuales
     ? ` <span class="chip ajustada" title="${esc(
@@ -10525,8 +10543,13 @@ const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 // sabe quien la pinta, no esta función (2026-08-28).
 function filaDetalle(f, clases = "", tituloAtraso = TITULO_PEDIDO_VIEJO) {
   const viejo = clases.includes("fila-atrasada") ? `${tituloAtraso} ` : "";
+  // El color de la fila se explica en su hover, que es donde se pregunta por él.
+  const cambio = clases.includes("fila-cambio-sin-llenar")
+    ? "Tiene cambios a mano que todavía no se han llenado. "
+    : clases.includes("fila-cambiada")
+    ? "Se llenó con cambios a mano. " : "";
   return ` class="${(clases + " abre-detalle").trim()}"`
-    + ` title="${viejo}Clic para ver el detalle del pedido"`
+    + ` title="${viejo}${cambio}Clic para ver el detalle del pedido"`
     + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
         f.tiene_detalle === false ? ",true" : ""})"`;
 }
@@ -10745,10 +10768,15 @@ async function guardarYSalirDetalle() {
 // "Descartar cambios": repone línea por línea lo que había al abrir la ventana
 // (cantidad con su origen, descuento y la decisión del producto repetido) y
 // vuelve. Solo se manda lo que de verdad cambió.
-async function descartarCambiosDetalle() {
+// `boton` y `cerrar` (2026-09-10): el mismo trabajo se pide desde el pie —una
+// salida, cierra— y desde el botón del aviso, que deshace y deja la ventana
+// abierta con los valores del sistema ya repuestos a la vista.
+const deshacerCambiosDetalle = (btn) => descartarCambiosDetalle(btn, false);
+
+async function descartarCambiosDetalle(boton = $("detalle-descartar"), cerrar = true) {
   const clave = detalleAbierto;
   const foto = detalleOriginal;
-  const boton = $("detalle-descartar");
+  const etiqueta = boton.textContent;
   boton.disabled = true;
   boton.textContent = "Deshaciendo…";
   await Promise.all(detalleAjustesEnVuelo);   // no pisar con lo viejo un ajuste que aún viaja
@@ -10787,7 +10815,7 @@ async function descartarCambiosDetalle() {
     // No se pudo deshacer: la ventana NO se cierra — el operador tiene que
     // enterarse de que sus números siguen puestos.
     boton.disabled = false;
-    boton.textContent = "Descartar cambios";
+    boton.textContent = etiqueta;
     // Al estado, no al nodo: la recarga de abajo rehace el cuerpo y borraría
     // el motivo escrito directamente en la cajita.
     detalleErrorAjuste[clave] = `No se pudieron deshacer los cambios: ${e.message}`;
@@ -10795,8 +10823,10 @@ async function descartarCambiosDetalle() {
     return;
   }
   boton.disabled = false;
-  boton.textContent = "Descartar cambios";
-  cerrarDetalle();
+  boton.textContent = etiqueta;
+  detalleSinGuardar = false;   // ya no queda nada que guardar
+  if (cerrar) cerrarDetalle();
+  else await cargarDetalle(...partesDeClave(clave));   // sin el aviso y con lo automático
   cargar();     // el chip de "a mano" de la fila vuelve a su cuenta
 }
 
@@ -10961,11 +10991,11 @@ function pintarBotonDetalle() {
   // reemplaza por las dos salidas que sí lo dicen. Ya guardados pero sin llenar
   // (2026-09-09): "Volver" vuelve —los cambios quedan esperando en la factura—
   // y "Descartar" sigue a mano para deshacerlos.
-  const pendientes = hayAjustesSinLlenar(detalleDatos[detalleAbierto]);
+  // Lo ya guardado y sin llenar tiene su propio botón de deshacer, en el aviso
+  // de la ventana (2026-09-10): el pie no lo repite.
   $("detalle-volver").style.display = detalleSinGuardar ? "none" : "";
   $("detalle-guardar").style.display = detalleSinGuardar ? "" : "none";
-  $("detalle-descartar").style.display =
-    (detalleSinGuardar || detalleTocado || pendientes) ? "" : "none";
+  $("detalle-descartar").style.display = detalleSinGuardar ? "" : "none";
 }
 
 // Cambios a mano guardados con los que todavía no salió ningún documento
@@ -11131,11 +11161,14 @@ function contenidoDetalle(clave) {
   // Guardado pero sin llenar (2026-09-09, pedido del usuario): la diferencia no
   // se da por buena hasta que salga en un documento. Hecho + consecuencia + las
   // dos salidas que tiene, que son las del pie de esta misma ventana.
+  // El botón de deshacer va DENTRO del aviso (2026-09-10, pedido del usuario):
+  // deshacer no es editar, así que no pasa por "Habilitar edición" ni obliga a
+  // bajar la vista hasta el pie — está donde se lee el problema.
   const pendiente = hayAjustesSinLlenar(d)
-    ? `<div class="det-nota alerta">Hay cambios a mano guardados que todavía no
-        se han llenado: se escriben en el documento al llenar esta factura.
-        Mientras no la llenes quedan aquí, o los deshaces con «Descartar
-        cambios».</div>` : "";
+    ? `<div class="det-nota alerta">Esta factura tiene cambios a mano que todavía
+        no se han llenado: se escriben en el documento cuando la llenes.
+        <button type="button" onclick="deshacerCambiosDetalle(this)"
+                title="Devuelve las cantidades y los descuentos que calculó el sistema.">Deshacer cambios</button></div>` : "";
   return `
     ${nota}${pendiente}
     <table><thead><tr>
@@ -11481,8 +11514,8 @@ function avisoPendientesVacio() {
 // lado de los botones, como en PROCESADAS.
 function filaPendiente(f, enFamilia, atrasada = false) {
   const clave = esc(`${f.pedido_id}|${f.parte}`);
-  const clases = [enFamilia ? "fam-parte" : "", atrasada ? "fila-atrasada" : ""]
-    .filter(Boolean).join(" ");
+  const clases = [enFamilia ? "fam-parte" : "", atrasada ? "fila-atrasada" : "",
+                  claseCambio(f)].filter(Boolean).join(" ");
   return `
     <tr${filaDetalle(f, clases, TITULO_PEDIDO_FECHA_INUSUAL)} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
@@ -11859,7 +11892,8 @@ function pintarLlenadosPorRevisar(lista) {
            onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Marcar como procesada</button>
          <button class="peligro" onclick="descartar('${esc(f.pedido_id)}',${f.parte})">Descartar</button>`;
     return `
-    <tr${filaDetalle(f, atrasada ? "fila-atrasada" : "")}>
+    <tr${filaDetalle(f, [atrasada ? "fila-atrasada" : "", claseCambio(f)]
+                        .filter(Boolean).join(" "))}>
       <td>${esc(f.pedido_id)}${f.total_partes > 1
         ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
       <td>${celdaCliente(f)}</td>
@@ -12206,7 +12240,8 @@ function filaProcesada(f, enFamilia) {
       </td>
     </tr>` : "";
   return `
-    <tr${filaDetalle(f, enFamilia ? "fam-parte" : "")} data-factura-key="${clave}">
+    <tr${filaDetalle(f, [enFamilia ? "fam-parte" : "", claseCambio(f)]
+                        .filter(Boolean).join(" "))} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
       <td>${enFamilia ? "" : esc(nombreRuta(f.ruta || ""))}</td>
