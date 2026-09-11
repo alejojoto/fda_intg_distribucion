@@ -10810,10 +10810,54 @@ async function guardarYSalirDetalle() {
 // "Descartar cambios": repone línea por línea lo que había al abrir la ventana
 // (cantidad con su origen, descuento y la decisión del producto repetido) y
 // vuelve. Solo se manda lo que de verdad cambió.
-// `boton` y `cerrar` (2026-09-10): el mismo trabajo se pide desde el pie —una
-// salida, cierra— y desde el botón del aviso, que deshace y deja la ventana
-// abierta con los valores del sistema ya repuestos a la vista.
-const deshacerCambiosDetalle = (btn) => descartarCambiosDetalle(btn, false);
+// Es la salida del pie: cierra. El botón del aviso NO pasa por aquí — devuelve
+// a lo automático con volverTodoAutomatico, que no repone ajustes firmes.
+// "Deshacer cambios" del aviso: devuelve a lo automático TODAS las líneas que
+// hoy tienen algo puesto a mano, firme o no. Distinto del "Descartar cambios"
+// del pie, que repone la foto de apertura: para esa foto un ajuste ya llenado
+// es un valor al que volver, y aquí es justo lo que se quiere quitar.
+async function volverTodoAutomatico(boton) {
+  const clave = detalleAbierto;
+  const etiqueta = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = "Deshaciendo…";
+  await Promise.all(detalleAjustesEnVuelo);   // no pisar con lo viejo un ajuste que aún viaja
+  const [pedidoId, parte] = partesDeClave(clave);
+  try {
+    for (const l of lineasAjustadas(detalleDatos[clave]))
+      await api("/api/factura/ajuste-linea", {
+        pedido_id: pedidoId, parte, codigo_winledger: l.codigo_winledger,
+        quitar: true,
+      });
+  } catch (e) {
+    // No se pudo deshacer: la ventana se queda con el motivo a la vista — el
+    // operador tiene que enterarse de que sus números siguen puestos.
+    boton.disabled = false;
+    boton.textContent = etiqueta;
+    detalleErrorAjuste[clave] = `No se pudieron deshacer los cambios: ${e.message}`;
+    await cargarDetalle(pedidoId, parte);
+    return;
+  }
+  boton.disabled = false;
+  boton.textContent = etiqueta;
+  detalleSinGuardar = false;   // ya no queda nada que guardar
+  // La foto de apertura se rehace con lo que quedó: si no, "Descartar cambios"
+  // del pie repondría justo lo que se acaba de deshacer.
+  detalleOriginal = null;
+  await cargarDetalle(pedidoId, parte);
+  cargar();     // el chip de "a mano" de la fila vuelve a su cuenta
+}
+
+// Deshacer se confirma en el sitio (2026-09-11, pedido del usuario), con la
+// misma pregunta que el resto del panel: devuelve al automático números que el
+// operador tecleó, y un clic distraído no puede llevárselos. Sin vencimiento,
+// como la de la cantidad despachada — decidir qué se factura se piensa.
+function pedirDeshacerDetalle(btn) {
+  detalleConfirmando = true;
+  confirmarSinQuitar(btn, () => volverTodoAutomatico(btn), "Confirmar deshacer",
+                     () => { detalleConfirmando = false; retomarRepinteDetalle(); },
+                     true);
+}
 
 async function descartarCambiosDetalle(boton = $("detalle-descartar"), cerrar = true) {
   const clave = detalleAbierto;
@@ -11044,8 +11088,15 @@ function pintarBotonDetalle() {
 // (2026-09-09, pedido del usuario): la diferencia solo se da por firme cuando
 // hay un llenado hecho con ella. En una factura cerrada no aplica — lo que se
 // mira ahí es la foto de lo que se facturó.
-const hayAjustesSinLlenar = (d) =>
-  !!(d && d.editable && (d.lineas || []).some(l => l.ajuste && !l.ajuste.llenado));
+// Líneas con cantidad o descuento puestos a mano. La ventana tiene que poder
+// devolverlas a lo automático SIEMPRE que existan, no solo mientras el cambio
+// esté sin llenar (2026-09-11, pedido del usuario): un ajuste ya firme se
+// seguía escribiendo en cada documento y el aviso que ofrece deshacerlo ya no
+// salía, así que la única vuelta atrás era teclear el valor del sistema línea
+// por línea. Un ajuste sin cantidad ni descuento no existe — el panel lo borra
+// entero (ver api_factura_ajuste_linea).
+const lineasAjustadas = (d) =>
+  (d && d.editable ? (d.lineas || []) : []).filter(l => l.ajuste);
 
 // El botón de llenar: la etiqueta de llenadoDirecto con el mismo candado de la
 // tasa que el lote (2026-07-31, regla del usuario) — sin la tasa del día no se
@@ -11202,15 +11253,24 @@ function contenidoDetalle(clave) {
       : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
   // Guardado pero sin llenar (2026-09-09, pedido del usuario): la diferencia no
   // se da por buena hasta que salga en un documento. Hecho + consecuencia + las
-  // dos salidas que tiene, que son las del pie de esta misma ventana.
+  // dos salidas que tiene, que son las del pie de esta misma ventana. Ya
+  // llenado el aviso cambia de texto y deja el ámbar: no hay nada que decidir
+  // antes de llenar, pero el cambio sigue puesto y vuelve a escribirse.
   // El botón de deshacer va DENTRO del aviso (2026-09-10, pedido del usuario):
   // deshacer no es editar, así que no pasa por "Habilitar edición" ni obliga a
-  // bajar la vista hasta el pie — está donde se lee el problema.
-  const pendiente = hayAjustesSinLlenar(d)
-    ? `<div class="det-nota alerta">Esta factura tiene cambios a mano que todavía
-        no se han llenado: se escriben en el documento cuando la llenes.
-        <button type="button" onclick="deshacerCambiosDetalle(this)"
-                title="Devuelve las cantidades y los descuentos que calculó el sistema.">Deshacer cambios</button></div>` : "";
+  // bajar la vista hasta el pie — está donde se lee el problema. Sin el rol
+  // Editor el aviso informa y no ofrece el botón: el panel rechazaría el
+  // cambio igual (ver api_factura_ajuste_linea).
+  const ajustadas = lineasAjustadas(d);
+  const sinLlenar = ajustadas.some(l => !l.ajuste.llenado);
+  const pendiente = !ajustadas.length ? "" : `
+    <div class="det-nota${sinLlenar ? " alerta" : ""}">${sinLlenar
+      ? `Esta factura tiene cambios a mano que todavía no se han llenado: se
+         escriben en el documento cuando la llenes.`
+      : `Esta factura tiene cambios a mano que ya salieron en un documento: si
+         vuelves a llenarla, se escriben otra vez.`}
+      ${d.puede_editar ? `<button type="button" onclick="pedirDeshacerDetalle(this)"
+          title="Devuelve las cantidades y los descuentos que calculó el sistema.">Deshacer cambios</button>` : ""}</div>`;
   return `
     ${nota}${pendiente}
     <table><thead><tr>
