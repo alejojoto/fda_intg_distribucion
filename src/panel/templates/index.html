@@ -535,11 +535,14 @@
   tr.fila-cambio-sin-llenar td:first-child { box-shadow:inset 4px 0 0 #7e3ff2; }
   tr.fila-cambiada td { background:#eaf6ec; }
   tr.fila-cambiada td:first-child { box-shadow:inset 4px 0 0 #2e7d32; }
-  /* Pedido de un cliente que no factura (2026-09-11): la fila va en gris
-     porque no hay nada que hacer con ella; el color del tipo vive en la franja
-     y en la pastilla, que es lo que dice por qué está ahí. */
-  tr.fila-sin-factura td { background:#f7f8fa; color:#475467; }
-  tr.fila-sin-factura.tipo-prueba td:first-child { box-shadow:inset 4px 0 0 #7c3aed; }
+  /* Pedido de un cliente que no factura (2026-09-11, colores pedidos por el
+     usuario): la fila entera lleva el color de su tipo —rojo el de prueba,
+     cian el especial— para reconocerse de lejos en una lista larga. El gris de
+     la primera versión se perdía entre las filas normales. La franja del borde
+     y la pastilla repiten ese mismo color. */
+  tr.fila-sin-factura.tipo-prueba td { background:#fde7e5; }
+  tr.fila-sin-factura.tipo-prueba td:first-child { box-shadow:inset 4px 0 0 #d92d20; }
+  tr.fila-sin-factura.tipo-especial td { background:#cbf3fb; }
   tr.fila-sin-factura.tipo-especial td:first-child { box-shadow:inset 4px 0 0 #0891b2; }
   /* Filas de un grupo atrasado (2026-08-08, pedido del usuario): amarillo
      suave, visible contra el blanco pero sin el tono resaltador que cansa la
@@ -584,7 +587,7 @@
   .chip.descartada { background:#eaecf0; color:var(--mut); }
   /* Pedidos que NO se facturan (2026-09-11): el color separa de un vistazo el
      ensayo del cliente de verdad al que se le factura por otra vía. */
-  .chip.no_factura_prueba { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; }
+  .chip.no_factura_prueba { background:#fee4e2; color:#b42318; border:1px solid #fda29b; }
   .chip.no_factura_especial { background:#cffafe; color:#155e75; border:1px solid #a5f3fc; }
   /* TEMPORAL (2026-07-22): factura vieja que NO pasó por el asistente — la
      factura una persona a mano. Azul apagado: no es un logro del sistema
@@ -1322,7 +1325,7 @@
      leer. El corte los separa de lo que sí factura. */
   .seg-btn.seg-aparte { flex:0 0 auto; }
   .seg-btn.seg-corte { border-left:2px solid #98a2b3; }
-  .seg-btn.activa.seg-prueba { background:#6b21a8; }
+  .seg-btn.activa.seg-prueba { background:#b42318; }
   .seg-btn.activa.seg-especial { background:#0e7490; }
   .editor-acciones { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
   /* Ventana de UN cliente (Clientes y sucursales -> Editar): su nombre, sus
