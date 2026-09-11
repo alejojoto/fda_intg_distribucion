@@ -767,20 +767,12 @@
   /* El grupo por el que va el llenado AHORA. Anillo por sombra y no por borde
      más grueso: así el resalte no mueve ni un pixel a las cajitas vecinas. */
   .cajita.actual { border-color:#1d4ed8; box-shadow:0 0 0 2px rgba(29,78,216,.18); }
-  /* El producto en curso se queda con lo que sobre de la fila y recorta con
-     elipsis. La base es 0 y no `auto`: con `auto` un nombre largo pide su
-     ancho de contenido, se pasa de los 560 px fijos de la caja flotante y la
-     cajita se va a un renglón propio, empujando los grupos fuera de la caja. */
-  #info-producto-caja { flex:1 1 0; min-width:0; }
-  /* Solo el NOMBRE se recorta: la cantidad y el descuento quedan clavados a
-     la derecha. Un producto de nombre largo no puede dejar sin ver los dos
-     numeros con los que se coteja el renglon en pantalla. */
-  #info-producto { display:flex; gap:5px; min-width:0; white-space:nowrap; }
-  #info-producto .ip-nom { flex:0 1 auto; min-width:0;
-                           overflow:hidden; text-overflow:ellipsis; }
-  #info-producto .ip-extra { flex:none; font-weight:400; color:var(--mut); }
-  #info-producto .ip-pct { flex:none; color:#047857; }
-  #llenado-info .cj-salto { flex-basis:100%; height:0; }
+  /* Cuánto lleva el grupo de cada presentación (2026-09-11, pedido del
+     usuario): la cuenta de líneas sola no dice si son kilos o paquetes, y en
+     este catálogo el mismo producto tiene artículo distinto para cada una. En
+     un tercer renglón de la cajita y en letra chica: puesto al lado de la
+     cuenta ensanchaba los grupos hasta sacarlos de los 560 px de la caja. */
+  .cajita .cj-uni { font-size:10px; color:var(--mut); white-space:nowrap; }
   /* Los grupos van juntos y despegados de serie/fecha/línea: son otra cosa. */
   #info-grupos { display:flex; flex-wrap:wrap; gap:6px; margin-left:6px; }
   /* Hover de un grupo: qué cantidad y qué descuento toca a cada producto.
@@ -2615,16 +2607,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <span class="cj-val" id="info-fecha">—</span></div>
       <div class="cajita" id="info-linea-caja" style="display:none">
         <span class="cj-rot">Línea</span><span class="cj-val" id="info-linea">—</span></div>
-      <!-- Qué producto está entrando AHORA (2026-09-10, pedido del usuario):
-           código y nombre juntos, con la cantidad y el descuento de esa línea,
-           para poder cotejarlo contra el renglón que se escribe en la Ficha. -->
-      <div class="cajita" id="info-producto-caja" style="display:none">
-        <span class="cj-rot">Producto</span>
-        <span class="cj-val" id="info-producto">—</span></div>
-      <!-- Los grupos arrancan siempre en su propio renglón: compartiendo fila
-           con el producto, un nombre largo los correría de sitio en cada
-           línea. -->
-      <div class="cj-salto"></div>
       <div id="info-grupos"></div>
     </div>
     <div id="seguridad">
@@ -4973,21 +4955,6 @@ function pintarInfoLlenado() {
   // aparece con la primera línea de verdad.
   $("info-linea-caja").style.display = hayLineas && av.linea ? "" : "none";
   if (hayLineas && av.linea) $("info-linea").textContent = `${av.linea} de ${av.total}`;
-  // El producto que entra AHORA (2026-09-10, pedido del usuario). Lo resuelve
-  // el servidor y no el índice: tras un reintento al final la lista se
-  // reordena y la posición ya no señala la misma línea. El `title` devuelve el
-  // nombre completo cuando la cajita lo recortó.
-  const prod = hayLineas ? av.producto_actual : null;
-  $("info-producto-caja").style.display = prod ? "" : "none";
-  if (prod) {
-    const cod = prod.codigo || "";
-    const nom = prod.producto || "";
-    const rotulo = cod && nom ? `${cod} · ${nom}` : (cod || nom || "—");
-    $("info-producto").innerHTML = `<span class="ip-nom">${esc(rotulo)}</span>`
-      + `<span class="ip-extra">· ${fmtCantidad(prod.cantidad)}</span>`
-      + (prod.descuento ? `<span class="ip-pct">${pctCorto(prod.descuento)}%</span>` : "");
-    $("info-producto-caja").title = rotulo;
-  }
   // Hover de cada grupo: sus productos con cantidad y descuento (2026-07-31).
   // Sale de las mismas líneas que ya viajan en el avance; con un servidor
   // viejo que no las mande, simplemente no hay hover.
@@ -5012,10 +4979,16 @@ function pintarInfoLlenado() {
       <div class="tp-fila"><span class="tp-nom">${esc(l.producto || l.codigo || "")}</span>
         <span class="tp-cant">${fmtCantidad(l.cantidad)}</span>${!conDescuento ? "" : `
         <span class="tp-pct">${l.descuento ? `${pctCorto(l.descuento)}%` : "—"}</span>`}</div>`).join("");
+    // Kilos y paquetes del grupo (2026-09-11, pedido del usuario). Se omite
+    // la presentación que no trae nada: el grupo que es todo paquetes no
+    // gana nada con un "0 kg".
+    const unidades = [g.paq ? `${fmtCantidad(g.paq)} paq` : "",
+                      g.kg ? `${fmtCantidad(g.kg)} kg` : ""].filter(Boolean).join(" · ");
     return `<div class="${clases.join(" ")}">
       <span class="cj-rot">${esc(g.nombre)}</span>
       <span class="cj-val">${g.lineas}${
         desc ? ` · <span class="cj-pct">${esc(desc)}</span>` : ""}</span>
+      ${unidades ? `<span class="cj-uni">${esc(unidades)}</span>` : ""}
       ${filasTip ? `<div class="cj-tip">${filasTip}</div>` : ""}
     </div>`;
   }).join("");
@@ -13006,6 +12979,17 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // segundos y la factura quedaba a medias; ahora espera el clic, sin plazo.
     pide_foco: `Haz clic en la ventana del programa de facturación: el llenado sigue solo en cuanto esté al frente.`,
   };
+  // "Llenando <pedido> — <código> · <producto>" (2026-09-11, pedido del
+  // usuario): el artículo que entra AHORA va en esta línea y no en una cajita
+  // porque es el único sitio de la caja flotante (560 px de ancho) donde el
+  // nombre completo cabe entero. Sin producto todavía, el texto es el de
+  // siempre.
+  const textoDeFase = (f) => {
+    const p = f.fase === "lineas" && f.avance ? f.avance.producto_actual : null;
+    if (!p) return TEXTO_FASE[f.fase];
+    const producto = [p.codigo, p.producto].filter(Boolean).join(" · ");
+    return `Llenando ${refFactura(pedido_id, parte)} — ${producto}…`;
+  };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
   // si se reinicia) y el aviso "no tocar" se esconde. 'preparando_datos' entra
@@ -13058,7 +13042,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // puesta a punto hay pasos largos —cancelar el documento sin terminar—
         // que el texto genérico de la fase no distingue, y son justo los que
         // parecen colgados desde afuera.
-        mensaje(enFilaPrefijo() + (f.detalle || TEXTO_FASE[f.fase])
+        mensaje(enFilaPrefijo() + (f.detalle || textoDeFase(f))
                 + (pausaPedida && f.fase !== "pausado"
                    ? " Pausa pedida: se detiene al terminar el paso en curso." : ""),
                 "info",
