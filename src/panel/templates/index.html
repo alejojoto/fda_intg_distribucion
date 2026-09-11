@@ -12979,16 +12979,17 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // segundos y la factura quedaba a medias; ahora espera el clic, sin plazo.
     pide_foco: `Haz clic en la ventana del programa de facturación: el llenado sigue solo en cuanto esté al frente.`,
   };
-  // "Llenando <pedido> — <código> · <producto>" (2026-09-11, pedido del
-  // usuario): el artículo que entra AHORA va en esta línea y no en una cajita
-  // porque es el único sitio de la caja flotante (560 px de ancho) donde el
-  // nombre completo cabe entero. Sin producto todavía, el texto es el de
+  // Mientras se llenan las líneas, esta línea es el PRODUCTO que entra ahora
+  // —código y nombre juntos—, en lugar de "Llenando <pedido>…" (2026-09-11,
+  // pedido del usuario). Va aquí y no en una cajita porque es el único sitio
+  // de la caja flotante (560 px de ancho) donde el nombre completo cabe
+  // entero; qué factura se llena sigue a la vista en el título de la ventana.
+  // Sin producto todavía (antes de la primera línea), el texto es el de
   // siempre.
   const textoDeFase = (f) => {
     const p = f.fase === "lineas" && f.avance ? f.avance.producto_actual : null;
     if (!p) return TEXTO_FASE[f.fase];
-    const producto = [p.codigo, p.producto].filter(Boolean).join(" · ");
-    return `Llenando ${refFactura(pedido_id, parte)} — ${producto}…`;
+    return `${[p.codigo, p.producto].filter(Boolean).join(" · ")}…`;
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
