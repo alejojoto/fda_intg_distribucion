@@ -767,6 +767,12 @@
   /* El grupo por el que va el llenado AHORA. Anillo por sombra y no por borde
      más grueso: así el resalte no mueve ni un pixel a las cajitas vecinas. */
   .cajita.actual { border-color:#1d4ed8; box-shadow:0 0 0 2px rgba(29,78,216,.18); }
+  /* Cuánto lleva el grupo de cada presentación (2026-09-11, pedido del
+     usuario): la cuenta de líneas sola no dice si son kilos o paquetes, y en
+     este catálogo el mismo producto tiene artículo distinto para cada una. En
+     un tercer renglón de la cajita y en letra chica: puesto al lado de la
+     cuenta ensanchaba los grupos hasta sacarlos de los 560 px de la caja. */
+  .cajita .cj-uni { font-size:10px; color:var(--mut); white-space:nowrap; }
   /* Los grupos van juntos y despegados de serie/fecha/línea: son otra cosa. */
   #info-grupos { display:flex; flex-wrap:wrap; gap:6px; margin-left:6px; }
   /* Hover de un grupo: qué cantidad y qué descuento toca a cada producto.
@@ -4961,10 +4967,16 @@ function pintarInfoLlenado() {
       <div class="tp-fila"><span class="tp-nom">${esc(l.producto || l.codigo || "")}</span>
         <span class="tp-cant">${fmtCantidad(l.cantidad)}</span>${!conDescuento ? "" : `
         <span class="tp-pct">${l.descuento ? `${pctCorto(l.descuento)}%` : "—"}</span>`}</div>`).join("");
+    // Kilos y paquetes del grupo (2026-09-11, pedido del usuario). Se omite
+    // la presentación que no trae nada: el grupo que es todo paquetes no
+    // gana nada con un "0 kg".
+    const unidades = [g.paq ? `${fmtCantidad(g.paq)} paq` : "",
+                      g.kg ? `${fmtCantidad(g.kg)} kg` : ""].filter(Boolean).join(" · ");
     return `<div class="${clases.join(" ")}">
       <span class="cj-rot">${esc(g.nombre)}</span>
       <span class="cj-val">${g.lineas}${
         desc ? ` · <span class="cj-pct">${esc(desc)}</span>` : ""}</span>
+      ${unidades ? `<span class="cj-uni">${esc(unidades)}</span>` : ""}
       ${filasTip ? `<div class="cj-tip">${filasTip}</div>` : ""}
     </div>`;
   }).join("");
@@ -5392,7 +5404,7 @@ function pintarResumenFinal() {
           <td>${esc(l.producto || l.codigo || "")}${
             motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>`
             : l.al_final ? `<div class="fl-final">Se agregó al final: no entró cuando le tocaba.</div>` : ""}</td>
-          <td class="vp-num">${fmtCantidad(l.cantidad)}</td>
+          <td class="vp-num">${fmtCantidad(l.cantidad)} ${esc(l.unidad || "paq")}</td>
           <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
       }).join("")}</tbody></table>`;
@@ -12629,6 +12641,19 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // segundos y la factura quedaba a medias; ahora espera el clic, sin plazo.
     pide_foco: `Haz clic en la ventana del programa de facturación: el llenado sigue solo en cuanto esté al frente.`,
   };
+  // Mientras se llenan las líneas, esta línea es el PRODUCTO que entra ahora
+  // —código y nombre juntos—, en lugar de "Llenando <pedido>…" (2026-09-11,
+  // pedido del usuario). Va aquí y no en una cajita porque es el único sitio
+  // de la caja flotante (560 px de ancho) donde el nombre completo cabe
+  // entero; qué factura se llena sigue a la vista en el título de la ventana.
+  // Sin producto todavía (antes de la primera línea), el texto es el de
+  // siempre.
+  const textoDeFase = (f) => {
+    const p = f.fase === "lineas" && f.avance ? f.avance.producto_actual : null;
+    if (!p) return TEXTO_FASE[f.fase];
+    return `${[p.codigo, p.producto].filter(Boolean).join(" · ")}`
+      + ` · ${fmtCantidad(p.cantidad)} ${p.unidad || "paq"}…`;
+  };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
   // si se reinicia) y el aviso "no tocar" se esconde. 'preparando_datos' entra
@@ -12677,7 +12702,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // (espera de la impresión, pausa), no el programa. Con la pausa PEDIDA
         // y el llenado todavía andando se anuncia que va a parar: si no, pulsar
         // ⏸ parecería no hacer nada mientras termina el paso en curso.
-        mensaje(enFilaPrefijo() + TEXTO_FASE[f.fase]
+        mensaje(enFilaPrefijo() + textoDeFase(f)
                 + (pausaPedida && f.fase !== "pausado"
                    ? " Pausa pedida: se detiene al terminar el paso en curso." : ""),
                 "info",
