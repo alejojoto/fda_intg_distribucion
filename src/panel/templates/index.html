@@ -535,6 +535,12 @@
   tr.fila-cambio-sin-llenar td:first-child { box-shadow:inset 4px 0 0 #7e3ff2; }
   tr.fila-cambiada td { background:#eaf6ec; }
   tr.fila-cambiada td:first-child { box-shadow:inset 4px 0 0 #2e7d32; }
+  /* Pedido de un cliente que no factura (2026-09-11): la fila va en gris
+     porque no hay nada que hacer con ella; el color del tipo vive en la franja
+     y en la pastilla, que es lo que dice por qué está ahí. */
+  tr.fila-sin-factura td { background:#f7f8fa; color:#475467; }
+  tr.fila-sin-factura.tipo-prueba td:first-child { box-shadow:inset 4px 0 0 #7c3aed; }
+  tr.fila-sin-factura.tipo-especial td:first-child { box-shadow:inset 4px 0 0 #0891b2; }
   /* Filas de un grupo atrasado (2026-08-08, pedido del usuario): amarillo
      suave, visible contra el blanco pero sin el tono resaltador que cansa la
      vista. El separador de fecha comparte la familia ámbar, un paso más
@@ -576,6 +582,10 @@
   .chip.completada { background:#d1fadf; color:var(--ok); }
   .chip.error_llenado { background:#fee4e2; color:var(--err); }
   .chip.descartada { background:#eaecf0; color:var(--mut); }
+  /* Pedidos que NO se facturan (2026-09-11): el color separa de un vistazo el
+     ensayo del cliente de verdad al que se le factura por otra vía. */
+  .chip.no_factura_prueba { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; }
+  .chip.no_factura_especial { background:#cffafe; color:#155e75; border:1px solid #a5f3fc; }
   /* TEMPORAL (2026-07-22): factura vieja que NO pasó por el asistente — la
      factura una persona a mano. Azul apagado: no es un logro del sistema
      (verde = lista) ni un problema (rojo), es "esto no es trabajo de aquí". */
@@ -1307,6 +1317,13 @@
   .seg-btn + .seg-btn { border-left:1px solid #cbd2dc; }
   .seg-btn:hover:not(:disabled) { background:#f4f6f9; }
   .seg-btn.activa { background:#1d4ed8; color:#fff; font-weight:600; }
+  /* Los tipos que no facturan (2026-09-11): van al final, sin robarle ancho a
+     las opciones de todos los días, y elegidos se reconocen por su color sin
+     leer. El corte los separa de lo que sí factura. */
+  .seg-btn.seg-aparte { flex:0 0 auto; }
+  .seg-btn.seg-corte { border-left:2px solid #98a2b3; }
+  .seg-btn.activa.seg-prueba { background:#6b21a8; }
+  .seg-btn.activa.seg-especial { background:#0e7490; }
   .editor-acciones { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
   /* Ventana de UN cliente (Clientes y sucursales -> Editar): su nombre, sus
      marcas y sus sucursales dejan de pisar la lista. Va por DEBAJO del editor
@@ -10686,6 +10703,9 @@ const botonVolverALlenar = (f) =>
   `<button onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`;
 
 function accionesDeFila(f) {
+  // Pedido de un cliente que no factura: no hay nada que llenar, reabrir ni
+  // descartar — la fila es constancia, no trabajo.
+  if (f.sin_factura) return "";
   const id = esc(f.pedido_id);
   // Pendiente vieja fuera de la ventana (fila VIRTUAL, sin registro local): no
   // hay nada que reabrir, va directo a su prellenado.
@@ -10828,6 +10848,11 @@ const chipDespacho = (f) =>
 const claseCambio = (f) =>
   f.ajustes_sin_llenar ? "fila-cambio-sin-llenar"
   : f.ajustes_manuales ? "fila-cambiada" : "";
+
+// Pedido de un cliente que no factura (2026-09-11): la fila lo dice con su
+// franja de color, distinta según sea de prueba o especial.
+const claseSinFactura = (f) =>
+  f.sin_factura ? `fila-sin-factura tipo-${f.sin_factura}` : "";
 
 const chipAjustes = (f) =>
   f.ajustes_manuales
@@ -10994,6 +11019,11 @@ const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 // `tituloAtraso` es el motivo del ámbar en esa lista: por qué está resaltada lo
 // sabe quien la pinta, no esta función (2026-08-28).
 function filaDetalle(f, clases = "", tituloAtraso = TITULO_PEDIDO_VIEJO) {
+  // Pedido de un cliente que no factura: no hay detalle que abrir — la fila
+  // existe solo para dejar constancia de que el pedido se vio y no se facturó.
+  if (f.sin_factura)
+    return ` class="${clases.trim()}" title="Este cliente no se factura desde el`
+         + ` asistente: el pedido se muestra para dejar constancia de que se vio."`;
   const viejo = clases.includes("fila-atrasada") ? `${tituloAtraso} ` : "";
   // El color de la fila se explica en su hover, que es donde se pregunta por él.
   const cambio = clases.includes("fila-cambio-sin-llenar")
@@ -12648,7 +12678,9 @@ function crearProductoDesdeRevision(i, j) {
 const ETIQUETAS_ESTADO = {completada: "lista", error_llenado: "error",
                           facturada_a_mano: "facturada a mano",
                           reservada: "apartada",
-                          llenada_prueba: "llenada en prueba"};
+                          llenada_prueba: "llenada en prueba",
+                          no_factura_prueba: "no se factura (prueba)",
+                          no_factura_especial: "no se factura (especial)"};
 const etiquetaEstado = (estado) => ETIQUETAS_ESTADO[estado] || estado;
 
 // Separadores por fecha/hora de PROCESAMIENTO (2026-08-02): la lista ya viene
@@ -12752,7 +12784,8 @@ function filaProcesada(f, enFamilia) {
       </td>
     </tr>` : "";
   return `
-    <tr${filaDetalle(f, [enFamilia ? "fam-parte" : "", claseCambio(f)]
+    <tr${filaDetalle(f, [enFamilia ? "fam-parte" : "", claseCambio(f),
+                         claseSinFactura(f)]
                         .filter(Boolean).join(" "))} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
@@ -12763,7 +12796,7 @@ function filaProcesada(f, enFamilia) {
       <td>${esc(f.serie || "")}</td>
       <td class="${f.a_mano ? "mut" : "detalle-error"}">${esc(detalle)}${
         reemisiones ? `<div class="mut">${esc(reemisiones).replaceAll("\n", "<br>")}</div>` : ""}</td>
-      <td class="mut">${esc(f.fecha_cierre || f.fecha_cargado || "")}${
+      <td class="mut">${f.sin_factura ? "" : esc(f.fecha_cierre || f.fecha_cargado || "")}${
         f.fecha_factura ? `<div>Factura: ${esc(f.fecha_factura)}</div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
@@ -17808,7 +17841,7 @@ function confirmarEnFilaEquipo(nodo, alConfirmar, etiqueta) {
 
 // Dar o quitar un rol y dejar una computadora fuera de servicio afectan a
 // OTRA máquina; con un interruptor de un clic es fácil moverlos sin querer
-// (pedido del usuario 2026-08-06). Mismo patrón que onClickEsPruebaChk: el
+// (pedido del usuario 2026-08-06). Mismo patrón que editorElegirSegmento: el
 // valor que el clic iba a dejar se lee ANTES —en un checkbox `checked` ya
 // trae el valor nuevo cuando corre el manejador, y preventDefault lo revierte
 // recién al terminar— y se repone tal cual al confirmar.
@@ -19160,19 +19193,15 @@ const CATALOGOS = {
       // ver catalogos.sembrar_clientes_desde_agromovil). Solo una entrada que
       // ni la app conoce arranca sin elegir, y de ahí depende el resto del
       // formulario (ver editorAplicarEtiquetas y los obligatorioSi de abajo).
-      // El check de prueba va PEGADO al dropdown y no como una tercera opción
-      // suya (pedido del usuario 2026-07-31): marcar prueba es raro y elegir
-      // entre tres cosas cada vez, para lo mismo de siempre, estorba. Marcado
-      // apaga el dropdown y el resto de obligatorios: ese cliente no factura.
+      // Los tipos que NO facturan (de prueba, especial) son opciones del MISMO
+      // control desde 2026-09-11: el dato es una sola columna con un valor
+      // excluyente, y con dos controles el check tenía que "mandar sobre" el
+      // segmentado — con dos tipos que no facturan esa excepción se duplicaba.
+      // Van al final y con su color, para que el caso de todos los días
+      // (cliente o sucursal) se siga eligiendo igual de rápido. Elegido uno de
+      // ellos se apagan los obligatorios y "Activo": ese cliente no factura.
       {campo: "clasificacion", etiqueta: "Qué es", obligatorio: true, origenDato: "panel",
-       opcionesDe: () => opcionesClasificacion(),
-       checkAcompanante: {campo: "es_prueba", etiqueta: "Cliente de prueba",
-         ayuda: "Marca esta entrada como cliente de prueba: sus pedidos no se facturan "
-              + "ni aparecen en revisión. No hace falta ningún código."}},
-      // Se pinta junto al dropdown de arriba (checkAcompanante), pero se declara
-      // aquí para que el guardado y la firma de cambios del editor lo vean.
-      {campo: "es_prueba", tipo: "checkbox", etiqueta: "Cliente de prueba",
-       pintadoJunto: true},
+       segmentado: true, opcionesDe: () => opcionesClasificacion()},
       {campo: "codigo_cliente_winledger", etiqueta: "Código de cliente", obligatorio: true,
        etiquetaSegun: (get) => get("clasificacion") === "sucursal"
          ? "Código del cliente principal" : "Código de cliente",
@@ -19702,10 +19731,14 @@ function clienteEsCadena(codigoCliente) {
 // pedido cae en revisión con ese motivo) hasta que alguien los clasifica.
 const esEntradaNueva = (f) => (f && f.clasificacion) === "nuevo";
 
-// Cliente de prueba (2026-07-31): lo marca una persona con el check del editor.
-// No factura nunca, así que no se le pide código ninguno ni aparece entre las
-// entradas por resolver.
+// Los dos tipos que NO facturan, elegidos por una persona en el editor: de
+// prueba (2026-07-31) y especial (2026-09-11). Ninguno factura, así que no se
+// les pide código ninguno ni aparecen entre las entradas por resolver. La
+// diferencia es de lectura: "de prueba" son datos de ensayo, "especial" es un
+// cliente de verdad al que se le factura por otra vía.
 const esClientePrueba = (f) => (f && f.clasificacion) === "prueba";
+const esClienteEspecial = (f) => (f && f.clasificacion) === "especial";
+const esClienteSinFactura = (f) => esClientePrueba(f) || esClienteEspecial(f);
 
 // Qué le falta a una entrada para poder cruzar, o "" si está completa
 // (2026-07-31, pedido del usuario). La clasificación ya llega sola del catálogo
@@ -19713,7 +19746,7 @@ const esClientePrueba = (f) => (f && f.clasificacion) === "prueba";
 // persona: sin él la entrada no cruza y su pedido espera en revisión. Devuelve
 // el texto que se le muestra al operador.
 function faltaDeEntrada(f) {
-  if (!f || esClientePrueba(f)) return "";
+  if (!f || esClienteSinFactura(f)) return "";
   if (esEntradaNueva(f)) return "Falta decir qué es";
   if (!(f.codigo_cliente_winledger || "").trim()) return "Falta el código de cliente";
   // El programa de facturación mostró un aviso al llenar con esta entrada
@@ -19738,11 +19771,12 @@ function faltaDeEntrada(f) {
 // que ahí no es adivinar: sus códigos están puestos desde hace tiempo.
 function clasificacionDe(fila) {
   if (!fila) return "";
-  if (fila.clasificacion === "cliente" || fila.clasificacion === "sucursal")
+  // Los cuatro valores que una persona pudo elegir se reflejan tal cual: desde
+  // 2026-09-11 los que no facturan también son opciones del mismo control, así
+  // que el segmento que corresponde queda marcado al abrir.
+  if (["cliente", "sucursal", "prueba", "especial"].includes(fila.clasificacion))
     return fila.clasificacion;
-  // Una de prueba tampoco trae elección: si alguien desmarca el check, el
-  // dropdown vuelve a pedirla en vez de dejar "cliente" puesto por descarte.
-  if (esEntradaNueva(fila) || esClientePrueba(fila)) return "";
+  if (esEntradaNueva(fila)) return "";
   return fila.codigo_sucursal_winledger ? "sucursal" : "cliente";
 }
 
@@ -19780,6 +19814,10 @@ function opcionesClasificacion() {
   // YA es sucursal se deja siempre, para no perder lo que la fila es hoy.
   if (actual === "sucursal" || puedeSerSucursal(fila))
     opciones.push({valor: "sucursal", etiqueta: "Sucursal de otro cliente"});
+  // Los dos que no facturan siempre están disponibles: marcar una entrada así
+  // no depende de lo que tenga puesto, justamente porque deja de importar.
+  opciones.push({valor: "prueba", etiqueta: "De prueba", aparte: true});
+  opciones.push({valor: "especial", etiqueta: "Especial", aparte: true});
   return opciones;
 }
 
@@ -20048,6 +20086,7 @@ function pintarFilasCatalogo() {
 // catálogo ahogaban a los clientes ya resueltos.
 const GRUPO_PENDIENTES = " pendientes";   // sentinela: no choca con ningún código real
 const GRUPO_PRUEBA = " prueba";
+const GRUPO_ESPECIAL = " especial";
 
 // Orden de una lista de clientes: favoritos → cadenas → resto. Lo comparten el
 // catálogo de AJUSTES y el selector de descuentos (2026-08-02, pedido del
@@ -20060,17 +20099,22 @@ function pintarClientesAgrupados(filtro) {
   catalogoFilas.forEach((f, i) => {
     const falta = faltaDeEntrada(f);
     const prueba = esClientePrueba(f);
+    const especial = esClienteEspecial(f);
+    const sinFactura = prueba || especial;
     const codigo = falta ? GRUPO_PENDIENTES
-      : prueba ? GRUPO_PRUEBA : (f.codigo_cliente_winledger || "");
+      : prueba ? GRUPO_PRUEBA
+      : especial ? GRUPO_ESPECIAL : (f.codigo_cliente_winledger || "");
     const etiqueta = falta
       ? "Entradas por resolver"
       : prueba
         ? "Clientes de prueba"
-        : `${codigo} — ${f.nombre_cliente_winledger || "(nombre no cargado)"}`;
+        : especial
+          ? "Clientes especiales"
+          : `${codigo} — ${f.nombre_cliente_winledger || "(nombre no cargado)"}`;
     if (!grupos.has(codigo))
       grupos.set(codigo, {codigo, etiqueta, favorito: !!f.favorito,
-                          sueltas: !!falta || prueba, pendientes: !!falta,
-                          prueba, filas: []});
+                          sueltas: !!falta || sinFactura, pendientes: !!falta,
+                          prueba, especial, sinFactura, filas: []});
     grupos.get(codigo).filas.push([f, i]);
   });
   // Dentro de las entradas por resolver, primero las que ya frenan pedidos
@@ -20090,10 +20134,13 @@ function pintarClientesAgrupados(filtro) {
     const auto = g.filas.length >= 2 || g.filas.some(([f]) => f.codigo_sucursal_winledger);
     g.esCadena = primera.es_cadena_manual == null ? auto : !!primera.es_cadena_manual;
   }
-  // Los clientes de prueba al final y el resto en el orden de siempre del panel
-  // (favoritos → cadenas → resto, ver rangoCliente); dentro de cada bloque manda
-  // el orden alfabético que ya trae el backend.
-  lista.sort((a, b) => (a.codigo === GRUPO_PRUEBA) - (b.codigo === GRUPO_PRUEBA)
+  // Los que no facturan cierran la lista, en orden fijo (prueba y después
+  // especial): no son parte del catálogo que se trabaja todos los días. El
+  // resto va en el orden de siempre del panel (favoritos → cadenas → resto, ver
+  // rangoCliente); dentro de cada bloque manda el orden alfabético que ya trae
+  // el backend.
+  const rangoSinFactura = (g) => g.especial ? 2 : g.prueba ? 1 : 0;
+  lista.sort((a, b) => rangoSinFactura(a) - rangoSinFactura(b)
                        || rangoCliente(a.favorito, a.esCadena)
                           - rangoCliente(b.favorito, b.esCadena));
   // Reparto en dos pestañas (pedido del usuario 2026-07-31): las entradas por
@@ -20135,7 +20182,7 @@ function pintarClientesAgrupados(filtro) {
   const catFiltroActivo = hayFiltroActivo("catalogo");
   const conteoTexto = enRevisar
     ? `${totalSucursales} entrada(s) por resolver`
-    : `${lista.filter(g => !g.prueba).length} cliente(s) · ${totalSucursales} sucursal(es)`;
+    : `${lista.filter(g => !g.sinFactura).length} cliente(s) · ${totalSucursales} sucursal(es)`;
   $("cat-conteo").innerHTML = `<span class="${catFiltroActivo ? "conteo-filtrado" : ""}">${conteoTexto}</span> ${chipFiltroActivo(catFiltroActivo)}`;
   let html = "", grupoPintado = null;
   for (const [g, par] of visibles) {
@@ -20151,7 +20198,9 @@ function pintarClientesAgrupados(filtro) {
         html += `<tr class="grupo"><td colspan="3">${enRevisar ? "" : esc(g.etiqueta)}
              <div class="mut" style="font-weight:400; max-width:62ch">${g.pendientes
                ? "Sus pedidos esperan en revisión hasta que estén completas. Lo que le falta a cada una está en su fila: el tipo lo trae la app de pedidos, pero el código de cliente se escribe aquí."
-               : "No se facturan nunca: sus pedidos se descartan sin pasar por revisión."}</div>
+               : g.especial
+                 ? "No se facturan desde aquí. Sus pedidos igual se ven en PROCESADAS, marcados especiales."
+                 : "No se facturan nunca. Sus pedidos igual se ven en PROCESADAS, marcados de prueba."}</div>
            </td></tr>`;
       }
       const [f, i] = par;
@@ -20367,7 +20416,7 @@ function filaSucursalHtml(f, i, conEditar, opciones) {
 
 // Confirmación antes de activar O desactivar una sucursal (pedido del usuario
 // 2026-08-04: el toggle de un solo clic es fácil de pasar por alto por error).
-// Mismo patrón que onClickEsPruebaChk: el clic se revierte con preventDefault
+// Mismo patrón que editorElegirSegmento: el clic se revierte con preventDefault
 // y confirmarSinQuitar dispara alternarActivoSucursal recién al confirmar.
 function onClickActivoSucursal(ev, indice) {
   ev.preventDefault();
@@ -20481,7 +20530,7 @@ function avisoActivoCliente(codigo, msg) {
 // Confirmación antes de activar O desactivar el cliente completo (pedido del
 // usuario 2026-08-04: apaga TODAS sus sucursales de un golpe y es el primer
 // control debajo del título — fácil de tocar sin querer). Mismo patrón que
-// onClickEsPruebaChk/onClickActivoSucursal.
+// editorElegirSegmento/onClickActivoSucursal.
 function onClickActivoCliente(ev, codigo) {
   ev.preventDefault();
   const filas = catalogoFilas.filter(f => (f.codigo_cliente_winledger || "") === codigo);
@@ -20739,7 +20788,6 @@ function abrirEditor(indice, prefill) {
   // se recuerda aparte (`claseActual`) porque el campo de la fila ya quedó
   // pisado con el valor normalizado.
   if (catalogoActual === "clientes") {
-    fila.es_prueba = esClientePrueba(fila) ? 1 : 0;
     editorFila.claseActual = clasificacionDe(fila);
     fila.clasificacion = editorFila.claseActual;
     // Sucursal que ya se puede colgar de un cliente resuelto: el editor abre
@@ -20770,8 +20818,6 @@ function abrirEditor(indice, prefill) {
   $("editor-origenes").style.display = leyenda ? "" : "none";
   const mezcla = origenesDeCatalogo(def).length > 1;
   $("editor-campos").innerHTML = def.campos.map(c => {
-    // Lo pinta el campo que lo acompaña (checkAcompanante), no este map.
-    if (c.pintadoJunto) return "";
     const valor = fila[c.campo];
     const chip = chipOrigen(c.origenDato, mezcla);
     // Una clave puede ser editable en algunas filas (la fecha de un feriado
@@ -20817,8 +20863,7 @@ function abrirEditor(indice, prefill) {
     // no dice.
     const opciones = c.opcionesDe ? c.opcionesDe() : c.opciones;
     if (opciones) {
-      const ac = c.checkAcompanante;
-      if (!ac) {
+      if (!c.segmentado) {
         const select = `<select id="ed-${c.campo}" ${esClave ? "disabled" : ""}>
             ${opciones.map(o => {
               const v = o.valor ?? o, txt = o.etiqueta ?? o;
@@ -20827,30 +20872,29 @@ function abrirEditor(indice, prefill) {
           </select>`;
         return `<label class="editor-campo">${linea(notaClave, tag)}${select}</label>`;
       }
-      // "Qué es" (Cliente/Sucursal): las dos opciones a la vista, no un
-      // dropdown. La opción placeholder ("— elige qué es —") no se pinta como
-      // botón: ningún segmento queda "activa" hasta que se elige una. El valor
-      // real vive en el input oculto ed-${c.campo}, que es lo que leen
-      // firmaEditorCatalogo/editorValidar/editorMarcarObligatorios — mismo
-      // contrato que tenían con el <select> que reemplaza.
+      // "Qué es": las opciones a la vista, no un dropdown. La opción placeholder
+      // ("— elige qué es —") no se pinta como botón: ningún segmento queda
+      // "activa" hasta que se elige una. El valor real vive en el input oculto
+      // ed-${c.campo}, que es lo que leen firmaEditorCatalogo/editorValidar/
+      // editorMarcarObligatorios — mismo contrato que tenían con el <select>
+      // que reemplaza. Las opciones marcadas `aparte` son los tipos que no
+      // facturan: la primera dibuja el corte con las de todos los días.
       const segmentos = opciones.filter(o => (o.valor ?? o) !== "");
+      let corteHecho = false;
       const seg = `<div class="seg-grupo" id="ed-${c.campo}-seg">
           ${segmentos.map(o => {
             const v = o.valor ?? o, txt = o.etiqueta ?? o;
-            return `<button type="button" class="seg-btn${v === valor ? " activa" : ""}"
+            let extra = "";
+            if (o.aparte) {
+              extra = ` seg-aparte seg-${esc(v)}${corteHecho ? "" : " seg-corte"}`;
+              corteHecho = true;
+            }
+            return `<button type="button" class="seg-btn${v === valor ? " activa" : ""}${extra}"
                      ${esClave ? "disabled" : ""} data-valor="${esc(v)}"
                      onclick="editorElegirSegmento('${c.campo}','${esc(v)}')">${esc(txt)}</button>`;
           }).join("")}
         </div><input type="hidden" id="ed-${c.campo}" value="${esc(valor ?? "")}">`;
-      return `<div class="editor-campo">${linea(notaClave, tag)}
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="flex:1">${seg}</div>
-          <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer"
-                 title="${esc(ac.ayuda || "")}">
-            <input type="checkbox" id="ed-${ac.campo}" ${fila[ac.campo] ? "checked" : ""}
-                   onclick="return onClickEsPruebaChk(event)">${esc(ac.etiqueta)}</label>
-        </div>
-      </div>`;
+      return `<div class="editor-campo">${linea(notaClave, tag)}${seg}</div>`;
     }
     // Sugerencias (`sugerenciasDe`): el campo se sigue tecleando libre, pero
     // ofrece la lista de lo que ya existe — así colgar una sucursal de su
@@ -20874,7 +20918,7 @@ function abrirEditor(indice, prefill) {
   editorError("");   // sin avisos de una edición anterior
   editorDerivarCampos();   // la presentación de una fila existente se pinta de una
   editorAplicarEtiquetas();   // rótulos que dependen de "Qué es"
-  editorAplicarPrueba();   // apaga el selector y los obligatorios si es de prueba
+  editorAplicarSinFactura();   // apaga los obligatorios y "Activo" si no factura
   editorAplicarVisibilidad();   // oculta campos que no aplican con el "Qué es" actual
   editorMarcarObligatorios();   // barras ámbar/azul de los obligatorios desde el arranque
   $("editor-overlay").classList.add("visible");
@@ -21122,7 +21166,7 @@ function editorMarcarObligatorios() {
   if (!def) return;
   const mezcla = origenesDeCatalogo(def).length > 1;
   const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
-  const prueba = editorEsPrueba();
+  const prueba = editorSinFactura();
   for (const c of def.campos) {
     if (c.tipo === "checkbox" || c.derivadaDe) continue;
     const el = $("ed-" + c.campo);
@@ -21175,7 +21219,7 @@ function editorValidar() {
   const def = CATALOGOS[catalogoActual];
   if (!def) return "";
   const get = campo => { const el = $("ed-" + campo); return el ? el.value.trim() : ""; };
-  const prueba = editorEsPrueba();
+  const prueba = editorSinFactura();
   for (const c of def.campos) {
     if (c.tipo === "checkbox") continue;
     if (prueba && !def.clave.includes(c.campo)) continue;
@@ -21195,27 +21239,50 @@ function editorValidar() {
   return "";
 }
 
-// ¿El editor abierto está marcado como cliente de prueba? Ese cliente no
-// factura, así que ningún código le hace falta: el dropdown se apaga y los
-// obligatorios dejan de pedirse (solo la clave sigue haciendo falta, sin ella
-// no hay a quién marcar).
-function editorEsPrueba() {
-  const el = $("ed-es_prueba");
-  return !!(el && el.checked);
+// ¿El editor abierto quedó en uno de los tipos que no facturan? Ese cliente no
+// factura, así que ningún código le hace falta: los obligatorios dejan de
+// pedirse (solo la clave sigue haciendo falta, sin ella no hay a quién marcar).
+function editorSinFactura() {
+  const el = $("ed-clasificacion");
+  return !!el && ["prueba", "especial"].includes(el.value);
 }
 
-// Botón segmentado de "Qué es" (Cliente/Sucursal, ver el render de `opciones`
-// más arriba): pinta el elegido, guarda el valor en su input oculto — de ahí
-// en más es indistinguible de lo que dejaba un <select> con su "change" — y
-// dispara la misma cadena de recálculos.
+// Botón segmentado de "Qué es" (ver el render de `opciones` más arriba): pinta
+// el elegido, guarda el valor en su input oculto — de ahí en más es
+// indistinguible de lo que dejaba un <select> con su "change" — y dispara la
+// misma cadena de recálculos.
+//
+// Cruzar la frontera entre facturar y no facturar se confirma en el sitio
+// (2026-08-04, mudado al control unificado el 2026-09-11): elegir un tipo que
+// no factura saca al cliente de facturación y volver atrás lo vuelve a meter,
+// así que los dos sentidos se confirman y ninguno sale de un clic accidental.
+// Cambiar entre "De prueba" y "Especial" no pregunta nada: ninguno factura, no
+// hay consecuencia que confirmar.
+const CLASIFICACION_NO_FACTURA = ["prueba", "especial"];
+
 function editorElegirSegmento(campo, valor) {
   const oculto = $("ed-" + campo);
   if (!oculto || oculto.disabled) return;
+  const noFactura = (v) => CLASIFICACION_NO_FACTURA.includes(v);
+  const grupo = $("ed-" + campo + "-seg");
+  const boton = grupo && grupo.querySelector(`.seg-btn[data-valor="${valor}"]`);
+  if (campo === "clasificacion" && noFactura(oculto.value) !== noFactura(valor) && boton) {
+    confirmarSinQuitar(boton, () => editorAplicarSegmento(campo, valor),
+      noFactura(valor) ? "Confirmar: no facturará" : "Confirmar: vuelve a facturar");
+    return;
+  }
+  editorAplicarSegmento(campo, valor);
+}
+
+function editorAplicarSegmento(campo, valor) {
+  const oculto = $("ed-" + campo);
+  if (!oculto) return;
   oculto.value = valor;
   const grupo = $("ed-" + campo + "-seg");
   if (grupo) grupo.querySelectorAll(".seg-btn").forEach(
     b => b.classList.toggle("activa", b.dataset.valor === valor));
   editorPrefillPorClasificacion(campo, valor);
+  editorAplicarSinFactura();
   editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad();
   editorMarcarObligatorios(); editorRevalidar();
 }
@@ -21257,30 +21324,11 @@ function editorAplicarVisibilidad() {
   }
 }
 
-// Confirmación antes de marcar O de quitar "Cliente de prueba" (pedido del
-// usuario 2026-08-04): a diferencia de modo admin (onClickModoAdminChk, que
-// solo confirma al prender), este interruptor tiene consecuencia fiscal en
-// los dos sentidos — marcarlo saca al cliente de facturación, quitarlo lo
-// vuelve a meter — así que los dos se confirman. Mismo patrón: el clic se
-// revierte con preventDefault y confirmarSinQuitar lo repone recién al
-// confirmar.
-function onClickEsPruebaChk(ev) {
-  const activando = ev.target.checked;   // valor que el clic estaba por dejar
-  ev.preventDefault();
-  confirmarSinQuitar(ev.target.closest("label"), () => {
-    ev.target.checked = activando;
-    editorAplicarPrueba();
-    editorDerivarCampos(); editorAplicarEtiquetas(); editorAplicarVisibilidad();
-    editorMarcarObligatorios(); editorRevalidar();
-  }, activando ? "Confirmar: no facturará" : "Confirmar: vuelve a facturar");
-  return false;
-}
-
 // Confirmación antes de marcar O de quitar "Activo" desde el editor completo
 // de un catálogo (clientes, vendedores, feriados…), no solo desde el switch
 // rápido de la ficha del cliente (ver onClickActivoSucursal/onClickActivoCliente
 // más arriba). No dispara ningún recálculo: nada más depende de este valor
-// (a diferencia de "es_prueba"), así que basta con fijar el checkbox — se
+// (a diferencia de "Qué es"), así que basta con fijar el checkbox — se
 // guarda igual que cualquier otro campo recién al pulsar Guardar.
 function onClickActivoEditorChk(ev) {
   const activando = ev.target.checked;
@@ -21290,19 +21338,19 @@ function onClickActivoEditorChk(ev) {
   return false;
 }
 
-function editorAplicarPrueba() {
-  const oculto = $("ed-clasificacion");
-  if (oculto) oculto.disabled = editorEsPrueba();
-  const grupoSeg = $("ed-clasificacion-seg");
-  if (grupoSeg) grupoSeg.querySelectorAll(".seg-btn").forEach(b => b.disabled = editorEsPrueba());
-  // Un cliente de prueba nunca factura, así que "Activo" no tendría ningún
-  // efecto: se apaga y no se puede prender de vuelta (regla del usuario
-  // 2026-07-31). El valor que el operador ya tenía puesto se conserva y se
-  // restaura al desmarcar — mismo criterio que cualquier campo que un toggle
-  // oculta en vez de perderlo.
+function editorAplicarSinFactura() {
+  // El control de "Qué es" NO se apaga (2026-09-11): con los cuatro valores en
+  // un solo control, deshabilitarlo dejaba al operador sin manera de deshacer
+  // la elección. Antes se podía porque el check de prueba vivía aparte.
+  //
+  // Un cliente que no factura nunca llena un documento, así que "Activo" no
+  // tendría ningún efecto: se apaga y no se puede prender de vuelta (regla del
+  // usuario 2026-07-31). El valor que el operador ya tenía puesto se conserva y
+  // se restaura al volver a un tipo que sí factura — mismo criterio que
+  // cualquier campo que un toggle oculta en vez de perderlo.
   const activo = $("ed-activo");
   if (!activo) return;
-  if (editorEsPrueba()) {
+  if (editorSinFactura()) {
     if (activo.dataset.activoPrevio === undefined)
       activo.dataset.activoPrevio = activo.checked ? "1" : "0";
     activo.checked = false;
