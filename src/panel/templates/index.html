@@ -11220,6 +11220,17 @@ async function guardarYSalirDetalle() {
 // abierta con los valores del sistema ya repuestos a la vista.
 const deshacerCambiosDetalle = (btn) => descartarCambiosDetalle(btn, false);
 
+// Deshacer se confirma en el sitio (2026-09-11, pedido del usuario), con la
+// misma pregunta que el resto del panel: devuelve al automático números que el
+// operador tecleó, y un clic distraído no puede llevárselos. Sin vencimiento,
+// como la de la cantidad despachada — decidir qué se factura se piensa.
+function pedirDeshacerDetalle(btn) {
+  detalleConfirmando = true;
+  confirmarSinQuitar(btn, () => deshacerCambiosDetalle(btn), "Confirmar deshacer",
+                     () => { detalleConfirmando = false; retomarRepinteDetalle(); },
+                     true);
+}
+
 async function descartarCambiosDetalle(boton = $("detalle-descartar"), cerrar = true) {
   const clave = detalleAbierto;
   const foto = detalleOriginal;
@@ -11614,7 +11625,7 @@ function contenidoDetalle(clave) {
   const pendiente = hayAjustesSinLlenar(d)
     ? `<div class="det-nota alerta">Esta factura tiene cambios a mano que todavía
         no se han llenado: se escriben en el documento cuando la llenes.
-        <button type="button" onclick="deshacerCambiosDetalle(this)"
+        <button type="button" onclick="pedirDeshacerDetalle(this)"
                 title="Devuelve las cantidades y los descuentos que calculó el sistema.">Deshacer cambios</button></div>` : "";
   return `
     ${nota}${pendiente}
