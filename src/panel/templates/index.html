@@ -5416,7 +5416,7 @@ function pintarResumenFinal() {
           <td>${esc(l.producto || l.codigo || "")}${
             motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>`
             : l.al_final ? `<div class="fl-final">Se agregó al final: no entró cuando le tocaba.</div>` : ""}</td>
-          <td class="vp-num">${fmtCantidad(l.cantidad)}</td>
+          <td class="vp-num">${fmtCantidad(l.cantidad)} ${esc(l.unidad || "paq")}</td>
           <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
       }).join("")}</tbody></table>`;
@@ -13049,7 +13049,8 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   const textoDeFase = (f) => {
     const p = f.fase === "lineas" && f.avance ? f.avance.producto_actual : null;
     if (!p) return TEXTO_FASE[f.fase];
-    return `${[p.codigo, p.producto].filter(Boolean).join(" · ")}…`;
+    return `${[p.codigo, p.producto].filter(Boolean).join(" · ")}`
+      + ` · ${fmtCantidad(p.cantidad)} ${p.unidad || "paq"}…`;
   };
   // Fases en las que el robot NO está tecleando en Winledger: mouse y teclado
   // son del operador (⏸, «Continuar» tras imprimir, cerrar el aviso, responder
