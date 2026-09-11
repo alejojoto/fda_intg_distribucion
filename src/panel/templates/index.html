@@ -11022,19 +11022,20 @@ const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 // `tituloAtraso` es el motivo del ámbar en esa lista: por qué está resaltada lo
 // sabe quien la pinta, no esta función (2026-08-28).
 function filaDetalle(f, clases = "", tituloAtraso = TITULO_PEDIDO_VIEJO) {
-  // Pedido de un cliente que no factura: no hay detalle que abrir — la fila
-  // existe solo para dejar constancia de que el pedido se vio y no se facturó.
-  if (f.sin_factura)
-    return ` class="${clases.trim()}" title="Este cliente no se factura desde el`
-         + ` asistente: el pedido se muestra para dejar constancia de que se vio."`;
   const viejo = clases.includes("fila-atrasada") ? `${tituloAtraso} ` : "";
+  // Pedido de un cliente que no factura (2026-09-11): la fila SÍ abre su
+  // detalle —el pedido tiene líneas y verlas es lo único que hace falta—, y el
+  // hover explica por qué está en esta lista sin documento.
+  const noFactura = f.sin_factura
+    ? "Este cliente no se factura desde el asistente: el pedido queda aquí como constancia. "
+    : "";
   // El color de la fila se explica en su hover, que es donde se pregunta por él.
   const cambio = clases.includes("fila-cambio-sin-llenar")
     ? "Tiene cambios a mano que todavía no se han llenado. "
     : clases.includes("fila-cambiada")
     ? "Se llenó con cambios a mano. " : "";
   return ` class="${(clases + " abre-detalle").trim()}"`
-    + ` title="${viejo}${cambio}Clic para ver el detalle del pedido"`
+    + ` title="${viejo}${cambio}${noFactura}Clic para ver el detalle del pedido"`
     + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
         f.tiene_detalle === false ? ",true" : ""})"`;
 }
@@ -11691,6 +11692,10 @@ function contenidoDetalle(clave) {
          <div class="det-nota alerta">Estos datos normalmente conservan lo
           recibido de la aplicación de pedidos. Edita a mano solo por una
           discrepancia de despacho, una corrección u otra excepción real.</div>`)
+    : d.origen === "sin_factura"
+      ? `<div class="det-nota">Lo que trae el pedido en la aplicación de pedidos.
+          Este cliente no se factura desde el asistente, así que de aquí no salió
+          ningún documento y no hay nada que ajustar.</div>`
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
