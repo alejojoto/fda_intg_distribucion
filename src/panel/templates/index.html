@@ -4966,13 +4966,12 @@ function repartoTip(productos, altoDisponible) {
 }
 
 function pintarInfoLlenado() {
-  // ESCONDIDAS EN PRODUCCIÓN hasta que la sección quede lista (2026-07-29,
-  // pedido del usuario). El gate vive aquí y no en pintarBarraEnFila porque
-  // esa solo corre al abrir AJUSTES/ADMIN, pestañas que una máquina de
-  // operación no abre nunca — allá las cajitas habrían quedado a la vista.
-  // Nada se quita: el HTML y lo que las llena siguen intactos, así que
-  // devolverlas es borrar estas dos líneas.
-  $("llenado-info").style.display = enFilaDisponible() ? "" : "none";
+  // Las cajitas se ven en TODA máquina desde el 2026-09-14 (pedido del
+  // usuario): cae el gate `enFilaDisponible()` que las escondía fuera del
+  // equipo admin desde el 2026-07-29 — la sección ya quedó lista. Quién las
+  // muestra es el CSS (`#llenado-info` nace oculto y `body.modo-llenado` lo
+  // abre), así que aquí no se toca el display: ponerlo a mano volvería a
+  // pisar la regla de `modo-fin-llenado`, que las esconde para el resumen.
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
   $("info-fecha").textContent = iso ? dmaCorto(iso) : "—";
@@ -14458,10 +14457,10 @@ function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
 // del 2026-08-03 dejó la corrida escondida también en desarrollo (antes ADMIN
 // prendía la prueba en silencio y con ella esta barra). PRUEBA sigue mandando
 // sobre el AISLAMIENTO de los resultados, no sobre qué barra se ve.
-// Consumidores: pintarBarraEnFila, las cajitas de info del llenado
-// (pintarInfoLlenado), "ruta completa" y el gate del resumen de fin de
-// llenado (el resumen es exclusivo de producción — ver el bloque de éxito
-// de llenar()).
+// Consumidores: pintarBarraEnFila, "ruta completa" y el gate del resumen de
+// fin de llenado (el resumen es exclusivo de producción — ver el bloque de
+// éxito de llenar()). Las cajitas de info del llenado SALIERON de este gate
+// el 2026-09-14: se ven en toda máquina (ver pintarInfoLlenado).
 // El canal por sí solo NO alcanza (2026-08-05): en una máquina de operación la
 // clave de canal está VACÍA — el automático por hostname del lanzador la manda
 // a `produccion`, pero el panel solo veía el radio de ADMIN sin marcar y daba
