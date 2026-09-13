@@ -2575,6 +2575,9 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
              title="Marcado: carga la misma versión exacta que corren las máquinas de operación, al reabrir el asistente. Sin marcar: Dev, todo lo que se sube al repositorio, apenas se sube.">
         <input type="checkbox" id="rapida-prod" onclick="rapidaCanal(this.checked ? 'produccion' : 'desarrollo')">
         Prod</label>
+      <button type="button" class="rapida-chip" id="rapida-como-operacion"
+              onclick="onClickComoOperacion(this)"
+              title="Este equipo pasa a ser una computadora de operación más: al reabrir el asistente carga producción, sin herramientas de admin ni prueba aislada, y un llenado desde aquí reclama y registra como en cualquier otra. No se deshace desde el panel: scripts\windows\volver_a_dev.bat.">Como operación</button>
     </span>
     <!-- Vista por rol (2026-08-05): el mismo selector de AJUSTES → Vista del
          panel, a un clic. Solo BAJA de rol; el backend rechaza igual que la
@@ -16908,6 +16911,26 @@ function avisoCargaBarra() {
       + " — TODAVÍA CORRE " + nombre(cargaEnCurso.rama);
   if (cargaEnCurso.rama === "main") return "";
   return "CORRE " + nombre(cargaEnCurso.rama);
+}
+
+// "Como operación" (2026-09-13, pedido del usuario): este equipo admin pasa a
+// ser una laptop de operación más — el mismo código (produccion al reabrir) y
+// la misma pantalla, sin nada de lo que solo ve la supervisión. Sin vuelta
+// desde el panel a propósito: scripts\windows\volver_a_dev.bat.
+function onClickComoOperacion(btn) {
+  confirmarSinQuitar(btn, aplicarComoOperacion, "Confirmar: pasar a operación");
+}
+
+async function aplicarComoOperacion() {
+  try {
+    await api("/api/ajustes/como-operacion", {ok: true});
+    mensaje("Este equipo ya es una computadora de operación más. Cierra y vuelve "
+      + "a abrir el asistente para que cargue producción. Para volver a dev: "
+      + "scripts\\windows\\volver_a_dev.bat.", "info");
+    setTimeout(() => location.reload(), 4000);
+  } catch (e) {
+    mensaje("No se pudo pasar a operación: " + e.message, "error");
+  }
 }
 
 async function guardarCanal() {
