@@ -1693,6 +1693,7 @@
   #admin-subtab-ajustes { --st-fg:#64748b; --st-bg:#64748b; }
   #admin-subtab-supervision { --st-fg:#6b21a8; --st-bg:#7e22ce; }
   #admin-panel-supervision { padding:0 14px 18px; }
+  select.sup-canal { margin-top:4px; font-size:11px; padding:1px 4px; max-width:130px; }
   #admin-subtab-tickets { --st-fg:#9a3412; --st-bg:#ea580c; }
   #admin-panel-tickets { padding:0 14px 18px; }
   #admin-subtab-despliegue { --st-fg:#0f766e; --st-bg:#0d9488; }
@@ -2565,6 +2566,9 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
              title="Marcado: carga la misma versión exacta que corren las máquinas de operación, al reabrir el asistente. Sin marcar: Dev, todo lo que se sube al repositorio, apenas se sube.">
         <input type="checkbox" id="rapida-prod" onclick="rapidaCanal(this.checked ? 'produccion' : 'desarrollo')">
         Prod</label>
+      <button type="button" class="rapida-chip" id="rapida-como-operacion"
+              onclick="onClickComoOperacion(this)"
+              title="Este equipo pasa a ser una computadora de operación más: al reabrir el asistente carga producción, sin herramientas de admin ni prueba aislada, y un llenado desde aquí reclama y registra como en cualquier otra. No se deshace desde el panel: scripts\windows\volver_a_dev.bat.">Como operación</button>
     </span>
     <!-- Vista por rol (2026-08-05): el mismo selector de AJUSTES → Vista del
          panel, a un clic. Solo BAJA de rol; el backend rechaza igual que la
@@ -7469,6 +7473,47 @@ function supReleaseMasNuevo() {
   return masNuevo;
 }
 
+// Qué versión le toca correr a ESA computadora (2026-09-14, pedido del
+// usuario). Es otra cosa que la rama de arriba, que es la que corre HOY: entre
+// las dos está el reabrir del asistente. Vive aquí porque el caso que lo pidió
+// es el que no tiene panel a mano — el server puesto "como operación" ya no
+// muestra herramientas de admin, así que su vuelta a Dev se hace desde aquí.
+const SUP_CANALES_ASIGNABLES = [["", "Automático"], ["desarrollo", "Dev"],
+                                ["produccion", "Producción"],
+                                ["estable", "Estable (1.0)"],
+                                ["estable-1.1", "Estable 1.1"]];
+
+function supSelectorCanal(equipo) {
+  const host = esc(equipo.dispositivo || "");
+  if (!host) return "";
+  const puesto = equipo.canal_asignado || "";
+  const opciones = SUP_CANALES_ASIGNABLES.map(([v, txt]) =>
+    `<option value="${v}"${v === puesto ? " selected" : ""}>${txt}</option>`).join("");
+  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente. Automático: el server y el Mac cargan desarrollo; las demás, producción. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev se las devuelve."
+    onchange="supCambiarCanal(this, '${host}')">${opciones}</select>`;
+}
+
+async function supCambiarCanal(sel, dispositivo) {
+  const anterior = sel.dataset.puesto || "";
+  const canal = sel.value;
+  sel.disabled = true;
+  try {
+    await api("/api/supervision/canal-equipo", {dispositivo, canal});
+    sel.dataset.puesto = canal;
+    const eq = supEquipos.find(e => e.dispositivo === dispositivo);
+    if (eq) eq.canal_asignado = canal;
+    mensaje("Versión de " + dispositivo + ": "
+      + (SUP_CANALES_ASIGNABLES.find(([v]) => v === canal) || ["", canal])[1]
+      + ". Se aplica cuando esa computadora cierre y vuelva a abrir el asistente.",
+      "info");
+  } catch (e) {
+    sel.value = anterior;
+    mensaje("No se pudo cambiar la versión: " + e.message, "error");
+  } finally {
+    sel.disabled = false;
+  }
+}
+
 function supFilaEquipo(equipo, sinDatos) {
   const host = esc(equipo.dispositivo || "");
   const canal = supCanalEquipo(equipo);
@@ -7496,6 +7541,7 @@ function supFilaEquipo(equipo, sinDatos) {
     <td>${supEstadoEquipo(equipo, sinDatos)}${notaAccesoEquipo(equipo)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
       !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}${
+      supSelectorCanal(equipo)}${
       !sinDatos && equipo.fecha_release
         ? `<div class="sup-estado-nota${atrasada ? " atrasada" : ""}">${
             esc(supFechaCorta(equipo.fecha_release))}${
@@ -16515,6 +16561,26 @@ function avisoCargaBarra() {
       + " — TODAVÍA CORRE " + nombre(cargaEnCurso.rama);
   if (cargaEnCurso.rama === "main") return "";
   return "CORRE " + nombre(cargaEnCurso.rama);
+}
+
+// "Como operación" (2026-09-13, pedido del usuario): este equipo admin pasa a
+// ser una laptop de operación más — el mismo código (produccion al reabrir) y
+// la misma pantalla, sin nada de lo que solo ve la supervisión. Sin vuelta
+// desde el panel a propósito: scripts\windows\volver_a_dev.bat.
+function onClickComoOperacion(btn) {
+  confirmarSinQuitar(btn, aplicarComoOperacion, "Confirmar: pasar a operación");
+}
+
+async function aplicarComoOperacion() {
+  try {
+    await api("/api/ajustes/como-operacion", {ok: true});
+    mensaje("Este equipo ya es una computadora de operación más. Cierra y vuelve "
+      + "a abrir el asistente para que cargue producción. Para volver a dev: "
+      + "scripts\\windows\\volver_a_dev.bat.", "info");
+    setTimeout(() => location.reload(), 4000);
+  } catch (e) {
+    mensaje("No se pudo pasar a operación: " + e.message, "error");
+  }
 }
 
 async function guardarCanal() {
