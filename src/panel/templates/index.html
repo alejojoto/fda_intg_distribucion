@@ -10267,7 +10267,7 @@ function pintarModalReinicio(motivos, urge) {
   boton.style.display = puedeCerrar ? "" : "none";
   // El texto y el `disabled` NO se tocan si el operador tiene un cierre en
   // vuelo: el latido pasa cada ocho segundos y le devolvería el botón a
-  // "Cerrar el asistente ahora" mientras todavía está cerrando.
+  // "Reiniciar el asistente ahora" mientras todavía está reiniciando.
   if (!cerrandoDesdeAviso) {
     boton.disabled = false;
     boton.textContent = "Cerrar el asistente ahora";
