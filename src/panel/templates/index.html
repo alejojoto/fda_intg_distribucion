@@ -9422,6 +9422,14 @@ function contactoRellenar(pref) {
 function montarFormularioContacto(pref) {
   const contenedor = $(`${pref}-contacto`);
   if (!contenedor) return;
+  if (!contactoEnTicketsDisponible()) {
+    // Escondido en operación: sin formulario no hay nada que leer ni validar.
+    contenedor.innerHTML = "";
+    contenedor.style.display = "none";
+    contactoMontado[pref] = false;
+    return;
+  }
+  contenedor.style.display = "";
   if (!contactoMontado[pref]) {
     contenedor.innerHTML = htmlFormularioContacto(pref);
     contenedor.querySelectorAll(`input[name="${pref}-contacto-metodo"]`)
@@ -9454,6 +9462,7 @@ function contactoFoco(pref) {
 }
 
 function contactoLeer(pref) {
+  if (!contactoEnTicketsDisponible()) return {metodo: "", valor: ""};
   contactoSincronizar(pref);
   const metodo = contactoSoporte.metodo || "";
   if (!metodo) return {error: "Elige cómo prefieres que te contactemos: correo o WhatsApp."};
@@ -14817,6 +14826,12 @@ function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
 // quitaba al equipo admin la corrida, que es suya. Quien quiera ver la vista
 // del operador tiene el selector de rol de la barra ("Ver como").
 const enFilaDisponible = () => esMaquinaAdmin;
+// El contacto del operador en los tickets (correo o WhatsApp) queda ESCONDIDO
+// fuera del equipo admin (2026-09-15, pedido del usuario): main y produccion
+// son la misma versión, pero esa opción no sale a operación todavía. Mismo
+// gate que la barra de llenado en serie; el servidor aplica el suyo
+// (_contacto_operador en app.py), así una máquina de operación no lo exige.
+const contactoEnTicketsDisponible = () => esMaquinaAdmin;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
