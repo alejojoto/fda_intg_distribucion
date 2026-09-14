@@ -2943,12 +2943,11 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <!-- Filtro en dos pasos (2026-09-14, pedido del usuario): primero QUÉ se
          mira —máquinas, clientes de prueba, especiales o normales— y solo
          entonces aparece el segundo desplegable para quedarse con todos o con
-         uno solo de ese grupo. "Máquinas" sale únicamente con el permiso
-         filtro_maquina (Editor, Admin y supervisión) y REEMPLAZA a la casilla
-         de arriba: a quien solo factura no le sirve elegir de qué otra máquina
-         mirar el historial, y a quien sí puede no le hace falta un segundo
-         control para su propio equipo. Los grupos de cliente los ve todo el
-         mundo: no son datos de otro equipo, son el pedido de uno mismo. La
+         uno solo de ese grupo. Los dos salen únicamente con el permiso
+         filtro_maquina (Admin y Editor) y REEMPLAZAN a la casilla de arriba:
+         a quien solo factura no le sirve elegir de qué otra máquina mirar el
+         historial ni separar los pedidos que nadie factura, y a quien sí puede
+         no le hace falta un segundo control para su propio equipo. La
          visibilidad la decide cada refresco, no el render de la página, para
          que cambiarle el rol a una PC se le note sin reabrir. -->
     <div class="campo" id="campo-clase" style="display:none">Filtrar por
@@ -6793,20 +6792,16 @@ function soltarFiltro(cual) {
 
 // Cambiar de grupo empieza de cero dentro del grupo nuevo: el equipo o el
 // cliente que estaba elegido no existe en el otro desplegable.
-// Quien tiene el grupo "Máquinas" NO tiene la casilla (ver mostrarCamposClase),
+// Quien tiene estos desplegables NO tiene la casilla (ver mostrarCamposClase),
 // así que elegir un equipo —incluido "(esta máquina)"— se queda en el
 // dropdown: convertirlo en la casilla escondería el único control que ese rol
 // ve. La casilla se suelta igual por si quedó marcada de antes del permiso:
-// las dos recortan por el mismo criterio y juntas dan lista vacía en cuanto el
-// equipo elegido no es este.
+// juntas dan lista vacía en cuanto lo elegido no es de esta máquina.
 function elegirClaseFiltro() {
   claseSeleccionada = $("f-clase").value;
   maquinaSeleccionada = "";
   clienteSeleccionado = "";
-  // Solo el grupo "Máquinas" pelea con la casilla: los dos recortan por equipo
-  // y juntos dan lista vacía en cuanto el elegido no es este. Los grupos de
-  // cliente son otro corte y pueden convivir con ella.
-  if (claseSeleccionada === "maquina") $("f-solo-aqui").checked = false;
+  if (claseSeleccionada) $("f-solo-aqui").checked = false;
   pintarValoresClaseFiltro();
   mostrarCamposClase();
   aplicarFiltros();
@@ -6825,8 +6820,7 @@ function elegirValorClaseFiltro() {
 // coinciden nunca en pantalla (ver mostrarCamposClase), pero un equipo que
 // acaba de perder el permiso puede llegar aquí con un filtro de máquina puesto.
 function marcarSoloAqui() {
-  if ($("f-solo-aqui").checked && claseSeleccionada === "maquina")
-    soltarFiltro("clase");
+  if ($("f-solo-aqui").checked) soltarFiltro("clase");
   mostrarCamposClase();
   aplicarFiltros();
 }
@@ -7201,10 +7195,12 @@ let dispositivoPropio = "";
 // juntas porque cambian por vías distintas: la tab al clickear, el permiso en
 // el refresco, la casilla al marcarla (con ella puesta el grupo sobra: ya se
 // está mirando esta máquina).
-// El grupo "Máquinas" y la casilla son EXCLUYENTES por rol (2026-08-05, regla
-// del usuario): con permiso se ve solo el desplegable —que ya incluye "(esta
-// máquina)"— y sin él solo la casilla. Nunca los dos: ofrecen el mismo recorte
-// y juntos solo confunden. Los grupos de cliente no dependen del permiso.
+// Los desplegables y la casilla son EXCLUYENTES por rol (2026-08-05, regla del
+// usuario): con permiso se ven solo los desplegables —el de máquinas ya
+// incluye "(esta máquina)"— y sin él solo la casilla. Nunca los dos: ofrecen
+// el mismo recorte y juntos solo confunden. TODOS los grupos van detrás del
+// permiso filtro_maquina, también los de cliente (2026-09-14, regla del
+// usuario: estos filtros los ven Admin y Editor, nadie más).
 // El segundo desplegable solo sale con un grupo ya elegido: sin él no tendría
 // de qué lista sacar sus opciones.
 function mostrarCamposClase() {
@@ -7214,23 +7210,25 @@ function mostrarCamposClase() {
     casilla.style.display =
       (!puedeFiltrarPorMaquina && enProcesadas) ? "" : "none";
   const campo = $("campo-clase");
-  if (campo) campo.style.display = enProcesadas ? "" : "none";
+  if (campo)
+    campo.style.display =
+      (puedeFiltrarPorMaquina && enProcesadas) ? "" : "none";
   const valor = $("campo-clase-valor");
   if (valor)
-    valor.style.display = (enProcesadas && claseSeleccionada) ? "" : "none";
+    valor.style.display =
+      (puedeFiltrarPorMaquina && enProcesadas && claseSeleccionada) ? "" : "none";
 }
 
-// Si esta PC deja de estar habilitada (se le quitó la marca desde ADMIN), el
-// grupo "Máquinas" desaparece del desplegable y suelta lo que tuviera puesto:
-// un filtro que ya no se puede ver ni quitar dejaría la lista recortada sin
-// explicación.
+// Si esta PC deja de estar habilitada (se le quitó la marca desde ADMIN), los
+// desplegables se esconden y sueltan lo que tuvieran puesto: un filtro que ya
+// no se puede ver ni quitar dejaría la lista recortada sin explicación.
 function pintarFiltrosDeGrupo(puede, equipos, clientes) {
   if (!$("campo-clase")) return;
   puedeFiltrarPorMaquina = !!puede;
   maquinasFiltro = puede ? (equipos || []) : [];
-  clientesFiltro = clientes || [];
+  clientesFiltro = puede ? (clientes || []) : [];
   let recargar = false;
-  if (!puede && claseSeleccionada === "maquina") {
+  if (!puede && claseSeleccionada) {
     soltarFiltro("clase");
     recargar = true;
   }
@@ -7241,7 +7239,7 @@ function pintarFiltrosDeGrupo(puede, equipos, clientes) {
     recargar = true;
   }
   const grupos = [["", "Todo"],
-                  ...(puede ? [["maquina", ETIQUETAS_CLASE_FILTRO.maquina]] : []),
+                  ["maquina", ETIQUETAS_CLASE_FILTRO.maquina],
                   ["prueba", ETIQUETAS_CLASE_FILTRO.prueba],
                   ["especial", ETIQUETAS_CLASE_FILTRO.especial],
                   ["normal", ETIQUETAS_CLASE_FILTRO.normal]];
