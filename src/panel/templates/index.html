@@ -493,6 +493,28 @@
   #aviso-reinicio.urge { background:#fff4e0; color:#7a4a00;
                      border-left:5px solid #d98300; }
   #aviso-reinicio div + div { margin-top:6px; }
+  /* El MISMO aviso, pero tapando la pantalla (2026-09-14, pedido del usuario:
+     "mejor como un popup que te obliga a cerrar el programa"). La franja
+     convivía con el trabajo y se la saltaba cualquiera: una computadora podía
+     pasar días con la versión vieja sin que nadie se diera por aludido. Sin
+     cierre por clic afuera —apareció solo, no lo abrió nadie— y por encima de
+     todo lo demás, menú de contexto incluido (z-index 200). La franja no se
+     retira: es la que queda cuando el modal está callado o hay un llenado. */
+  #reinicio-overlay { position:fixed; inset:0; background:rgba(29,36,51,.55);
+                      display:none; z-index:300; align-items:center;
+                      justify-content:center; }
+  #reinicio-overlay.visible { display:flex; }
+  #reinicio-caja { background:#fff; border-radius:12px; padding:22px 24px;
+                   width:min(560px, 92vw); max-height:88vh; overflow:auto;
+                   box-shadow:0 12px 48px rgba(0,0,0,.35);
+                   border-top:6px solid #1a73e8; }
+  #reinicio-caja.urge { border-top-color:#d98300; }
+  #reinicio-caja h3 { margin:0 0 10px; font-size:17px; color:#1d2433; }
+  #reinicio-caja p + h3 { margin-top:18px; }
+  #reinicio-caja p { margin:0 0 14px; font-size:13.5px; line-height:1.55;
+                     color:#3a4252; }
+  #reinicio-nota { display:none; background:#fff4e0; color:#7a4a00;
+                   border-radius:6px; padding:8px 10px; font-size:12.5px; }
   /* Rompe-vidrio puesto (2026-08-07): ámbar y no rojo — no hay nada roto, hay
      una puerta abierta a conciencia. Se ve en TODAS las pestañas y no se
      puede cerrar: el día que se olvide puesto, esta franja es lo único que
@@ -1238,6 +1260,16 @@
   #ticket-resumen { background:#f6f8fb; border:1px solid #e2e6ec; border-radius:8px;
                     padding:10px 12px; margin:12px 0 0; font-size:12px; }
   #ticket-resumen h4 { margin:0 0 6px; font-size:12px; }
+  #ticket-contacto, #soporte-contacto { margin:10px 0; }
+  /* Mismo tono y tamaño que .editor-campo: el bloque va pegado al "¿Qué
+     ocurrió?" y con la letra por omisión se veía como otra cosa. */
+  .contacto-seccion { display:flex; flex-direction:column; gap:8px;
+                      font-size:12px; color:var(--mut); }
+  .contacto-metodos { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .contacto-metodos label { display:inline-flex; align-items:center; gap:4px; }
+  .contacto-bloque-sub { margin-top:2px; }
+  .contacto-campo { width:100%; max-width:280px; }
+  .contacto-aviso { margin:6px 0 0; font-size:12px; }
   .ticket-dato { display:flex; gap:10px; line-height:1.7; }
   .ticket-dato > span:first-child { color:#5a6472; flex:none; width:150px; }
   .ticket-dato > span:last-child { min-width:0; overflow-wrap:anywhere; }
@@ -3274,6 +3306,18 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <span class="prueba-nota" id="version-estable-nota" style="display:none"
               title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Congelada: no reciben actualizaciones</span>
       </div>
+      <!-- Buscar actualización ahora (2026-09-14, pedido del usuario): el vigía
+           mira cada media hora, y esperar media hora para saber si una versión
+           recién publicada llegó vuelve impracticable cualquier prueba. Este
+           botón corre el mismo tic a mano y no aplica nada: descarga y cuenta,
+           el merge sigue siendo del arranque. -->
+      <div class="ajustes-fila">
+        <b class="rotulo">Actualizaciones:</b>
+        <button type="button" id="buscar-version-btn"
+                onclick="buscarActualizacionAhora(this)"
+                title="Mira si hay una versión nueva publicada y la descarga. Entra al cerrar y volver a abrir el asistente, como siempre.">Buscar ahora</button>
+        <span class="prueba-nota" id="buscar-version-nota" style="display:none"></span>
+      </div>
       <!-- Rompe-vidrio (2026-08-07, tras el incidente del mismo día): volver a
            una versión vieja no alcanza cuando la nube ya exige condiciones que
            esa versión no sabe cumplir — el programa abre y aun así no trabaja.
@@ -3447,7 +3491,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <div id="sup-tickets-lista" style="display:none">
           <div class="sup-tabla-scroll"><table id="sup-tickets-tabla" class="sup-tabla">
             <thead><tr>
-              <th>Ticket</th><th>Fecha</th><th>Equipo</th><th>Mensaje</th>
+              <th>Ticket</th><th>Fecha</th><th>Equipo</th><th>Contacto</th><th>Mensaje</th>
               <th>Estado</th><th></th>
             </tr></thead>
             <tbody></tbody>
@@ -3530,6 +3574,27 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
 </main>
 
 <!-- Choques al editar el mismo dato de catálogo desde equipos distintos. -->
+<!-- Aviso de "cierra y vuelve a abrir" tapando la pantalla (2026-09-14).
+     SIN cierre por clic afuera: aparece solo, no lo abrió nadie, y cerrarlo de
+     un clic al lado sería justo lo que se vino a evitar.
+
+     VA AQUÍ, FUERA DE <main>, con el resto de los overlays (corregido el mismo
+     día). Nació metido dentro de <main> —el único de los veintitantos que
+     había— y ahí es un hijo directo de un contenedor flex: se pintaba, pero
+     los botones no respondían al clic. Ningún otro modal de esta página vive
+     ahí dentro, y esa era toda la diferencia. -->
+<div id="reinicio-overlay">
+  <div id="reinicio-caja">
+    <div id="reinicio-cuerpo"></div>
+    <p id="reinicio-nota"></p>
+    <div class="editor-acciones">
+      <button type="button" class="primario" id="reinicio-cerrar"
+              onclick="reiniciarDesdeAviso(this)">Reiniciar el asistente ahora</button>
+      <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
+    </div>
+  </div>
+</div>
+
 <div id="conflictos-sync-overlay">
   <div id="conflictos-sync-caja">
     <h3>Cambios de catálogo en choque</h3>
@@ -3566,6 +3631,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <textarea id="ticket-mensaje" rows="4" maxlength="4000"
                 placeholder="Qué estabas haciendo y qué salió mal."></textarea>
     </div>
+    <div id="ticket-contacto"></div>
     <div id="ticket-resumen"></div>
     <div id="ticket-error" class="desc-error" style="display:none"></div>
     <div id="ticket-ok" style="display:none"></div>
@@ -3587,6 +3653,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
   <div id="soporte-caja">
     <h3>Soporte remoto</h3>
     <div id="soporte-cuerpo"></div>
+    <div id="soporte-contacto"></div>
     <div id="soporte-error" style="display:none"></div>
     <div class="editor-acciones" id="soporte-acciones"></div>
   </div>
@@ -4970,15 +5037,20 @@ function repartoTip(productos, altoDisponible) {
 }
 
 function pintarInfoLlenado() {
-  // Las cajitas VUELVEN a esconderse fuera del equipo admin (2026-09-14,
-  // hotfix de producción): al salir a operación esa misma mañana, la barra
-  // flotante creció con ellas y, centrada arriba, tapó la parte alta del
-  // Detalle de línea. El campo del artículo quedó debajo de la barra
-  // "siempre encima" y el llenado dejó de encontrarlo ("campo_articulo: 0
-  // candidatos") — toda máquina de operación moría en la línea 1. Vuelven
-  // cuando la barra tenga un sitio que no tape el Detalle; mientras, este
-  // gate deja la barra con el alto de siempre (ALTO_CONTENIDO_FLOTANTE).
-  $("llenado-info").style.display = enFilaDisponible() ? "" : "none";
+  // Las cajitas se ven en TODA máquina desde el 2026-09-14 (pedido del
+  // usuario): cae el gate `enFilaDisponible()` que las escondía fuera del
+  // equipo admin desde el 2026-07-29 — la sección ya quedó lista. Quién las
+  // muestra es el CSS (`#llenado-info` nace oculto y `body.modo-llenado` lo
+  // abre), así que aquí no se toca el display: ponerlo a mano volvería a
+  // pisar la regla de `modo-fin-llenado`, que las esconde para el resumen.
+  //
+  // El hotfix que las escondió esa noche (a3eaccd) queda REVERTIDO el
+  // 2026-09-15: culpaba a la barra de tapar el Detalle, y no era. La barra
+  // mide lo mismo con las cajitas y sin ellas — su alto es la constante
+  // ALTO_CONTENIDO_FLOTANTE, que ya subió a 170 en julio JUSTO para caberlas,
+  // y ningún camino la redimensiona por contenido salvo un modal abierto o el
+  // resumen final. Lo que paraba a las máquinas era el campo del Detalle
+  // renombrado a MAYÚSCULAS (X_ARTICULO), arreglado aparte en 621645a.
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
   $("info-fecha").textContent = fechaCorta(iso) || "—";
@@ -7556,7 +7628,8 @@ function supSoporteEquipo(equipo) {
   }
   let html = `<div class="sup-nube-lineas">${partes.join("")}</div>`;
   if (equipo.rustdesk_id)
-    html += `<div class="sup-numero-acceso sop-numero">${esc(equipo.rustdesk_id)}</div>`;
+    html += `<div class="sup-numero-acceso sop-numero">${esc(equipo.rustdesk_id)} `
+      + `${botonCopiar(equipo.rustdesk_id, "Copiar número de acceso")}</div>`;
   if (equipo.soporte_ticket)
     html += `<div class="sup-estado-nota atrasada">solicitud ${
       esc(equipo.soporte_ticket)}</div>`;
@@ -7594,6 +7667,7 @@ function supReleaseMasNuevo() {
 // es el que no tiene panel a mano — el server puesto "como operación" ya no
 // muestra herramientas de admin, así que su vuelta a Dev se hace desde aquí.
 const SUP_CANALES_ASIGNABLES = [["", "Automático"], ["desarrollo", "Dev"],
+                                ["preprod", "Preprod"],
                                 ["produccion", "Producción"],
                                 ["estable", "Estable (1.0)"],
                                 ["estable-1.1", "Estable 1.1"]];
@@ -7604,7 +7678,7 @@ function supSelectorCanal(equipo) {
   const puesto = equipo.canal_asignado || "";
   const opciones = SUP_CANALES_ASIGNABLES.map(([v, txt]) =>
     `<option value="${v}"${v === puesto ? " selected" : ""}>${txt}</option>`).join("");
-  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente. Automático: el server y el Mac cargan desarrollo; las demás, producción. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev se las devuelve."
+  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente. Automático: el server y el Mac cargan desarrollo; las demás, producción. Preprod es el candidato de producción, que este equipo corre antes que el parque. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev y Preprod se las devuelven."
     onchange="supCambiarCanal(this, '${host}')">${opciones}</select>`;
 }
 
@@ -7987,6 +8061,13 @@ function supExtracto(texto) {
   return limpio.length > 120 ? limpio.slice(0, 117) + "…" : limpio;
 }
 
+function ticketContactoInfo(ticket) {
+  const ctx = (ticket && ticket.contexto && ticket.contexto.contacto) || {};
+  const valor = String(ticket?.contacto_valor || ctx.valor || "").trim();
+  const metodo = String(ticket?.contacto_metodo || ctx.metodo || "").trim();
+  return {metodo, valor};
+}
+
 function pintarFiltrosTickets() {
   $("sup-ticket-filtros").querySelectorAll(".sup-ticket-filtro").forEach(b =>
     b.classList.toggle("activa", b.dataset.estado === supTicketFiltro));
@@ -7994,19 +8075,24 @@ function pintarFiltrosTickets() {
 
 function pintarTicketsSupervision() {
   const cuerpo = $("sup-tickets-tabla").querySelector("tbody");
-  cuerpo.innerHTML = supTickets.length ? supTickets.map(t => `<tr>
-    <td><b>${esc(t.id || "—")}</b>${
-      t.tipo === "soporte_remoto"
-        ? `<div class="sup-estado-nota">solicitud remota</div>` : ""}</td>
-    <td>${esc(supFechaCorta(t.creado_en))}</td>
-    <td>${esc(t.maquina || t.dispositivo || "—")}${
-      t.rustdesk_id
-        ? `<div class="sup-numero-acceso mut">acceso ${esc(t.rustdesk_id)}</div>` : ""}</td>
-    <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
-    <td>${supEstadoTicket(t.estado)}</td>
-    <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
-  </tr>`).join("")
-    : `<tr><td colspan="6" class="sup-lista-vacia">No hay tickets en este filtro.</td></tr>`;
+  cuerpo.innerHTML = supTickets.length ? supTickets.map((t) => {
+    const contacto = ticketContactoInfo(t);
+    return `<tr>
+      <td><b>${esc(t.id || "—")}</b>${
+        t.tipo === "soporte_remoto"
+          ? `<div class="sup-estado-nota">solicitud remota</div>` : ""}</td>
+      <td>${esc(supFechaCorta(t.creado_en))}</td>
+      <td>${esc(t.maquina || t.dispositivo || "—")}${
+        t.rustdesk_id
+          ? `<div class="sup-numero-acceso mut">acceso ${esc(t.rustdesk_id)} `
+              + `${botonCopiar(t.rustdesk_id, "Copiar número de acceso")}</div>` : ""}</td>
+      <td>${esc(contacto.valor || "—")}${botonCopiar(contacto.valor, "Copiar contacto")}</td>
+      <td class="sup-ticket-mensaje">${esc(supExtracto(t.mensaje))}</td>
+      <td>${supEstadoTicket(t.estado)}</td>
+      <td><button type="button" onclick="abrirDetalleTicketSupervision('${esc(t.id || "")}')">Ver ticket</button></td>
+    </tr>`;
+  }).join("")
+    : `<tr><td colspan="7" class="sup-lista-vacia">No hay tickets en este filtro.</td></tr>`;
   $("sup-tickets-mas").style.display = supTicketsTotal > supTickets.length ? "" : "none";
 }
 
@@ -8126,6 +8212,7 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         <div class="sup-dato"><span>Número de acceso:</span>${
           equipo.rustdesk_id
             ? `<span class="sup-numero-acceso">${esc(equipo.rustdesk_id)}</span>`
+              + `${botonCopiar(equipo.rustdesk_id, "Copiar número de acceso")}`
             : "—"}</div>
         ${equipo.soporte_ticket ? `<div class="sup-dato"><span>Solicitud pendiente:</span>
           <b>${esc(equipo.soporte_ticket)}</b></div>` : ""}
@@ -8292,6 +8379,9 @@ async function abrirDetalleTicketSupervision(id) {
   try {
     const d = await api("/api/supervision/tickets/" + encodeURIComponent(id));
     const ticket = d.ticket || {};
+    const contacto = ticketContactoInfo(ticket);
+    const accionContacto = contacto.metodo === "correo" ? "Escribir correo"
+      : contacto.metodo === "whatsapp" ? "Abrir WhatsApp" : "";
     supTicketAbierto = ticket;
     $("sup-ticket-titulo").textContent = "Ticket " + (ticket.id || id);
     $("sup-ticket-cuerpo").innerHTML = `
@@ -8308,7 +8398,10 @@ async function abrirDetalleTicketSupervision(id) {
           <!-- El número con el que se entra: lo primero que se necesita de una
                solicitud remota, así que va arriba y seleccionable. -->
           ${ticket.rustdesk_id ? `<div class="sup-dato"><span>Número de acceso:</span>
-            <span class="sup-numero-acceso">${esc(ticket.rustdesk_id)}</span></div>` : ""}
+            <span class="sup-numero-acceso">${esc(ticket.rustdesk_id)}</span>${botonCopiar(ticket.rustdesk_id, "Copiar número de acceso")}</div>` : ""}
+          ${contacto.valor ? `<div class="sup-dato"><span>Contacto:</span>
+            <span>${esc(contacto.valor)}</span>${botonCopiar(contacto.valor, "Copiar contacto")}
+            ${accionContacto ? `<button type="button" onclick="abrirContactoTicket()">${accionContacto}</button>` : ""}</div>` : ""}
         </div>
       </div>
       <div class="sup-detalle-seccion"><h4>Mensaje</h4>
@@ -8325,6 +8418,66 @@ async function abrirDetalleTicketSupervision(id) {
   } catch (e) {
     $("sup-ticket-cuerpo").innerHTML = `<div class="desc-error">${esc(e.message)}</div>`;
   }
+}
+
+function abrirContactoTicket() {
+  if (!supTicketAbierto) return;
+  const contacto = ticketContactoInfo(supTicketAbierto);
+  if (!contacto.valor) return mensaje("No hay un contacto para este ticket.", "error");
+
+  if (contacto.metodo === "correo") {
+    const asunto = `Soporte del asistente — ticket ${supTicketAbierto.id || "—"}`;
+    const cuerpo = `Hola,\n`
+      + `Te escribo por el ticket ${supTicketAbierto.id || "—"} registrado el `
+      + `${supFechaCorta(supTicketAbierto.creado_en)} desde ${supTicketAbierto.maquina || supTicketAbierto.dispositivo || "este equipo"}.\n\n`;
+    // Se usa Gmail web en vez de mailto para no mezclar este caso con el correo
+    // por omisión del sistema operativo.
+    return abrirEnlaceExterno(
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contacto.valor)}`
+      + `&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
+    );
+  }
+
+  if (contacto.metodo === "whatsapp") {
+    const texto = `Te escribo por el ticket ${supTicketAbierto.id || "—"} registrado el `
+      + `${supFechaCorta(supTicketAbierto.creado_en)} desde ${supTicketAbierto.maquina || supTicketAbierto.dispositivo || "este equipo"}.`;
+    return abrirEnlaceExterno(
+      `https://wa.me/${String(contacto.valor || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(texto)}`
+    );
+  }
+
+  return mensaje("Ese ticket no tiene un método de contacto válido.", "error");
+}
+
+async function abrirEnlaceExterno(url) {
+  const mensajeError = "No se pudo abrir el enlace.";
+  let abierto = false;
+
+  if (window.pywebview) {
+    try {
+      await api("/api/abrir-enlace", {url});
+      abierto = true;
+    } catch (e) {
+      mensaje(e.message || mensajeError, "error");
+      return;
+    }
+  } else {
+    try {
+      const win = window.open(url, "_blank", "noopener");
+      if (win) abierto = true;
+    } catch (_) {}
+    if (!abierto) {
+      try {
+        await api("/api/abrir-enlace", {url});
+        abierto = true;
+      } catch (e) {
+        mensaje(e.message || mensajeError, "error");
+        return;
+      }
+    }
+  }
+
+  if (!abierto) mensaje(mensajeError, "error");
 }
 
 function supTicketCoincideFiltro(ticket) {
@@ -9096,6 +9249,260 @@ async function abrirDiagnosticoSync() {
 // ventana con un botón.
 // ---------------------------------------------------------------------------
 
+const CONTACTO_STORAGE_KEY = "fda_contacto_soporte";
+// El número vive en UN campo que arranca en "04" (lo venezolano es lo normal
+// aquí); borrando el 04 el campo pasa a "+" para un número de otro país.
+const CONTACTO_SOPORTE_DEFAULT = {metodo:"", correo:"", numero:"04"};
+let contactoSoporte = cargarContactoSoporte();
+let contactoMontado = {ticket:false, soporte:false};
+
+function cargarContactoSoporte() {
+  try {
+    const datos = JSON.parse(localStorage.getItem(CONTACTO_STORAGE_KEY) || "{}");
+    if (!datos || typeof datos !== "object") return {...CONTACTO_SOPORTE_DEFAULT};
+    let numero = typeof datos.numero === "string" ? datos.numero : "";
+    // Guardado por el formulario anterior (código en un selector aparte y un
+    // campo "otro" para internacionales): se juntan en el campo único.
+    if (datos.prefijo === "otro" && typeof datos.otro === "string" && datos.otro) {
+      numero = datos.otro;
+    } else if (typeof datos.prefijo === "string" && /^04\d\d$/.test(datos.prefijo)) {
+      // El campo viejo llevaba solo los 7 dígitos de después del código.
+      const local = numero.replace(/\D/g, "");
+      if (local && local.length <= 7) numero = datos.prefijo + local;
+    }
+    return {
+      metodo: typeof datos.metodo === "string" ? datos.metodo : "",
+      correo: typeof datos.correo === "string" ? datos.correo : "",
+      numero: numero || "04",
+    };
+  } catch (_) {
+    return {...CONTACTO_SOPORTE_DEFAULT};
+  }
+}
+
+function guardarContactoSoporte() {
+  try { localStorage.setItem(CONTACTO_STORAGE_KEY, JSON.stringify(contactoSoporte)); } catch (_) {}
+}
+
+function htmlFormularioContacto(pref) {
+  return `<div class="contacto-seccion">
+    <!-- El título del grupo va sin atributo for: con él, un clic ahí
+         marcaría "Correo" sin que nadie lo eligiera. -->
+    <label>¿Cómo prefieres que te contactemos? (obligatorio)</label>
+    <div class="contacto-metodos">
+      <label><input type="radio" id="${pref}-contacto-metodo-correo"
+                    name="${pref}-contacto-metodo" value="correo">
+        <span>Correo</span></label>
+      <label><input type="radio" id="${pref}-contacto-metodo-whatsapp"
+                    name="${pref}-contacto-metodo" value="whatsapp">
+        <span>WhatsApp</span></label>
+    </div>
+    <div id="${pref}-contacto-caja-correo" class="contacto-bloque-sub">
+      <input type="email" id="${pref}-contacto-correo" class="contacto-campo"
+             maxlength="200" placeholder="nombre@dominio.com">
+    </div>
+    <div id="${pref}-contacto-caja-whatsapp" class="contacto-bloque-sub">
+      <!-- Un solo campo, arranca en 04. El 04 y el + se portan como UNA tecla:
+           borrar el 04 deja el + para un número de otro país, y borrar el +
+           devuelve el 04. Sin maxlength: el tope (y su aviso al teclear) lo
+           pone contactoNumeroTecleado según el modo. -->
+      <input id="${pref}-contacto-numero" class="contacto-campo" inputmode="tel">
+      <div id="${pref}-contacto-aviso" class="desc-error contacto-aviso"
+           style="display:none"></div>
+    </div>
+  </div>`;
+}
+
+function contactoSincronizar(pref) {
+  const correo = $(`${pref}-contacto-correo`);
+  const numero = $(`${pref}-contacto-numero`);
+  contactoSoporte = {
+    metodo: contactoMetodoMarcado(pref),
+    correo: correo ? correo.value.trim() : (contactoSoporte.correo || ""),
+    numero: numero ? numero.value.trim() : (contactoSoporte.numero || "04"),
+  };
+  guardarContactoSoporte();
+}
+
+function contactoAviso(pref, texto) {
+  const caja = $(`${pref}-contacto-aviso`);
+  if (!caja) return;
+  caja.textContent = texto || "";
+  caja.style.display = texto ? "" : "none";
+}
+
+// El campo único del número. Nunca queda vacío: vive en modo 04 (venezolano,
+// 11 dígitos) o en modo + (internacional, hasta 15 después del +), y el 04 y
+// el + se portan como UNA tecla — borrar el 04 deja el + de una, borrar el +
+// devuelve el 04. El tope de dígitos avisa al teclear, no al enviar.
+function contactoNumeroTecleado(pref, ev) {
+  const nodo = $(`${pref}-contacto-numero`);
+  if (!nodo) return;
+  const borrando = !!(ev && typeof ev.inputType === "string"
+                      && ev.inputType.startsWith("delete"));
+  let valor = String(nodo.value || "").replace(/[^0-9+]/g, "");
+  let aviso = "";
+  if (borrando && valor === "0") valor = "+";      // se llevó el 04 entero
+  if (valor === "") valor = "04";                  // y borrar el + devuelve el 04
+  if (valor.includes("+")) {
+    let d = valor.replace(/\D/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    if (d.startsWith("0")) {
+      // Ningún código de país empieza por 0: "+04…" es un venezolano tecleado
+      // con el + puesto — se atiende abajo como 04.
+      valor = d;
+    } else {
+      if (d.length > 15) {
+        d = d.slice(0, 15);
+        aviso = "Después del + van máximo 15 dígitos.";
+      }
+      valor = "+" + d;
+    }
+  }
+  if (!valor.includes("+")) {
+    let d = valor.replace(/\D/g, "");
+    if (d.startsWith("00")) {
+      d = d.slice(2);
+      if (d.length > 15) {
+        d = d.slice(0, 15);
+        aviso = "Después del + van máximo 15 dígitos.";
+      }
+      valor = "+" + d;
+    } else {
+      // Tecleó su 04 encima del 04 puesto (ningún número real empieza 0404).
+      while (d.startsWith("0404")) d = d.slice(2);
+      if (d && !d.startsWith("0")) d = "0" + d;
+      // El prefijo no se parte: un borrado a la mitad lo restaura.
+      if (d && d !== "0" && !d.startsWith("04")) d = "04" + d.slice(1);
+      if (d.length > 11) {
+        d = d.slice(0, 11);
+        aviso = "Un número venezolano lleva 11 dígitos. Si es de otro país, "
+              + "borra el 04 para escribirlo con +.";
+      }
+      valor = d || "04";
+    }
+  }
+  if (nodo.value !== valor) nodo.value = valor;
+  contactoAviso(pref, aviso);
+  contactoSincronizar(pref);
+}
+
+// Los radios se leen por su id y no por selector: $ en esta página es
+// getElementById, así que un `input[name=…]:checked` devolvería null siempre.
+function contactoMetodoMarcado(pref) {
+  if (($(`${pref}-contacto-metodo-correo`) || {}).checked) return "correo";
+  if (($(`${pref}-contacto-metodo-whatsapp`) || {}).checked) return "whatsapp";
+  return "";
+}
+
+function contactoActualizar(pref) {
+  const correoCaja = $(`${pref}-contacto-caja-correo`);
+  const whatsappCaja = $(`${pref}-contacto-caja-whatsapp`);
+  const metodo = (contactoSoporte && contactoSoporte.metodo) || "";
+  if (correoCaja) correoCaja.style.display = metodo === "correo" ? "" : "none";
+  if (whatsappCaja) whatsappCaja.style.display = metodo === "whatsapp" ? "" : "none";
+}
+
+function contactoRellenar(pref) {
+  const correo = $(`${pref}-contacto-correo`);
+  const numero = $(`${pref}-contacto-numero`);
+  const radioCorreo = $(`${pref}-contacto-metodo-correo`);
+  const radioWhatsapp = $(`${pref}-contacto-metodo-whatsapp`);
+  if (radioCorreo) radioCorreo.checked = (contactoSoporte.metodo === "correo");
+  if (radioWhatsapp) radioWhatsapp.checked = (contactoSoporte.metodo === "whatsapp");
+  // Solo se escribe el campo que de verdad cambió: la ventana de soporte se
+  // repinta sola cuando llega el estado del programa, y reasignar .value con
+  // el mismo texto le manda el cursor al final a quien está tecleando.
+  const poner = (nodo, valor) => { if (nodo && nodo.value !== valor) nodo.value = valor; };
+  poner(correo, contactoSoporte.correo || "");
+  poner(numero, contactoSoporte.numero || "04");
+  contactoActualizar(pref);
+}
+
+function montarFormularioContacto(pref) {
+  const contenedor = $(`${pref}-contacto`);
+  if (!contenedor) return;
+  if (!contactoEnTicketsDisponible()) {
+    // Escondido en operación: sin formulario no hay nada que leer ni validar.
+    contenedor.innerHTML = "";
+    contenedor.style.display = "none";
+    contactoMontado[pref] = false;
+    return;
+  }
+  contenedor.style.display = "";
+  if (!contactoMontado[pref]) {
+    contenedor.innerHTML = htmlFormularioContacto(pref);
+    contenedor.querySelectorAll(`input[name="${pref}-contacto-metodo"]`)
+      .forEach((nodo) => {
+        nodo.addEventListener("change", () => {
+          contactoAviso(pref, "");
+          contactoSincronizar(pref);
+          contactoActualizar(pref);
+        });
+      });
+    $(`${pref}-contacto-correo`)?.addEventListener("input", () => contactoSincronizar(pref));
+    $(`${pref}-contacto-numero`)?.addEventListener("input",
+      (ev) => contactoNumeroTecleado(pref, ev));
+    contactoMontado[pref] = true;
+  }
+  contactoRellenar(pref);
+}
+
+function contactoHabilitar(pref, habilitar) {
+  const contenedor = $(`${pref}-contacto`);
+  if (!contenedor) return;
+  contenedor.querySelectorAll("input,select").forEach((nodo) => { nodo.disabled = !habilitar; });
+}
+
+function contactoFoco(pref) {
+  const met = contactoMetodoMarcado(pref);
+  if (!met) { const radio = $(`${pref}-contacto-metodo-correo`); if (radio) radio.focus(); return; }
+  const nodo = $(met === "correo" ? `${pref}-contacto-correo` : `${pref}-contacto-numero`);
+  if (nodo) nodo.focus();
+}
+
+function contactoLeer(pref) {
+  if (!contactoEnTicketsDisponible()) return {metodo: "", valor: ""};
+  contactoSincronizar(pref);
+  const metodo = contactoSoporte.metodo || "";
+  if (!metodo) return {error: "Elige cómo prefieres que te contactemos: correo o WhatsApp."};
+  if (metodo === "correo") {
+    const correo = (contactoSoporte.correo || "").trim().toLowerCase();
+    contactoSoporte.correo = correo;
+    if (!correo) return {error: "Falta el correo."};
+    if (!/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(correo)) {
+      return {error: "Ese correo no parece completo. Ejemplo: nombre@dominio.com"};
+    }
+    return {metodo, valor: correo};
+  }
+  if (metodo === "whatsapp") {
+    const v = (contactoSoporte.numero || "").trim();
+    const d = v.replace(/\D/g, "");
+    // "04" y "+" solos son el arranque de los dos modos, no un número.
+    if (!v || v === "04" || v === "+")
+      return {error: "Falta el número de WhatsApp."};
+    if (v.startsWith("+")) {
+      if (d.length < 8 || d.length > 15) {
+        return {
+          error: "Ese número no está completo. Escríbelo con el signo + y el "
+               + "código de tu país.",
+        };
+      }
+      // Sin el 0 y con el +: es lo que se copia y se pega en WhatsApp desde
+      // otro país, y con el 0 delante no se puede marcar.
+      return {metodo, valor: `+${d}`};
+    }
+    if (d.length === 11 && d.startsWith("0"))
+      return {metodo, valor: `+58${d.slice(1)}`};
+    return {
+      error: "Ese número no está completo. Un número venezolano lleva 11 "
+           + "dígitos. Si es de otro país, borra el 04 y escríbelo con el "
+           + "signo + y el código de tu país.",
+    };
+  }
+  return {error: "Elige cómo prefieres que te contactemos: correo o WhatsApp."};
+}
+
 // Último estado que mandó el servidor: {programa, numero, solicitud, ...}.
 let soporte = {programa: {}, numero: "", solicitud: null};
 let soporteEnVuelo = false;
@@ -9144,9 +9551,11 @@ function pintarSoporte() {
   const cuerpo = $("soporte-cuerpo");
   const acciones = $("soporte-acciones");
   const prog = soporte.programa || {};
+  const contContacto = $("soporte-contacto");
   const cerrar = `<button data-preseleccionado type="button" onclick="cerrarSoporte()">Cerrar</button>`;
 
   if (soporteHaySolicitud()) {
+    if (contContacto) contContacto.style.display = "none";
     const numero = soporte.solicitud.rustdesk_id || soporte.numero || "";
     cuerpo.innerHTML =
         `<div class="sop-caja-ok"><b>Soporte técnico solicitado</b><br>`
@@ -9169,6 +9578,11 @@ function pintarSoporte() {
   }
 
   if (prog.comprobado && !prog.disponible) {
+    if (contContacto) {
+      contContacto.style.display = "";
+      montarFormularioContacto("soporte");
+      contactoActualizar("soporte");
+    }
     cuerpo.innerHTML =
         `<div class="sop-caja-falta">En esta computadora falta el programa de `
       + `soporte remoto.</div>`
@@ -9184,6 +9598,11 @@ function pintarSoporte() {
     return;
   }
 
+  if (contContacto) {
+    contContacto.style.display = "";
+    montarFormularioContacto("soporte");
+    contactoActualizar("soporte");
+  }
   cuerpo.innerHTML =
       `<p>Al pedir soporte queda registrada una solicitud con los datos de esta `
     + `computadora y se abre el programa de soporte remoto.</p>`
@@ -9209,6 +9628,7 @@ function abrirSoporteRemoto() {
   if ($("soporte-overlay").classList.contains("visible")) { cerrarSoporte(); return; }
   errorSoporte("");
   pintarSoporte();
+  contactoAviso("soporte", "");
   $("soporte-overlay").classList.add("visible");
   // La comprobación de verdad (¿está el programa? ¿cuál es el número?) puede
   // tardar segundos: la ventana se abre YA con lo último sabido y se repinta
@@ -9242,9 +9662,19 @@ async function conBotonOcupado(btn, rotulo, tarea) {
 }
 
 function pedirSoporte(btn) {
+  if (soporteHaySolicitud()) return;
+  const contacto = contactoLeer("soporte");
+  if (contacto.error) {
+    errorSoporte(contacto.error);
+    contactoFoco("soporte");
+    return;
+  }
   return conBotonOcupado(btn, "Pidiendo soporte…", async () => {
     try {
-      aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+      aplicarEstadoSoporte(await api("/api/soporte/solicitud", {
+        contacto_metodo: contacto.metodo,
+        contacto_valor: contacto.valor,
+      }));
     } catch (e) {
       // El servidor manda el estado hasta cuando falla (p. ej. falta el
       // programa): se aplica igual, así la ventana pasa sola a ofrecer la
@@ -9256,6 +9686,13 @@ function pedirSoporte(btn) {
 }
 
 function instalarSoporte(btn) {
+  if (soporteHaySolicitud()) return;
+  const contacto = contactoLeer("soporte");
+  if (contacto.error) {
+    errorSoporte(contacto.error);
+    contactoFoco("soporte");
+    return;
+  }
   return conBotonOcupado(btn, "Descargando…", async () => {
     aplicarEstadoSoporte(await api("/api/soporte/instalar-remoto", {}));
     // Comprobación automática de que quedó disponible: si no, no se pide nada
@@ -9264,7 +9701,10 @@ function instalarSoporte(btn) {
     if (!(soporte.programa || {}).disponible)
       throw new Error("El programa se descargó pero todavía no está disponible. "
                       + "Vuelve a intentar.");
-    aplicarEstadoSoporte(await api("/api/soporte/solicitud", {}));
+    aplicarEstadoSoporte(await api("/api/soporte/solicitud", {
+      contacto_metodo: contacto.metodo,
+      contacto_valor: contacto.valor,
+    }));
   });
 }
 
@@ -9361,6 +9801,9 @@ function abrirTicket() {
   const campo = $("ticket-mensaje");
   campo.value = ticketBorrador;
   campo.disabled = false;
+  montarFormularioContacto("ticket");
+  contactoAviso("ticket", "");
+  contactoHabilitar("ticket", true);
   $("ticket-error").style.display = "none";
   $("ticket-ok").style.display = "none";
   const enviar = $("ticket-enviar");
@@ -9387,6 +9830,13 @@ async function enviarTicket() {
     $("ticket-mensaje").focus();
     return;
   }
+  const contacto = contactoLeer("ticket");
+  if (contacto.error) {
+    error.textContent = contacto.error;
+    error.style.display = "";
+    contactoFoco("ticket");
+    return;
+  }
   ticketEnVuelo = true;
   ticketBorrador = texto;
   error.style.display = "none";
@@ -9398,6 +9848,8 @@ async function enviarTicket() {
       id: ticketId,
       mensaje: texto,
       informe: $("diag-sync-texto").textContent,
+      contacto_metodo: contacto.metodo,
+      contacto_valor: contacto.valor,
     });
     mostrarTicketCreado(r.id);
   } catch (e) {
@@ -9425,6 +9877,7 @@ function mostrarTicketCreado(id) {
   $("ticket-enviar").style.display = "none";
   $("ticket-copiar-id").style.display = "";
   $("ticket-cancelar").textContent = "Cerrar";
+  contactoHabilitar("ticket", false);
 }
 
 // Copiado que también funciona sin permiso de portapapeles (http): cae a un
@@ -9496,6 +9949,16 @@ function copiarInformeSync(btn) {
 
 function copiarIdTicket(btn) {
   return copiarConAviso(btn, ticketCreado || ticketId || "", "Copiar número");
+}
+
+function copiarDato(btn) {
+  return copiarConAviso(btn, btn.dataset.copiar || "", btn.dataset.rotulo || "Copiar");
+}
+
+function botonCopiar(valor, titulo) {
+  if (!valor) return "";
+  return `<button type="button" class="copiar-pedido" data-copiar="${esc(valor)}"`
+    + ` title="${esc(titulo || "Copiar")}" onclick="copiarDato(this)">Copiar</button>`;
 }
 
 // El número de pedido del título del detalle (2026-08-06, pedido del usuario):
@@ -10140,19 +10603,156 @@ async function latido() {
 // con datos incompletos — ahí sí hay algo que el reinicio arregla.
 // `version_nueva` se sigue aceptando para no depender del orden de despliegue:
 // una página vieja contra un panel nuevo, o al revés, no se queda sin aviso.
+// Cuánto se calla el modal con "Ahora no" y hasta cuándo (ms de Date.now();
+// 0 = no está callado). Diez minutos a propósito: el aviso tiene que insistir,
+// pero encerrar a quien está a mitad de algo no es insistir, es estorbar.
+const REINICIO_INSISTE_MS = 10 * 60 * 1000;
+let reinicioCalladoHasta = 0;
+let reinicioPintado = "";          // firma de lo último pintado en el modal
+let ultimoEstadoReinicio = null;   // lo último que dijo /salud, para repintar sin esperar al latido
+let ultimaVersionNuevaReinicio = null;
+
 function pintarAvisoReinicio(estado, versionNueva) {
+  ultimoEstadoReinicio = estado;
+  ultimaVersionNuevaReinicio = versionNueva;
   const caja = $("aviso-reinicio");
-  if (!caja) return;
   const motivos = (estado && estado.motivos) || (versionNueva && versionNueva.hay
-    ? [{texto: "Hay una versión nueva del asistente, ya descargada. Se aplica "
-              + "cuando cierres y vuelvas a abrir el programa.", urgente: false}]
+    ? [{clave: "version_nueva",
+        titulo: "Hay una versión nueva del asistente",
+        texto: "La versión nueva ya está descargada y entra cuando cierres y "
+             + "vuelvas a abrir el programa. Hasta entonces esta computadora "
+             + "sigue con la anterior.", urgente: false}]
     : []);
-  caja.style.display = motivos.length ? "" : "none";
-  caja.classList.toggle("urge", motivos.some(m => m.urgente));
-  if (!motivos.length) return;
   // Lo urgente primero: si las dos cosas están, la que pide acción manda.
   const ordenados = [...motivos].sort((a, b) => (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+  const urge = ordenados.some(m => m.urgente);
+
+  // El modal NO se asoma con un llenado en curso: taparía la barra flotante,
+  // y el panel se niega a apagarse a mitad de un documento — ofrecer el botón
+  // ahí sería empujar a algo que va a salir rechazado.
+  const enLlenado = !!(estado && estado.llenado_en_curso) || llenando;
+  const conModal = ordenados.length > 0 && !enLlenado && Date.now() >= reinicioCalladoHasta;
+  pintarModalReinicio(conModal ? ordenados : [], urge);
+
+  if (!caja) return;
+  // La franja se queda con lo que el modal no cubre —el llenado en curso y los
+  // diez minutos de "Ahora no"—; con el modal encima sería decir lo mismo dos
+  // veces en la misma pantalla.
+  const conFranja = ordenados.length > 0 && !conModal;
+  caja.style.display = conFranja ? "" : "none";
+  caja.classList.toggle("urge", urge);
+  if (!conFranja) return;
   caja.innerHTML = ordenados.map(m => `<div>${esc(m.texto)}</div>`).join("");
+}
+
+function pintarModalReinicio(motivos, urge) {
+  const overlay = $("reinicio-overlay");
+  if (!overlay) return;
+  overlay.classList.toggle("visible", motivos.length > 0);
+  if (!motivos.length) { reinicioPintado = ""; return; }
+  // Sin esta firma el latido repintaría el modal cada ocho segundos y se
+  // llevaría por delante el clic que el operador estuviera dando.
+  const firma = motivos.map(m => m.clave || m.titulo).join("|");
+  if (firma !== reinicioPintado) {
+    reinicioPintado = firma;
+    $("reinicio-caja").classList.toggle("urge", urge);
+    $("reinicio-cuerpo").innerHTML = motivos.map(m =>
+      `<h3>${esc(m.titulo || "Hace falta cerrar y volver a abrir el asistente")}</h3>`
+      + `<p>${esc(m.texto)}</p>`).join("");
+  }
+  // EL BOTÓN SE RE-EVALÚA EN CADA PINTADA, FUERA de la guarda anti-repintado
+  // (2026-09-14, corregido: así nació y no servía). pywebview inyecta
+  // `window.pywebview.api` DESPUÉS de cargar la página; si la primera pintada
+  // cae antes de eso, `puedeCerrar` sale falso, el botón se esconde — y con el
+  // motivo sin cambiar la firma nunca volvía a mirar, así que quedaba
+  // escondido para siempre. Reescribir dos propiedades cada ocho segundos no
+  // le cuesta nada a nadie; perder el botón sí.
+  const api = apiVentana();
+  const puedeCerrar = !!(api && api.reiniciar);
+  const boton = $("reinicio-cerrar");
+  const nota = $("reinicio-nota");
+  boton.style.display = puedeCerrar ? "" : "none";
+  // El texto y el `disabled` NO se tocan si el operador tiene un cierre en
+  // vuelo: el latido pasa cada ocho segundos y le devolvería el botón a
+  // "Reiniciar el asistente ahora" mientras todavía está reiniciando.
+  if (!cerrandoDesdeAviso) {
+    boton.disabled = false;
+    boton.textContent = "Reiniciar el asistente ahora";
+    nota.style.display = puedeCerrar ? "none" : "";
+    if (!puedeCerrar) {
+      nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
+        + "actualiza solo.";
+    }
+  }
+}
+
+// Buscar actualización a mano (2026-09-14). Tras el tic, el aviso se repinta
+// sin esperar al próximo latido: quien pulsó el botón está mirando AHORA.
+async function buscarActualizacionAhora(boton) {
+  const nota = $("buscar-version-nota");
+  const antes = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = "Buscando…";
+  nota.style.display = "none";
+  try {
+    const r = await api("/api/version/revisar", {});
+    nota.style.display = "";
+    nota.textContent = r.hay ? "Versión nueva descargada."
+                             : "Al día: sin cambios nuevos.";
+    const salud = await (await fetch("/salud", {cache: "no-store"})).json();
+    // El silencio de "Ahora no" no puede tapar lo que se acaba de pedir a mano.
+    reinicioCalladoHasta = 0;
+    pintarAvisoReinicio(salud.reinicio, salud.version_nueva);
+  } catch (e) {
+    nota.style.display = "";
+    nota.textContent = "No se pudo buscar: " + e.message;
+  } finally {
+    boton.disabled = false;
+    boton.textContent = antes;
+  }
+}
+
+function callarAvisoReinicio() {
+  reinicioCalladoHasta = Date.now() + REINICIO_INSISTE_MS;
+  reinicioPintado = "";
+  pintarAvisoReinicio(ultimoEstadoReinicio, ultimaVersionNuevaReinicio);
+}
+
+let cerrandoDesdeAviso = false;   // hay un cierre en vuelo: el latido no lo pisa
+
+async function reiniciarDesdeAviso(boton) {
+  const api = apiVentana();
+  const nota = $("reinicio-nota");
+  if (!api || !api.reiniciar) {
+    // No debería llegar aquí (sin API el botón no se pinta), pero si llega hay
+    // que DECIRLO: un botón que no hace nada al pulsarlo es lo peor de todo.
+    nota.style.display = "";
+    nota.textContent = "Esta ventana no puede reiniciarse sola. Ciérrala con "
+      + "la X y vuelve a abrir el asistente.";
+    return;
+  }
+  cerrandoDesdeAviso = true;
+  boton.disabled = true;
+  boton.textContent = "Reiniciando…";
+  // Cada paso deja rastro en el log del panel: este botón corre en el server,
+  // donde no hay depurador, y lo único que puede decir dónde murió es esto.
+  reportarAlPanel({tipo: "reiniciar-aviso", paso: "pedido"});
+  let ok = false, fallo = "";
+  try {
+    ok = await Promise.resolve(api.reiniciar());
+  } catch (e) {
+    fallo = (e && e.message) || String(e);
+  }
+  reportarAlPanel({tipo: "reiniciar-aviso", paso: "respuesta", ok, fallo});
+  if (ok) return;   // el asistente se va y vuelve: no queda nada que repintar
+  cerrandoDesdeAviso = false;
+  boton.disabled = false;
+  boton.textContent = "Reiniciar el asistente ahora";
+  nota.style.display = "";
+  nota.textContent = fallo
+    ? "No se pudo reiniciar: " + fallo + ". Ciérralo con la X y vuelve a abrirlo."
+    : "No se pudo reiniciar ahora mismo. Suele ser un llenado en curso: "
+      + "termínalo y vuelve a intentar.";
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
@@ -11784,8 +12384,9 @@ const TITULO_PEDIDO_FECHA_INUSUAL =
 const RESALTADO_FECHA_A_FACTURAR = {
   tituloDia: TITULO_DIA_FECHA_INUSUAL,
   arma: () => {
-    const esperada = fechaDePedidoEsperada($("f-fecha-facturar").value);
-    return (iso, partes) => !!esperada && !!iso && iso !== esperada
+    const rango = rangoDePedidoUsual($("f-fecha-facturar").value);
+    return (iso, partes) => !!rango && !!iso
+                            && (iso < rango.desde || iso > rango.hasta)
                             && !(partes[0] || {}).de_prueba;
   },
 };
@@ -14225,6 +14826,12 @@ function familiaDelSiguiente(p = llenablesEnOrdenDeFila()) {
 // quitaba al equipo admin la corrida, que es suya. Quien quiera ver la vista
 // del operador tiene el selector de rol de la barra ("Ver como").
 const enFilaDisponible = () => esMaquinaAdmin;
+// El contacto del operador en los tickets (correo o WhatsApp) queda ESCONDIDO
+// fuera del equipo admin (2026-09-15, pedido del usuario): main y produccion
+// son la misma versión, pero esa opción no sale a operación todavía. Mismo
+// gate que la barra de llenado en serie; el servidor aplica el suyo
+// (_contacto_operador en app.py), así una máquina de operación no lo exige.
+const contactoEnTicketsDisponible = () => esMaquinaAdmin;
 
 function pintarBarraEnFila() {
   const conFila = enFilaDisponible();
@@ -15139,17 +15746,52 @@ const TRIANGULO_ALERTA =
 // El desfase se calcula aparte del aviso porque también lo necesitan los
 // botones de llenar, que se pintan ANTES que los avisos y no pueden leerlo del
 // HTML ya pintado.
-// Fecha de pedido que corresponde a una fecha a facturar: el día anterior,
-// salvo el salto del fin de semana (sábado, domingo y lunes facturan el pedido
-// del viernes). La comparten el aviso y el ámbar de PENDIENTES: es la misma
-// regla y tiene que decidir igual en los dos sitios.
-function fechaDePedidoEsperada(isoFacturar) {
+// Fechas de pedido que corresponden a una fecha a facturar: el día anterior,
+// y el fin de semana estira el rango hacia atrás hasta el viernes (sábado,
+// domingo y lunes facturan desde el pedido del viernes). La comparten el aviso
+// y el ámbar de PENDIENTES: es la misma regla y tiene que decidir igual en los
+// dos sitios.
+//
+// Es un RANGO y no un solo día desde 2026-09-15: tomando únicamente el viernes,
+// un pedido hecho en sábado o en domingo no tenía NINGUNA fecha a facturar que
+// lo diera por usual —el lunes esperaba el del viernes, el domingo también— y
+// el aviso no había forma de quitarlo, se pusiera la fecha que se pusiera. La
+// inversa de "el pedido del viernes se factura sábado, domingo o lunes" es que
+// el lunes factura pedidos del viernes, del sábado y del domingo.
+function rangoDePedidoUsual(isoFacturar) {
   const fechaFacturar = calDesdeISO(isoFacturar);
-  if (!fechaFacturar) return "";
+  if (!fechaFacturar) return null;
   const diasHastaViernes = ({6: 1, 0: 2, 1: 3})[fechaFacturar.getDay()] || 1;
-  const esperadaFecha = new Date(fechaFacturar);
-  esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
-  return calISO(esperadaFecha);
+  const corrida = (dias) => {
+    const d = new Date(fechaFacturar);
+    d.setDate(d.getDate() - dias);
+    return calISO(d);
+  };
+  return {desde: corrida(diasHastaViernes), hasta: corrida(1)};
+}
+
+const pedidoEnFechaUsual = (isoPedido, isoFacturar) => {
+  const rango = rangoDePedidoUsual(isoFacturar);
+  return !!rango && !!isoPedido
+         && isoPedido >= rango.desde && isoPedido <= rango.hasta;
+};
+
+// Las fechas a facturar que admiten un pedido: la inversa del rango de arriba,
+// probada día a día desde el siguiente al pedido. Cuatro alcanzan de sobra
+// porque el rango nunca pasa de tres días. Es lo que el aviso nombra cuando hay
+// UNA sola factura: ahí la pregunta del operador es "¿y entonces qué fecha le
+// toca a este pedido?", no cuáles pedidos le tocan a la fecha puesta.
+function fechasAFacturarDePedido(isoPedido) {
+  const pedido = calDesdeISO(isoPedido);
+  if (!pedido) return [];
+  const salida = [];
+  for (let i = 1; i <= 4; i++) {
+    const d = new Date(pedido);
+    d.setDate(d.getDate() + i);
+    const iso = calISO(d);
+    if (pedidoEnFechaUsual(isoPedido, iso)) salida.push(iso);
+  }
+  return salida;
 }
 
 function desfaseDeFechas(facturas) {
@@ -15159,8 +15801,8 @@ function desfaseDeFechas(facturas) {
   // verse igual con el modo admin prendido y apagado); lo que cambia es el
   // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
   if (!isoFacturar) return null;
-  const esperada = fechaDePedidoEsperada(isoFacturar);
-  if (!esperada) return null;
+  const rango = rangoDePedidoUsual(isoFacturar);
+  if (!rango) return null;
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   // Los pedidos de PRUEBA tampoco (2026-08-11, pedido del usuario): son
   // sintéticos, su fecha es la del día en que se armaron y no hay nada que
@@ -15168,13 +15810,13 @@ function desfaseDeFechas(facturas) {
   const fechas = facturas.filter(f => !(f || {}).de_prueba)
                          .map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
-  const desfasadas = fechas.filter(f => f !== esperada);
+  const desfasadas = fechas.filter(f => !pedidoEnFechaUsual(f, isoFacturar));
   if (!desfasadas.length) return null;
   const distintas = [...new Set(desfasadas)].sort();
   // La firma ES la decisión: mover la fecha a facturar o cambiar los días
   // desfasados de la fila plantea otro caso y se vuelve a preguntar. Sacar una
   // factura sin que cambien esos días NO deshace lo ya decidido.
-  return {isoFacturar, esperada, fechas, desfasadas, distintas,
+  return {isoFacturar, rango, fechas, desfasadas, distintas,
           firma: `${isoFacturar}|${distintas.join(",")}`};
 }
 
@@ -15224,7 +15866,7 @@ function motivoDeFechaParaFactura(pedido_id, parte) {
 function avisoFechaDelPedido(facturas, donde) {
   const desfase = desfaseDeFechas(facturas);
   if (!desfase) return "";
-  const {isoFacturar, esperada, fechas, desfasadas, distintas} = desfase;
+  const {isoFacturar, rango, fechas, desfasadas, distintas} = desfase;
   const sinDecidir = desfase.firma !== fechaDesfaseOk[donde];
   const corta = fechaCorta;
   // Cuatro fechas o más no se enumeran: la lista se vuelve ilegible y lo que
@@ -15241,12 +15883,26 @@ function avisoFechaDelPedido(facturas, donde) {
         : `Las ${fechas.length} facturas son de pedidos ${dias}`)
     : `${desfasadas.length} de las ${fechas.length} facturas son de pedidos ${dias}`;
   const unaSola = fechas.length === 1;
-  // Mover la fecha solo se ofrece cuando arregla TODAS: con parte del lote en
-  // regla, correrla dejaría fuera de sitio a las que estaban bien.
-  const finDeSemana = ["0", "6", "1"].includes(String(calDesdeISO(isoFacturar)?.getDay()));
-  const regla = finDeSemana
-    ? "Los pedidos del viernes se pueden facturar sábado, domingo o lunes."
-    : "Lo usual es facturar al día siguiente del pedido.";
+  // Con UNA factura el aviso nombra la fecha que le toca a ESE pedido, que es
+  // lo que el operador necesita para corregir el campo (2026-09-15, pedido del
+  // usuario: "debería ser más claro cuál fecha debe llevar ese pedido"). Con
+  // varias no hay una sola respuesta, así que se dice al revés: qué pedidos
+  // admite la fecha puesta.
+  const aFacturar = unaSola ? fechasAFacturarDePedido(fechas[0]) : [];
+  const leToca = aFacturar.length === 1
+    ? `le toca el ${corta(aFacturar[0])}`
+    : aFacturar.length
+    ? `le toca entre el ${corta(aFacturar[0])} y el ${corta(aFacturar[aFacturar.length - 1])}`
+    : "";
+  const tocan = rango.desde === rango.hasta
+    ? `Al ${corta(isoFacturar)} le toca el pedido del ${corta(rango.desde)}.`
+    : `Al ${corta(isoFacturar)} le tocan los pedidos del ${corta(rango.desde)} al ${
+        corta(rango.hasta)}.`;
+  const encabezado = leToca
+    ? `${hecho} y ${leToca}. Arriba está puesto el ${corta(isoFacturar)}.`
+    : `${hecho}. ${tocan}`;
+  // Mover la fecha no se ofrece: con parte del lote en regla, correrla dejaría
+  // fuera de sitio a las que estaban bien. La corrige el operador arriba.
   const confirmar = sinDecidir
     ? `<button title="La Fecha a facturar se mantiene; pide un motivo antes de llenar."
          onclick="pedirMotivoFechaDesfase('${donde}')">Indicar motivo</button>`
@@ -15256,15 +15912,14 @@ function avisoFechaDelPedido(facturas, donde) {
     ? (unaSola ? "La fecha no se pone: el documento sale"
                : "La fecha no se pone: los documentos salen")
       + " con la que tenga el programa de facturación."
-    : (unaSola ? "El documento sale" : "Los documentos salen")
-      + " con la fecha de arriba.";
+    // Con una sola factura el encabezado ya nombró la fecha de arriba: repetirla
+    // aquí sonaba a que se hablaba de otra.
+    : leToca ? "El documento sale con esa."
+    : "Los documentos salen con la fecha de arriba.";
   const cierre = sinDecidir ? destino + " Indica el motivo antes de llenar:"
     : (unaSola ? "Se llena igual. " : "Se llenan igual. ") + destino;
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
-      TRIANGULO_ALERTA}</div><div>${
-      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}. ${esc(regla)} `
-    + `Para esa fecha, el pedido usual es del ${esc(corta(esperada))}. `
-    + `${esc(cierre)}${salida}</div></div>`;
+      TRIANGULO_ALERTA}</div><div>${esc(encabezado)} ${esc(cierre)}${salida}</div></div>`;
 }
 
 // Líneas donde lo despachado no coincide con lo aprobado, con el dato de cuánto
