@@ -475,6 +475,11 @@
                      padding-top:0; padding-bottom:8px; }
   tr.fila-omitidas.pendiente td { background:#fffbeb; color:#b54708;
                      font-weight:600; border-left:4px solid #f5a524; }
+  /* Fecha de factura distinta del día en que se procesó: la normal es que
+     coincidan, así que solo se muestra la excepción y en ámbar, para que salte. */
+  .fecha-factura-distinta { display:inline-block; margin-top:2px; padding:1px 6px;
+                     background:#fffbeb; border:1px solid #fde68a; border-radius:4px;
+                     color:#b54708; font-weight:600; }
   tr.fila-omitidas:hover td { background:#f6f6f6; }
   tr.fila-omitidas.pendiente:hover td { background:#fffbeb; }
   tr.fila-omitidas button { margin-left:10px; vertical-align:middle; }
@@ -13204,7 +13209,8 @@ function filaProcesada(f, enFamilia) {
       <td>${esc(f.numero_documento || "")}</td>
       <td>${esc(f.serie || "")}</td>
       <td class="mut">${f.sin_factura ? "" : esc(fechaCortaHora(f.fecha_cierre || f.fecha_cargado))}${
-        f.fecha_factura ? `<div>Factura: ${esc(fechaCorta(f.fecha_factura))}</div>` : ""}</td>
+        f.fecha_factura && fechaCorta(f.fecha_factura) !== fechaCorta(f.fecha_cierre || f.fecha_cargado)
+          ? `<div><span class="fecha-factura-distinta">Factura: ${esc(fechaCorta(f.fecha_factura))}</span></div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
