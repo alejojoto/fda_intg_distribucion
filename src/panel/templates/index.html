@@ -2846,21 +2846,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        facturas tiene que quedar pegada a la lista. -->
   <div id="aviso-reinicio" style="display:none"></div>
 
-  <!-- El mismo aviso tapando la pantalla (2026-09-14). SIN cierre por clic
-       afuera: este modal aparece solo, no lo abrió nadie, y cerrarlo sin
-       querer con un clic al lado sería justo lo que se vino a evitar. -->
-  <div id="reinicio-overlay">
-    <div id="reinicio-caja">
-      <div id="reinicio-cuerpo"></div>
-      <p id="reinicio-nota"></p>
-      <div class="editor-acciones">
-        <button type="button" class="primario" id="reinicio-cerrar"
-                onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
-        <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
        este no lo dispara nada que haya pasado en esta computadora — es un
        estado de la nube que vale para todas. Va arriba de todo y en todas las
@@ -3579,6 +3564,27 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
 </main>
 
 <!-- Choques al editar el mismo dato de catálogo desde equipos distintos. -->
+<!-- Aviso de "cierra y vuelve a abrir" tapando la pantalla (2026-09-14).
+     SIN cierre por clic afuera: aparece solo, no lo abrió nadie, y cerrarlo de
+     un clic al lado sería justo lo que se vino a evitar.
+
+     VA AQUÍ, FUERA DE <main>, con el resto de los overlays (corregido el mismo
+     día). Nació metido dentro de <main> —el único de los veintitantos que
+     había— y ahí es un hijo directo de un contenedor flex: se pintaba, pero
+     los botones no respondían al clic. Ningún otro modal de esta página vive
+     ahí dentro, y esa era toda la diferencia. -->
+<div id="reinicio-overlay">
+  <div id="reinicio-caja">
+    <div id="reinicio-cuerpo"></div>
+    <p id="reinicio-nota"></p>
+    <div class="editor-acciones">
+      <button type="button" class="primario" id="reinicio-cerrar"
+              onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
+      <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
+    </div>
+  </div>
+</div>
+
 <div id="conflictos-sync-overlay">
   <div id="conflictos-sync-caja">
     <h3>Cambios de catálogo en choque</h3>
@@ -5019,12 +5025,15 @@ function repartoTip(productos, altoDisponible) {
 }
 
 function pintarInfoLlenado() {
-  // Las cajitas se ven en TODA máquina desde el 2026-09-14 (pedido del
-  // usuario): cae el gate `enFilaDisponible()` que las escondía fuera del
-  // equipo admin desde el 2026-07-29 — la sección ya quedó lista. Quién las
-  // muestra es el CSS (`#llenado-info` nace oculto y `body.modo-llenado` lo
-  // abre), así que aquí no se toca el display: ponerlo a mano volvería a
-  // pisar la regla de `modo-fin-llenado`, que las esconde para el resumen.
+  // Las cajitas VUELVEN a esconderse fuera del equipo admin (2026-09-14,
+  // hotfix de producción): al salir a operación esa misma mañana, la barra
+  // flotante creció con ellas y, centrada arriba, tapó la parte alta del
+  // Detalle de línea. El campo del artículo quedó debajo de la barra
+  // "siempre encima" y el llenado dejó de encontrarlo ("campo_articulo: 0
+  // candidatos") — toda máquina de operación moría en la línea 1. Vuelven
+  // cuando la barra tenga un sitio que no tape el Detalle; mientras, este
+  // gate deja la barra con el alto de siempre (ALTO_CONTENIDO_FLOTANTE).
+  $("llenado-info").style.display = enFilaDisponible() ? "" : "none";
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
   $("info-fecha").textContent = fechaCorta(iso) || "—";
