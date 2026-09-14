@@ -447,6 +447,16 @@
   tr.fila-aviso-error td { background:#fdecec; color:#a12a2a; font-size:12px;
                      padding-top:0; padding-bottom:8px; }
   tr.fila-aviso-error:hover td { background:#fdecec; }
+  /* Detalle de la factura procesada (2026-09-14, pedido del usuario): salió de
+     su columna —donde el texto de un error se partía en cuatro renglones y
+     apretaba a las demás— a un renglón propio a todo lo ancho, igual que el
+     fallo en PENDIENTES. Rojo solo el error de llenado; el motivo de un cierre
+     a mano y el historial de la factura van en gris. */
+  tr.fila-detalle td { background:#f6f6f6; color:var(--mut); font-size:12px;
+                     padding-top:0; padding-bottom:8px; }
+  tr.fila-detalle.error td { background:#fdecec; color:#a12a2a; }
+  tr.fila-detalle:hover td { background:#f6f6f6; }
+  tr.fila-detalle.error:hover td { background:#fdecec; }
   /* Doble llenado (2026-07-28): dos documentos fiscales por el mismo pedido.
      Abierto grita —franja roja, borde grueso a la izquierda— porque espera
      una decisión; resuelto baja a gris y se queda solo como rastro. */
@@ -2984,7 +2994,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div class="tabla-scroll"><table id="t-procesadas">
       <thead><tr>
         <th>Pedido</th><th>Cliente y sucursal</th><th>Ruta</th><th>Fecha pedido</th><th>Líneas</th>
-        <th>Nº doc</th><th>Serie</th><th>Detalle</th><th>Procesada</th><th>Máquina</th><th>Estado</th><th></th>
+        <th>Nº doc</th><th>Serie</th><th>Procesada</th><th>Máquina</th><th>Estado</th><th></th>
       </tr></thead>
       <tbody></tbody>
     </table></div>
@@ -4981,7 +4991,7 @@ function pintarInfoLlenado() {
   // pisar la regla de `modo-fin-llenado`, que las esconde para el resumen.
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
-  $("info-fecha").textContent = iso ? dmaCorto(iso) : "—";
+  $("info-fecha").textContent = fechaCorta(iso) || "—";
   const av = avanceLlenado;
   const hayLineas = !!(av && av.total);
   // Los grupos se saben desde antes de la primera línea (mientras se ajusta el
@@ -8794,21 +8804,40 @@ const RESALTADO_ESPERA_LARGA = {
 };
 
 // Índice de getDay(): 0 = domingo.
-const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves",
-                     "viernes", "sábado"];
+const DIAS_SEMANA_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
-// "Hoy" / "Ayer" / "viernes 07 agosto" (con año solo si no es el actual, como
-// en avisoFechaDelPedido) / "Sin fecha registrada" para lo que llegó sin dato.
-// El mes va con nombre y no en "07/08": esa forma se leía como un rango
-// "del 7 al 8" (2026-08-10, confusión real de una operadora).
+// UN solo formato para toda fecha que el panel muestre como dato (2026-09-14,
+// pedido del usuario): "vie 3 sept". Antes cada lista decía la suya —el ISO
+// pelado "2026-09-03" en las columnas, el instante con la T de la base en
+// "Procesada", "03/09" en los avisos— y en una misma pantalla convivían tres
+// formas de escribir el mismo día. Sin año ni ceros de relleno: lo que se
+// factura es de esta semana. El día de semana va delante porque es como el
+// operador tiene el día en la cabeza ("lo del viernes"), y el mes con nombre
+// porque "07/08" se leía como un rango "del 7 al 8" (2026-08-10, confusión
+// real de una operadora). El año se pega solo cuando no es el corriente: sin
+// él, un pedido del año pasado pasaría por uno de este.
+function fechaCorta(valor) {
+  const d = calDesdeISO((valor || "").slice(0, 10));
+  if (!d) return "";
+  const dia = `${DIAS_SEMANA_CORTOS[d.getDay()]} ${d.getDate()} ${CAL_MESES_CORTOS[d.getMonth()]}`;
+  return d.getFullYear() === new Date().getFullYear() ? dia : `${dia} ${d.getFullYear()}`;
+}
+
+// La misma fecha con la hora pegada ("vie 3 sept 14:22"), para los instantes
+// que el panel guarda con hora. Un dato sin hora queda solo con su fecha.
+function fechaCortaHora(valor) {
+  const dia = fechaCorta(valor);
+  const hora = (valor || "").slice(11, 16);
+  return dia && /^\d\d:\d\d$/.test(hora) ? `${dia} ${hora}` : dia;
+}
+
+// "Hoy" / "Ayer" / "vie 3 sept" / "Sin fecha registrada" para lo que llegó sin
+// dato.
 function etiquetaSeparadorFecha(iso, hoy, ayer) {
   if (!iso) return "Sin fecha registrada";
   if (iso === hoy) return "Hoy";
   if (iso === ayer) return "Ayer";
-  const d = calDesdeISO(iso);
-  if (!d) return iso;
-  const diaMes = `${DIAS_SEMANA[d.getDay()]} ${calPad(d.getDate())} ${CAL_MESES[d.getMonth()]}`;
-  return iso.slice(0, 4) === hoy.slice(0, 4) ? diaMes : `${diaMes} ${d.getFullYear()}`;
+  return fechaCorta(iso) || iso;
 }
 
 // Pinta `items` —YA en el orden final que se quiere mostrar; esta función
@@ -12166,7 +12195,7 @@ function pintarPendientes(familias) {
         <td><b>${esc(f0.pedido_id)}</b></td>
         <td>${celdaCliente(f0)}</td>
         <td>${esc(nombreRuta(f0.ruta || ""))}</td>
-        <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
+        <td>${esc(fechaCorta(f0.fecha_orden_salida))}</td>
         <td colspan="4" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaPendiente(f, true, atrasada)).join("");
     },
@@ -12220,7 +12249,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
       <td>${enFamilia ? "" : esc(nombreRuta(f.ruta || ""))}</td>
-      <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
+      <td>${enFamilia ? "" : esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
       <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}</td>
@@ -12596,7 +12625,7 @@ function pintarLlenadosPorRevisar(lista) {
       <td>${esc(f.pedido_id)}${f.total_partes > 1
         ? `<div class="mut">factura ${f.parte} de ${f.total_partes}</div>` : ""}</td>
       <td>${celdaCliente(f)}</td>
-      <td>${esc((f.fecha_orden_salida || "").slice(0,10))}</td>
+      <td>${esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${esc(nombreRuta(f.ruta || ""))}</td>
       <td>${quePaso}${(f.tipo === "error" && detalle && ultimaReemision)
         ? `<div class="mut">${esc(ultimaReemision)}</div>` : ""}</td>
@@ -12674,7 +12703,7 @@ function pintarRevision(lista) {
       <td>${esc(p.pedido_id)}</td>
       <td>${esc(p.razon_social || p.cliente_id)}${p.razon_social
             ? `<div class="mut">${esc(p.cliente_id)}</div>` : ""}</td>
-      <td>${esc((p.fecha_orden_salida || "").slice(0,10))}</td>
+      <td>${esc(fechaCorta(p.fecha_orden_salida))}</td>
       <td>${p.motivos.map(m => casoDeMotivo(m)?.objeto(p) ?? "—").join("<br>")}</td>
       <td>${p.motivos.map(m => esc(detalleDeMotivo(m, p))).join("<br>")}</td>
       <td${CELDA_ACCIONES}>${botonesRevision(p, i, abre)}</td>
@@ -12880,7 +12909,7 @@ function pintarProcesadas(familias) {
              + `${c.facturas} factura${c.facturas === 1 ? "" : "s"}` : "";
   };
   $("t-procesadas").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
-    familias, fechaDeFamiliaProcesada, 12, (partes) => {
+    familias, fechaDeFamiliaProcesada, 11, (partes) => {
       const f0 = partes[0];
       if (partes.length === 1 && !(f0.total_partes > 1)) return filaProcesada(f0, false);
       return `
@@ -12888,12 +12917,12 @@ function pintarProcesadas(familias) {
         <td><b>${esc(f0.pedido_id)}</b></td>
         <td>${celdaCliente(f0)}</td>
         <td>${esc(nombreRuta(f0.ruta || ""))}</td>
-        <td>${esc((f0.fecha_orden_salida || "").slice(0,10))}</td>
-        <td colspan="8" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
+        <td>${esc(fechaCorta(f0.fecha_orden_salida))}</td>
+        <td colspan="7" class="fam-resumen">${esc(resumenFamilia(partes))}</td>
       </tr>` + partes.map(f => filaProcesada(f, true)).join("");
     },
     null, sufijo
-  ) || `<tr><td colspan="12" class="mut">Nada registrado todavía.</td></tr>`;
+  ) || `<tr><td colspan="11" class="mut">Nada registrado todavía.</td></tr>`;
 }
 
 function filaProcesada(f, enFamilia) {
@@ -12904,16 +12933,30 @@ function filaProcesada(f, enFamilia) {
     : (f.estado === "descartada" || f.estado === "facturada_a_mano") ? (f.motivo_descarte || "")
     : (f.detalle_error ? f.detalle_error + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "") : "");
   const clave = esc(`${f.pedido_id}|${f.parte}`);
-  // Historial de la factura: renglón aparte y en gris debajo del detalle
-  // (2026-07-27). No es el resultado del último llenado —que es lo que pinta
-  // de rojo la celda—, sino la historia de la factura, y se queda ahí para
-  // siempre: un documento reemitido tiene que poder explicarse meses después.
+  // Historial de la factura: en gris y debajo del detalle (2026-07-27). No es
+  // el resultado del último llenado —que es lo que pinta de rojo el renglón—,
+  // sino la historia de la factura, y se queda ahí para siempre: un documento
+  // reemitido tiene que poder explicarse meses después.
   // Desde 2026-08-05 son TODOS los eventos (fallos y las decisiones que los
-  // resolvieron), menos el más nuevo, que ya lo dice la celda de al lado.
+  // resolvieron), menos el más nuevo, que ya lo cuenta el detalle de arriba.
   // Va en todos los estados, también en una reabierta que terminó marcada
   // como llenada a mano (las filas virtuales nunca traen nota: no tienen
   // registro local que reabrir).
   const reemisiones = historialPrevio(f.nota_reemision);
+  // Renglón propio a todo lo ancho en vez de una columna (2026-09-14, pedido
+  // del usuario): el texto de un error no cabía en la columna Detalle, se
+  // partía en cuatro renglones y apretaba a las demás. Mismo trato que el
+  // fallo en PENDIENTES, que ya se cuenta así. En rojo solo el error de
+  // llenado; el motivo de un cierre a mano y el historial van en gris, que no
+  // son un problema sino el rastro de lo que se decidió.
+  const esErrorDeLlenado = !f.a_mano && !!f.detalle_error
+    && f.estado !== "descartada" && f.estado !== "facturada_a_mano";
+  const detalleFila = (detalle || reemisiones) ? `
+    <tr class="fila-detalle${esErrorDeLlenado ? " error" : ""}${enFamilia ? " fam-parte" : ""}"
+        data-factura-key="${clave}">
+      <td colspan="11">${esc(detalle)}${
+        reemisiones ? `<div class="mut">${esc(reemisiones).replaceAll("\n", "<br>")}</div>` : ""}</td>
+    </tr>` : "";
   // Doble llenado (2026-07-28): renglón propio a todo lo ancho, porque no es
   // un detalle de la factura sino un problema de plata — dos documentos
   // fiscales por el mismo pedido. Mientras esté abierto va en rojo y con su
@@ -12921,7 +12964,7 @@ function filaProcesada(f, enFamilia) {
   const conflicto = f.conflicto ? `
     <tr class="fila-conflicto${f.conflicto_abierto ? " abierto" : ""}${enFamilia ? " fam-parte" : ""}"
         data-factura-key="${clave}">
-      <td colspan="12">
+      <td colspan="11">
         <span>${esc(f.conflicto).replaceAll("\n", "<br>")}</span>
         ${f.conflicto_abierto ? botonesResolverConflicto(f) : ""}
       </td>
@@ -12932,11 +12975,11 @@ function filaProcesada(f, enFamilia) {
   const omitidas = f.lineas_omitidas ? `
     <tr class="fila-omitidas${f.revision_pendiente ? " pendiente" : ""}${enFamilia ? " fam-parte" : ""}"
         data-factura-key="${clave}">
-      <td colspan="12">
+      <td colspan="11">
         ${f.revision_pendiente
           ? `<span>Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas).replaceAll("\n", "<br>")}</span>
              <button class="acento" onclick="marcarFacturaRevisada('${esc(f.pedido_id)}',${f.parte})">Revisada</button>`
-          : `<span>Se revisó el ${esc((f.revisada_at || "").replace("T", " ").slice(0, 16))}. `
+          : `<span>Se revisó el ${esc(fechaCortaHora(f.revisada_at))}. `
             + `Faltaron líneas en el documento:<br>${esc(f.lineas_omitidas).replaceAll("\n", "<br>")}</span>`}
       </td>
     </tr>` : "";
@@ -12947,19 +12990,17 @@ function filaProcesada(f, enFamilia) {
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
       <td>${enFamilia ? "" : esc(nombreRuta(f.ruta || ""))}</td>
-      <td>${enFamilia ? "" : esc((f.fecha_orden_salida || "").slice(0,10))}</td>
+      <td>${enFamilia ? "" : esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.numero_documento || "")}</td>
       <td>${esc(f.serie || "")}</td>
-      <td class="${f.a_mano ? "mut" : "detalle-error"}">${esc(detalle)}${
-        reemisiones ? `<div class="mut">${esc(reemisiones).replaceAll("\n", "<br>")}</div>` : ""}</td>
-      <td class="mut">${f.sin_factura ? "" : esc(f.fecha_cierre || f.fecha_cargado || "")}${
-        f.fecha_factura ? `<div>Factura: ${esc(f.fecha_factura)}</div>` : ""}</td>
+      <td class="mut">${f.sin_factura ? "" : esc(fechaCortaHora(f.fecha_cierre || f.fecha_cargado))}${
+        f.fecha_factura ? `<div>Factura: ${esc(fechaCorta(f.fecha_factura))}</div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
       <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
-    </tr>${conflicto}${omitidas}
-    <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="12"></td></tr>`;
+    </tr>${detalleFila}${conflicto}${omitidas}
+    <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
 }
 
 // La misma acción desde los tres lugares donde se ve el problema: "Marcar como
@@ -13017,7 +13058,7 @@ function abrirAvisoTasa(motivo, llenado) {
   const btnDespacho = $("tasa-despacho");
   btnDespacho.style.display = (fecha === despacho) ? "none" : "";
   btnDespacho.textContent =
-    `Llenar para el despacho de ${nombreDiaDespacho()} (${dmaCorto(despacho)})`;
+    `Llenar para el despacho de ${nombreDiaDespacho()} (${fechaCorta(despacho)})`;
   btnDespacho.title = `Mueve la Fecha a facturar al despacho (${nombreDiaDespacho()}) `
     + "y llena. Si la tasa de ese día todavía no salió, este mismo aviso vuelve "
     + "a aparecer.";
@@ -13063,9 +13104,6 @@ function intentarPararPorTasa() {
     alMostrar: () => crecerVentanaPorModal("tasa-caja"),   // la pregunta agranda la caja
   });
 }
-
-// "aaaa-mm-dd" → "dd/mm" (para las etiquetas cortas de los botones).
-const dmaCorto = (iso) => (iso || "").slice(5).split("-").reverse().join("/");
 
 // "Llenar con esta tasa": la del aviso pasa al campo Tasa de la barra como
 // escrita a mano — así viaja a Tasas de Cambio de Winledger (tasaParaLlenar
@@ -15482,12 +15520,6 @@ const diaDespuesDe = (iso) => {
   return calISO(d);
 };
 
-// "dd/mm", con el año pegado solo cuando no es el de la fecha a facturar: un
-// pedido de otro año en dd/mm se leería como uno de este.
-const fechaCortaDelAviso = (iso, isoFacturar) =>
-  iso.slice(0, 4) === isoFacturar.slice(0, 4)
-    ? dmaCorto(iso) : iso.split("-").reverse().join("/");
-
 // SVG y no el carácter "⚠": el glifo se escala con el font-size y no puede
 // crecer hasta el alto de la caja, que es lo que se pidió (2026-08-02).
 const TRIANGULO_ALERTA =
@@ -15562,7 +15594,7 @@ function pedirMotivoFechaDesfase(donde) {
   if (!d) return;
   abrirMotivo("fecha_desfasada", "", [], {
     donde, firma: d.firma,
-    aviso: `La Fecha a facturar se mantiene en ${fechaCortaDelAviso(d.isoFacturar, d.isoFacturar)}. `
+    aviso: `La Fecha a facturar se mantiene en ${fechaCorta(d.isoFacturar)}. `
       + "Elige el motivo antes de llenar.",
   });
 }
@@ -15586,7 +15618,7 @@ function avisoFechaDelPedido(facturas, donde) {
   if (!desfase) return "";
   const {isoFacturar, esperada, fechas, desfasadas, distintas} = desfase;
   const sinDecidir = desfase.firma !== fechaDesfaseOk[donde];
-  const corta = (iso) => fechaCortaDelAviso(iso, isoFacturar);
+  const corta = fechaCorta;
   // Cuatro fechas o más no se enumeran: la lista se vuelve ilegible y lo que
   // hay que saber es que son de días que no corresponden, no cuáles.
   const listadas = distintas.map(corta);
@@ -23790,7 +23822,7 @@ async function restaurarFeriado(indice) {
 const CAL_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
                    "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const CAL_MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul",
-                          "ago", "sep", "oct", "nov", "dic"];
+                          "ago", "sept", "oct", "nov", "dic"];
 const CAL_DIAS = ["lu", "ma", "mi", "ju", "vi", "sá", "do"];
 let calCampo = null;   // campo al que pertenece el calendario abierto
 let calMes = null;     // Date del día 1 del mes que se está mostrando
@@ -24370,7 +24402,7 @@ mensaje("", "");   // estado inicial: barra oculta
 $("t-pendientes").querySelector("tbody").innerHTML =
   `<tr><td colspan="8" class="mut"><span class="spinner"></span> Cargando pedidos…</td></tr>`;
 $("t-procesadas").querySelector("tbody").innerHTML =
-  `<tr><td colspan="12" class="mut"><span class="spinner"></span> Cargando…</td></tr>`;
+  `<tr><td colspan="11" class="mut"><span class="spinner"></span> Cargando…</td></tr>`;
 const cargaInicial = cargar();
 consultarTasaBCV();   // en paralelo con cargar(): el BCV puede tardar segundos
 // modo_implantacion viaja en /api/ajustes: se carga ya (no solo al abrir la
