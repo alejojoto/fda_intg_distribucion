@@ -1,6 +1,6 @@
 Distribucion del Asistente FDA (bytecode; el codigo fuente no viaja).
-commit_fuente: 8cca963fd79b605cbd76f480e8c8716cc498bc20
-fecha_commit: 2026-09-14T02:45:36+02:00
+commit_fuente: 8ab92d4dd2e9a08e2f04fcb720a0832f35e60d62
+fecha_commit: 2026-09-14T03:14:43+02:00
 canal: main
 modo_prueba_implantacion: false
 dias_pendiente_reciente_none: false

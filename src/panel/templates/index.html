@@ -493,6 +493,28 @@
   #aviso-reinicio.urge { background:#fff4e0; color:#7a4a00;
                      border-left:5px solid #d98300; }
   #aviso-reinicio div + div { margin-top:6px; }
+  /* El MISMO aviso, pero tapando la pantalla (2026-09-14, pedido del usuario:
+     "mejor como un popup que te obliga a cerrar el programa"). La franja
+     convivía con el trabajo y se la saltaba cualquiera: una computadora podía
+     pasar días con la versión vieja sin que nadie se diera por aludido. Sin
+     cierre por clic afuera —apareció solo, no lo abrió nadie— y por encima de
+     todo lo demás, menú de contexto incluido (z-index 200). La franja no se
+     retira: es la que queda cuando el modal está callado o hay un llenado. */
+  #reinicio-overlay { position:fixed; inset:0; background:rgba(29,36,51,.55);
+                      display:none; z-index:300; align-items:center;
+                      justify-content:center; }
+  #reinicio-overlay.visible { display:flex; }
+  #reinicio-caja { background:#fff; border-radius:12px; padding:22px 24px;
+                   width:min(560px, 92vw); max-height:88vh; overflow:auto;
+                   box-shadow:0 12px 48px rgba(0,0,0,.35);
+                   border-top:6px solid #1a73e8; }
+  #reinicio-caja.urge { border-top-color:#d98300; }
+  #reinicio-caja h3 { margin:0 0 10px; font-size:17px; color:#1d2433; }
+  #reinicio-caja p + h3 { margin-top:18px; }
+  #reinicio-caja p { margin:0 0 14px; font-size:13.5px; line-height:1.55;
+                     color:#3a4252; }
+  #reinicio-nota { display:none; background:#fff4e0; color:#7a4a00;
+                   border-radius:6px; padding:8px 10px; font-size:12.5px; }
   /* Rompe-vidrio puesto (2026-08-07): ámbar y no rojo — no hay nada roto, hay
      una puerta abierta a conciencia. Se ve en TODAS las pestañas y no se
      puede cerrar: el día que se olvide puesto, esta franja es lo único que
@@ -2833,6 +2855,21 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        conflictos a propósito: si las dos están, la que pide acción sobre las
        facturas tiene que quedar pegada a la lista. -->
   <div id="aviso-reinicio" style="display:none"></div>
+
+  <!-- El mismo aviso tapando la pantalla (2026-09-14). SIN cierre por clic
+       afuera: este modal aparece solo, no lo abrió nadie, y cerrarlo sin
+       querer con un clic al lado sería justo lo que se vino a evitar. -->
+  <div id="reinicio-overlay">
+    <div id="reinicio-caja">
+      <div id="reinicio-cuerpo"></div>
+      <p id="reinicio-nota"></p>
+      <div class="editor-acciones">
+        <button type="button" class="primario" id="reinicio-cerrar"
+                onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
+        <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
        este no lo dispara nada que haya pasado en esta computadora — es un
@@ -10530,19 +10567,99 @@ async function latido() {
 // con datos incompletos — ahí sí hay algo que el reinicio arregla.
 // `version_nueva` se sigue aceptando para no depender del orden de despliegue:
 // una página vieja contra un panel nuevo, o al revés, no se queda sin aviso.
+// Cuánto se calla el modal con "Ahora no" y hasta cuándo (ms de Date.now();
+// 0 = no está callado). Diez minutos a propósito: el aviso tiene que insistir,
+// pero encerrar a quien está a mitad de algo no es insistir, es estorbar.
+const REINICIO_INSISTE_MS = 10 * 60 * 1000;
+let reinicioCalladoHasta = 0;
+let reinicioPintado = "";          // firma de lo último pintado en el modal
+let ultimoEstadoReinicio = null;   // lo último que dijo /salud, para repintar sin esperar al latido
+let ultimaVersionNuevaReinicio = null;
+
 function pintarAvisoReinicio(estado, versionNueva) {
+  ultimoEstadoReinicio = estado;
+  ultimaVersionNuevaReinicio = versionNueva;
   const caja = $("aviso-reinicio");
-  if (!caja) return;
   const motivos = (estado && estado.motivos) || (versionNueva && versionNueva.hay
-    ? [{texto: "Hay una versión nueva del asistente, ya descargada. Se aplica "
-              + "cuando cierres y vuelvas a abrir el programa.", urgente: false}]
+    ? [{clave: "version_nueva",
+        titulo: "Hay una versión nueva del asistente",
+        texto: "La versión nueva ya está descargada y entra cuando cierres y "
+             + "vuelvas a abrir el programa. Hasta entonces esta computadora "
+             + "sigue con la anterior.", urgente: false}]
     : []);
-  caja.style.display = motivos.length ? "" : "none";
-  caja.classList.toggle("urge", motivos.some(m => m.urgente));
-  if (!motivos.length) return;
   // Lo urgente primero: si las dos cosas están, la que pide acción manda.
   const ordenados = [...motivos].sort((a, b) => (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+  const urge = ordenados.some(m => m.urgente);
+
+  // El modal NO se asoma con un llenado en curso: taparía la barra flotante,
+  // y el panel se niega a apagarse a mitad de un documento — ofrecer el botón
+  // ahí sería empujar a algo que va a salir rechazado.
+  const enLlenado = !!(estado && estado.llenado_en_curso) || llenando;
+  const conModal = ordenados.length > 0 && !enLlenado && Date.now() >= reinicioCalladoHasta;
+  pintarModalReinicio(conModal ? ordenados : [], urge);
+
+  if (!caja) return;
+  // La franja se queda con lo que el modal no cubre —el llenado en curso y los
+  // diez minutos de "Ahora no"—; con el modal encima sería decir lo mismo dos
+  // veces en la misma pantalla.
+  const conFranja = ordenados.length > 0 && !conModal;
+  caja.style.display = conFranja ? "" : "none";
+  caja.classList.toggle("urge", urge);
+  if (!conFranja) return;
   caja.innerHTML = ordenados.map(m => `<div>${esc(m.texto)}</div>`).join("");
+}
+
+function pintarModalReinicio(motivos, urge) {
+  const overlay = $("reinicio-overlay");
+  if (!overlay) return;
+  overlay.classList.toggle("visible", motivos.length > 0);
+  if (!motivos.length) { reinicioPintado = ""; return; }
+  // Sin esta firma el latido repintaría el modal cada ocho segundos y se
+  // llevaría por delante el clic que el operador estuviera dando.
+  const firma = motivos.map(m => m.clave || m.titulo).join("|");
+  if (firma === reinicioPintado) return;
+  reinicioPintado = firma;
+  $("reinicio-caja").classList.toggle("urge", urge);
+  $("reinicio-cuerpo").innerHTML = motivos.map(m =>
+    `<h3>${esc(m.titulo || "Hace falta cerrar y volver a abrir el asistente")}</h3>`
+    + `<p>${esc(m.texto)}</p>`).join("");
+  // El botón solo existe en la ventana propia: apagar el panel exige el token
+  // de data/panel_apagado.token, que es del proceso de la ventana. Con Edge o
+  // en una pestaña el aviso pide el cierre a mano, como hacía antes.
+  const api = apiVentana();
+  const puedeCerrar = !!(api && api.cerrar);
+  const boton = $("reinicio-cerrar");
+  const nota = $("reinicio-nota");
+  boton.style.display = puedeCerrar ? "" : "none";
+  boton.disabled = false;
+  boton.textContent = "Cerrar el asistente ahora";
+  nota.style.display = puedeCerrar ? "none" : "";
+  if (!puedeCerrar) {
+    nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
+      + "actualiza solo.";
+  }
+}
+
+function callarAvisoReinicio() {
+  reinicioCalladoHasta = Date.now() + REINICIO_INSISTE_MS;
+  reinicioPintado = "";
+  pintarAvisoReinicio(ultimoEstadoReinicio, ultimaVersionNuevaReinicio);
+}
+
+async function cerrarDesdeAvisoReinicio(boton) {
+  const api = apiVentana();
+  if (!api || !api.cerrar) return;
+  boton.disabled = true;
+  boton.textContent = "Cerrando…";
+  let ok = false;
+  try { ok = await Promise.resolve(api.cerrar()); } catch (e) { ok = false; }
+  if (ok) return;   // el asistente se está yendo: no queda nada que repintar
+  boton.disabled = false;
+  boton.textContent = "Cerrar el asistente ahora";
+  const nota = $("reinicio-nota");
+  nota.style.display = "";
+  nota.textContent = "No se pudo cerrar ahora mismo. Termina lo que tengas en "
+    + "curso y ciérralo con la X de la ventana.";
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
