@@ -3321,6 +3321,18 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         <span class="prueba-nota" id="version-estable-nota" style="display:none"
               title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Congelada: no reciben actualizaciones</span>
       </div>
+      <!-- Buscar actualización ahora (2026-09-14, pedido del usuario): el vigía
+           mira cada media hora, y esperar media hora para saber si una versión
+           recién publicada llegó vuelve impracticable cualquier prueba. Este
+           botón corre el mismo tic a mano y no aplica nada: descarga y cuenta,
+           el merge sigue siendo del arranque. -->
+      <div class="ajustes-fila">
+        <b class="rotulo">Actualizaciones:</b>
+        <button type="button" id="buscar-version-btn"
+                onclick="buscarActualizacionAhora(this)"
+                title="Mira si hay una versión nueva publicada y la descarga. Entra al cerrar y volver a abrir el asistente, como siempre.">Buscar ahora</button>
+        <span class="prueba-nota" id="buscar-version-nota" style="display:none"></span>
+      </div>
       <!-- Rompe-vidrio (2026-08-07, tras el incidente del mismo día): volver a
            una versión vieja no alcanza cuando la nube ya exige condiciones que
            esa versión no sabe cumplir — el programa abre y aun así no trabaja.
@@ -10637,6 +10649,32 @@ function pintarModalReinicio(motivos, urge) {
   if (!puedeCerrar) {
     nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
       + "actualiza solo.";
+  }
+}
+
+// Buscar actualización a mano (2026-09-14). Tras el tic, el aviso se repinta
+// sin esperar al próximo latido: quien pulsó el botón está mirando AHORA.
+async function buscarActualizacionAhora(boton) {
+  const nota = $("buscar-version-nota");
+  const antes = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = "Buscando…";
+  nota.style.display = "none";
+  try {
+    const r = await api("/api/version/revisar", {});
+    nota.style.display = "";
+    nota.textContent = r.hay ? "Versión nueva descargada."
+                             : "Al día: sin cambios nuevos.";
+    const salud = await (await fetch("/salud", {cache: "no-store"})).json();
+    // El silencio de "Ahora no" no puede tapar lo que se acaba de pedir a mano.
+    reinicioCalladoHasta = 0;
+    pintarAvisoReinicio(salud.reinicio, salud.version_nueva);
+  } catch (e) {
+    nota.style.display = "";
+    nota.textContent = "No se pudo buscar: " + e.message;
+  } finally {
+    boton.disabled = false;
+    boton.textContent = antes;
   }
 }
 
