@@ -7653,6 +7653,7 @@ function supReleaseMasNuevo() {
 // es el que no tiene panel a mano — el server puesto "como operación" ya no
 // muestra herramientas de admin, así que su vuelta a Dev se hace desde aquí.
 const SUP_CANALES_ASIGNABLES = [["", "Automático"], ["desarrollo", "Dev"],
+                                ["preprod", "Preprod"],
                                 ["produccion", "Producción"],
                                 ["estable", "Estable (1.0)"],
                                 ["estable-1.1", "Estable 1.1"]];
@@ -7663,7 +7664,7 @@ function supSelectorCanal(equipo) {
   const puesto = equipo.canal_asignado || "";
   const opciones = SUP_CANALES_ASIGNABLES.map(([v, txt]) =>
     `<option value="${v}"${v === puesto ? " selected" : ""}>${txt}</option>`).join("");
-  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente. Automático: el server y el Mac cargan desarrollo; las demás, producción. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev se las devuelve."
+  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente. Automático: el server y el Mac cargan desarrollo; las demás, producción. Preprod es el candidato de producción, que este equipo corre antes que el parque. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev y Preprod se las devuelven."
     onchange="supCambiarCanal(this, '${host}')">${opciones}</select>`;
 }
 
