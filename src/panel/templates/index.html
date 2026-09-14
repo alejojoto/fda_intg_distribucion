@@ -10630,26 +10630,36 @@ function pintarModalReinicio(motivos, urge) {
   // Sin esta firma el latido repintaría el modal cada ocho segundos y se
   // llevaría por delante el clic que el operador estuviera dando.
   const firma = motivos.map(m => m.clave || m.titulo).join("|");
-  if (firma === reinicioPintado) return;
-  reinicioPintado = firma;
-  $("reinicio-caja").classList.toggle("urge", urge);
-  $("reinicio-cuerpo").innerHTML = motivos.map(m =>
-    `<h3>${esc(m.titulo || "Hace falta cerrar y volver a abrir el asistente")}</h3>`
-    + `<p>${esc(m.texto)}</p>`).join("");
-  // El botón solo existe en la ventana propia: apagar el panel exige el token
-  // de data/panel_apagado.token, que es del proceso de la ventana. Con Edge o
-  // en una pestaña el aviso pide el cierre a mano, como hacía antes.
+  if (firma !== reinicioPintado) {
+    reinicioPintado = firma;
+    $("reinicio-caja").classList.toggle("urge", urge);
+    $("reinicio-cuerpo").innerHTML = motivos.map(m =>
+      `<h3>${esc(m.titulo || "Hace falta cerrar y volver a abrir el asistente")}</h3>`
+      + `<p>${esc(m.texto)}</p>`).join("");
+  }
+  // EL BOTÓN SE RE-EVALÚA EN CADA PINTADA, FUERA de la guarda anti-repintado
+  // (2026-09-14, corregido: así nació y no servía). pywebview inyecta
+  // `window.pywebview.api` DESPUÉS de cargar la página; si la primera pintada
+  // cae antes de eso, `puedeCerrar` sale falso, el botón se esconde — y con el
+  // motivo sin cambiar la firma nunca volvía a mirar, así que quedaba
+  // escondido para siempre. Reescribir dos propiedades cada ocho segundos no
+  // le cuesta nada a nadie; perder el botón sí.
   const api = apiVentana();
   const puedeCerrar = !!(api && api.cerrar);
   const boton = $("reinicio-cerrar");
   const nota = $("reinicio-nota");
   boton.style.display = puedeCerrar ? "" : "none";
-  boton.disabled = false;
-  boton.textContent = "Cerrar el asistente ahora";
-  nota.style.display = puedeCerrar ? "none" : "";
-  if (!puedeCerrar) {
-    nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
-      + "actualiza solo.";
+  // El texto y el `disabled` NO se tocan si el operador tiene un cierre en
+  // vuelo: el latido pasa cada ocho segundos y le devolvería el botón a
+  // "Cerrar el asistente ahora" mientras todavía está cerrando.
+  if (!cerrandoDesdeAviso) {
+    boton.disabled = false;
+    boton.textContent = "Cerrar el asistente ahora";
+    nota.style.display = puedeCerrar ? "none" : "";
+    if (!puedeCerrar) {
+      nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
+        + "actualiza solo.";
+    }
   }
 }
 
@@ -10685,20 +10695,41 @@ function callarAvisoReinicio() {
   pintarAvisoReinicio(ultimoEstadoReinicio, ultimaVersionNuevaReinicio);
 }
 
+let cerrandoDesdeAviso = false;   // hay un cierre en vuelo: el latido no lo pisa
+
 async function cerrarDesdeAvisoReinicio(boton) {
   const api = apiVentana();
-  if (!api || !api.cerrar) return;
+  const nota = $("reinicio-nota");
+  if (!api || !api.cerrar) {
+    // No debería llegar aquí (sin API el botón no se pinta), pero si llega hay
+    // que DECIRLO: un botón que no hace nada al pulsarlo es lo peor de todo.
+    nota.style.display = "";
+    nota.textContent = "Esta ventana no puede cerrarse sola. Ciérrala con la X "
+      + "y vuelve a abrir el asistente.";
+    return;
+  }
+  cerrandoDesdeAviso = true;
   boton.disabled = true;
   boton.textContent = "Cerrando…";
-  let ok = false;
-  try { ok = await Promise.resolve(api.cerrar()); } catch (e) { ok = false; }
+  // Cada paso deja rastro en el log del panel: este botón corre en el server,
+  // donde no hay depurador, y lo único que puede decir dónde murió es esto.
+  reportarAlPanel({tipo: "cerrar-aviso", paso: "pedido"});
+  let ok = false, fallo = "";
+  try {
+    ok = await Promise.resolve(api.cerrar());
+  } catch (e) {
+    fallo = (e && e.message) || String(e);
+  }
+  reportarAlPanel({tipo: "cerrar-aviso", paso: "respuesta", ok, fallo});
   if (ok) return;   // el asistente se está yendo: no queda nada que repintar
+  cerrandoDesdeAviso = false;
   boton.disabled = false;
   boton.textContent = "Cerrar el asistente ahora";
-  const nota = $("reinicio-nota");
   nota.style.display = "";
-  nota.textContent = "No se pudo cerrar ahora mismo. Termina lo que tengas en "
-    + "curso y ciérralo con la X de la ventana.";
+  nota.textContent = fallo
+    ? "No se pudo cerrar: " + fallo + ". Ciérralo con la X de la ventana."
+    : "No se pudo cerrar ahora mismo. Termina lo que tengas en curso y "
+      + "ciérralo con la X de la ventana.";
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
