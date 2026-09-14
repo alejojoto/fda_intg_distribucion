@@ -5031,12 +5031,15 @@ function repartoTip(productos, altoDisponible) {
 }
 
 function pintarInfoLlenado() {
-  // Las cajitas se ven en TODA máquina desde el 2026-09-14 (pedido del
-  // usuario): cae el gate `enFilaDisponible()` que las escondía fuera del
-  // equipo admin desde el 2026-07-29 — la sección ya quedó lista. Quién las
-  // muestra es el CSS (`#llenado-info` nace oculto y `body.modo-llenado` lo
-  // abre), así que aquí no se toca el display: ponerlo a mano volvería a
-  // pisar la regla de `modo-fin-llenado`, que las esconde para el resumen.
+  // Las cajitas VUELVEN a esconderse fuera del equipo admin (2026-09-14,
+  // hotfix de producción): al salir a operación esa misma mañana, la barra
+  // flotante creció con ellas y, centrada arriba, tapó la parte alta del
+  // Detalle de línea. El campo del artículo quedó debajo de la barra
+  // "siempre encima" y el llenado dejó de encontrarlo ("campo_articulo: 0
+  // candidatos") — toda máquina de operación moría en la línea 1. Vuelven
+  // cuando la barra tenga un sitio que no tape el Detalle; mientras, este
+  // gate deja la barra con el alto de siempre (ALTO_CONTENIDO_FLOTANTE).
+  $("llenado-info").style.display = enFilaDisponible() ? "" : "none";
   $("info-serie").textContent = serieSeleccionada || "—";
   const iso = $("f-fecha-facturar").value;
   $("info-fecha").textContent = fechaCorta(iso) || "—";
