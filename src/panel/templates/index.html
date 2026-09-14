@@ -2950,16 +2950,23 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
            title="Oculta lo que llenaron las otras máquinas y lo que se facturó a mano.">
       <input type="checkbox" id="f-solo-aqui" onchange="marcarSoloAqui()">
       Llenadas en esta máquina</label>
-    <!-- Filtro por UN equipo (2026-08-04). Aparece con el permiso
+    <!-- Filtro en dos pasos (2026-09-14, pedido del usuario): primero QUÉ se
+         mira —máquinas, clientes de prueba, especiales o normales— y solo
+         entonces aparece el segundo desplegable para quedarse con todos o con
+         uno solo de ese grupo. "Máquinas" sale únicamente con el permiso
          filtro_maquina (Editor, Admin y supervisión) y REEMPLAZA a la casilla
          de arriba: a quien solo factura no le sirve elegir de qué otra máquina
          mirar el historial, y a quien sí puede no le hace falta un segundo
-         control para su propio equipo. La visibilidad la decide cada refresco,
-         no el render de la página, para que cambiarle el rol a una PC se le
-         note sin reabrir. -->
-    <div class="campo" id="campo-maquina" style="display:none">Máquina
-      <select id="f-maquina" onchange="elegirMaquinaFiltro()"
-              title="Muestra solo lo llenado desde ese equipo."></select></div>
+         control para su propio equipo. Los grupos de cliente los ve todo el
+         mundo: no son datos de otro equipo, son el pedido de uno mismo. La
+         visibilidad la decide cada refresco, no el render de la página, para
+         que cambiarle el rol a una PC se le note sin reabrir. -->
+    <div class="campo" id="campo-clase" style="display:none">Filtrar por
+      <select id="f-clase" onchange="elegirClaseFiltro()"
+              title="Recorta la lista a un grupo: lo llenado por las máquinas, o los pedidos de clientes de prueba, especiales o normales."></select></div>
+    <div class="campo" id="campo-clase-valor" style="display:none">
+      <select id="f-clase-valor" onchange="elegirValorClaseFiltro()"
+              title="Todos los del grupo, o solo uno."></select></div>
   </div>
 
   <section id="sec-pendientes" class="tab-panel">
@@ -6627,13 +6634,21 @@ function filtros() {
        + "&ruta=" + encodeURIComponent(rutaSeleccionada)
        + "&dias=" + ventanaProcesadasDias()
        + "&solo_aqui=" + ($("f-solo-aqui").checked ? "1" : "")
+       + "&clase=" + encodeURIComponent(claseSeleccionada)
+       + "&cliente=" + encodeURIComponent(clienteSeleccionado)
        + "&maquina=" + encodeURIComponent(maquinaSeleccionada);
 }
 
-// Hostname del equipo elegido en el dropdown ("" = todas). Vive aparte del
-// <select> porque el dropdown se repinta en cada refresco (la lista de equipos
-// puede crecer) y el valor tiene que sobrevivir a ese repintado.
+// Grupo elegido en el primer desplegable de PROCESADAS: "" (todas), "maquina"
+// o uno de los tipos de cliente ("prueba", "especial", "normal").
+let claseSeleccionada = "";
+// Lo elegido en el segundo desplegable, que cambia según el grupo: hostname del
+// equipo con "maquina", Cliente_id con los grupos de cliente. "" = todos.
+// Viven aparte del <select> porque los dropdowns se repintan en cada refresco
+// (la lista de equipos y la de clientes pueden crecer) y el valor tiene que
+// sobrevivir a ese repintado.
 let maquinaSeleccionada = "";
+let clienteSeleccionado = "";
 
 // --- Filtro activo (2026-07-31, pedido del usuario) --------------------------
 // Mientras haya un filtro puesto la lista NO está completa, y eso se ve en tres
@@ -6664,17 +6679,38 @@ function filtrosActivos(tab) {
   if ($("f-hasta").value) activos.push({cual: "hasta", texto: `Hasta: ${dma($("f-hasta").value)}`});
   if (tab === "procesadas") {
     if ($("f-solo-aqui").checked) activos.push({cual: "solo_aqui", texto: "Llenadas en esta máquina"});
-    if (maquinaSeleccionada)
+    // El grupo y lo elegido dentro de él son dos recortes distintos y cada uno
+    // lleva su chip: quitar "Caja 2" deja la lista en todas las máquinas, no
+    // en la lista completa.
+    if (claseSeleccionada)
+      activos.push({cual: "clase", texto: `Filtrar por: ${ETIQUETAS_CLASE_FILTRO[claseSeleccionada] || claseSeleccionada}`});
+    if (claseSeleccionada === "maquina" && maquinaSeleccionada)
       activos.push({cual: "maquina", texto: `Máquina: ${nombreMaquinaFiltro(maquinaSeleccionada)}`});
+    if (claseSeleccionada && claseSeleccionada !== "maquina" && clienteSeleccionado)
+      activos.push({cual: "cliente", texto: `Cliente: ${nombreClienteFiltro(clienteSeleccionado)}`});
   }
   return activos;
 }
+
+const ETIQUETAS_CLASE_FILTRO = {
+  maquina: "Máquinas",
+  prueba: "Clientes de prueba",
+  especial: "Clientes especiales",
+  normal: "Clientes normales",
+};
 
 // El nombre visible del equipo elegido; su hostname si el catálogo todavía no
 // trajo uno (el dropdown ya muestra ese mismo texto).
 function nombreMaquinaFiltro(dispositivo) {
   const equipo = maquinasFiltro.find(m => m.dispositivo === dispositivo);
   return (equipo && equipo.nombre) || dispositivo;
+}
+
+// Igual para el cliente elegido: el mismo texto que muestra el dropdown, y el
+// Cliente_id crudo si esa fila ya no viene en el refresco.
+function nombreClienteFiltro(cliente_id) {
+  const cliente = clientesFiltro.find(c => c.cliente_id === cliente_id);
+  return cliente ? clienteEnLinea(cliente) : cliente_id;
 }
 
 // La ruta puesta recorta la lista, sí, pero solo se denuncia como filtro cuando
@@ -6710,6 +6746,13 @@ function pintarEstadoFiltros() {
   $("f-ruta").classList.toggle("filtro-on", tab !== "revision" && rutaFiltrando());
   $("campo-solo-aqui").classList.toggle(
     "filtro-on", tab === "procesadas" && $("f-solo-aqui").checked);
+  if ($("f-clase"))
+    $("f-clase").classList.toggle(
+      "filtro-on", tab === "procesadas" && !!claseSeleccionada);
+  if ($("f-clase-valor"))
+    $("f-clase-valor").classList.toggle(
+      "filtro-on", tab === "procesadas"
+        && !!(claseSeleccionada === "maquina" ? maquinaSeleccionada : clienteSeleccionado));
   $("filtro-aviso").style.display = activos.length ? "" : "none";
   // "Quitar todos" solo con dos o más: con uno solo repetiría la × del chip.
   $("filtro-aviso-chips").innerHTML = activos.map(a => `
@@ -6744,36 +6787,59 @@ function soltarFiltro(cual) {
     sincronizarRangosFecha();   // el otro extremo suelta su tope cruzado
   } else if (cual === "solo_aqui") {
     $("f-solo-aqui").checked = false;
-    mostrarCampoMaquina();
-  } else if (cual === "maquina") {
+    mostrarCamposClase();
+  } else if (cual === "clase") {
+    // Soltar el grupo suelta también lo elegido dentro de él: si no, volver a
+    // entrar en ese grupo lo encontraría con un recorte que nadie puso hoy.
+    claseSeleccionada = "";
     maquinaSeleccionada = "";
-    if ($("f-maquina")) $("f-maquina").value = "";
+    clienteSeleccionado = "";
+    if ($("f-clase")) $("f-clase").value = "";
+    mostrarCamposClase();
+  } else if (cual === "maquina" || cual === "cliente") {
+    if (cual === "maquina") maquinaSeleccionada = "";
+    else clienteSeleccionado = "";
+    if ($("f-clase-valor")) $("f-clase-valor").value = "";
   }
 }
 
-// Quien tiene el dropdown NO tiene la casilla (ver mostrarCampoMaquina), así
-// que elegir un equipo —incluido "(esta máquina)"— se queda en el dropdown:
-// convertirlo en la casilla escondería el único control que ese rol ve. La
-// casilla se suelta igual por si quedó marcada de antes del permiso: las dos
-// recortan por el mismo criterio y juntas dan lista vacía en cuanto el equipo
-// elegido no es este.
-function elegirMaquinaFiltro() {
-  maquinaSeleccionada = $("f-maquina").value;
-  if (maquinaSeleccionada) $("f-solo-aqui").checked = false;
-  mostrarCampoMaquina();
+// Cambiar de grupo empieza de cero dentro del grupo nuevo: el equipo o el
+// cliente que estaba elegido no existe en el otro desplegable.
+// Quien tiene el grupo "Máquinas" NO tiene la casilla (ver mostrarCamposClase),
+// así que elegir un equipo —incluido "(esta máquina)"— se queda en el
+// dropdown: convertirlo en la casilla escondería el único control que ese rol
+// ve. La casilla se suelta igual por si quedó marcada de antes del permiso:
+// las dos recortan por el mismo criterio y juntas dan lista vacía en cuanto el
+// equipo elegido no es este.
+function elegirClaseFiltro() {
+  claseSeleccionada = $("f-clase").value;
+  maquinaSeleccionada = "";
+  clienteSeleccionado = "";
+  // Solo el grupo "Máquinas" pelea con la casilla: los dos recortan por equipo
+  // y juntos dan lista vacía en cuanto el elegido no es este. Los grupos de
+  // cliente son otro corte y pueden convivir con ella.
+  if (claseSeleccionada === "maquina") $("f-solo-aqui").checked = false;
+  pintarValoresClaseFiltro();
+  mostrarCamposClase();
   aplicarFiltros();
 }
 
-// El lado simétrico: marcar la casilla suelta el equipo que hubiera quedado
-// elegido en el dropdown. Hoy los dos controles no coinciden nunca en pantalla
-// (ver mostrarCampoMaquina), pero un equipo que acaba de perder el permiso
-// puede llegar aquí con un filtro de máquina puesto.
+// El segundo desplegable: "todos" o uno solo del grupo que ya está elegido.
+function elegirValorClaseFiltro() {
+  const valor = $("f-clase-valor").value;
+  if (claseSeleccionada === "maquina") maquinaSeleccionada = valor;
+  else clienteSeleccionado = valor;
+  aplicarFiltros();
+}
+
+// El lado simétrico: marcar la casilla suelta el grupo que hubiera quedado
+// elegido en los desplegables. Hoy la casilla y el grupo "Máquinas" no
+// coinciden nunca en pantalla (ver mostrarCamposClase), pero un equipo que
+// acaba de perder el permiso puede llegar aquí con un filtro de máquina puesto.
 function marcarSoloAqui() {
-  if ($("f-solo-aqui").checked) {
-    maquinaSeleccionada = "";
-    if ($("f-maquina")) $("f-maquina").value = "";
-  }
-  mostrarCampoMaquina();
+  if ($("f-solo-aqui").checked && claseSeleccionada === "maquina")
+    soltarFiltro("clase");
+  mostrarCamposClase();
   aplicarFiltros();
 }
 
@@ -7133,57 +7199,96 @@ function pintarRutas(rutas, haySinRuta) {
 // esta PC puede usarlo, tal como los mandó el último refresco.
 let maquinasFiltro = [];
 let puedeFiltrarPorMaquina = false;
+// Clientes que aparecen en PROCESADAS, con su tipo ("prueba", "especial" o
+// "normal"): las opciones del segundo desplegable cuando el grupo es de
+// cliente. Llegan en cada refresco, tomados del histórico ANTES de aplicar el
+// filtro, para que elegir uno no vacíe la lista de los demás.
+let clientesFiltro = [];
 // El hostname propio, del mismo refresco: marca "(esta máquina)" en el
 // dropdown y convierte elegirla en la casilla "Llenadas en esta máquina".
 let dispositivoPropio = "";
 
-// El dropdown vive en PROCESADAS (la única lista con facturas de otras
-// laptops) y solo en las PC habilitadas. Las condiciones se miran juntas
-// porque cambian por vías distintas: la tab al clickear, el permiso en el
-// refresco, la casilla al marcarla (con ella puesta el dropdown sobra: ya se
+// Los desplegables viven en PROCESADAS (la única lista con facturas de otras
+// laptops y con pedidos apartados por no facturar). Las condiciones se miran
+// juntas porque cambian por vías distintas: la tab al clickear, el permiso en
+// el refresco, la casilla al marcarla (con ella puesta el grupo sobra: ya se
 // está mirando esta máquina).
-// Los dos controles de máquina de PROCESADAS son EXCLUYENTES por rol
-// (2026-08-05, regla del usuario): con permiso se ve solo el dropdown —que ya
-// incluye "(esta máquina)"— y sin él solo la casilla. Nunca los dos: ofrecen
-// el mismo recorte y juntos solo confunden.
-function mostrarCampoMaquina() {
+// El grupo "Máquinas" y la casilla son EXCLUYENTES por rol (2026-08-05, regla
+// del usuario): con permiso se ve solo el desplegable —que ya incluye "(esta
+// máquina)"— y sin él solo la casilla. Nunca los dos: ofrecen el mismo recorte
+// y juntos solo confunden. Los grupos de cliente no dependen del permiso.
+// El segundo desplegable solo sale con un grupo ya elegido: sin él no tendría
+// de qué lista sacar sus opciones.
+function mostrarCamposClase() {
   const enProcesadas = tabActiva() === "procesadas";
   const casilla = $("campo-solo-aqui");
   if (casilla)
     casilla.style.display =
       (!puedeFiltrarPorMaquina && enProcesadas) ? "" : "none";
-  const campo = $("campo-maquina");
-  if (campo)
-    campo.style.display =
-      (puedeFiltrarPorMaquina && enProcesadas) ? "" : "none";
+  const campo = $("campo-clase");
+  if (campo) campo.style.display = enProcesadas ? "" : "none";
+  const valor = $("campo-clase-valor");
+  if (valor)
+    valor.style.display = (enProcesadas && claseSeleccionada) ? "" : "none";
 }
 
 // Si esta PC deja de estar habilitada (se le quitó la marca desde ADMIN), el
-// dropdown se esconde y suelta lo que tuviera puesto: un filtro que ya no se
-// puede ver ni quitar dejaría la lista recortada sin explicación.
-function pintarMaquinasFiltro(puede, equipos) {
-  if (!$("campo-maquina")) return;
+// grupo "Máquinas" desaparece del desplegable y suelta lo que tuviera puesto:
+// un filtro que ya no se puede ver ni quitar dejaría la lista recortada sin
+// explicación.
+function pintarFiltrosDeGrupo(puede, equipos, clientes) {
+  if (!$("campo-clase")) return;
   puedeFiltrarPorMaquina = !!puede;
-  if (!puede) {
-    mostrarCampoMaquina();
-    if (maquinaSeleccionada) { maquinaSeleccionada = ""; aplicarFiltros(); }
-    return;
+  maquinasFiltro = puede ? (equipos || []) : [];
+  clientesFiltro = clientes || [];
+  let recargar = false;
+  if (!puede && claseSeleccionada === "maquina") {
+    soltarFiltro("clase");
+    recargar = true;
   }
-  maquinasFiltro = equipos || [];
-  mostrarCampoMaquina();
   // Al ganar el permiso la casilla deja de verse: si venía marcada seguiría
   // recortando la lista sin ningún control a la vista para quitarla.
-  if ($("f-solo-aqui").checked) { $("f-solo-aqui").checked = false; aplicarFiltros(); }
-  const opciones = [["", "Todas"], ...maquinasFiltro.map(m =>
-    [m.dispositivo, m.dispositivo === dispositivoPropio
-                    ? m.nombre + " (esta máquina)" : m.nombre])];
-  // El equipo elegido conserva su opción aunque ya no aparezca en la lista
-  // (mismo motivo que en pintarRutas: si no, el <select> cae en "Todas" y
-  // aparenta que no hay filtro puesto cuando sí lo hay).
-  if (maquinaSeleccionada && !opciones.some(([valor]) => valor === maquinaSeleccionada))
-    opciones.push([maquinaSeleccionada, maquinaSeleccionada]);
-  $("f-maquina").innerHTML = opciones.map(([valor, texto]) => `
-    <option value="${esc(valor)}" ${valor === maquinaSeleccionada ? "selected" : ""}>
+  if (puede && $("f-solo-aqui").checked) {
+    $("f-solo-aqui").checked = false;
+    recargar = true;
+  }
+  const grupos = [["", "Todo"],
+                  ...(puede ? [["maquina", ETIQUETAS_CLASE_FILTRO.maquina]] : []),
+                  ["prueba", ETIQUETAS_CLASE_FILTRO.prueba],
+                  ["especial", ETIQUETAS_CLASE_FILTRO.especial],
+                  ["normal", ETIQUETAS_CLASE_FILTRO.normal]];
+  $("f-clase").innerHTML = opcionesSelect(grupos, claseSeleccionada);
+  pintarValoresClaseFiltro();
+  mostrarCamposClase();
+  if (recargar) aplicarFiltros();
+}
+
+// Opciones del segundo desplegable según el grupo elegido. Lo elegido conserva
+// su opción aunque ya no aparezca en la lista (mismo motivo que en pintarRutas:
+// si no, el <select> cae en "Todos" y aparenta que no hay filtro puesto cuando
+// sí lo hay).
+function pintarValoresClaseFiltro() {
+  if (!$("f-clase-valor")) return;
+  const esMaquina = claseSeleccionada === "maquina";
+  const elegido = esMaquina ? maquinaSeleccionada : clienteSeleccionado;
+  let opciones;
+  if (esMaquina) {
+    opciones = [["", "Todas las máquinas"], ...maquinasFiltro.map(m =>
+      [m.dispositivo, m.dispositivo === dispositivoPropio
+                      ? m.nombre + " (esta máquina)" : m.nombre])];
+  } else {
+    opciones = [["", "Todos los clientes"],
+                ...clientesFiltro.filter(c => c.tipo === claseSeleccionada)
+                                 .map(c => [c.cliente_id, clienteEnLinea(c)])];
+  }
+  if (elegido && !opciones.some(([valor]) => valor === elegido))
+    opciones.push([elegido, elegido]);
+  $("f-clase-valor").innerHTML = opcionesSelect(opciones, elegido);
+}
+
+function opcionesSelect(opciones, elegido) {
+  return opciones.map(([valor, texto]) => `
+    <option value="${esc(valor)}" ${valor === elegido ? "selected" : ""}>
       ${esc(texto)}</option>`).join("");
 }
 
@@ -8394,10 +8499,10 @@ function cambiarTab(tab) {
   // para que cambiar de lista no deje puesto el de la anterior.
   aplicarTopeHoy();
   sincronizarRangosFecha();
-  // "Llenadas en esta máquina" y el dropdown de equipo son de PROCESADAS (la
-  // única lista con facturas de otras laptops) y excluyentes por rol: los dos
-  // los pinta mostrarCampoMaquina.
-  mostrarCampoMaquina();
+  // "Llenadas en esta máquina" y los desplegables de grupo son de PROCESADAS
+  // (la única lista con facturas de otras laptops y con pedidos apartados por
+  // no facturar): los pinta mostrarCamposClase.
+  mostrarCamposClase();
   // Cambiar de tab cambia QUÉ filtra (la casilla y el equipo solo cuentan en
   // PROCESADAS): el aviso se repinta con los de la tab que queda a la vista.
   pintarEstadoFiltros();
@@ -8866,7 +8971,8 @@ async function cargar(conservarScroll = false) {
     preseleccionarRutaSiFalta();
     pintarRutas(d.rutas, d.hay_sin_ruta);
     dispositivoPropio = d.dispositivo_propio || "";
-    pintarMaquinasFiltro(d.puede_filtrar_por_maquina, d.maquinas_filtro);
+    pintarFiltrosDeGrupo(d.puede_filtrar_por_maquina, d.maquinas_filtro,
+                         d.clientes_filtro);
     pintarAvisoConflictos(d.conflictos_abiertos || 0);
     cargaFallo = false;
     pintarNube();
