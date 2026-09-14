@@ -3579,7 +3579,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <p id="reinicio-nota"></p>
     <div class="editor-acciones">
       <button type="button" class="primario" id="reinicio-cerrar"
-              onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
+              onclick="reiniciarDesdeAviso(this)">Reiniciar el asistente ahora</button>
       <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
     </div>
   </div>
@@ -10261,7 +10261,7 @@ function pintarModalReinicio(motivos, urge) {
   // escondido para siempre. Reescribir dos propiedades cada ocho segundos no
   // le cuesta nada a nadie; perder el botón sí.
   const api = apiVentana();
-  const puedeCerrar = !!(api && api.cerrar);
+  const puedeCerrar = !!(api && api.reiniciar);
   const boton = $("reinicio-cerrar");
   const nota = $("reinicio-nota");
   boton.style.display = puedeCerrar ? "" : "none";
@@ -10270,7 +10270,7 @@ function pintarModalReinicio(motivos, urge) {
   // "Reiniciar el asistente ahora" mientras todavía está reiniciando.
   if (!cerrandoDesdeAviso) {
     boton.disabled = false;
-    boton.textContent = "Cerrar el asistente ahora";
+    boton.textContent = "Reiniciar el asistente ahora";
     nota.style.display = puedeCerrar ? "none" : "";
     if (!puedeCerrar) {
       nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
@@ -10313,39 +10313,39 @@ function callarAvisoReinicio() {
 
 let cerrandoDesdeAviso = false;   // hay un cierre en vuelo: el latido no lo pisa
 
-async function cerrarDesdeAvisoReinicio(boton) {
+async function reiniciarDesdeAviso(boton) {
   const api = apiVentana();
   const nota = $("reinicio-nota");
-  if (!api || !api.cerrar) {
+  if (!api || !api.reiniciar) {
     // No debería llegar aquí (sin API el botón no se pinta), pero si llega hay
     // que DECIRLO: un botón que no hace nada al pulsarlo es lo peor de todo.
     nota.style.display = "";
-    nota.textContent = "Esta ventana no puede cerrarse sola. Ciérrala con la X "
-      + "y vuelve a abrir el asistente.";
+    nota.textContent = "Esta ventana no puede reiniciarse sola. Ciérrala con "
+      + "la X y vuelve a abrir el asistente.";
     return;
   }
   cerrandoDesdeAviso = true;
   boton.disabled = true;
-  boton.textContent = "Cerrando…";
+  boton.textContent = "Reiniciando…";
   // Cada paso deja rastro en el log del panel: este botón corre en el server,
   // donde no hay depurador, y lo único que puede decir dónde murió es esto.
-  reportarAlPanel({tipo: "cerrar-aviso", paso: "pedido"});
+  reportarAlPanel({tipo: "reiniciar-aviso", paso: "pedido"});
   let ok = false, fallo = "";
   try {
-    ok = await Promise.resolve(api.cerrar());
+    ok = await Promise.resolve(api.reiniciar());
   } catch (e) {
     fallo = (e && e.message) || String(e);
   }
-  reportarAlPanel({tipo: "cerrar-aviso", paso: "respuesta", ok, fallo});
+  reportarAlPanel({tipo: "reiniciar-aviso", paso: "respuesta", ok, fallo});
   if (ok) return;   // el asistente se está yendo: no queda nada que repintar
   cerrandoDesdeAviso = false;
   boton.disabled = false;
-  boton.textContent = "Cerrar el asistente ahora";
+  boton.textContent = "Reiniciar el asistente ahora";
   nota.style.display = "";
   nota.textContent = fallo
-    ? "No se pudo cerrar: " + fallo + ". Ciérralo con la X de la ventana."
-    : "No se pudo cerrar ahora mismo. Termina lo que tengas en curso y "
-      + "ciérralo con la X de la ventana.";
+    ? "No se pudo reiniciar: " + fallo + ". Ciérralo con la X y vuelve a abrirlo."
+    : "No se pudo reiniciar ahora mismo. Suele ser un llenado en curso: "
+      + "termínalo y vuelve a intentar.";
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
