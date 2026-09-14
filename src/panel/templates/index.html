@@ -2856,21 +2856,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        facturas tiene que quedar pegada a la lista. -->
   <div id="aviso-reinicio" style="display:none"></div>
 
-  <!-- El mismo aviso tapando la pantalla (2026-09-14). SIN cierre por clic
-       afuera: este modal aparece solo, no lo abrió nadie, y cerrarlo sin
-       querer con un clic al lado sería justo lo que se vino a evitar. -->
-  <div id="reinicio-overlay">
-    <div id="reinicio-caja">
-      <div id="reinicio-cuerpo"></div>
-      <p id="reinicio-nota"></p>
-      <div class="editor-acciones">
-        <button type="button" class="primario" id="reinicio-cerrar"
-                onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
-        <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Rompe-vidrio puesto (2026-08-07): a diferencia del resto de los avisos,
        este no lo dispara nada que haya pasado en esta computadora — es un
        estado de la nube que vale para todas. Va arriba de todo y en todas las
@@ -3589,6 +3574,27 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
 </main>
 
 <!-- Choques al editar el mismo dato de catálogo desde equipos distintos. -->
+<!-- Aviso de "cierra y vuelve a abrir" tapando la pantalla (2026-09-14).
+     SIN cierre por clic afuera: aparece solo, no lo abrió nadie, y cerrarlo de
+     un clic al lado sería justo lo que se vino a evitar.
+
+     VA AQUÍ, FUERA DE <main>, con el resto de los overlays (corregido el mismo
+     día). Nació metido dentro de <main> —el único de los veintitantos que
+     había— y ahí es un hijo directo de un contenedor flex: se pintaba, pero
+     los botones no respondían al clic. Ningún otro modal de esta página vive
+     ahí dentro, y esa era toda la diferencia. -->
+<div id="reinicio-overlay">
+  <div id="reinicio-caja">
+    <div id="reinicio-cuerpo"></div>
+    <p id="reinicio-nota"></p>
+    <div class="editor-acciones">
+      <button type="button" class="primario" id="reinicio-cerrar"
+              onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
+      <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
+    </div>
+  </div>
+</div>
+
 <div id="conflictos-sync-overlay">
   <div id="conflictos-sync-caja">
     <h3>Cambios de catálogo en choque</h3>
