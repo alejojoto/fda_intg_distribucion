@@ -3589,7 +3589,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <p id="reinicio-nota"></p>
     <div class="editor-acciones">
       <button type="button" class="primario" id="reinicio-cerrar"
-              onclick="cerrarDesdeAvisoReinicio(this)">Cerrar el asistente ahora</button>
+              onclick="reiniciarDesdeAviso(this)">Reiniciar el asistente ahora</button>
       <button type="button" onclick="callarAvisoReinicio()">Ahora no</button>
     </div>
   </div>
@@ -10659,7 +10659,7 @@ function pintarModalReinicio(motivos, urge) {
   // escondido para siempre. Reescribir dos propiedades cada ocho segundos no
   // le cuesta nada a nadie; perder el botón sí.
   const api = apiVentana();
-  const puedeCerrar = !!(api && api.cerrar);
+  const puedeCerrar = !!(api && api.reiniciar);
   const boton = $("reinicio-cerrar");
   const nota = $("reinicio-nota");
   boton.style.display = puedeCerrar ? "" : "none";
@@ -10668,7 +10668,7 @@ function pintarModalReinicio(motivos, urge) {
   // "Cerrar el asistente ahora" mientras todavía está cerrando.
   if (!cerrandoDesdeAviso) {
     boton.disabled = false;
-    boton.textContent = "Cerrar el asistente ahora";
+    boton.textContent = "Reiniciar el asistente ahora";
     nota.style.display = puedeCerrar ? "none" : "";
     if (!puedeCerrar) {
       nota.textContent = "Cierra el asistente y vuelve a abrirlo: al abrir se "
@@ -10711,39 +10711,39 @@ function callarAvisoReinicio() {
 
 let cerrandoDesdeAviso = false;   // hay un cierre en vuelo: el latido no lo pisa
 
-async function cerrarDesdeAvisoReinicio(boton) {
+async function reiniciarDesdeAviso(boton) {
   const api = apiVentana();
   const nota = $("reinicio-nota");
-  if (!api || !api.cerrar) {
+  if (!api || !api.reiniciar) {
     // No debería llegar aquí (sin API el botón no se pinta), pero si llega hay
     // que DECIRLO: un botón que no hace nada al pulsarlo es lo peor de todo.
     nota.style.display = "";
-    nota.textContent = "Esta ventana no puede cerrarse sola. Ciérrala con la X "
-      + "y vuelve a abrir el asistente.";
+    nota.textContent = "Esta ventana no puede reiniciarse sola. Ciérrala con "
+      + "la X y vuelve a abrir el asistente.";
     return;
   }
   cerrandoDesdeAviso = true;
   boton.disabled = true;
-  boton.textContent = "Cerrando…";
+  boton.textContent = "Reiniciando…";
   // Cada paso deja rastro en el log del panel: este botón corre en el server,
   // donde no hay depurador, y lo único que puede decir dónde murió es esto.
-  reportarAlPanel({tipo: "cerrar-aviso", paso: "pedido"});
+  reportarAlPanel({tipo: "reiniciar-aviso", paso: "pedido"});
   let ok = false, fallo = "";
   try {
-    ok = await Promise.resolve(api.cerrar());
+    ok = await Promise.resolve(api.reiniciar());
   } catch (e) {
     fallo = (e && e.message) || String(e);
   }
-  reportarAlPanel({tipo: "cerrar-aviso", paso: "respuesta", ok, fallo});
-  if (ok) return;   // el asistente se está yendo: no queda nada que repintar
+  reportarAlPanel({tipo: "reiniciar-aviso", paso: "respuesta", ok, fallo});
+  if (ok) return;   // el asistente se va y vuelve: no queda nada que repintar
   cerrandoDesdeAviso = false;
   boton.disabled = false;
-  boton.textContent = "Cerrar el asistente ahora";
+  boton.textContent = "Reiniciar el asistente ahora";
   nota.style.display = "";
   nota.textContent = fallo
-    ? "No se pudo cerrar: " + fallo + ". Ciérralo con la X de la ventana."
-    : "No se pudo cerrar ahora mismo. Termina lo que tengas en curso y "
-      + "ciérralo con la X de la ventana.";
+    ? "No se pudo reiniciar: " + fallo + ". Ciérralo con la X y vuelve a abrirlo."
+    : "No se pudo reiniciar ahora mismo. Suele ser un llenado en curso: "
+      + "termínalo y vuelve a intentar.";
 }
 
 // Rompe-vidrio (2026-08-07). Lo pinta en dos lugares a la vez: la franja de
@@ -12375,8 +12375,9 @@ const TITULO_PEDIDO_FECHA_INUSUAL =
 const RESALTADO_FECHA_A_FACTURAR = {
   tituloDia: TITULO_DIA_FECHA_INUSUAL,
   arma: () => {
-    const esperada = fechaDePedidoEsperada($("f-fecha-facturar").value);
-    return (iso, partes) => !!esperada && !!iso && iso !== esperada
+    const rango = rangoDePedidoUsual($("f-fecha-facturar").value);
+    return (iso, partes) => !!rango && !!iso
+                            && (iso < rango.desde || iso > rango.hasta)
                             && !(partes[0] || {}).de_prueba;
   },
 };
@@ -15730,17 +15731,52 @@ const TRIANGULO_ALERTA =
 // El desfase se calcula aparte del aviso porque también lo necesitan los
 // botones de llenar, que se pintan ANTES que los avisos y no pueden leerlo del
 // HTML ya pintado.
-// Fecha de pedido que corresponde a una fecha a facturar: el día anterior,
-// salvo el salto del fin de semana (sábado, domingo y lunes facturan el pedido
-// del viernes). La comparten el aviso y el ámbar de PENDIENTES: es la misma
-// regla y tiene que decidir igual en los dos sitios.
-function fechaDePedidoEsperada(isoFacturar) {
+// Fechas de pedido que corresponden a una fecha a facturar: el día anterior,
+// y el fin de semana estira el rango hacia atrás hasta el viernes (sábado,
+// domingo y lunes facturan desde el pedido del viernes). La comparten el aviso
+// y el ámbar de PENDIENTES: es la misma regla y tiene que decidir igual en los
+// dos sitios.
+//
+// Es un RANGO y no un solo día desde 2026-09-15: tomando únicamente el viernes,
+// un pedido hecho en sábado o en domingo no tenía NINGUNA fecha a facturar que
+// lo diera por usual —el lunes esperaba el del viernes, el domingo también— y
+// el aviso no había forma de quitarlo, se pusiera la fecha que se pusiera. La
+// inversa de "el pedido del viernes se factura sábado, domingo o lunes" es que
+// el lunes factura pedidos del viernes, del sábado y del domingo.
+function rangoDePedidoUsual(isoFacturar) {
   const fechaFacturar = calDesdeISO(isoFacturar);
-  if (!fechaFacturar) return "";
+  if (!fechaFacturar) return null;
   const diasHastaViernes = ({6: 1, 0: 2, 1: 3})[fechaFacturar.getDay()] || 1;
-  const esperadaFecha = new Date(fechaFacturar);
-  esperadaFecha.setDate(esperadaFecha.getDate() - diasHastaViernes);
-  return calISO(esperadaFecha);
+  const corrida = (dias) => {
+    const d = new Date(fechaFacturar);
+    d.setDate(d.getDate() - dias);
+    return calISO(d);
+  };
+  return {desde: corrida(diasHastaViernes), hasta: corrida(1)};
+}
+
+const pedidoEnFechaUsual = (isoPedido, isoFacturar) => {
+  const rango = rangoDePedidoUsual(isoFacturar);
+  return !!rango && !!isoPedido
+         && isoPedido >= rango.desde && isoPedido <= rango.hasta;
+};
+
+// Las fechas a facturar que admiten un pedido: la inversa del rango de arriba,
+// probada día a día desde el siguiente al pedido. Cuatro alcanzan de sobra
+// porque el rango nunca pasa de tres días. Es lo que el aviso nombra cuando hay
+// UNA sola factura: ahí la pregunta del operador es "¿y entonces qué fecha le
+// toca a este pedido?", no cuáles pedidos le tocan a la fecha puesta.
+function fechasAFacturarDePedido(isoPedido) {
+  const pedido = calDesdeISO(isoPedido);
+  if (!pedido) return [];
+  const salida = [];
+  for (let i = 1; i <= 4; i++) {
+    const d = new Date(pedido);
+    d.setDate(d.getDate() + i);
+    const iso = calISO(d);
+    if (pedidoEnFechaUsual(isoPedido, iso)) salida.push(iso);
+  }
+  return salida;
 }
 
 function desfaseDeFechas(facturas) {
@@ -15750,8 +15786,8 @@ function desfaseDeFechas(facturas) {
   // verse igual con el modo admin prendido y apagado); lo que cambia es el
   // cierre, porque ahí la fecha no se toca y el documento no sale con esta.
   if (!isoFacturar) return null;
-  const esperada = fechaDePedidoEsperada(isoFacturar);
-  if (!esperada) return null;
+  const rango = rangoDePedidoUsual(isoFacturar);
+  if (!rango) return null;
   // Un pedido sin fecha no entra en la cuenta: no hay dato que contradiga nada.
   // Los pedidos de PRUEBA tampoco (2026-08-11, pedido del usuario): son
   // sintéticos, su fecha es la del día en que se armaron y no hay nada que
@@ -15759,13 +15795,13 @@ function desfaseDeFechas(facturas) {
   const fechas = facturas.filter(f => !(f || {}).de_prueba)
                          .map(f => ((f || {}).fecha_orden_salida || "").slice(0, 10))
                          .filter(Boolean);
-  const desfasadas = fechas.filter(f => f !== esperada);
+  const desfasadas = fechas.filter(f => !pedidoEnFechaUsual(f, isoFacturar));
   if (!desfasadas.length) return null;
   const distintas = [...new Set(desfasadas)].sort();
   // La firma ES la decisión: mover la fecha a facturar o cambiar los días
   // desfasados de la fila plantea otro caso y se vuelve a preguntar. Sacar una
   // factura sin que cambien esos días NO deshace lo ya decidido.
-  return {isoFacturar, esperada, fechas, desfasadas, distintas,
+  return {isoFacturar, rango, fechas, desfasadas, distintas,
           firma: `${isoFacturar}|${distintas.join(",")}`};
 }
 
@@ -15815,7 +15851,7 @@ function motivoDeFechaParaFactura(pedido_id, parte) {
 function avisoFechaDelPedido(facturas, donde) {
   const desfase = desfaseDeFechas(facturas);
   if (!desfase) return "";
-  const {isoFacturar, esperada, fechas, desfasadas, distintas} = desfase;
+  const {isoFacturar, rango, fechas, desfasadas, distintas} = desfase;
   const sinDecidir = desfase.firma !== fechaDesfaseOk[donde];
   const corta = fechaCorta;
   // Cuatro fechas o más no se enumeran: la lista se vuelve ilegible y lo que
@@ -15832,12 +15868,26 @@ function avisoFechaDelPedido(facturas, donde) {
         : `Las ${fechas.length} facturas son de pedidos ${dias}`)
     : `${desfasadas.length} de las ${fechas.length} facturas son de pedidos ${dias}`;
   const unaSola = fechas.length === 1;
-  // Mover la fecha solo se ofrece cuando arregla TODAS: con parte del lote en
-  // regla, correrla dejaría fuera de sitio a las que estaban bien.
-  const finDeSemana = ["0", "6", "1"].includes(String(calDesdeISO(isoFacturar)?.getDay()));
-  const regla = finDeSemana
-    ? "Los pedidos del viernes se pueden facturar sábado, domingo o lunes."
-    : "Lo usual es facturar al día siguiente del pedido.";
+  // Con UNA factura el aviso nombra la fecha que le toca a ESE pedido, que es
+  // lo que el operador necesita para corregir el campo (2026-09-15, pedido del
+  // usuario: "debería ser más claro cuál fecha debe llevar ese pedido"). Con
+  // varias no hay una sola respuesta, así que se dice al revés: qué pedidos
+  // admite la fecha puesta.
+  const aFacturar = unaSola ? fechasAFacturarDePedido(fechas[0]) : [];
+  const leToca = aFacturar.length === 1
+    ? `le toca el ${corta(aFacturar[0])}`
+    : aFacturar.length
+    ? `le toca entre el ${corta(aFacturar[0])} y el ${corta(aFacturar[aFacturar.length - 1])}`
+    : "";
+  const tocan = rango.desde === rango.hasta
+    ? `Al ${corta(isoFacturar)} le toca el pedido del ${corta(rango.desde)}.`
+    : `Al ${corta(isoFacturar)} le tocan los pedidos del ${corta(rango.desde)} al ${
+        corta(rango.hasta)}.`;
+  const encabezado = leToca
+    ? `${hecho} y ${leToca}. Arriba está puesto el ${corta(isoFacturar)}.`
+    : `${hecho}. ${tocan}`;
+  // Mover la fecha no se ofrece: con parte del lote en regla, correrla dejaría
+  // fuera de sitio a las que estaban bien. La corrige el operador arriba.
   const confirmar = sinDecidir
     ? `<button title="La Fecha a facturar se mantiene; pide un motivo antes de llenar."
          onclick="pedirMotivoFechaDesfase('${donde}')">Indicar motivo</button>`
@@ -15847,15 +15897,14 @@ function avisoFechaDelPedido(facturas, donde) {
     ? (unaSola ? "La fecha no se pone: el documento sale"
                : "La fecha no se pone: los documentos salen")
       + " con la que tenga el programa de facturación."
-    : (unaSola ? "El documento sale" : "Los documentos salen")
-      + " con la fecha de arriba.";
+    // Con una sola factura el encabezado ya nombró la fecha de arriba: repetirla
+    // aquí sonaba a que se hablaba de otra.
+    : leToca ? "El documento sale con esa."
+    : "Los documentos salen con la fecha de arriba.";
   const cierre = sinDecidir ? destino + " Indica el motivo antes de llenar:"
     : (unaSola ? "Se llena igual. " : "Se llenan igual. ") + destino;
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
-      TRIANGULO_ALERTA}</div><div>${
-      esc(hecho)}, y se factura para el ${esc(corta(isoFacturar))}. ${esc(regla)} `
-    + `Para esa fecha, el pedido usual es del ${esc(corta(esperada))}. `
-    + `${esc(cierre)}${salida}</div></div>`;
+      TRIANGULO_ALERTA}</div><div>${esc(encabezado)} ${esc(cierre)}${salida}</div></div>`;
 }
 
 // Líneas donde lo despachado no coincide con lo aprobado, con el dato de cuánto
