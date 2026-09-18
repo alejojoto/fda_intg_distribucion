@@ -52,6 +52,15 @@
   /* Logo del asistente (el mismo árbol del ícono de la app). Fondo blanco
      propio del SVG: sobre la cabecera oscura queda como una placa. */
   header #logo { display:block; border-radius:7px; flex-shrink:0; }
+  /* Progreso de la carga del día (2026-09-18, pedido del usuario): al lado
+     del título, con % y tiempo estimado. "Bajando los pedidos" a secas no
+     decía si faltaban dos segundos o medio minuto. */
+  #carga-progreso { display:flex; align-items:center; gap:9px; font-size:12.5px;
+                    color:#c9d3e6; white-space:nowrap; }
+  #carga-barra { width:92px; height:6px; border-radius:99px; overflow:hidden;
+                 background:rgba(255,255,255,.18); flex-shrink:0; }
+  #carga-barra i { display:block; height:100%; width:0; border-radius:99px;
+                   background:#60a5fa; transition:width .9s linear; }
   .mock { background:#b54708; color:#fff; padding:3px 10px; border-radius:4px; font-size:12px; font-weight:600; }
   /* Botón de estado de la nube (2026-07-30): mundito en la cabecera con el
      detalle en un desplegable anclado (no un popup). Verde = conectado y al
@@ -2557,6 +2566,13 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        la ventana. -->
   <img id="logo" src="/assets/icono.svg" alt="" width="42" height="42">
   <h1>Asistente de llenado — Finca Dos Aguas</h1>
+  <!-- Va pegado al título porque es lo único que importa mientras la lista no
+       está: aparece sola al arrancar y se va sola cuando la lista aterriza. -->
+  <div id="carga-progreso" style="display:none"
+       title="La lista del día se baja sola. El tiempo es un estimado y puede variar con la conexión.">
+    <span id="carga-texto"></span>
+    <span id="carga-barra"><i></i></span>
+  </div>
   {% if modo_mock %}<a class="mock" href="/mock" title="Solo el llenado de WinLedger es simulado. Los cambios compartidos de catálogos, rutas y ajustes sí son reales y se sincronizan." style="text-decoration:none">SIMULACIÓN WINLEDGER — cambios compartidos sí sincronizan · escenarios</a>{% endif %}
   <span class="mock" id="banderas-prueba" title="Apágalas en el .env — o en src/settings.py si es MODO_PRUEBA_IMPLANTACION — y reinicia el panel (PLAN.md 4.6); la entrada MODO ADMIN se apaga en ADMIN → Ajustes de admin"{% if not banderas_prueba %} style="display:none"{% endif %}>MODO PRUEBA — {{ banderas_prueba|join(" · ") }}</span>
   <!-- Estado de la nube (2026-07-30): el mundito dice de un vistazo si esta
@@ -3006,6 +3022,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
   </div>
 
   <section id="sec-pendientes" class="tab-panel">
+    <div id="aviso-lista-de-antes" class="mut" style="display:none;padding:6px 4px"></div>
     <div class="tabla-scroll"><table id="t-pendientes">
       <thead><tr>
         <th>Pedido</th><th>Cliente y sucursal</th><th>Ruta</th><th>Fecha pedido</th>
@@ -9013,6 +9030,9 @@ async function cargar(conservarScroll = false) {
       nube.carga_ts = d.nube.carga_ts;
       nube.espejo_activo = d.nube.espejo_activo;
       nube.bajada_error = d.nube.bajada_error;
+      nube.lista_de_antes = !!d.nube.lista_de_antes;
+      nube.paso_carga = d.nube.paso_carga || null;
+      recibirProgresoCarga(d.nube.progreso_carga || null);
       pintarAvisoConflictosSync(d.nube.sync_conflictos);
       pintarNube();
     }
@@ -9134,9 +9154,41 @@ setInterval(async () => {
 // visto y se pinta. "ok" = el último sondeo respondió; "caida" = la nube (o
 // el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
 // lleva demasiado sin aterrizar una carga completa.
-let nube = {estado: "ok", ultimoOk: null, carga_ts: null, espejo_activo: true};
+let nube = {estado: "ok", ultimoOk: null, carga_ts: null, espejo_activo: true,
+            lista_de_antes: false, paso_carga: null};
 let nubeAbierto = false;
 let cargaFallo = false;   // la última /api/facturas no aterrizó (ver cargar())
+
+// La lista en pantalla es la que guardó el arranque anterior (2026-09-18): se
+// mira, no se llena — las cantidades pueden no ser las de hoy. La fresca la
+// reemplaza sola cuando aterriza (ver sondearCompartido).
+const listaDeAntes = () => !!nube.lista_de_antes;
+// Rótulo de cada paso de la carga completa. Va en la barra del título, junto
+// al % y al tiempo que falta.
+const TEXTO_PASO_CARGA = {
+  catalogos: "Bajando los catálogos",
+  pedidos: "Bajando los pedidos",
+  armando: "Armando las facturas",
+};
+// El botón de la nube ya no desglosa el paso (pedido del usuario 2026-09-18):
+// ese detalle vive arriba, al lado del título. Aquí solo QUÉ se está trayendo
+// — lo que cambió desde hace un rato, o el día entero.
+function textoActualizando() {
+  return nube.paso_carga ? "Bajando todo el día…" : "Trayendo la actualización…";
+}
+function textoListaDeAntes() {
+  const ts = ultimaLista.cache_ts || "";
+  const hoy = new Date().toISOString().slice(0, 10);
+  const cuando = !ts ? "" : ts.slice(0, 10) === hoy
+    ? ` de hoy ${ts.slice(11, 16)}`
+    : ` del ${ts.slice(8, 10)}/${ts.slice(5, 7)} ${ts.slice(11, 16)}`;
+  // Sin conexión, "actualizando" mentiría: no hay con qué actualizarla.
+  // Cuánto falta no se repite aquí: lo dice la barra del título.
+  const estado = nubeClase() === "nube-caida"
+    ? "sin conexión para actualizarla, no se puede llenar todavía"
+    : "bajando la de hoy";
+  return `Lista de la última vez${cuando} · ${estado}`;
+}
 
 // El sondeo revisa TODO de una (facturas, pedidos y los siete catálogos) en la
 // misma llamada, así que el estado es uno solo: o está todo al día, o se está
@@ -9174,7 +9226,7 @@ function armarPopoverNube(clase) {
   const titulo = clase === "nube-caida" ? "Sin conexión con la nube"
                : clase === "nube-sync"  ? (nube.bajada_error
                                             ? "No se está pudiendo actualizar"
-                                            : "Actualizando…")
+                                            : textoActualizando())
                                         : "Todo al día";
   let html = `<h3><span class="nube-punto" style="background:${color}"></span>${titulo}</h3>`;
   if (clase === "nube-caida") {
@@ -10276,6 +10328,77 @@ async function menuContextoAccion(accion, btn) {
   menuContextoCerrar();
 }
 
+// --- Barra de progreso de la carga del día (2026-09-18) -------------------
+// El servidor manda el % y los segundos que faltan; entre un sondeo y el
+// siguiente la cuenta la sigue el reloj de aquí, porque un número que solo
+// se mueve cada pocos segundos se ve trancado. `progresoPctVisto` impide que
+// la barra retroceda cuando el estimado se corrige a mitad de camino: una
+// barra que vuelve atrás se lee como que algo falló.
+let progresoCarga = null;
+let progresoPctVisto = 0;
+let progresoCerrandoHasta = 0;   // hasta cuándo se queda llena antes de irse
+
+function recibirProgresoCarga(p) {
+  if (!p) {
+    // La lista aterrizó: la barra se completa y se retira sola. Irse en 40%
+    // dejaría dudando de si terminó o se cayó.
+    if (progresoCarga) progresoCerrandoHasta = Date.now() + 1200;
+    progresoCarga = null;
+    progresoPctVisto = 0;
+    pintarProgresoCarga();
+    return;
+  }
+  // Menos tiempo transcurrido que el último visto = es otra carga, no la
+  // misma: la barra arranca de cero otra vez.
+  if (progresoCarga && p.transcurrido_s < progresoCarga.transcurrido_s) progresoPctVisto = 0;
+  progresoCerrandoHasta = 0;
+  progresoCarga = Object.assign({}, p, {recibido: Date.now()});
+  // El % que ya dio el servidor manda sobre el que se recalcula aquí: es el
+  // mismo cálculo, pero él lleva el suyo sin retroceder desde que arrancó.
+  progresoPctVisto = Math.max(progresoPctVisto, p.pct || 0);
+  pintarProgresoCarga();
+}
+
+function textoFalta(segundos) {
+  if (segundos <= 3) return "casi listo";
+  if (segundos < 60) return `faltan ~${Math.ceil(segundos)} s`;
+  return `faltan ~${Math.ceil(segundos / 60)} min`;
+}
+
+function pintarProgresoCarga() {
+  const caja = document.getElementById("carga-progreso");
+  if (!caja) return;
+  const barra = caja.querySelector("#carga-barra i");
+  if (!progresoCarga) {
+    if (Date.now() < progresoCerrandoHasta) {
+      barra.style.width = "100%";
+      document.getElementById("carga-texto").textContent = "Lista al día";
+      caja.style.display = "";
+    } else {
+      caja.style.display = "none";
+      barra.style.width = "0";
+    }
+    return;
+  }
+  const desde = (Date.now() - progresoCarga.recibido) / 1000;
+  // Sin noticias frescas (sondeo caído, pestaña oculta, llenado en curso) la
+  // barra se retira: clavada en 99% diría que algo sigue pasando cuando ya
+  // nadie sabe si pasa.
+  if (desde > 15) { caja.style.display = "none"; return; }
+  const restante = Math.max((progresoCarga.restante_s || 0) - desde, 0);
+  const transcurrido = (progresoCarga.transcurrido_s || 0) + desde;
+  const total = transcurrido + restante;
+  let pct = total > 0 ? (100 * transcurrido) / total : 0;
+  pct = Math.max(Math.min(pct, 99), progresoPctVisto);
+  progresoPctVisto = pct;
+  const paso = TEXTO_PASO_CARGA[progresoCarga.paso] || "Actualizando";
+  document.getElementById("carga-texto").textContent =
+      `${paso} · ${Math.round(pct)}% · ${textoFalta(restante)}`;
+  barra.style.width = pct.toFixed(1) + "%";
+  caja.style.display = "";
+}
+setInterval(pintarProgresoCarga, 1000);
+
 function pintarNube() {
   const env = document.getElementById("nube-envoltorio");
   if (!env) return;
@@ -10286,6 +10409,11 @@ function pintarNube() {
   // Solo lleva texto lo que pide atención; al día, el check habla solo.
   document.getElementById("nube-texto").textContent =
       clase === "nube-caida" ? "Sin conexión" : "";
+  const avisoDeAntes = document.getElementById("aviso-lista-de-antes");
+  if (avisoDeAntes) {
+    avisoDeAntes.style.display = listaDeAntes() ? "" : "none";
+    if (listaDeAntes()) avisoDeAntes.textContent = textoListaDeAntes();
+  }
   const pop = document.getElementById("nube-popover");
   if (!nubeAbierto) { pop.style.display = "none"; return; }
   pop.innerHTML = armarPopoverNube(clase);
@@ -10435,9 +10563,19 @@ async function sondearCompartido() {
     nube.estado = "ok";
     nube.ultimoOk = Date.now();
     if (r.nube) {
+      const eraDeAntes = nube.lista_de_antes;
       nube.carga_ts = r.nube.carga_ts;
       nube.espejo_activo = r.nube.espejo_activo;
       nube.bajada_error = r.nube.bajada_error;
+      nube.lista_de_antes = !!r.nube.lista_de_antes;
+      nube.paso_carga = r.nube.paso_carga || null;
+      recibirProgresoCarga(r.nube.progreso_carga || null);
+      // La fresca aterrizó: la lista de la última vez se reemplaza sin esperar
+      // a que cambie nada en la nube, y el detalle abierto se repinta con ella.
+      if (eraDeAntes && !nube.lista_de_antes) {
+        accionesSyncPendientes.add("principal");
+        accionesSyncPendientes.add("detalle");
+      }
     }
     pintarNube();
     const cambio = r.cambio;
@@ -11963,10 +12101,11 @@ function pintarBotonLlenarDetalle() {
     boton.toggleAttribute("data-preseleccionado", true);
     // Mismo candado que el lote para el desfase de fecha del pedido (2026-08-05).
     const faltaFecha = faltaDecidirLaFecha("detalle");
-    boton.disabled = sinTasaParaLlenar() || faltaFecha;
+    boton.disabled = listaDeAntes() || sinTasaParaLlenar() || faltaFecha;
     // Llegando desde la revisión del lote, llenar ESTA deja el lote sin arrancar
     // (llenarDesdeDetalle): el botón lo dice antes de pulsarlo.
-    boton.textContent = sinTasaParaLlenar() ? "Escribe la tasa para llenar"
+    boton.textContent = listaDeAntes() ? "Esperando la lista de hoy…"
+      : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
       : faltaFecha ? "Decide la fecha para llenar"
       : (previoResolver && etiqueta === "Llenar") ? "Llenar esta factura sola"
       : etiqueta;
@@ -13395,6 +13534,13 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   if (esperandoLogin) {
     mensaje("Ya se está esperando el inicio del programa de facturación — usa Cancelar si desistes.", "info");
     return "esperando_login";
+  }
+  // La lista en pantalla es la guardada por el arranque anterior: se mira,
+  // no se llena. El servidor lo bloquea igual (codigo 'lista_de_antes').
+  if (listaDeAntes()) {
+    mensaje("La lista todavía es la de la última vez y se está actualizando. " +
+            "Espera a que termine para llenar.", "info");
+    return "lista_de_antes";
   }
   // Configuración obligatoria de esta computadora (2026-07-29): sin nombre y
   // sin vendedor no se llena nada. Va antes que la tasa y antes de prender
@@ -15139,11 +15285,12 @@ function pintarBotonPrevio() {
   // El desfase de fecha del pedido pide una decisión antes de llenar
   // (2026-08-05): o se mueve la fecha, o se confirma la que está puesta.
   const faltaFecha = faltaDecidirLaFecha("previo");
-  btn.disabled = previoCargando || !previoCola.length || sinTasaParaLlenar()
-    || faltaSerieParaElLote() || !!previoQuitando || faltaFecha;
+  btn.disabled = listaDeAntes() || previoCargando || !previoCola.length
+    || sinTasaParaLlenar() || faltaSerieParaElLote() || !!previoQuitando || faltaFecha;
   // Con una sola unidad el botón dice "Llenar siguiente" (2026-07-31, pedido del
   // usuario): "Llenar 1 factura" contaba algo que no hace falta contar.
-  btn.textContent = previoCargando ? "Rehaciendo la fila…"
+  btn.textContent = listaDeAntes() ? "Esperando la lista de hoy…"
+    : previoCargando ? "Rehaciendo la fila…"
     : previoQuitando ? "Decide qué pasa con la fila"
     : !previoCola.length ? "No hay nada que llenar"
     : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
