@@ -9164,17 +9164,25 @@ let cargaFallo = false;   // la última /api/facturas no aterrizó (ver cargar()
 // reemplaza sola cuando aterriza (ver sondearCompartido).
 const listaDeAntes = () => !!nube.lista_de_antes;
 // Rótulo de cada paso de la carga completa. Va en la barra del título, junto
-// al % y al tiempo que falta.
+// al % y al tiempo que falta. "Bajando" solo cuando de verdad viene algo
+// (2026-09-19, pedido del usuario): mientras no haya nada nuevo se está
+// consultando, y decir que se baja sería mentira.
 const TEXTO_PASO_CARGA = {
-  catalogos: "Bajando los catálogos",
-  pedidos: "Bajando los pedidos",
-  armando: "Armando las facturas",
+  catalogos: ["Consultando catálogos", "Bajando los catálogos"],
+  pedidos: ["Consultando pedidos", "Bajando los pedidos"],
+  armando: ["Armando las facturas", "Armando las facturas"],
 };
+function textoPasoCarga(paso, novedad) {
+  const par = TEXTO_PASO_CARGA[paso];
+  return par ? par[novedad ? 1 : 0] : "Actualizando";
+}
 // El botón de la nube ya no desglosa el paso (pedido del usuario 2026-09-18):
 // ese detalle vive arriba, al lado del título. Aquí solo QUÉ se está trayendo
 // — lo que cambió desde hace un rato, o el día entero.
 function textoActualizando() {
-  return nube.paso_carga ? "Bajando todo el día…" : "Trayendo la actualización…";
+  if (!nube.paso_carga) return "Trayendo la actualización…";
+  return (progresoCarga && progresoCarga.novedad)
+    ? "Bajando todo el día…" : "Revisando si hay algo nuevo…";
 }
 function textoListaDeAntes() {
   const ts = ultimaLista.cache_ts || "";
@@ -10391,7 +10399,7 @@ function pintarProgresoCarga() {
   let pct = total > 0 ? (100 * transcurrido) / total : 0;
   pct = Math.max(Math.min(pct, 99), progresoPctVisto);
   progresoPctVisto = pct;
-  const paso = TEXTO_PASO_CARGA[progresoCarga.paso] || "Actualizando";
+  const paso = textoPasoCarga(progresoCarga.paso, progresoCarga.novedad);
   document.getElementById("carga-texto").textContent =
       `${paso} · ${Math.round(pct)}% · ${textoFalta(restante)}`;
   barra.style.width = pct.toFixed(1) + "%";
