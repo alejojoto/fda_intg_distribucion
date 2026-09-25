@@ -11231,8 +11231,7 @@ function resumenFamilia(partes) {
 // clic en el renglón; el botón lo deja a la vista con el nombre de la acción.
 const botonPrellenado = (f, etiqueta, clase) =>
   `<button${clase ? ` class="${clase}"` : ""} onclick="abrirDetalle('${
-    esc(f.pedido_id)}',${f.parte}${f.tiene_detalle === false ? ",true" : ""})">${
-    etiqueta}</button>`;
+    esc(f.pedido_id)}',${f.parte})">${etiqueta}</button>`;
 
 // "Volver a llenar" reabre un documento fiscal YA CERRADO: emite uno nuevo y
 // el anterior queda anulado en papel. No pide rol (2026-08-24, pedido del
@@ -11538,22 +11537,23 @@ let detalleOriginal = null;           // {clave, ajustes:{código:{…}}, repeti
 // Se apaga al abrir y al cerrar: cada factura vuelve a empezar bloqueada.
 let detalleEdicionHabilitada = false;
 let detalleAjustesEnVuelo = [];       // ajustes tecleados que todavía viajan
-const sinDetalleGuardado = new Set(); // claves abiertas cuya factura no guardó sus líneas
-const AVISO_SIN_DETALLE = `De esta factura no quedó guardado el detalle: se marcó
-  a mano, la llenó otra máquina, o se llenó antes de que el panel guardara sus
-  líneas. El pedido completo se ve en AppSheet.`;
+// Claves cuya factura no dejó foto de lo que se llenó: lo que la ventana
+// enseña es el pedido rearmado desde el origen (`origen: "pedido"`). Lo marca
+// la respuesta del panel, no la lista: desde el 2026-09-25 el detalle se pide
+// SIEMPRE, porque siempre hay algo que mostrar.
+const sinDetalleGuardado = new Set();
 
 const claveDetalle = (pedidoId, parte) => `${pedidoId}|${parte}`;
 
 // La fila entera abre la ventana al pulsarla (2026-07-31, pedido del usuario):
 // antes solo lo hacían tres celdas y un botón, y no se notaba que se podía.
-// TODAS las filas abren, también las que no guardaron sus líneas (llenadas
-// antes de que el panel las registrara, cerradas a mano, o de otra máquina):
-// una fila muerta que no responde al clic se lee como que el panel está roto —
-// la ventana dice en su lugar por qué no hay nada que mostrar. Eso se sabe
-// desde la lista (`tiene_detalle`), así que va en el clic y se ahorra el viaje
-// al servidor. `clases` son las que ya lleva la fila por otro motivo (parte de
-// familia).
+// TODAS las filas abren, y todas traen su detalle (2026-09-25, regla del
+// usuario): la que no guardó sus líneas —llenada antes de que el panel las
+// registrara, cerrada a mano o de otra máquina— enseña el pedido rearmado
+// desde el origen, con su aviso de que no es la foto del documento. Antes la
+// lista se adelantaba con `tiene_detalle` y esas filas abrían una ventana que
+// solo mandaba a buscar el pedido en la aplicación de pedidos.
+// `clases` son las que ya lleva la fila por otro motivo (parte de familia).
 // Una fila atrasada estrena el hover con lo suyo (2026-08-07): se reconoce por
 // la clase que ya le llega, así ninguno de sus llamadores tiene que repetirlo.
 // `tituloAtraso` es el motivo del ámbar en esa lista: por qué está resaltada lo
@@ -11573,8 +11573,7 @@ function filaDetalle(f, clases = "", tituloAtraso = TITULO_PEDIDO_VIEJO) {
     ? "Se llenó con cambios a mano. " : "";
   return ` class="${(clases + " abre-detalle").trim()}"`
     + ` title="${viejo}${cambio}${noFactura}Clic para ver el detalle del pedido"`
-    + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
-        f.tiene_detalle === false ? ",true" : ""})"`;
+    + ` onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})"`;
 }
 
 // Celda de acciones: sus botones hacen lo suyo y NO abren el detalle de paso.
@@ -11582,9 +11581,7 @@ function filaDetalle(f, clases = "", tituloAtraso = TITULO_PEDIDO_VIEJO) {
 // los botones.
 const CELDA_ACCIONES = ` style="white-space:nowrap" title="" onclick="event.stopPropagation()"`;
 
-// `sinDetalle`: la lista ya sabe que esa factura no guardó sus líneas, así que
-// la ventana lo explica de una vez en vez de ir a buscar lo que no existe.
-async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
+async function abrirDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
   detalleAbierto = clave;
   detalleTocado = false;
@@ -11597,14 +11594,12 @@ async function abrirDetalle(pedidoId, parte, sinDetalle = false) {
   motivoFechaDesfase.detalle = "";
   delete detalleFallos[clave];
   delete detalleErrorAjuste[clave];
-  if (sinDetalle) sinDetalleGuardado.add(clave);
-  else sinDetalleGuardado.delete(clave);
+  sinDetalleGuardado.delete(clave);
   pintarVentanaDetalle(clave);      // lo que ya se haya traído antes, de una vez
   // Abierta desde la revisión del lote: por encima de ella (los renglones del
   // previo también abren su detalle, 2026-07-31).
   $("detalle-overlay").classList.toggle("sobre-previo", !!previoResolver);
   $("detalle-overlay").classList.add("visible");
-  if (sinDetalle) return;
   await cargarDetalle(pedidoId, parte);
 }
 
@@ -11984,6 +11979,16 @@ async function llenarDesdeDetalle() {
   llenar(pedidoId, parte);
 }
 
+// Reintento del botón del error: se limpia el rojo y se vuelve a pedir, para
+// que la ventana muestre "Buscando el detalle…" mientras viaja.
+function reintentarDetalle() {
+  if (!detalleAbierto) return;
+  const clave = detalleAbierto;
+  delete detalleFallos[clave];
+  pintarVentanaDetalle(clave);
+  cargarDetalle(...partesDeClave(clave));
+}
+
 async function cargarDetalle(pedidoId, parte) {
   const clave = claveDetalle(pedidoId, parte);
   // Nº de consulta por factura: una respuesta que llegue fuera de orden se
@@ -12001,6 +12006,11 @@ async function cargarDetalle(pedidoId, parte) {
     const datos = await api("/api/factura/detalle?" + params);
     if (detalleReq[clave] !== req) return true;
     detalleDatos[clave] = datos;
+    // Quien manda es la respuesta: sin foto del documento lo que se ve es el
+    // pedido rearmado, y de ahí no hay documento que reabrir (regla del
+    // usuario 2026-07-31) — el pie se queda con Cerrar.
+    if (datos.origen === "pedido") sinDetalleGuardado.add(clave);
+    else sinDetalleGuardado.delete(clave);
     // Primer detalle desde que se abrió la ventana: es a esto a lo que vuelve
     // "Descartar cambios".
     if (!detalleOriginal && clave === detalleAbierto)
@@ -12198,12 +12208,11 @@ function fraseDescuentosDetalle(d) {
 // El pedido y su factura van en el título, y el cliente con el contexto en la
 // cabecera fija (fijoDetalle): aquí quedan la nota y la tabla de líneas.
 function contenidoDetalle(clave) {
-  // Sin líneas guardadas no hay detalle que armar, y no es un fallo: se dice
-  // como lo que es (nota gris), no en rojo de error.
-  if (sinDetalleGuardado.has(clave))
-    return `<div class="det-nota">${AVISO_SIN_DETALLE}</div>`;
+  // Un fallo no deja la ventana en un callejón: dice qué pasó y ofrece
+  // reintentar ahí mismo (casi siempre es la nube, que vuelve sola).
   if (detalleFallos[clave])
-    return `<div class="det-error">${esc(detalleFallos[clave])}</div>`;
+    return `<div class="det-error">${esc(detalleFallos[clave])}
+      <button type="button" onclick="reintentarDetalle()">Reintentar</button></div>`;
   const d = detalleDatos[clave];
   if (!d) return `<span class="mut">Buscando el detalle…</span>`;
   // Con la reapertura en vuelo, lo que se ve es la foto del documento
@@ -12234,6 +12243,14 @@ function contenidoDetalle(clave) {
       ? `<div class="det-nota">Lo que trae el pedido en la aplicación de pedidos.
           Este cliente no se factura desde el asistente, así que de aquí no salió
           ningún documento y no hay nada que ajustar.</div>`
+    : d.origen === "pedido"
+      ? `<div class="det-nota">De esta factura no quedó guardada la foto de lo
+          que se llenó, así que estas son las líneas del pedido tal como está
+          hoy en la aplicación de pedidos: si el pedido cambió después de
+          facturarse, aquí se ve el cambio. El descuento con que salió el
+          documento no se sabe.${d.parte_exacta === false
+            ? ` El pedido hoy no se parte igual que cuando se facturó: se
+                muestran todas sus líneas.` : ""}</div>`
     : d.origen === "registro"
       ? `<div class="det-nota">Las cantidades y los descuentos con que salió el documento.</div>`
       : `<div class="det-nota">Esta factura ya está cerrada: «Volver a llenar» la reabre para cambiarle algo.</div>`;
@@ -12300,7 +12317,9 @@ function filaLineaDetalle(d, l) {
       <td>${fmtCantidad(l.cantidad)}${l.ajustada
         || (l.ajuste && (l.ajuste.cantidad !== undefined || l.ajuste.descuento_pct !== undefined))
         ? ` <span class="chip ajustada">a mano</span>` : ""}</td>
-      <td>${fmtCantidad(l.descuento_pct)} %</td></tr>`;
+      <td>${l.descuento_pct === null
+        ? `<span class="mut" title="No quedó guardado con qué descuento salió el documento.">sin dato</span>`
+        : `${fmtCantidad(l.descuento_pct)} %`}</td></tr>`;
 
   const ajuste = l.ajuste || {};
   const cantidadAjustada = ajuste.cantidad !== undefined && ajuste.cantidad !== null;
@@ -15007,7 +15026,7 @@ function pintarBarraEnFila() {
 function llenarSiguiente() {
   const f = pendientesLlenables()[0];
   if (!f) { mensaje("No hay pendientes.", "info"); return; }
-  abrirDetalle(f.pedido_id, f.parte, f.tiene_detalle === false);
+  abrirDetalle(f.pedido_id, f.parte);
 }
 
 // --- Espera de envío a la plataforma (2026-07-28; resumen 2026-08-01) -------
@@ -15419,8 +15438,7 @@ function filaPrevio(f, i) {
   // renglón — igual que en la lista de afuera — encima de esta revisión.
   return `<tr class="${((fam ? "previo-fam " : "") + "abre-detalle").trim()}"
       title="Clic para ver el detalle del pedido"
-      onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte}${
-        f.tiene_detalle === false ? ",true" : ""})">
+      onclick="abrirDetalle('${esc(f.pedido_id)}',${f.parte})">
     <td class="previo-n"><button class="previo-menos"
         title="Saca esta factura de la fila. El pedido queda pendiente para otro lote."
         onclick="event.stopPropagation();previoQuitarFactura('${esc(f.pedido_id)}')">−</button>${i + 1}</td>
