@@ -4239,6 +4239,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <p id="resolver-como"></p>
     <div id="resolver-opciones"></div>
     <div class="editor-acciones">
+      <button class="peligro" onclick="descartarPedidoDesdeRevision()">Descartar el pedido</button>
       <button data-preseleccionado onclick="cerrarResolver()">Cerrar</button>
     </div>
   </div>
@@ -13207,6 +13208,14 @@ function ejecutarSolucion(j) {
   if (sol) sol.ejecutar();
 }
 
+// Salida de siempre de la ventana: este pedido no lo factura el asistente.
+// Pide motivo como cualquier descarte — queda en el registro y viaja al resto.
+function descartarPedidoDesdeRevision() {
+  const p = resolverAbierto && listaRevisionVisible[resolverAbierto.i];
+  cerrarResolver();
+  if (p) abrirMotivo("descartar_pedido", p.pedido_id, [1]);
+}
+
 // La ficha que se abre desde EN REVISIÓN vuelve a EN REVISIÓN al cerrarse
 // (2026-09-27, pedido del usuario: "reviso, creo cliente, siguiente revisión"
 // sin tener que buscar la lista otra vez). Guardar o cancelar, da igual: el
@@ -14248,6 +14257,23 @@ const ACCIONES_MOTIVO = {
     boton: "Descartar",
     clase: "peligro",
   },
+  // Descartar un pedido de "no se pueden facturar" (2026-09-27, pedido del
+  // usuario): ahí el pedido NO tiene factura armada — el asistente nunca pudo
+  // armarla porque le falta un dato de catálogo—, así que se descarta el
+  // pedido entero (parte 1). Lo demás es el mismo camino de siempre: motivo
+  // obligatorio, queda en PROCESADAS y viaja a las demás máquinas.
+  descartar_pedido: {
+    titulo: (id) => `Descartar el pedido ${id} — ¿por qué?`,
+    nota: () => "El asistente no lo vuelve a ofrecer. Queda en PROCESADAS con "
+      + "este motivo; si hace falta, desde ahí se puede volver a llenar.",
+    opciones: ["Ya se facturó a mano",
+               "El cliente anuló el pedido",
+               "No se despachó (no hubo entrega)",
+               "El pedido está repetido",
+               "Nadie va a arreglar el dato que falta"],
+    boton: "Descartar el pedido",
+    clase: "peligro",
+  },
   // "Llenar igual" (2026-07-26): tomarle a otra máquina una factura que tiene
   // apartada o a medio llenar. Es la salida para el equipo que se dañó o se
   // quedó sin red con facturas en la mano — el candado compartido no caduca
@@ -14604,6 +14630,20 @@ async function confirmarMotivo() {
     cerrarMotivo();
     if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
     else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+    return;
+  }
+  if (accion === "descartar_pedido") {
+    cerrarMotivo();
+    const listo = avisarTrabajando("Descartando el pedido…");
+    try {
+      await api("/api/descartar", {pedido_id, parte: 1, motivo});
+      await cargar();
+      listo();
+    } catch (e) {
+      await cargar();
+      listo();
+      mensaje("No se pudo descartar: " + e.message, "error");
+    }
     return;
   }
   if (accion === "descartar") {
