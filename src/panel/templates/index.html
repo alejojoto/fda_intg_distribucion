@@ -12776,17 +12776,24 @@ const aperturaCliente = (p, i) => ({
 const CASOS_REVISION = [
   // El programa de facturación rechazó el código con el llenado ya empezado
   // (caso real 2026-07-30): nada local puede saber si un código existe allá, así
-  // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado.
+  // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado —
+  // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). La
+  // apertura se llama como en los demás casos de cliente ("Crear cliente" /
+  // "Crear sucursal", pedido del usuario): es el mismo formulario.
   {
     prefijo: "El programa de facturación no reconoció el código",
     objeto: (p) => `<b>Cliente:</b> ${esc(p.razon_social || p.cliente_id)}`,
-    detalle: (p, m) => `${m} al intentar llenar. Créalo allá y pulsa `
-      + `«Ya está creado»; si el código está mal, corrígelo.`,
+    detalle: (p, m) => `${m} al intentar llenar. Si falta allá, se crea en el `
+      + `programa de facturación y se pulsa «Ya está creado»; si el código está `
+      + `mal, se corrige con «${m.includes("de sucursal") ? "Crear sucursal" : "Crear cliente"}».`,
     botones: (p, i) => [
       `<button class="acento" onclick="marcarCruceCreado(${i})">Ya está creado</button>`,
     ],
-    aperturas: (p, i) => [{llamada: `crearClienteDesdeRevision(${i})`,
-                           etiqueta: "Corregir el código", que: "corregir el código"}],
+    aperturas: (p, i, m) => [m.includes("de sucursal")
+      ? {llamada: `crearClienteDesdeRevision(${i})`,
+         etiqueta: "Crear sucursal", que: "crear la sucursal"}
+      : {llamada: `crearClienteDesdeRevision(${i})`,
+         etiqueta: "Crear cliente", que: "crear el cliente"}],
   },
   {
     prefijo: "Cliente sin conversión",
@@ -13096,7 +13103,7 @@ function pintarRevision(lista) {
 function aperturasRevision(p, i) {
   const abre = [];
   for (const m of p.motivos)
-    for (const a of casoDeMotivo(m)?.aperturas?.(p, i) || [])
+    for (const a of casoDeMotivo(m)?.aperturas?.(p, i, m) || [])
       if (!abre.some(x => x.llamada === a.llamada)) abre.push(a);
   return abre;
 }
