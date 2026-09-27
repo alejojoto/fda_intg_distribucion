@@ -12803,16 +12803,21 @@ function falloHace(fechaCargado) {
 // varios motivos de la misma fila se juntan sin repetir etiqueta.
 // Los datos que llegan dañados de AppSheet no tienen solución aquí (Supabase
 // es solo lectura): esas filas no llevan «Resolver».
+// Cada solución se escribe desde quien opera (2026-09-27, corrección del
+// usuario): el TÍTULO es la causa posible en palabras llanas, el TEXTO dice
+// qué hacer y qué pasa después, y el BOTÓN es la acción. Nada de jerga
+// ("dar de alta", "cola", "cruce"): el operador tiene que reconocer su caso
+// de un vistazo.
 const solucionCliente = (p, i) => p.entrada_nueva
-  ? {titulo: "Falta decir qué es este cliente",
-     texto: "Llegó solo de la app de pedidos y nadie ha dicho si es un cliente "
-       + "independiente o la sucursal de otro. Se clasifica en su ficha; al "
-       + "guardarla, el pedido vuelve a la cola.",
+  ? {titulo: "Es un cliente nuevo y falta decir qué es",
+     texto: "Llegó solo de la app de pedidos. Hay que decir si es un cliente "
+       + "independiente o una sucursal de otro, y ponerle el código que tiene "
+       + "en el programa de facturación. Al guardar, el pedido vuelve a PENDIENTES.",
      etiqueta: "Clasificar cliente", ejecutar: () => crearClienteDesdeRevision(i)}
-  : {titulo: "Falta el cruce del cliente en el catálogo",
-     texto: "El asistente no sabe con qué código factura este cliente. Se crea "
-       + "el cruce en su ficha, con el código que ya tiene en el programa de "
-       + "facturación; al guardarla, el pedido vuelve a la cola.",
+  : {titulo: "El cliente no está en el catálogo del asistente",
+     texto: "El asistente no sabe con qué código se factura este cliente. Crea "
+       + "su ficha con el código que tiene en el programa de facturación. Al "
+       + "guardar, el pedido vuelve a PENDIENTES.",
      etiqueta: "Crear cliente", ejecutar: () => crearClienteDesdeRevision(i)};
 
 const CASOS_REVISION = [
@@ -12820,28 +12825,35 @@ const CASOS_REVISION = [
   // (caso real 2026-07-30): nada local puede saber si un código existe allá, así
   // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado —
   // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). Dos
-  // salidas: corregir el cruce aquí, o —si lo dieron de alta allá— devolver el
-  // pedido a la cola para que el próximo llenado lo intente. Crear el cliente
-  // o la sucursal en el programa de facturación se hace allá: el asistente no
-  // puede, y por eso aquí no hay ninguna solución "Crear".
+  // salidas: corregir el código aquí, o —si ya la crearon allá— intentar de
+  // nuevo. Crear el cliente o la sucursal en el programa de facturación se
+  // hace allá: el asistente no puede, y por eso aquí no hay ninguna solución
+  // "Crear".
   {
     prefijo: "El programa de facturación no reconoció el código",
     objeto: (p) => `<b>Cliente:</b> ${esc(p.razon_social || p.cliente_id)}`,
     detalle: (p, m) => `${m} al intentar llenar.`,
     soluciones: (p, i, m) => {
-      const que = m.includes("de sucursal") ? "la sucursal" : "el cliente";
+      const suc = m.includes("de sucursal");
+      const que = suc ? "la sucursal" : "el cliente";
+      const Que = suc ? "La sucursal" : "El cliente";
+      const del = suc ? "de la sucursal" : "del cliente";
+      const ninguna = suc ? "ninguna sucursal" : "ningún cliente";
+      const creada = suc ? "creada" : "creado";
+      const codigo = (m.match(/'([^']+)'/) || [])[1] || "";
       return [
-        {titulo: "El código del cruce está mal",
-         texto: `El cruce de ${que} en el catálogo apunta a un código que el `
-           + "programa de facturación no reconoce. Se corrige aquí, en la "
-           + "ficha del cruce; al guardarla, el pedido vuelve a la cola.",
+        {titulo: `El código ${del} está mal escrito aquí`,
+         texto: `En el programa de facturación no hay ${ninguna} con el código `
+           + `'${codigo}'. Compara este código con el que tiene ${que} allá y `
+           + "corrígelo en su ficha. Al guardar, el pedido vuelve a PENDIENTES.",
          etiqueta: "Corregir el código", ejecutar: () => crearClienteDesdeRevision(i)},
-        {titulo: `${que[0].toUpperCase()}${que.slice(1)} ya existe en el programa de facturación`,
-         texto: `${que[0].toUpperCase()}${que.slice(1)} se dio de alta allá con este `
-           + "mismo código (el asistente no puede crearlo). Al devolver el "
-           + "pedido a la cola, el próximo llenado lo vuelve a intentar; si el "
-           + "código sigue sin existir, el pedido regresa a esta lista.",
-         etiqueta: "Devolver a la cola", ejecutar: () => marcarCruceCreado(i)},
+        {titulo: `${Que} todavía no existe en el programa de facturación`,
+         texto: `El código está bien, pero ${que} todavía no está ${creada} allá. `
+           + "Eso se hace en el programa de facturación; el asistente no puede. Cuando "
+           + `ya esté ${creada}, pulsa «Intentar de nuevo»: el pedido vuelve a `
+           + "PENDIENTES para llenarlo otra vez. Si sigue sin existir, regresa a "
+           + "esta lista.",
+         etiqueta: "Intentar de nuevo", ejecutar: () => marcarCruceCreado(i)},
       ];
     },
   },
@@ -12871,20 +12883,20 @@ const CASOS_REVISION = [
       || "<b>Producto</b>",
     detalle: "Sin artículo de facturación para ese producto",
     soluciones: (p, i) => (p.productos_sin_articulo || []).map((pr, j, todos) => ({
-      titulo: `Falta el artículo de ${pr.descripcion || pr.pt_id}`,
+      titulo: `${pr.descripcion || pr.pt_id} no tiene código de facturación`,
       texto: "Primero se crea el artículo en el programa de facturación (el "
-        + "asistente no puede crearlo); después se registra aquí su código, en "
-        + "la ficha del producto. Al guardarla, el pedido vuelve a la cola.",
+        + "asistente no puede crearlo). Después se anota aquí ese código, en la "
+        + "ficha del producto. Al guardar, el pedido vuelve a PENDIENTES.",
       etiqueta: `Crear producto${todos.length > 1 ? ` ${j + 1} de ${todos.length}` : ""}`,
       ejecutar: () => crearProductoDesdeRevision(i, j),
     })),
   },
   // El programa rechazó ESTE código al llenar (2026-08-13, pedido del usuario:
   // "debe haber consistencia en que se trate como los demás pedidos cuando
-  // falta algo"). Aquí el panel no puede crear nada —el precio se pone en el
-  // programa de facturación—, así que su única salida es devolver el pedido a
-  // la cola cuando ya esté arreglado allá. Si sigue mal, el próximo llenado lo
-  // marca otra vez.
+  // falta algo"). Aquí el panel no puede arreglar nada —el precio se pone en
+  // el programa de facturación—, así que su única salida es intentar de nuevo
+  // cuando ya esté arreglado allá. Si sigue mal, el próximo llenado lo marca
+  // otra vez.
   {
     prefijo: "El programa de facturación no pudo facturar",
     objeto: (p) => (p.productos_rechazados || []).map(pr =>
@@ -12893,13 +12905,18 @@ const CASOS_REVISION = [
       || "<b>Producto</b>",
     detalle: "El programa de facturación rechazó ese código al llenar: esa "
       + "línea no entraría al documento.",
-    soluciones: (p, i) => [
-      {titulo: "El producto ya está arreglado en el programa de facturación",
-       texto: "Normalmente es ponerle precio; se hace allá, el asistente no "
-         + "puede. Al devolver el pedido a la cola, el próximo llenado lo "
-         + "vuelve a intentar; si sigue rechazado, el pedido regresa a esta lista.",
-       etiqueta: "Devolver a la cola", ejecutar: () => marcarProductoArreglado(i)},
-    ],
+    soluciones: (p, i) => {
+      const motivos = [...new Set((p.productos_rechazados || []).map(pr => pr.motivo).filter(Boolean))];
+      return [
+        {titulo: "Al producto le falta algo en el programa de facturación",
+         texto: `Al llenar, el programa lo rechazó${motivos.length ? `: ${motivos.join(", ")}` : ""}. `
+           + "Eso se arregla allá (normalmente es ponerle el precio); el "
+           + "asistente no puede. Cuando ya esté arreglado, pulsa «Intentar de "
+           + "nuevo»: el pedido vuelve a PENDIENTES para llenarlo otra vez. Si "
+           + "sigue igual, regresa a esta lista.",
+         etiqueta: "Intentar de nuevo", ejecutar: () => marcarProductoArreglado(i)},
+      ];
+    },
   },
   // Producto desactivado a mano en el catálogo (2026-08-22). A diferencia del
   // rechazo de arriba, aquí no hay nada que arreglar del otro lado: alguien
@@ -12913,10 +12930,10 @@ const CASOS_REVISION = [
       || "<b>Producto</b>",
     detalle: "Ese producto está desactivado en el catálogo, así que no se factura.",
     soluciones: (p, i) => [
-      {titulo: "El producto volvió a venderse",
-       texto: "Alguien lo desactivó aquí, en el catálogo. Al reactivarlo vuelve "
-         + "a facturarse y el pedido regresa a la cola. Si de verdad no se "
-         + "factura, el pedido se factura a mano.",
+      {titulo: "El producto está desactivado en el catálogo del asistente",
+       texto: "Alguien lo desactivó aquí y por eso no se factura. Si volvió a "
+         + "venderse, reactívalo: el pedido vuelve a PENDIENTES. Si de verdad "
+         + "no se factura, el pedido se factura a mano.",
        etiqueta: "Reactivar el producto", ejecutar: () => reactivarProductoDesdeRevision(i)},
     ],
   },
@@ -13238,7 +13255,7 @@ async function editarClienteDesdeLlenado(clienteId) {
   else mensaje("Ese cliente ya no está en el catálogo local.", "error");
 }
 
-// «Devolver a la cola» (rótulo desde 2026-09-27; antes "Ya está creado"): el
+// «Intentar de nuevo» (así se llama desde 2026-09-27; antes "Ya está creado"): el
 // operador ya resolvió el código —lo corrigió aquí o lo dieron de alta en el
 // programa de facturación—, así que se le quita la marca al cruce y el pedido
 // vuelve a la cola. No hace falta comprobar nada aquí: si el código sigue sin
@@ -13246,17 +13263,17 @@ async function editarClienteDesdeLlenado(clienteId) {
 async function marcarCruceCreado(i) {
   const p = listaRevisionVisible[i];
   if (!p) return;
-  avisarTrabajando("Devolviendo el pedido a la cola…");
+  avisarTrabajando("Devolviendo el pedido a PENDIENTES…");
   try {
     await api("/api/revision/cruce-rechazado/limpiar", {cliente_id: p.cliente_id});
     await cargar();
-    mensaje("El pedido vuelve a la cola de facturas.", "info");
+    mensaje("El pedido volvió a PENDIENTES: se puede llenar otra vez.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
 }
 
-// «Devolver a la cola» del producto (2026-08-13, así se llama desde 2026-09-27; antes
+// «Intentar de nuevo» del producto (2026-08-13, así se llama desde 2026-09-27; antes
 // "Ya tiene precio"): el operador ya arregló el producto en el programa de
 // facturación, así que su código sale de la lista de rechazados y el pedido
 // vuelve a la cola. Gemelo del de los clientes: no
@@ -13265,13 +13282,13 @@ async function marcarCruceCreado(i) {
 async function marcarProductoArreglado(i) {
   const p = listaRevisionVisible[i];
   if (!p || !(p.productos_rechazados || []).length) return;
-  avisarTrabajando("Devolviendo el pedido a la cola…");
+  avisarTrabajando("Devolviendo el pedido a PENDIENTES…");
   try {
     for (const pr of p.productos_rechazados) {
       await api("/api/catalogo/articulos-revision/eliminar", {codigo_articulo: pr.codigo});
     }
     await cargar();
-    mensaje("El pedido vuelve a la cola de facturas.", "info");
+    mensaje("El pedido volvió a PENDIENTES: se puede llenar otra vez.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
@@ -13283,14 +13300,14 @@ async function marcarProductoArreglado(i) {
 async function reactivarProductoDesdeRevision(i) {
   const p = listaRevisionVisible[i];
   if (!p || !(p.productos_desactivados || []).length) return;
-  avisarTrabajando("Devolviendo el pedido a la cola…");
+  avisarTrabajando("Reactivando el producto…");
   try {
     for (const pr of p.productos_desactivados) {
       await api("/api/catalogo/productos/activo",
                 {pt_id: pr.pt_id, presentacion: pr.presentacion, activo: 1});
     }
     await cargar();
-    mensaje("El producto vuelve a facturarse y el pedido a la cola de facturas.", "info");
+    mensaje("El producto vuelve a facturarse y el pedido volvió a PENDIENTES.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
@@ -20487,7 +20504,7 @@ function faltaDeEntrada(f) {
   // El programa de facturación mostró un aviso al llenar con esta entrada
   // (2026-08-13, pedido del usuario): entra a Por revisar como SUGERENCIA —
   // el aviso literal viaja en rechazo_detalle y lo pinta la fila. Se sale
-  // corrigiendo la ficha, o con «Devolver a la cola» desde EN REVISIÓN si el
+  // corrigiendo la ficha, o con «Intentar de nuevo» desde EN REVISIÓN si el
   // código estaba bien y lo que faltaba era darlo de alta en el programa.
   if (f.rechazo_campo) {
     return `El programa no aceptó el código de ${
