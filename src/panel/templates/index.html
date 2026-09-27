@@ -12766,7 +12766,8 @@ function falloHace(fechaCargado) {
 // Las acciones que ABREN un formulario se declaran aparte de las que tienen
 // efecto (2026-08-01): la fila entera dispara la de apertura cuando es la única
 // de esa fila, igual que en las demás listas del panel. Una acción con efecto
-// —"Ya está creado" marca el cruce— nunca se dispara por pulsar el renglón.
+// —«Devolver a la cola» quita la marca del cruce— nunca se dispara por pulsar
+// el renglón.
 const aperturaCliente = (p, i) => ({
   llamada: `crearClienteDesdeRevision(${i})`,
   etiqueta: p.entrada_nueva ? "Clasificar cliente" : "Crear cliente",
@@ -12777,23 +12778,28 @@ const CASOS_REVISION = [
   // El programa de facturación rechazó el código con el llenado ya empezado
   // (caso real 2026-07-30): nada local puede saber si un código existe allá, así
   // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado —
-  // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). La
-  // apertura se llama como en los demás casos de cliente ("Crear cliente" /
-  // "Crear sucursal", pedido del usuario): es el mismo formulario.
+  // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). Los
+  // botones dicen lo que HACEN, no lo que el operador afirma (2026-09-27,
+  // pedido del usuario tras pulsar «Ya está creado» creyendo que era
+  // informativo): «Corregir el código» abre el cruce en el catálogo;
+  // «Devolver a la cola» quita la marca y el pedido vuelve a PENDIENTES.
+  // Crear el cliente o la sucursal en el programa de facturación se hace
+  // allá: el asistente no puede, y por eso aquí no hay botón "Crear".
   {
     prefijo: "El programa de facturación no reconoció el código",
     objeto: (p) => `<b>Cliente:</b> ${esc(p.razon_social || p.cliente_id)}`,
-    detalle: (p, m) => `${m} al intentar llenar. Si falta allá, se crea en el `
-      + `programa de facturación y se pulsa «Ya está creado»; si el código está `
-      + `mal, se corrige con «${m.includes("de sucursal") ? "Crear sucursal" : "Crear cliente"}».`,
+    detalle: (p, m) => `${m} al intentar llenar. Dos causas posibles: el código `
+      + `del cruce está mal (se corrige aquí, con «Corregir el código»), o `
+      + `${m.includes("de sucursal") ? "la sucursal" : "el cliente"} no existe en el `
+      + `programa de facturación (se crea allá; el asistente no puede crearlo). `
+      + `Cuando esté resuelto, «Devolver a la cola» regresa el pedido a `
+      + `PENDIENTES; si el código sigue sin existir, el próximo llenado lo trae `
+      + `de vuelta aquí.`,
     botones: (p, i) => [
-      `<button class="acento" onclick="marcarCruceCreado(${i})">Ya está creado</button>`,
+      `<button onclick="marcarCruceCreado(${i})">Devolver a la cola</button>`,
     ],
-    aperturas: (p, i, m) => [m.includes("de sucursal")
-      ? {llamada: `crearClienteDesdeRevision(${i})`,
-         etiqueta: "Crear sucursal", que: "crear la sucursal"}
-      : {llamada: `crearClienteDesdeRevision(${i})`,
-         etiqueta: "Crear cliente", que: "crear el cliente"}],
+    aperturas: (p, i) => [{llamada: `crearClienteDesdeRevision(${i})`,
+                           etiqueta: "Corregir el código", que: "corregir el código"}],
   },
   {
     prefijo: "Cliente sin conversión",
@@ -12842,10 +12848,13 @@ const CASOS_REVISION = [
        <div class="mut">${esc(pr.codigo)} · ${esc(pr.motivo)}</div>`).join("")
       || "<b>Producto</b>",
     detalle: "El programa de facturación rechazó ese código al llenar, así que "
-      + "esa línea no entraría al documento. Se arregla allá —normalmente es "
-      + "ponerle precio— y aquí se pulsa «Ya tiene precio».",
+      + "esa línea no entraría al documento. Se arregla en el programa de "
+      + "facturación —normalmente es ponerle precio—; el asistente no puede "
+      + "hacerlo. Cuando esté resuelto, «Devolver a la cola» regresa el pedido "
+      + "a PENDIENTES; si sigue sin precio, el próximo llenado lo trae de "
+      + "vuelta aquí.",
     botones: (p, i) => [
-      `<button class="acento" onclick="marcarProductoArreglado(${i})">Ya tiene precio</button>`,
+      `<button onclick="marcarProductoArreglado(${i})">Devolver a la cola</button>`,
     ],
   },
   // Producto desactivado a mano en el catálogo (2026-08-22). A diferencia del
@@ -13112,13 +13121,16 @@ function aperturasRevision(p, i) {
 // un formulario. El botón de apertura se conserva aunque la fila ya abra sola:
 // es lo que nombra la acción (crear un cliente y crear un producto no se
 // adivinan del renglón), y con varias aperturas es la única forma de elegir.
+// El acento va en el primer botón que lo pida: un caso cuyo botón con efecto
+// no es la acción principal («Devolver a la cola») lo deja para la apertura.
 function botonesRevision(p, i, abre) {
   const botones = [];
+  const hayAcento = () => botones.some(b => b.includes('class="acento"'));
   for (const m of p.motivos)
     for (const b of casoDeMotivo(m)?.botones?.(p, i) || [])
       if (!botones.includes(b)) botones.push(b);
   for (const a of abre || aperturasRevision(p, i))
-    botones.push(`<button${botones.length ? "" : ' class="acento"'}${
+    botones.push(`<button${hayAcento() ? "" : ' class="acento"'}${
       a.titulo ? ` title="${esc(a.titulo)}"` : ""} onclick="${a.llamada}">${
       esc(a.etiqueta)}</button>`);
   return botones.join("<br>");
@@ -13164,10 +13176,11 @@ async function editarClienteDesdeLlenado(clienteId) {
   else mensaje("Ese cliente ya no está en el catálogo local.", "error");
 }
 
-// "Ya está creado": el operador acaba de darlo de alta en el programa de
-// facturación, así que se le quita la marca al cruce y el pedido vuelve a la
-// cola. No hace falta comprobar nada aquí: si el código sigue sin existir, el
-// próximo llenado lo marca otra vez solo (2026-07-30).
+// «Devolver a la cola» (rótulo desde 2026-09-27; antes "Ya está creado"): el
+// operador ya resolvió el código —lo corrigió aquí o lo dieron de alta en el
+// programa de facturación—, así que se le quita la marca al cruce y el pedido
+// vuelve a la cola. No hace falta comprobar nada aquí: si el código sigue sin
+// existir, el próximo llenado lo marca otra vez solo (2026-07-30).
 async function marcarCruceCreado(i) {
   const p = listaRevisionVisible[i];
   if (!p) return;
@@ -13181,9 +13194,10 @@ async function marcarCruceCreado(i) {
   }
 }
 
-// "Ya tiene precio" (2026-08-13): el operador acaba de arreglar el producto en
-// el programa de facturación, así que su código sale de la lista de rechazados
-// y el pedido vuelve a la cola. Gemelo de "Ya está creado" de los clientes: no
+// «Devolver a la cola» del producto (2026-08-13, rótulo desde 2026-09-27; antes
+// "Ya tiene precio"): el operador ya arregló el producto en el programa de
+// facturación, así que su código sale de la lista de rechazados y el pedido
+// vuelve a la cola. Gemelo del de los clientes: no
 // se comprueba nada aquí — si el código sigue sin precio, el próximo llenado
 // lo marca de nuevo solo.
 async function marcarProductoArreglado(i) {
@@ -20410,7 +20424,7 @@ function faltaDeEntrada(f) {
   // El programa de facturación mostró un aviso al llenar con esta entrada
   // (2026-08-13, pedido del usuario): entra a Por revisar como SUGERENCIA —
   // el aviso literal viaja en rechazo_detalle y lo pinta la fila. Se sale
-  // corrigiendo la ficha, o con «Ya está creado» desde EN REVISIÓN si el
+  // corrigiendo la ficha, o con «Devolver a la cola» desde EN REVISIÓN si el
   // código estaba bien y lo que faltaba era darlo de alta en el programa.
   if (f.rechazo_campo) {
     return `El programa no aceptó el código de ${
