@@ -900,6 +900,18 @@
      arreglar), solo cambió de sitio — por eso informativa y no ámbar. */
   #fin-llenado-cuerpo tr.fl-al-final td { background:#f0f9ff; color:#075985; }
   #fin-llenado-cuerpo .fl-final { font-size:11px; }
+  /* Totalización por grupo (2026-09-28, pedido del usuario): un número por
+     grupo con los paquetes y los kilos SUMADOS (30 paq + 3,5 kg = 33,5), para
+     cuadrar el despacho por grupo sin ir producto por producto. Mismas
+     cajitas de la barra de llenado: es el mismo dato, ya sumado. */
+  #fin-llenado-totales { display:flex; flex-wrap:wrap; align-items:center;
+                         gap:6px; margin-top:8px; }
+  #fin-llenado-totales:empty { display:none; }
+  #fin-llenado-totales .cj-val { font-size:13px; }
+  #fin-llenado-totales .flt-rot { font-size:10.5px; font-weight:700;
+                         letter-spacing:.4px; text-transform:uppercase;
+                         color:var(--mut); }
+  #fin-llenado-totales .flt-nota { font-size:11px; color:var(--mut); }
   #fin-llenado-acciones { display:flex; gap:8px; margin-top:8px; }
   #mensaje.error { background:#fee4e2; color:var(--err); }
   #mensaje.info { background:#e0eaff; color:#1d4ed8; }
@@ -2729,6 +2741,11 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div id="fin-llenado">
       <div id="fin-llenado-chequeo"></div>
       <div id="fin-llenado-cuerpo"></div>
+      <!-- Totalización por grupo (2026-09-28, pedido del usuario): al pie del
+           resumen, cuánto llevó cada grupo con paquetes y kilos sumados en un
+           solo número. Va FUERA del cuerpo para que no se vaya con el scroll
+           de la lista cuando el pedido no cabe en pantalla. -->
+      <div id="fin-llenado-totales"></div>
       <div id="fin-llenado-acciones"></div>
     </div>
   </div>
@@ -5531,7 +5548,7 @@ function pintarBotonPausa() {
    la vista ☰ del 2026-07-31 (retirada a pedido del usuario: pausar a mitad
    de llenado para mirar el pedido descuadraba más de lo que ayudaba —
    durante el llenado quedan solo ⏸ y los hovers de las cajitas). */
-let resumenFinal = null;   // {pedido_id, parte, omitidas, llenadas, pedidas, lineas}
+let resumenFinal = null;   // {pedido_id, parte, omitidas, llenadas, pedidas, lineas, grupos}
 // Última composición con líneas que reportó /api/fase_llenado: al terminar,
 // el backend limpia la fase (avanceLlenado queda null) y el resumen se pinta
 // con esta foto. Se borra al arrancar cada llenado.
@@ -5581,7 +5598,39 @@ function pintarResumenFinal() {
           <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
       }).join("")}</tbody></table>`;
+  pintarTotalesGrupo(lineas, omitidas);
   pintarAccionesResumen(claves.length > 0);
+}
+
+// Totalización por grupo al pie del resumen (2026-09-28, pedido del usuario):
+// un solo número por grupo con los paquetes y los kilos SUMADOS (30 paq +
+// 3,5 kg = 33,5). Es para cuadrar la factura contra el despacho por grupo
+// —ensaladas, hierbas…—, no producto por producto: ese detalle ya está en la
+// tabla de arriba.
+// Solo suma lo que ENTRÓ al documento: el total tiene que dar lo que dice la
+// factura que quedó en pantalla, y cuando quedó algo fuera lo aclara la nota.
+function pintarTotalesGrupo(lineas, omitidas) {
+  const suma = {};
+  const comoSeLlenaron = [];
+  let fuera = 0;
+  (lineas || []).forEach(l => {
+    if (omitidas && omitidas[l.codigo]) { fuera++; return; }
+    const grupo = l.grupo || "Otros";
+    if (!(grupo in suma)) { suma[grupo] = 0; comoSeLlenaron.push(grupo); }
+    suma[grupo] += Number(l.cantidad) || 0;
+  });
+  // El orden es el de las cajitas del llenado; si el avance no trajo la lista
+  // de grupos, el orden en que se llenaron las líneas, que es el mismo.
+  const nombres = (resumenFinal.grupos || []).map(g => g.nombre).filter(n => n in suma);
+  comoSeLlenaron.forEach(n => { if (!nombres.includes(n)) nombres.push(n); });
+  $("fin-llenado-totales").innerHTML = !nombres.length ? ""
+    : `<span class="flt-rot">Total por grupo</span>`
+      + nombres.map(n => `<div class="cajita">
+           <span class="cj-rot">${esc(n)}</span>
+           <span class="cj-val">${fmtCantidad(suma[n])}</span>
+         </div>`).join("")
+      + (!fuera ? "" : `<span class="flt-nota">No suma ${
+           fuera === 1 ? "la línea que no entró" : `las ${fuera} líneas que no entraron`}.</span>`);
 }
 
 // Las salidas del resumen (2026-08-01, pedido del usuario). Con líneas
@@ -15181,8 +15230,12 @@ function llenarSiguiente() {
 function esperarEnvioPlataforma(texto, tipo, factura) {
   esperandoEnvioPlataforma = true;
   exitoTrasEnvio = {texto, tipo};
+  // Los grupos viajan con el resumen SOLO por su orden (Ensaladas → Frutas, y
+  // lo que no cae en ningún grupo al final): las cantidades se suman aparte,
+  // porque las de aquí incluyen lo que no entró al documento.
   resumenFinal = {...factura,
-                  lineas: (ultimoAvanceLlenado && ultimoAvanceLlenado.lineas) || []};
+                  lineas: (ultimoAvanceLlenado && ultimoAvanceLlenado.lineas) || [],
+                  grupos: (ultimoAvanceLlenado && ultimoAvanceLlenado.grupos) || []};
   // Sin spinner (mismo criterio que la espera del login): el programa no está
   // trabajando, está esperando al operador.
   mensaje(`${texto} Envíala a la plataforma de facturación.`, tipo, false);
