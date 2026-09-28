@@ -7780,7 +7780,7 @@ function supSelectorCanal(equipo) {
   const puesto = equipo.canal_asignado || "";
   const opciones = SUP_CANALES_ASIGNABLES.map(([v, txt]) =>
     `<option value="${v}"${v === puesto ? " selected" : ""}>${txt}</option>`).join("");
-  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente. Automático: el server y el Mac cargan desarrollo; las demás, producción. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev se las devuelve."
+  return `<select class="sup-canal" data-puesto="${esc(puesto)}" title="Qué versión carga esta computadora al reabrir el asistente, una vez que la reciba (su panel la busca cada minuto). Automático: el server y el Mac cargan desarrollo; las demás, producción. Una versión liberada le quita además las herramientas de administración al server y al Mac; Dev se las devuelve."
     onchange="supCambiarCanal(this, '${host}')">${opciones}</select>`;
 }
 
@@ -7793,9 +7793,14 @@ async function supCambiarCanal(sel, dispositivo) {
     sel.dataset.puesto = canal;
     const eq = supEquipos.find(e => e.dispositivo === dispositivo);
     if (eq) eq.canal_asignado = canal;
+    // El reabrir NO alcanza por sí solo (2026-09-28): la máquina primero tiene
+    // que BAJAR la asignación —su panel la busca cada minuto— y el arranque
+    // lee la copia que ya tenga guardada. Reabrir en el mismo minuto vuelve a
+    // cargar la versión anterior, que es justo lo que pasó con el server.
     mensaje("Versión de " + dispositivo + ": "
       + (SUP_CANALES_ASIGNABLES.find(([v]) => v === canal) || ["", canal])[1]
-      + ". Se aplica cuando esa computadora cierre y vuelva a abrir el asistente.",
+      + ". Esa computadora la recibe en menos de un minuto; se aplica cuando "
+      + "cierre y vuelva a abrir el asistente después de recibirla.",
       "info");
   } catch (e) {
     sel.value = anterior;
