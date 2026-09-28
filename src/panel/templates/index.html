@@ -879,7 +879,7 @@
                          font-size:12.5px; background:#d1fadf; color:var(--ok); }
   #fin-llenado-chequeo.alerta { background:#fef0c7; color:var(--warn); }
   /* El código de artículo en columna propia (2026-09-11, pedido del usuario):
-     es lo que se teclea en el programa, y cotejarlo contra el documento pide
+     es lo que se teclea en Winledger, y cotejarlo contra el documento pide
      verlo alineado, sin pelear por el ancho con el nombre del producto. */
   #fin-llenado .fl-codigo { white-space:nowrap; font-variant-numeric:tabular-nums; }
   /* El calc es solo el respaldo antes de que plantarVentanaResumen mida: al
@@ -2032,15 +2032,32 @@
   /* Motivo de "Volver a facturar" y de "Descartar": modal chico con los
      motivos comunes + "Otro" con texto libre. El de las facturas hermanas
      (misma familia visual) sale detrás, ya hecha la primera. */
-  #motivo-overlay, #hermanas-overlay, #conflicto-overlay {
+  #motivo-overlay, #hermanas-overlay, #conflicto-overlay, #resolver-overlay {
                     position:fixed; inset:0; background:rgba(29,36,51,.45);
                     display:none; z-index:20; align-items:flex-start; justify-content:center; }
   #motivo-overlay.visible, #hermanas-overlay.visible,
-  #conflicto-overlay.visible { display:flex; }
-  #motivo-caja, #hermanas-caja, #conflicto-caja {
+  #conflicto-overlay.visible, #resolver-overlay.visible { display:flex; }
+  #motivo-caja, #hermanas-caja, #conflicto-caja, #resolver-caja {
                  background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                  width:min(460px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
-  #motivo-caja h3, #hermanas-caja h3, #conflicto-caja h3 { margin:0 0 12px; font-size:14px; }
+  #motivo-caja h3, #hermanas-caja h3, #conflicto-caja h3, #resolver-caja h3 { margin:0 0 12px; font-size:14px; }
+  /* «Resolver» de EN REVISIÓN: el problema en rojo y, debajo, qué hacer. Sin
+     recuadros de color ni numeración con UNA sola salida (2026-09-28,
+     decisión del usuario): ahí el número y la caja son ruido — la frase y su
+     botón bastan. El número vuelve solo cuando hay varias, que es cuando hace
+     falta distinguir "así o así"; y entonces separa una raya, no un color. */
+  #resolver-caja { width:min(560px, 94vw); max-height:80vh; overflow:auto; }
+  #resolver-caja h3 { margin-bottom:10px; }
+  #resolver-problema { margin:0 0 14px; font-size:14px; font-weight:600; background:#fdecec;
+                       color:#a12a2a; border-radius:6px; padding:10px 12px; }
+  #resolver-problema div + div { margin-top:4px; }
+  #resolver-como { margin:0 0 10px; font-size:13.5px; }
+  .resolver-opcion { display:flex; gap:12px; align-items:center; font-size:14px; }
+  .resolver-opcion + .resolver-opcion { margin-top:12px; padding-top:12px;
+                                        border-top:1px solid #e3e6ec; }
+  .resolver-num { flex:none; color:var(--mut); font-weight:700; }
+  .resolver-linea { flex:1; }
+  .resolver-opcion button { flex:none; white-space:nowrap; }
   /* Resolución de un doble llenado: el detalle en rojo (es el hecho), los dos
      documentos como radios y los campos opcionales debajo. */
   #conflicto-detalle { margin:0 0 12px; font-size:13px; background:#fdecec;
@@ -2230,7 +2247,7 @@
   .pap-cajitas input[type=date]::-webkit-calendar-picker-indicator { display:none; }
   .pap-cajitas .cajita.ojo .cj-edit { color:#b54708; }
   /* Ámbar en la cajita = ese dato no lo pone el asistente y la factura sale con
-     lo que el programa de facturación tenga puesto. */
+     lo que Winledger tenga puesto. */
   .cajita.ojo { background:#fef0c7; border-color:#fde68a; }
   .cajita.ojo .cj-val { color:#b54708; }
   #previo-avisos, #detalle-avisos { display:flex; flex-direction:column; gap:6px;
@@ -2609,11 +2626,11 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <span class="rapida-grupo" id="rapida-grupo-salta">
       <b>Salta</b>
       <button type="button" class="rapida-chip letra" id="rapida-salto-tasa" onclick="rapidaSalto('tasa')"
-              title="Tasa: no se registra, la factura sale con el Cambio que el programa ya tenga.">T</button>
+              title="Tasa: no se registra, la factura sale con el Cambio que Winledger ya tenga.">T</button>
       <button type="button" class="rapida-chip letra" id="rapida-salto-fecha" onclick="rapidaSalto('fecha')"
               title="Fecha: no se cambia el período, el documento queda con la fecha que la Ficha traiga.">F</button>
       <button type="button" class="rapida-chip letra" id="rapida-salto-serie" onclick="rapidaSalto('serie')"
-              title="Serie: no se elige, queda la que esté puesta en el programa.">S</button>
+              title="Serie: no se elige, queda la que esté puesta en Winledger.">S</button>
     </span>
     <span class="rapida-grupo" id="rapida-grupo-prueba">
       <label class="rapida-check alerta" id="rapida-prueba-lbl"
@@ -2767,7 +2784,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
          fecha (Desde/Hasta) siguen con "Hoy". -->
     <div class="campo-con-aviso">
       <div class="campo"><span class="rotulo">Fecha a facturar<span class="rotulo-dia" id="f-fecha-dia"></span></span><input type="date" id="f-fecha-facturar" data-atajo="despacho" onchange="cambioFechaFacturar()"
-          title="Pre-seleccionada con el día de despacho de esta máquina (hoy o mañana, se elige en AJUSTES) y se puede cambiar a mano. Los fines de semana y feriados no la mueven — afectan la tasa (va la última publicada, nunca una posterior). Se escribe en el Período del programa de facturación si la Ficha no coincide."></div>
+          title="Pre-seleccionada con el día de despacho de esta máquina (hoy o mañana, se elige en AJUSTES) y se puede cambiar a mano. Los fines de semana y feriados no la mueven — afectan la tasa (va la última publicada, nunca una posterior). Se escribe en el Período de Winledger si la Ficha no coincide."></div>
       <span id="f-fecha-aviso"></span>
     </div>
     <div class="campo-con-aviso campo-separador">
@@ -2854,7 +2871,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
            pausarSecuenciaPorFallo). Un segundo clic durante un llenado lo frenan
            las guardas de llenar(). -->
       <button class="primario" id="btn-llenar-siguiente" onclick="llenarSiguiente()"
-              title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en el programa de facturación.">Llenar siguiente</button>
+              title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en Winledger.">Llenar siguiente</button>
       <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
            y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
            Lo marca pintarGramajeBaby() con el último elegido en esta computadora
@@ -3099,7 +3116,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <div class="ajustes-bloque" id="catalogos-bloque" style="display:none">
         <h3>Catálogos</h3>
         <p class="mut" style="margin:4px 0 10px">Relaciona datos de pedidos con
-          códigos usados por programa de facturación.</p>
+          códigos usados por Winledger.</p>
         <div class="cat-btns" id="cat-btns"></div>
         <!-- Resumen de lo pendiente por catálogo (2026-08-13, pedido del
              usuario: "afuera solo salga algo tipo por revisar en tal
@@ -3408,15 +3425,15 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
           <span class="rotulo-grupo">Saltar puesta a punto</span>
           <div class="ajustes-fila">
             <label class="desc-todos"
-                   title="No se registra la tasa en Archivos → Tasas de Cambio: la factura sale con el Cambio que el programa de facturación ya tenga. También quita el aviso «Todavía no hay tasa para el …» que sale antes de llenar mientras el BCV no publique la del día a facturar: si la tasa no se va a registrar, que falte deja de importar. Solo para probar — en producción ese aviso es lo que evita facturar con un cambio ajeno.">
+                   title="No se registra la tasa en Archivos → Tasas de Cambio: la factura sale con el Cambio que Winledger ya tenga. También quita el aviso «Todavía no hay tasa para el …» que sale antes de llenar mientras el BCV no publique la del día a facturar: si la tasa no se va a registrar, que falte deja de importar. Solo para probar — en producción ese aviso es lo que evita facturar con un cambio ajeno.">
               <input type="checkbox" id="prueba-saltar-tasa" onchange="guardarOpcionesPrueba()">
               Tasa</label>
             <label class="desc-todos"
-                   title="No se cambia el período del programa de facturación: el documento queda con la fecha que la Ficha traiga.">
+                   title="No se cambia el período de Winledger: el documento queda con la fecha que la Ficha traiga.">
               <input type="checkbox" id="prueba-saltar-fecha" onchange="guardarOpcionesPrueba()">
               Fecha</label>
             <label class="desc-todos"
-                   title="No se elige serie: queda la que esté puesta en el programa de facturación.">
+                   title="No se elige serie: queda la que esté puesta en Winledger.">
               <input type="checkbox" id="prueba-saltar-serie" onchange="guardarOpcionesPrueba()">
               Serie</label>
             <span class="prueba-nota" id="prueba-aviso-saltos-999" style="display:none"
@@ -3871,7 +3888,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div class="acceso-campo" id="equipo-config-series-campo">
       <label id="equipo-config-series-rotulo" style="display:none"></label>
       <p class="mut equipo-config-ayuda">Una computadora tiene todas las series
-        cargadas en el programa de facturación, o una sola. Con todas, la
+        cargadas en Winledger, o una sola. Con todas, la
         predeterminada es con la que arranca cada factura suya.</p>
       <!-- "Todas" y la predeterminada comparten línea (2026-08-07, pedido del
            usuario): son las dos decisiones de la sección y leerlas juntas
@@ -4196,7 +4213,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div id="conflicto-opciones"></div>
     <label id="conflicto-doc-label">
       Nº del documento que queda vivo (opcional)
-      <input type="text" id="conflicto-doc" placeholder="Como aparece en el programa">
+      <input type="text" id="conflicto-doc" placeholder="Como aparece en Winledger">
     </label>
     <label id="conflicto-nota-label">
       Nota (opcional)
@@ -4212,6 +4229,21 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
 <!-- Las facturas hermanas de un pedido dividido (pedido del usuario
      2026-07-22): descartada una parte, se pregunta por las que siguen sin
      llenar, con la opción de darles otro motivo. -->
+<!-- «Resolver» de EN REVISIÓN (2026-09-27): qué le falta al pedido y las
+     salidas posibles explicadas; el operador elige una. -->
+<div id="resolver-overlay" onclick="if(event.target===this)cerrarResolver()">
+  <div id="resolver-caja">
+    <h3 id="resolver-titulo"></h3>
+    <div id="resolver-problema"></div>
+    <p id="resolver-como"></p>
+    <div id="resolver-opciones"></div>
+    <div class="editor-acciones">
+      <button class="peligro" onclick="descartarPedidoDesdeRevision()">Descartar el pedido</button>
+      <button data-preseleccionado onclick="cerrarResolver()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div id="hermanas-overlay" onclick="if(event.target===this)cerrarHermanas()">
   <div id="hermanas-caja">
     <h3 id="hermanas-titulo"></h3>
@@ -4301,7 +4333,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     <div class="editor-acciones">
       <button class="primario" id="docencurso-si" onclick="resolverDocEnCurso(true)">Cancelarlo y continuar el llenado</button>
       <button data-preseleccionado id="docencurso-no" onclick="resolverDocEnCurso(false)"
-              title="El llenado se detiene aquí; resuelve el documento en el programa de facturación (Aceptar o Cancelar) y vuelve a darle Llenar.">No tocar nada</button>
+              title="El llenado se detiene aquí; resuelve el documento en Winledger (Aceptar o Cancelar) y vuelve a darle Llenar.">No tocar nada</button>
     </div>
   </div>
 </div>
@@ -5726,18 +5758,18 @@ const TEXTO_ESTORBO = {
   cancelar_documento_en_curso: {
     titulo: "La Ficha tiene un documento sin terminar",
     si: "Cancelarlo y continuar el llenado",
-    noTitle: "El llenado se detiene aquí; resuelve el documento en el programa de facturación " +
+    noTitle: "El llenado se detiene aquí; resuelve el documento en Winledger " +
              "(Aceptar o Cancelar) y vuelve a darle Llenar.",
     autorizado: "Autorizado: se cancela el documento en curso y se sigue…",
-    resuelveTu: "resuelve el documento en curso en el programa de facturación (Aceptar o Cancelar)",
+    resuelveTu: "resuelve el documento en curso en Winledger (Aceptar o Cancelar)",
   },
   cerrar_ventana_articulo: {
     titulo: "Quedó abierta una ventana de artículo",
     si: "Cerrarla y continuar el llenado",
     noTitle: "El llenado se detiene aquí; cierra la ventana de artículo en " +
-             "el programa de facturación y vuelve a darle Llenar.",
+             "Winledger y vuelve a darle Llenar.",
     autorizado: "Autorizado: se cierra la ventana de artículo y se sigue…",
-    resuelveTu: "cierra la ventana de artículo en el programa de facturación",
+    resuelveTu: "cierra la ventana de artículo en Winledger",
   },
 };
 
@@ -6057,7 +6089,7 @@ let rutaPredetAplicada = false;      // la predeterminada se aplica solo al abri
 // Solo el CAMPO por ahora: la lógica de series se define parte por parte;
 // la predeterminada por máquina usa la misma mecánica que la ruta.
 const SERIES = ["P00E", "P00F", "P00G", "P00I", "P00J", "P00L"];
-// Series disponibles en ESTA instalación del programa de facturación
+// Series disponibles en ESTA instalación de Winledger
 // (2026-08-07): las manda el servidor en /api/facturas y /api/ajustes según
 // la configuración de la computadora. Vacío = aún no llegó (se usa SERIES).
 let seriesMaquina = [];
@@ -6672,7 +6704,7 @@ function cambioFechaFacturar() {
 // abierto seguía ofreciendo la de ayer y PENDIENTES marcaba en ámbar todo lo
 // del día nuevo hasta que alguien recargaba. El disparador NO es la medianoche
 // sino la fecha del equipo, porque hay máquinas donde el operador la mueve a
-// mano (el programa de facturación factura con la fecha del sistema) y ahí un
+// mano (Winledger factura con la fecha del sistema) y ahí un
 // temporizador a las 00:00 no se enteraría. Comparar dos textos cada medio
 // minuto no cuesta red ni trabajo, y cubre además volver de suspender la
 // computadora, que descuadra cualquier temporizador largo.
@@ -10123,8 +10155,8 @@ async function leerPortapapeles() {
 //
 // CUÁL queda preseleccionado es la regla del usuario: la acción principal si es
 // segura (cerrar un informe, dejar una factura en revisión) y, si toca algo
-// delicado —arrancar un llenado, cancelar un documento del programa de
-// facturación, reiniciarlo—, la opción segura, de modo que la delicada se
+// delicado —arrancar un llenado, cancelar un documento de Winledger,
+// reiniciarlo—, la opción segura, de modo que la delicada se
 // alcance con un Tab y nunca con un Enter suelto. Los diálogos que se llenan a
 // mano no preseleccionan botón: ahí el foco pertenece al primer campo.
 // Cuál botón enfocamos nosotros. Es lo que distingue "el operador no ha tocado
@@ -10172,7 +10204,7 @@ function aplicarInerciaDeFondo() {
   }
 }
 
-// Durante un llenado el foreground lo tiene el programa de facturación, así que
+// Durante un llenado el foreground lo tiene Winledger, así que
 // el foco del documento no basta: sin activar la ventana el operador tenía que
 // pulsarla antes de poder usar Tab o Enter (2026-08-07).
 function activarVentanaDelPanel() {
@@ -10648,7 +10680,7 @@ function pintarSinConexion() {
     texto = "El asistente dejó de responder. Reintentando…";
   }
   if (llenadoInterrumpido) {
-    texto += " El llenado quedó a medias: revisa en el programa de facturación el documento abierto antes de seguir.";
+    texto += " El llenado quedó a medias: revisa en Winledger el documento abierto antes de seguir.";
   }
   $("sin-conexion-texto").textContent = texto;
   $("sin-conexion-reintentar").style.display = panelReabierto ? "none" : "";
@@ -11048,14 +11080,14 @@ const pendientesLlenables = () => (ultimaLista.pendientes || []).filter(f => f.l
    la del panel por el prefijo del <title>. */
 const TITULO_PAGINA = "Asistente FDA v1.1.3";  // el <title> del <head>; ver ventana_encima.py
 const TITULO_FASE = {
-  conectando: "buscando el programa",
+  conectando: "buscando Winledger",
   entorno: "ajustando fecha y serie",
   lineas: "llenando",
   aceptando: "cerrando el documento",
   esperando_impresion: "esperando tu «Continuar»",
   pausado: "en pausa",
-  esperando_popup: "cierra el aviso del programa",
-  pide_maximizar: "maximiza el programa",
+  esperando_popup: "cierra el aviso de Winledger",
+  pide_maximizar: "maximiza Winledger",
 };
 let faseActual = null;      // última fase que devolvió /api/fase_llenado
 let tituloPuesto = null;    // lo último escrito: cambiarlo es un viaje a la ventana
@@ -11408,26 +11440,26 @@ const chipPorRevisar = (f) =>
     ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
     : "";
 
-// Esta factura trae productos que el programa YA rechazó antes (2026-08-13,
+// Esta factura trae productos que Winledger YA rechazó antes (2026-08-13,
 // pedido del usuario: avisar antes de llenar, sabiendo que lo más probable es
 // que vuelvan a quedar fuera). No bloquea nada — se llena igual si el operador
-// quiere; lo que lo resuelve de verdad es ponerles precio en el programa de
-// facturación. El detalle de cuáles va en el hover: en la fila solo cabe el
+// quiere; lo que lo resuelve de verdad es ponerles precio en Winledger. El
+// detalle de cuáles va en el hover: en la fila solo cabe el
 // número, y la lista completa vive en AJUSTES → Catálogos → Productos.
 const chipRechazados = (f) => {
   const cuantos = (f.productos_rechazados || []).length;
   if (!cuantos) return "";
   const cuales = f.productos_rechazados.map(p => p.descripcion).join(", ");
   return ` <span class="chip por-revisar" title="${esc(
-    `El programa de facturación ya rechazó ${cuantos === 1 ? "este producto" : "estos productos"}: `
+    `Winledger ya rechazó ${cuantos === 1 ? "este producto" : "estos productos"}: `
     + `${cuales}. Lo más probable es que vuelvan a quedar fuera del documento. `
     + "Se puede llenar igual; para que entren, hay que ponerles precio en el "
-    + "programa de facturación.")}">${
+    + "Winledger.")}">${
     cuantos === 1 ? "1 producto sin precio" : `${cuantos} productos sin precio`}</span>`;
 };
 
 // El pedido traía un producto en varias líneas: se factura una sola con la
-// cantidad total (el programa de facturación no admite el mismo artículo
+// cantidad total (Winledger no admite el mismo artículo
 // repetido en un documento). El monto no cambia; se avisa porque el número de
 // líneas de la factura no coincide con el del pedido.
 // La cantidad se muestra con el mismo formato con que se escribe en el
@@ -12303,14 +12335,14 @@ function filaLineaDetalle(d, l) {
   // documento no tiene.
   const omitida = l.omitida
     ? `<div class="det-nota alerta">No entró al documento: ${esc(l.omitida)}.</div>` : "";
-  // El programa ya rechazó este código en un llenado anterior (2026-08-13): la
+  // Winledger ya rechazó este código en un llenado anterior (2026-08-13): la
   // marca de la fila dice cuántos, y aquí es donde el operador viene a ver
   // CUÁLES. No se pinta si la línea ya trae su propio "no entró": ahí eso ya
   // pasó y decirlo dos veces es ruido.
   const rechazado = (!l.omitida && l.rechazado_antes)
-    ? `<div class="det-nota alerta">El programa de facturación ya lo rechazó antes (${
+    ? `<div class="det-nota alerta">Winledger ya lo rechazó antes (${
         esc(l.rechazado_antes)}): lo más probable es que no entre. Se llena igual; para
-        que entre, hay que arreglarlo en el programa de facturación.</div>` : "";
+        que entre, hay que arreglarlo en Winledger.</div>` : "";
   if (!detalleEdicionActiva(d)) return `
     <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
       <td class="det-num">${l.n}</td><td>${producto}${omitida}${rechazado}</td>
@@ -12499,7 +12531,7 @@ async function enviarAjuste(pedidoId, parte, codigo, cuerpo) {
 }
 
 // Cliente y sucursal de una factura, resueltos para mostrar (2026-07-31): el
-// nombre del cliente viene del programa de facturación y el de la sucursal, de
+// nombre del cliente viene de Winledger y el de la sucursal, de
 // la app de pedidos. Solo las cadenas tienen sucursal propia, así que sin
 // código de sucursal se muestra un nombre solo — repetir el mismo nombre en dos
 // renglones no distingue nada. Sin nombre de cliente cargado (cliente aún sin
@@ -12682,7 +12714,7 @@ function avisoDeFactura(f, enFamilia) {
     <tr class="fila-aviso ${enFamilia ? "fam-parte" : ""}">
       <td colspan="8">Un llenado anterior de esta factura se cortó a mitad (se
         cerró el panel o se apagó el equipo): no quedó terminada y se llena
-        completa de nuevo. Si dejó un documento a medias en el programa de facturación, al dar
+        completa de nuevo. Si dejó un documento a medias en Winledger, al dar
         Llenar el asistente pregunta si lo cancela.</td>
     </tr>`;
   // Parte que el amarre retiene (2026-07-27): del pedido ya salió una factura
@@ -12763,30 +12795,57 @@ function falloHace(fechaCargado) {
 // Una entrada NUEVA (llegó sola de la app de pedidos y nadie ha dicho qué es)
 // no se "crea": se clasifica. Es el mismo formulario y el mismo guardado que
 // desde AJUSTES — las dos rutas terminan en el mismo sitio (2026-07-29).
-// Las acciones que ABREN un formulario se declaran aparte de las que tienen
-// efecto (2026-08-01): la fila entera dispara la de apertura cuando es la única
-// de esa fila, igual que en las demás listas del panel. Una acción con efecto
-// —"Ya está creado" marca el cruce— nunca se dispara por pulsar el renglón.
-const aperturaCliente = (p, i) => ({
-  llamada: `crearClienteDesdeRevision(${i})`,
-  etiqueta: p.entrada_nueva ? "Clasificar cliente" : "Crear cliente",
-  que: p.entrada_nueva ? "clasificar el cliente" : "crear el cliente",
-});
+// Cada caso declara sus SOLUCIONES (2026-09-27, pedido del usuario: "un solo
+// botón que diga Resolver y una ventana que explique las soluciones posibles y
+// de ahí se escoja"). La fila lleva un único «Resolver»; la ventana lista, por
+// cada motivo, las salidas con su explicación y su botón. Antes cada caso
+// traía sus propios botones ("Ya está creado", "Crear sucursal"…) y se leían
+// como afirmaciones o como si el asistente pudiera crear algo en Winledger.
+// Una solución es {titulo, texto, etiqueta, ejecutar}; las de
+// varios motivos de la misma fila se juntan sin repetir etiqueta.
+// Los datos que llegan dañados de AppSheet no tienen solución aquí (Supabase
+// es solo lectura): esas filas no llevan «Resolver».
+// Cada caso dice el PROBLEMA en una sola frase y cada solución en otra, con
+// su botón (2026-09-27, regla del usuario: quien opera no lee más de diez
+// palabras seguidas — "esto se resuelve así o así, como a un bebé"). Nada de
+// párrafos ni de jerga ("dar de alta", "cola", "cruce"). La ventana
+// «Resolver» pinta el problema en rojo y las soluciones numeradas.
+const solucionCliente = (p, i) => p.entrada_nueva
+  ? {linea: "Di si es un cliente o una sucursal de otro.",
+     etiqueta: "Clasificar cliente", ejecutar: () => crearClienteDesdeRevision(i)}
+  : {linea: "Ponle el código que tiene en Winledger.",
+     etiqueta: "Crear cliente", ejecutar: () => crearClienteDesdeRevision(i)};
+const problemaCliente = (p) => p.entrada_nueva
+  ? "Es un cliente nuevo de la app de pedidos."
+  : "El cliente no está en el catálogo del asistente.";
 
 const CASOS_REVISION = [
-  // El programa de facturación rechazó el código con el llenado ya empezado
+  // Winledger rechazó el código con el llenado ya empezado
   // (caso real 2026-07-30): nada local puede saber si un código existe allá, así
-  // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado.
+  // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado —
+  // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). UNA
+  // salida, con la misma forma que los demás casos (2026-09-28, decisión del
+  // usuario: "si dice que no existe, se crea"): «Crear sucursal» / «Crear
+  // cliente» abre la ficha del cruce, donde va el código; se crea en
+  // Winledger y aquí se confirma o corrige ese código. Guardar la ficha ya
+  // quita la marca y devuelve el pedido a PENDIENTES.
   {
-    prefijo: "El programa de facturación no reconoció el código",
+    prefijo: "Winledger no reconoció el código",
     objeto: (p) => `<b>Cliente:</b> ${esc(p.razon_social || p.cliente_id)}`,
-    detalle: (p, m) => `${m} al intentar llenar. Créalo allá y pulsa `
-      + `«Ya está creado»; si el código está mal, corrígelo.`,
-    botones: (p, i) => [
-      `<button class="acento" onclick="marcarCruceCreado(${i})">Ya está creado</button>`,
-    ],
-    aperturas: (p, i) => [{llamada: `crearClienteDesdeRevision(${i})`,
-                           etiqueta: "Corregir el código", que: "corregir el código"}],
+    detalle: (p, m) => `${m} al intentar llenar.`,
+    problema: (p, m) => {
+      const suc = m.includes("de sucursal");
+      const codigo = (m.match(/'([^']+)'/) || [])[1] || "";
+      return `Winledger no encontró ${suc ? "la sucursal" : "el cliente"} ${codigo}.`;
+    },
+    soluciones: (p, i, m) => {
+      const suc = m.includes("de sucursal");
+      return [
+        {linea: `Créa${suc ? "la" : "lo"} en Winledger y pon aquí su código.`,
+         etiqueta: suc ? "Crear sucursal" : "Crear cliente",
+         ejecutar: () => crearClienteDesdeRevision(i)},
+      ];
+    },
   },
   {
     prefijo: "Cliente sin conversión",
@@ -12794,8 +12853,9 @@ const CASOS_REVISION = [
     detalle: (p) => p.entrada_nueva
       ? "Cliente nuevo de la app de pedidos: falta decir si es un cliente "
         + "independiente o la sucursal de otro"
-      : "El cliente no está en el catálogo de facturación — se resuelve con 'Crear cliente'",
-    aperturas: (p, i) => [aperturaCliente(p, i)],
+      : "El cliente no está en el catálogo de facturación",
+    problema: problemaCliente,
+    soluciones: (p, i) => [solucionCliente(p, i)],
   },
   {
     prefijo: "Cliente_id",
@@ -12803,8 +12863,9 @@ const CASOS_REVISION = [
     detalle: (p) => p.entrada_nueva
       ? "Cliente nuevo de la app de pedidos: falta decir si es un cliente "
         + "independiente o la sucursal de otro"
-      : "Código de cliente sin forma RIF_sucursal — se resuelve con 'Crear cliente'",
-    aperturas: (p, i) => [aperturaCliente(p, i)],
+      : "Código de cliente sin forma RIF_sucursal",
+    problema: problemaCliente,
+    soluciones: (p, i) => [solucionCliente(p, i)],
   },
   {
     prefijo: "Producto(s) sin artículo",
@@ -12812,50 +12873,53 @@ const CASOS_REVISION = [
       `<b>Producto:</b> ${esc(pr.descripcion || pr.pt_id)}
        <div class="mut">${esc(pr.pt_id)} · ${esc(pr.presentacion)}</div>`).join("")
       || "<b>Producto</b>",
-    detalle: "Sin artículo de facturación para ese producto — se crea primero en " +
-             "el programa de facturación y después se registra aquí con 'Crear producto'",
-    aperturas: (p, i) => (p.productos_sin_articulo || []).map((pr, j) => ({
-      llamada: `crearProductoDesdeRevision(${i},${j})`,
-      etiqueta: `Crear producto${p.productos_sin_articulo.length > 1
-        ? ` ${j + 1} de ${p.productos_sin_articulo.length}` : ""}`,
-      que: "crear el producto",
-      titulo: pr.descripcion || pr.pt_id,
+    detalle: "Sin artículo de facturación para ese producto",
+    problema: (p) => (p.productos_sin_articulo || [])
+      .map(pr => `${pr.descripcion || pr.pt_id} no tiene código de facturación.`),
+    soluciones: (p, i) => (p.productos_sin_articulo || []).map((pr, j, todos) => ({
+      linea: `Créalo en Winledger y anota aquí su código${
+        todos.length > 1 ? ` (${pr.descripcion || pr.pt_id})` : ""}.`,
+      etiqueta: `Crear producto${todos.length > 1 ? ` ${j + 1} de ${todos.length}` : ""}`,
+      ejecutar: () => crearProductoDesdeRevision(i, j),
     })),
   },
-  // El programa rechazó ESTE código al llenar (2026-08-13, pedido del usuario:
+  // Winledger rechazó ESTE código al llenar (2026-08-13, pedido del usuario:
   // "debe haber consistencia en que se trate como los demás pedidos cuando
-  // falta algo"). Aquí el panel no puede crear nada —el precio se pone en el
-  // programa de facturación—, así que su acción es la misma que la del cliente
-  // que ya se creó allá: avisar que ya está listo y devolver el pedido a la
-  // cola. Si el código sigue mal, el próximo llenado lo marca otra vez.
+  // falta algo"). Aquí el panel no puede arreglar nada —el precio se pone en
+  // Winledger—, así que su única salida es intentar de nuevo
+  // cuando ya esté arreglado allá. Si sigue mal, el próximo llenado lo marca
+  // otra vez.
   {
-    prefijo: "El programa de facturación no pudo facturar",
+    prefijo: "Winledger no pudo facturar",
     objeto: (p) => (p.productos_rechazados || []).map(pr =>
       `<b>Producto:</b> ${esc(pr.descripcion || pr.codigo)}
        <div class="mut">${esc(pr.codigo)} · ${esc(pr.motivo)}</div>`).join("")
       || "<b>Producto</b>",
-    detalle: "El programa de facturación rechazó ese código al llenar, así que "
-      + "esa línea no entraría al documento. Se arregla allá —normalmente es "
-      + "ponerle precio— y aquí se pulsa «Ya tiene precio».",
-    botones: (p, i) => [
-      `<button class="acento" onclick="marcarProductoArreglado(${i})">Ya tiene precio</button>`,
+    detalle: "Winledger rechazó ese código al llenar: esa "
+      + "línea no entraría al documento.",
+    problema: (p) => (p.productos_rechazados || []).map(pr =>
+      `Winledger rechazó ${pr.descripcion || pr.codigo}${pr.motivo ? `: ${pr.motivo}` : ""}.`),
+    soluciones: (p, i) => [
+      {linea: "Arréglalo en Winledger (normalmente es ponerle precio).",
+       etiqueta: "Ya lo arreglé, intentar de nuevo", ejecutar: () => marcarProductoArreglado(i)},
     ],
   },
   // Producto desactivado a mano en el catálogo (2026-08-22). A diferencia del
   // rechazo de arriba, aquí no hay nada que arreglar del otro lado: alguien
   // decidió que ese producto no se factura, así que la única salida es
-  // reactivarlo — y el botón la trae resuelta, sin mandar a nadie al catálogo.
+  // reactivarlo — y la solución la trae resuelta, sin mandar a nadie al catálogo.
   {
     prefijo: "Producto(s) desactivado(s)",
     objeto: (p) => (p.productos_desactivados || []).map(pr =>
       `<b>Producto:</b> ${esc(pr.descripcion || pr.pt_id)}
        <div class="mut">${esc(pr.codigo || pr.pt_id)} · ${esc(pr.presentacion)}</div>`).join("")
       || "<b>Producto</b>",
-    detalle: "Ese producto está desactivado en el catálogo, así que no se "
-      + "factura. Si volvió a venderse, se reactiva aquí y el pedido regresa a "
-      + "la cola; si no, el pedido se factura a mano.",
-    botones: (p, i) => [
-      `<button class="acento" onclick="reactivarProductoDesdeRevision(${i})">Reactivar el producto</button>`,
+    detalle: "Ese producto está desactivado en el catálogo, así que no se factura.",
+    problema: (p) => (p.productos_desactivados || []).map(pr =>
+      `${pr.descripcion || pr.pt_id} está desactivado en el catálogo del asistente.`),
+    soluciones: (p, i) => [
+      {linea: "Si volvió a venderse, reactívalo.",
+       etiqueta: "Reactivar el producto", ejecutar: () => reactivarProductoDesdeRevision(i)},
     ],
   },
   {
@@ -12869,12 +12933,6 @@ const CASOS_REVISION = [
     objeto: () => "Dato dañado en AppSheet",
     detalle: "Líneas del pedido con error de fórmula (#ERROR!) — el panel no " +
              "puede tocarlas: se corrigen en AppSheet",
-  },
-  {
-    prefijo: "Causa_Salida",
-    objeto: () => "Presentación (Paq./kg)",
-    detalle: "La Causa_Salida del pedido no es 'Paq.' ni 'kg' y sin ella no se " +
-             "sabe qué artículos usar — se corrige en AppSheet",
   },
 ];
 
@@ -12952,7 +13010,7 @@ function pintarLlenadosPorRevisar(lista) {
       : "";
     // Y en vez del botón, a quién le toca (2026-08-05, pedido del usuario):
     // un fallo así suele ser un código de cliente o de producto que cambió en
-    // el programa de facturación, y quien solo factura se quedaba con
+    // Winledger, y quien solo factura se quedaba con
     // Reintentar y Descartar sin saber que el arreglo no está en su equipo. No
     // se nombra la causa: el aviso del llenado no la distingue (ver
     // acciones.VerificacionFallida) y acusar una equivocada es peor.
@@ -13068,15 +13126,14 @@ function pintarRevision(lista) {
   $("t-revision").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
     lista, (p) => p.entrada_revision, 6, (p, atrasada) => {
     i++;
-    // La fila entera abre el formulario que resuelve el caso, como en las demás
-    // listas del panel (2026-08-01). Solo cuando hay UNA sola apertura: con
-    // varias (un pedido con dos productos por crear) no hay "la" acción de la
-    // fila, y ahí manda el botón de cada una.
-    const abre = aperturasRevision(p, i);
+    // La fila entera abre la ventana «Resolver» del caso, como en las demás
+    // listas del panel (2026-08-01). Sin soluciones (dato dañado en AppSheet)
+    // la fila no abre nada.
+    const soluciones = solucionesRevision(p, i);
     const claseAtrasada = atrasada ? " fila-atrasada" : "";
     const viejo = atrasada ? `${TITULO_PEDIDO_VIEJO} ` : "";
-    const clic = abre.length === 1
-      ? ` class="abre-editor${claseAtrasada}" title="${viejo}Clic para ${abre[0].que}" onclick="${abre[0].llamada}"`
+    const clic = soluciones.length
+      ? ` class="abre-editor${claseAtrasada}" title="${viejo}Clic para ver cómo resolverlo" onclick="abrirResolver(${i})"`
       : (claseAtrasada ? ` class="${claseAtrasada.trim()}" title="${TITULO_PEDIDO_VIEJO}"` : "");
     return `
     <tr${clic}>
@@ -13086,36 +13143,85 @@ function pintarRevision(lista) {
       <td>${esc(fechaCorta(p.fecha_orden_salida))}</td>
       <td>${p.motivos.map(m => casoDeMotivo(m)?.objeto(p) ?? "—").join("<br>")}</td>
       <td>${p.motivos.map(m => esc(detalleDeMotivo(m, p))).join("<br>")}</td>
-      <td${CELDA_ACCIONES}>${botonesRevision(p, i, abre)}</td>
+      <td${CELDA_ACCIONES}>${soluciones.length
+        ? `<button class="acento" onclick="abrirResolver(${i})">Resolver</button>` : ""}</td>
     </tr>`;
   }) || `<tr><td colspan="6" class="mut">Nada en revisión.</td></tr>`;
 }
 
-// Aperturas de todos los motivos de la fila, sin repetir (los dos motivos de
-// cliente pueden co-ocurrir y ambos resuelven con el mismo formulario).
-function aperturasRevision(p, i) {
-  const abre = [];
+// Soluciones de todos los motivos de la fila, sin repetir etiqueta (los dos
+// motivos de cliente pueden co-ocurrir y ambos resuelven con la misma ficha).
+function solucionesRevision(p, i) {
+  const todas = [];
   for (const m of p.motivos)
-    for (const a of casoDeMotivo(m)?.aperturas?.(p, i) || [])
-      if (!abre.some(x => x.llamada === a.llamada)) abre.push(a);
-  return abre;
+    for (const sol of casoDeMotivo(m)?.soluciones?.(p, i, m) || [])
+      if (!todas.some(x => x.etiqueta === sol.etiqueta)) todas.push(sol);
+  return todas;
 }
 
-// Los botones de la fila: primero los que tienen efecto, después los que abren
-// un formulario. El botón de apertura se conserva aunque la fila ya abra sola:
-// es lo que nombra la acción (crear un cliente y crear un producto no se
-// adivinan del renglón), y con varias aperturas es la única forma de elegir.
-function botonesRevision(p, i, abre) {
-  const botones = [];
-  for (const m of p.motivos)
-    for (const b of casoDeMotivo(m)?.botones?.(p, i) || [])
-      if (!botones.includes(b)) botones.push(b);
-  for (const a of abre || aperturasRevision(p, i))
-    botones.push(`<button${botones.length ? "" : ' class="acento"'}${
-      a.titulo ? ` title="${esc(a.titulo)}"` : ""} onclick="${a.llamada}">${
-      esc(a.etiqueta)}</button>`);
-  return botones.join("<br>");
+// Ventana «Resolver» (2026-09-27): el problema en una frase (en rojo) y las
+// formas de resolverlo numeradas, cada una con una frase y su botón. El
+// operador elige una y esa ejecuta (abre la ficha o devuelve el pedido a
+// PENDIENTES). Se cierra antes de ejecutar: la ficha que se abre es otra
+// ventana.
+let resolverAbierto = null;   // {i, soluciones}
+
+// El problema de cada motivo, en una frase; sin caso conocido, el detalle.
+function problemasRevision(p) {
+  const frases = [];
+  for (const m of p.motivos) {
+    const caso = casoDeMotivo(m);
+    const prob = caso?.problema ? caso.problema(p, m) : detalleDeMotivo(m, p);
+    for (const f of [].concat(prob)) if (f && !frases.includes(f)) frases.push(f);
+  }
+  return frases;
 }
+
+function abrirResolver(i) {
+  const p = listaRevisionVisible[i];
+  if (!p) return;
+  const soluciones = solucionesRevision(p, i);
+  if (!soluciones.length) return;
+  resolverAbierto = {i, soluciones};
+  $("resolver-titulo").textContent = `${p.razon_social || p.cliente_id} · pedido ${p.pedido_id}`;
+  $("resolver-problema").innerHTML = problemasRevision(p).map(f => `<div>${esc(f)}</div>`).join("");
+  // El número solo se pinta con varias salidas: con una sola no numera nada.
+  const varias = soluciones.length > 1;
+  $("resolver-como").textContent = varias
+    ? "Se resuelve de una de estas formas:" : "Se resuelve así:";
+  $("resolver-opciones").innerHTML = soluciones.map((sol, j) => `
+    <div class="resolver-opcion">
+      ${varias ? `<span class="resolver-num">${j + 1}.</span>` : ""}
+      <span class="resolver-linea">${esc(sol.linea)}</span>
+      <button class="primario" onclick="ejecutarSolucion(${j})">${esc(sol.etiqueta)}</button>
+    </div>`).join("");
+  $("resolver-overlay").classList.add("visible");
+}
+
+function cerrarResolver() {
+  resolverAbierto = null;
+  $("resolver-overlay").classList.remove("visible");
+}
+
+function ejecutarSolucion(j) {
+  const sol = resolverAbierto && resolverAbierto.soluciones[j];
+  cerrarResolver();
+  if (sol) sol.ejecutar();
+}
+
+// Salida de siempre de la ventana: este pedido no lo factura el asistente.
+// Pide motivo como cualquier descarte — queda en el registro y viaja al resto.
+function descartarPedidoDesdeRevision() {
+  const p = resolverAbierto && listaRevisionVisible[resolverAbierto.i];
+  cerrarResolver();
+  if (p) abrirMotivo("descartar_pedido", p.pedido_id, [1]);
+}
+
+// La ficha que se abre desde EN REVISIÓN vuelve a EN REVISIÓN al cerrarse
+// (2026-09-27, pedido del usuario: "reviso, creo cliente, siguiente revisión"
+// sin tener que buscar la lista otra vez). Guardar o cancelar, da igual: el
+// operador venía de esa lista.
+let volverARevisionAlCerrar = false;
 
 // "Crear cliente" / "Clasificar cliente": salta a AJUSTES → Clientes y abre el
 // editor de ESE cliente. Si la entrada ya existe en el catálogo (lo normal en
@@ -13126,6 +13232,7 @@ function botonesRevision(p, i, abre) {
 async function crearClienteDesdeRevision(i) {
   const p = listaRevisionVisible[i];
   if (!p) return;
+  volverARevisionAlCerrar = true;
   cambiarTab("ajustes");
   await abrirCatalogo("clientes");
   const idx = catalogoFilas.findIndex(f => f.cliente_id === p.cliente_id);
@@ -13138,7 +13245,7 @@ async function crearClienteDesdeRevision(i) {
 }
 
 // "Editar cliente" desde un llenado fallido (2026-08-04, pedido del usuario):
-// un código de cliente/sucursal que el programa de facturación rechazó puede
+// un código de cliente/sucursal que Winledger rechazó puede
 // ser porque allá lo editaron/renombraron, no porque el cruce esté mal
 // clasificado — por eso NO se marca nada solo (regla 2026-08-01, ver
 // cargador.py: un fallo de escritura no prueba que el código esté mal, pudo
@@ -13157,38 +13264,40 @@ async function editarClienteDesdeLlenado(clienteId) {
   else mensaje("Ese cliente ya no está en el catálogo local.", "error");
 }
 
-// "Ya está creado": el operador acaba de darlo de alta en el programa de
-// facturación, así que se le quita la marca al cruce y el pedido vuelve a la
-// cola. No hace falta comprobar nada aquí: si el código sigue sin existir, el
-// próximo llenado lo marca otra vez solo (2026-07-30).
+// «Intentar de nuevo» (así se llama desde 2026-09-27; antes "Ya está creado"): el
+// operador ya resolvió el código —lo corrigió aquí o lo dieron de alta en el
+// Winledger—, así que se le quita la marca al cruce y el pedido
+// vuelve a la cola. No hace falta comprobar nada aquí: si el código sigue sin
+// existir, el próximo llenado lo marca otra vez solo (2026-07-30).
 async function marcarCruceCreado(i) {
   const p = listaRevisionVisible[i];
   if (!p) return;
-  avisarTrabajando("Devolviendo el pedido a la cola…");
+  avisarTrabajando("Devolviendo el pedido a PENDIENTES…");
   try {
     await api("/api/revision/cruce-rechazado/limpiar", {cliente_id: p.cliente_id});
     await cargar();
-    mensaje("El pedido vuelve a la cola de facturas.", "info");
+    mensaje("El pedido volvió a PENDIENTES: se puede llenar otra vez.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
 }
 
-// "Ya tiene precio" (2026-08-13): el operador acaba de arreglar el producto en
-// el programa de facturación, así que su código sale de la lista de rechazados
-// y el pedido vuelve a la cola. Gemelo de "Ya está creado" de los clientes: no
+// «Intentar de nuevo» del producto (2026-08-13, así se llama desde 2026-09-27; antes
+// "Ya tiene precio"): el operador ya arregló el producto en Winledger, así
+// que su código sale de la lista de rechazados y el pedido
+// vuelve a la cola. Gemelo del de los clientes: no
 // se comprueba nada aquí — si el código sigue sin precio, el próximo llenado
 // lo marca de nuevo solo.
 async function marcarProductoArreglado(i) {
   const p = listaRevisionVisible[i];
   if (!p || !(p.productos_rechazados || []).length) return;
-  avisarTrabajando("Devolviendo el pedido a la cola…");
+  avisarTrabajando("Devolviendo el pedido a PENDIENTES…");
   try {
     for (const pr of p.productos_rechazados) {
       await api("/api/catalogo/articulos-revision/eliminar", {codigo_articulo: pr.codigo});
     }
     await cargar();
-    mensaje("El pedido vuelve a la cola de facturas.", "info");
+    mensaje("El pedido volvió a PENDIENTES: se puede llenar otra vez.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
@@ -13200,14 +13309,14 @@ async function marcarProductoArreglado(i) {
 async function reactivarProductoDesdeRevision(i) {
   const p = listaRevisionVisible[i];
   if (!p || !(p.productos_desactivados || []).length) return;
-  avisarTrabajando("Devolviendo el pedido a la cola…");
+  avisarTrabajando("Reactivando el producto…");
   try {
     for (const pr of p.productos_desactivados) {
       await api("/api/catalogo/productos/activo",
                 {pt_id: pr.pt_id, presentacion: pr.presentacion, activo: 1});
     }
     await cargar();
-    mensaje("El producto vuelve a facturarse y el pedido a la cola de facturas.", "info");
+    mensaje("El producto vuelve a facturarse y el pedido volvió a PENDIENTES.", "info");
   } catch (e) {
     mensaje(e.message, "error");
   }
@@ -13221,6 +13330,7 @@ function crearProductoDesdeRevision(i, j) {
   const p = listaRevisionVisible[i];
   const pr = p && (p.productos_sin_articulo || [])[j];
   if (!pr) return;
+  volverARevisionAlCerrar = true;
   cambiarTab("ajustes");
   abrirCatalogo("productos", {
     pt_id: pr.pt_id,
@@ -13420,7 +13530,7 @@ function abrirAvisoTasa(motivo, llenado) {
   // afuera — es la única acción que falta, y está a un teclazo.
   $("tasa-consecuencia").textContent =
     "Escríbela aquí para llenar: sin una tasa registrada la factura saldría con el Cambio "
-    + "que el programa de facturación tenga en ese momento, que puede ser 0 o el de otro día.";
+    + "que Winledger tenga en ese momento, que puede ser 0 o el de otro día.";
 
   // El campo llega con la última tasa conocida ya escrita: el camino corto es
   // el correcto, y corregirla es escribir encima.
@@ -13517,7 +13627,7 @@ function llenarParaDespachoDesdeAviso() {
 
 // Retirado el 2026-07-31 (regla del usuario): "Llenar sin tocar la tasa" era la
 // salida para llenar sin registrar ninguna, y ahora sin tasa no se llena. Quien
-// ya la puso a mano en el programa la escribe también aquí: registrar la misma
+// ya la puso a mano en Winledger la escribe también aquí: registrar la misma
 // dos veces no cambia el documento.
 
 // "Parar": no se manda ni una tecla a Winledger. Si venía de "Llenar en
@@ -13559,7 +13669,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // (el sondeo reanuda solo; para desistir, Cancelar). No aplica a la
   // reanudación interna: esa limpia esperandoLogin antes de llamar a llenar().
   if (esperandoLogin) {
-    mensaje("Ya se está esperando el inicio del programa de facturación — usa Cancelar si desistes.", "info");
+    mensaje("Ya se está esperando el inicio de Winledger — usa Cancelar si desistes.", "info");
     return "esperando_login";
   }
   // La lista en pantalla es la guardada por el arranque anterior: se mira,
@@ -13626,7 +13736,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // trabajo, no una traba (2026-08-11, pedido del usuario): al entrar, que se
     // está dejando todo en orden ANTES de escribir; al salir, que se está
     // comprobando lo escrito. Entre medio las líneas se ven solas.
-    conectando: `Entrando al programa de facturación…`,
+    conectando: `Entrando a Winledger…`,
     entorno: `Dejando todo listo para ${refFactura(pedido_id, parte)}: fecha, tasa y serie…`,
     lineas: `Llenando ${refFactura(pedido_id, parte)}…`,
     // Líneas ya escritas, releyendo grid/totales/fecha/tasa/serie antes de
@@ -13639,7 +13749,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // sí"— espera aquí entre facturas. El mensaje enuncia el estado; la acción
     // vive en el botón «Continuar».
     aceptando: `Aceptando el documento…`,
-    esperando_impresion: `Esperando la impresión en el programa de facturación…`,
+    esperando_impresion: `Esperando la impresión en Winledger…`,
     // ⏸ del operador: el llenado quedó congelado y el Detalle cerrado, así que
     // el documento se puede ajustar a mano en Winledger. El texto no dice más
     // que el estado (2026-07-27): el motivo de la pausa es del operador, y el
@@ -13649,16 +13759,16 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // esperando a que el operador lo cierre en pantalla). Texto de respaldo
     // por si 'detalle' viniera vacío — la rama especial de abajo es la que
     // manda cuando la fase es esta (usa "alerta" y el detalle si lo hay).
-    esperando_popup: `Cierra el aviso que salió en el programa de facturación para continuar`,
+    esperando_popup: `Cierra el aviso que salió en Winledger para continuar`,
     // Falta pantalla (2026-08-08): algo que el llenado necesita quedó fuera de
     // la vista (la Ficha cortada, o el Aceptar del Detalle). Texto de respaldo
     // por si 'detalle' viniera vacío — la rama de abajo es la que manda cuando
     // la fase es esta, y ahí el detalle dice QUÉ falta.
-    pide_maximizar: `Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.`,
+    pide_maximizar: `Maximiza Winledger: el llenado sigue solo en cuanto se vea completo.`,
     // Falta el foco (2026-08-10): Windows no le devuelve el primer plano al
     // asistente y sin él no puede teclear. Antes el llenado moría a los pocos
     // segundos y la factura quedaba a medias; ahora espera el clic, sin plazo.
-    pide_foco: `Haz clic en la ventana del programa de facturación: el llenado sigue solo en cuanto esté al frente.`,
+    pide_foco: `Haz clic en la ventana de Winledger: el llenado sigue solo en cuanto esté al frente.`,
   };
   // Mientras se llenan las líneas, esta línea es el PRODUCTO que entra ahora
   // —código y nombre juntos—, en lugar de "Llenando <pedido>…" (2026-09-11,
@@ -13696,7 +13806,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
       const tocaPapel = f.fase === "esperando_impresion" && f.papel && f.papel.toca;
       // No pisar "Deteniendo…": con el stop pedido, btn-stop queda deshabilitado.
       if (llenando && !$("btn-stop").disabled && f.fase === "esperando_popup")
-        mensaje("Salió un aviso en el programa de facturación — ciérralo en pantalla para continuar."
+        mensaje("Salió un aviso en Winledger — ciérralo en pantalla para continuar."
           + (f.detalle ? " Aviso: " + f.detalle : ""), "alerta");
       else if (llenando && !$("btn-stop").disabled && tocaPapel)
         // Cada FACTURAS_POR_REVISION_PAPEL impresiones el aviso rompe la
@@ -13708,13 +13818,13 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
         // Ámbar y sin punto giratorio: el llenado está parado esperando UN clic
         // del operador. La acción va primero — el detalle técnico de qué paso
         // se quedó sin foco no le sirve para actuar.
-        mensaje("Haz clic en la ventana del programa de facturación: perdió el primer plano "
+        mensaje("Haz clic en la ventana de Winledger: perdió el primer plano "
                 + "y el llenado sigue solo en cuanto lo recupere.", "alerta", false);
       else if (llenando && !$("btn-stop").disabled && f.fase === "pide_maximizar")
         // Ámbar y sin punto giratorio: falta pantalla y el llenado está parado
         // esperando al operador, no trabajando. El detalle dice QUÉ no se ve.
         mensaje((f.detalle ? f.detalle + " " : "")
-                + "Maximiza el programa de facturación: el llenado sigue solo en cuanto se vea completo.",
+                + "Maximiza Winledger: el llenado sigue solo en cuanto se vea completo.",
                 "alerta", false);
       else if (llenando && !$("btn-stop").disabled && TEXTO_FASE[f.fase])
         // Sin punto giratorio cuando quien tiene que actuar es el operador
@@ -13804,7 +13914,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     const estorbo = TEXTO_ESTORBO[r.requiere_confirmacion];
     if (estorbo) {
       // Detener pulsado durante este llenado: el stop manda y el modal no se
-      // abre (2026-07-30). Nada se tocó en el programa de facturación —esta
+      // abre (2026-07-30). Nada se tocó en Winledger —esta
       // respuesta es justamente la de "no toqué nada"—, así que basta con
       // cerrar el llenado como cualquier otra detención.
       if (stopPedidoEnLlenado) {
@@ -14146,6 +14256,23 @@ const ACCIONES_MOTIVO = {
                "No se despachó (no hubo entrega)",
                "El pedido está repetido"],
     boton: "Descartar",
+    clase: "peligro",
+  },
+  // Descartar un pedido de "no se pueden facturar" (2026-09-27, pedido del
+  // usuario): ahí el pedido NO tiene factura armada — el asistente nunca pudo
+  // armarla porque le falta un dato de catálogo—, así que se descarta el
+  // pedido entero (parte 1). Lo demás es el mismo camino de siempre: motivo
+  // obligatorio, queda en PROCESADAS y viaja a las demás máquinas.
+  descartar_pedido: {
+    titulo: (id) => `Descartar el pedido ${id} — ¿por qué?`,
+    nota: () => "El asistente no lo vuelve a ofrecer. Queda en PROCESADAS con "
+      + "este motivo; si hace falta, desde ahí se puede volver a llenar.",
+    opciones: ["Ya se facturó a mano",
+               "El cliente anuló el pedido",
+               "No se despachó (no hubo entrega)",
+               "El pedido está repetido",
+               "Nadie va a arreglar el dato que falta"],
+    boton: "Descartar el pedido",
     clase: "peligro",
   },
   // "Llenar igual" (2026-07-26): tomarle a otra máquina una factura que tiene
@@ -14504,6 +14631,20 @@ async function confirmarMotivo() {
     cerrarMotivo();
     if (donde === "previo") { pintarPrevioAvisos(); pintarBotonPrevio(); }
     else { pintarDetalleAvisos(); pintarBotonDetalle(); }
+    return;
+  }
+  if (accion === "descartar_pedido") {
+    cerrarMotivo();
+    const listo = avisarTrabajando("Descartando el pedido…");
+    try {
+      await api("/api/descartar", {pedido_id, parte: 1, motivo});
+      await cargar();
+      listo();
+    } catch (e) {
+      await cargar();
+      listo();
+      mensaje("No se pudo descartar: " + e.message, "error");
+    }
     return;
   }
   if (accion === "descartar") {
@@ -15515,8 +15656,8 @@ function descuentoPrevio(f) {
 
 // --- Cajitas de puesta a punto (compartidas) --------------------------------
 // Los datos que deciden en qué documento cae cada factura. En ámbar va lo que
-// el asistente NO va a poner: ahí la factura sale con lo que el programa de
-// facturación tenga puesto en ese momento.
+// el asistente NO va a poner: ahí la factura sale con lo que Winledger tenga
+// puesto en ese momento.
 // Los ladrillos y las cajitas comunes los comparten la revisión del lote y la
 // ventana de una factura —su pantalla de prellenado desde 2026-07-31—: mismos
 // datos, mismos controles; cambia solo qué se repinta al tocarlos (ver
@@ -15569,11 +15710,11 @@ const cajitaSerie = (porBloques) => saltandoPuestaAPunto("serie")
       !serieSeleccionada);
 
 // Con "no" el hover explica qué pasa con lo que no se imprime (2026-08-01,
-// pedido del usuario): el documento igual queda guardado en el programa de
-// facturación y se busca después con su modo Consultar.
+// pedido del usuario): el documento igual queda guardado en Winledger y se
+// busca después con su modo Consultar.
 const cajitaImpresion = () => cajitaEditable("Imprimir",
   `<select class="cj-edit"${imprimirEnFila() ? "" :
-      ` title="${esc("Se guardan los pedidos: se pueden ver luego con Consultar, en el programa de facturación.")}"`
+      ` title="${esc("Se guardan los pedidos: se pueden ver luego con Consultar, en Winledger.")}"`
     } onchange="cajitaImpresionElegida(this.value)">${
     cajitaOpciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
   imprimirEnFila());
@@ -16090,7 +16231,7 @@ function avisoFechaDelPedido(facturas, donde) {
   const destino = saltandoPuestaAPunto("fecha")
     ? (unaSola ? "La fecha no se pone: el documento sale"
                : "La fecha no se pone: los documentos salen")
-      + " con la que tenga el programa de facturación."
+      + " con la que tenga Winledger."
     // Con una sola factura el encabezado ya nombró la fecha de arriba: repetirla
     // aquí sonaba a que se hablaba de otra.
     : leToca ? "El documento sale con esa."
@@ -17111,20 +17252,20 @@ const SONDEOS_ANTES_DE_OFRECER_SALIDA = 17;
 // Nunca el nombre interno del estado: 'seleccion_empresas' no le dice nada a
 // nadie. Lo que no esté aquí cae al texto genérico de siempre.
 const PANTALLA_WINLEDGER = {
-  cerrada: "El programa de facturación todavía no está abierto.",
-  login: "El programa de facturación está pidiendo Usuario y Clave.",
-  periodo: "El programa de facturación está pidiendo el Período a procesar.",
-  seleccion_empresas: "El programa de facturación está en la selección de empresa.",
-  menu_empresas: "El programa de facturación está en la selección de empresa.",
+  cerrada: "Winledger todavía no está abierto.",
+  login: "Winledger está pidiendo Usuario y Clave.",
+  periodo: "Winledger está pidiendo el Período a procesar.",
+  seleccion_empresas: "Winledger está en la selección de empresa.",
+  menu_empresas: "Winledger está en la selección de empresa.",
   actualizacion_empresas:
-    "El programa de facturación tiene abierta 'Actualización de Empresas': ciérrala sin guardar nada.",
-  tasas: "El programa de facturación tiene abierta 'Tasas de Cambio': ciérrala.",
-  seleccion_serie: "El programa de facturación está pidiendo la serie del documento.",
-  duplicado: "Hay más de una ventana de oportunidades del programa de facturación: deja una sola de oportunidades (los demás módulos pueden quedarse).",
-  desconocido: "No se puede leer la pantalla del programa de facturación en este momento.",
+    "Winledger tiene abierta 'Actualización de Empresas': ciérrala sin guardar nada.",
+  tasas: "Winledger tiene abierta 'Tasas de Cambio': ciérrala.",
+  seleccion_serie: "Winledger está pidiendo la serie del documento.",
+  duplicado: "Hay más de una ventana de oportunidades de Winledger: deja una sola de oportunidades (los demás módulos pueden quedarse).",
+  desconocido: "No se puede leer la pantalla de Winledger en este momento.",
 };
 const TEXTO_ESPERA_LOGIN =
-  "Esperando el programa de facturación: inicia sesión, elige la empresa y acepta la fecha.";
+  "Esperando Winledger: inicia sesión, elige la empresa y acepta la fecha.";
 const TEXTO_ESPERA_SIGUE_SOLO = "Al llegar a la pantalla principal el llenado sigue solo.";
 
 function esperarLogin(llenado) {
@@ -17168,7 +17309,7 @@ async function sondearLogin() {
   // vuelve a preguntar (tasaConfirmada=true).
   const l = llenadoTrasLogin;
   detenerEsperaLogin();
-  mensaje("Programa de facturación listo — retomando el llenado…", "info");
+  mensaje("Winledger listo — retomando el llenado…", "info");
   if (l) llenar(l.pedido_id, l.parte, l.autorizarCancelar, true);
 }
 
@@ -18633,7 +18774,7 @@ async function cambiarDiaEquipo(dispositivo, control) {
 
 // --- Rutas y series de OTRA computadora (2026-08-07) ------------------------
 // La asignación de rutas solo limita filtros y selectores de esa máquina; las
-// series son las que su instalación del programa de facturación de verdad
+// series son las que su instalación de Winledger de verdad
 // tiene. null/sin configurar equivale a todas (legado).
 
 // Etiquetas de color en vez del texto con ★ (2026-08-08, pedido del usuario):
@@ -19799,8 +19940,8 @@ function onClickModoPruebaChk(ev) {
 const ORIGENES = {
   appsheet: {etiqueta: "AppSheet", pide: "está en AppSheet",
              titulo: "Sale de la app de pedidos (AppSheet)"},
-  winledger: {etiqueta: "Facturación", pide: "está en el programa de facturación",
-              titulo: "Sale del programa de facturación"},
+  winledger: {etiqueta: "Facturación", pide: "está en Winledger",
+              titulo: "Sale de Winledger"},
   panel: {etiqueta: "Panel", pide: "se define aquí",
           titulo: "Dato propio del panel: se define aquí mismo"},
 };
@@ -19821,7 +19962,7 @@ const CATALOGOS = {
     // facturación, y RIF (nombre/código de sucursal solo si es sucursal, ver
     // `campos` más abajo); "Activo" y "Cliente de prueba" son opcionales.
     descripcion: "Cruza el cliente y la sucursal del pedido con su código en el "
-      + "programa de facturación. El código de facturación es el dato que hace "
+      + "Winledger. El código de facturación es el dato que hace "
       + "falta para facturar; el nombre es una referencia visual. Un pedido en "
       + "EN REVISIÓN por cliente sin código abre este mismo formulario con lo "
       + "ya conocido — normalmente solo falta completar el código.",
@@ -19858,7 +19999,7 @@ const CATALOGOS = {
          ? "Código del cliente principal" : "Código de cliente",
        sugerenciasDe: () => clientesPrincipales(),
        origenDato: "winledger"},
-      // Razón social en el programa de facturación. Llega sola (del propio
+      // Razón social en Winledger. Llega sola (del propio
       // programa o de la app de pedidos) pero se puede corregir a mano: la app
       // no siempre la manda, y sin ella la lista rotula al cliente con su
       // código pelado (pedido del usuario 2026-07-29).
@@ -19894,14 +20035,14 @@ const CATALOGOS = {
     titulo: "Productos",
     singular: "producto",
     // Con pestaña "Por revisar" (2026-08-11, pedido del usuario — el patrón
-    // de Clientes): los artículos que el programa de facturación rechazó al
+    // de Clientes): los artículos que Winledger rechazó al
     // llenar (src/db/articulos_revision.py) se ven aquí adentro, y la barra
     // de pestañas solo aparece cuando hay alguno.
     conRevision: true,
     // Obligatorio real: pt_id y codigo_articulo (ver `campos`). descripcion y
     // nombre se completan solos y son opcionales de corregir a mano.
     descripcion: "Cruza el producto del pedido (PT_id) con su código de "
-      + "artículo en el programa de facturación. La descripción y el nombre "
+      + "artículo en Winledger. La descripción y el nombre "
       + "en facturación se completan solos; si se escriben a mano, dejan de "
       + "actualizarse automáticamente. Un pedido en EN REVISIÓN por producto "
       + "sin código abre este mismo formulario con lo ya conocido — "
@@ -20106,7 +20247,7 @@ const CATALOGOS_AJUSTES = ["clientes", "productos", "vendedores", "feriados"];
 
 let catalogoActual = null;       // tipo abierto en la vista
 let catalogoFilas = [];          // filas del catálogo abierto
-let catalogoPorRevisar = [];     // artículos que el programa no aceptó (viaja con productos)
+let catalogoPorRevisar = [];     // artículos que Winledger no aceptó (viaja con productos)
 let catProductosTab = "productos"; // pestaña del catálogo de productos: productos | revisar
 let catClientesTab = "clientes"; // pestaña del catálogo de clientes: clientes | revisar
 let editorFila = null;           // fila en edición (null = nueva)
@@ -20116,7 +20257,7 @@ let clienteEnEdicion = null;     // código del cliente abierto en su vista de
                                  // edición ("" = grupo sin código; null = listado)
 
 function pintarBotonesCatalogos() {
-  // Los artículos que el programa rechazó ya no tienen botón propio aquí
+  // Los artículos que Winledger rechazó ya no tienen botón propio aquí
   // (2026-08-11, mismo día): viven como pestaña "Por revisar" DENTRO de
   // Productos —el patrón de Clientes— y en la sección conjunta de abajo.
   $("cat-btns").innerHTML = CATALOGOS_AJUSTES.map(tipo =>
@@ -20400,17 +20541,17 @@ function faltaDeEntrada(f) {
   if (!f || esClienteSinFactura(f)) return "";
   if (esEntradaNueva(f)) return "Falta decir qué es";
   if (!(f.codigo_cliente_winledger || "").trim()) return "Falta el código de cliente";
-  // El programa de facturación mostró un aviso al llenar con esta entrada
+  // Winledger mostró un aviso al llenar con esta entrada
   // (2026-08-13, pedido del usuario): entra a Por revisar como SUGERENCIA —
   // el aviso literal viaja en rechazo_detalle y lo pinta la fila. Se sale
-  // corrigiendo la ficha, o con «Ya está creado» desde EN REVISIÓN si el
-  // código estaba bien y lo que faltaba era darlo de alta en el programa.
+  // corrigiendo la ficha, o con «Intentar de nuevo» desde EN REVISIÓN si el
+  // código estaba bien y lo que faltaba era darlo de alta en Winledger.
   if (f.rechazo_campo) {
-    return `El programa no aceptó el código de ${
+    return `Winledger no aceptó el código de ${
       f.rechazo_campo === "sucursal" ? "sucursal" : "cliente"}`;
   }
   // El código de SUCURSAL no entra aquí (regla del usuario 2026-07-31): el
-  // programa de facturación deja facturar sin él y solo lo exige en los
+  // Winledger deja facturar sin él y solo lo exige en los
   // clientes que de verdad tienen sucursales. Si lo exige y falta, ese rechazo
   // ya manda el pedido a revisión por su cuenta.
   return "";
@@ -20446,7 +20587,7 @@ function puedeSerSucursal(fila) {
 // criterio para los dos (pedido del usuario 2026-08-04: un cliente sin
 // sucursales no necesita ver el campo, no solo que deje de exigirlo): en toda
 // entrada marcada sucursal, o en un cliente independiente cuyo código de
-// cliente ya es una cadena en el programa de facturación — ese código reparte
+// cliente ya es una cadena en Winledger — ese código reparte
 // en sub-cuentas allá aunque esta entrada no cuelgue de otra.
 function sucursalHaceFalta(get) {
   return get("clasificacion") === "sucursal"
@@ -20585,7 +20726,7 @@ async function abrirCatalogo(tipo, prefill) {
     const filtroPrevio = mismoCatalogo && $("cat-filtro") ? $("cat-filtro").value : "";
     catalogoActual = tipo;
     catalogoFilas = d.filas;
-    // Los artículos que el programa rechazó viajan con el catálogo de
+    // Los artículos que Winledger rechazó viajan con el catálogo de
     // productos (ver catalogos.listar_catalogo): alimentan su pestaña
     // "Por revisar".
     catalogoPorRevisar = d.por_revisar || [];
@@ -20894,7 +21035,7 @@ function theadCatalogo(columnas, conAcciones) {
     conAcciones ? "<th></th>" : ""}</tr></thead>`;
 }
 
-// --- Artículos que el programa de facturación rechazó (2026-08-11) ----------
+// --- Artículos que Winledger rechazó (2026-08-11) ----------
 // La pestaña "Por revisar" de Productos y la sección conjunta bajo los
 // botones de Catálogos pintan la misma lista (src/db/articulos_revision.py);
 // estas son las piezas que comparten.
@@ -20949,7 +21090,7 @@ function pintarArticulosPorRevisarCatalogo(filtro) {
   $("t-catalogo").innerHTML = theadCatalogo(COLUMNAS_ARTICULOS_REVISION, true)
     + `<tbody>
       <tr class="grupo"><td colspan="5"><div class="mut" style="font-weight:400; max-width:62ch">El
-        programa de facturación no aceptó estos códigos al llenar (el motivo
+        Winledger no aceptó estos códigos al llenar (el motivo
         está en su fila): se corrigen de ese lado y salen solos en cuanto un
         llenado los acepta. Desactivar es para el que ya no se factura: el
         producto queda inactivo en el catálogo —no se borra nada, se reactiva
@@ -20961,7 +21102,7 @@ function pintarArticulosPorRevisarCatalogo(filtro) {
 
 // --- Sección "Por revisar" bajo los botones de Catálogos (2026-08-11) -------
 // Junta lo pendiente de cada catálogo —entradas de clientes sin resolver y
-// artículos rechazados por el programa— sin tener que abrir cada uno para
+// artículos rechazados por Winledger— sin tener que abrir cada uno para
 // saber si hay algo. Cada lista sigue viéndose también dentro de su catálogo.
 let revisionCatalogos = {clientes: [], articulos: []};
 
@@ -21248,7 +21389,7 @@ function pintarVentanaCliente() {
     <label class="editor-campo" style="max-width:420px">
       <span class="campo-linea">Nombre del cliente${chipOrigen("winledger", true)}</span>
       <input type="text" id="cliente-nombre" value="${esc(primera.nombre_cliente_winledger || "")}"
-             placeholder="como aparece en el programa de facturación"
+             placeholder="como aparece en Winledger"
              onchange="guardarNombreCliente()"
              onkeydown="if(event.key==='Enter')this.blur()">
     </label>
@@ -21346,7 +21487,7 @@ function intentarCerrarVentanaCliente(porAfuera) {
   cerrarVentanaCliente();
 }
 
-// Nombre del cliente en el programa de facturación, tecleado en su ventana: la app
+// Nombre del cliente en Winledger, tecleado en su ventana: la app
 // de pedidos no siempre lo manda y sin él la lista lo rotula con el código pelado.
 // Guarda al salir del campo y solo si cambió. Devuelve si quedó guardado.
 async function guardarNombreCliente() {
@@ -21623,6 +21764,11 @@ function cerrarEditor() {
   $("editor-overlay").classList.remove("visible");
   editorFila = null;
   borradorOlvidar("catalogo");   // salida por las buenas (guardado o descarte deliberado): no es trabajo interrumpido
+  if (volverARevisionAlCerrar) {
+    volverARevisionAlCerrar = false;
+    cambiarTab("revision");
+    irASubtabRevision("datos");
+  }
 }
 
 async function guardarEditor(confirmado, nombreEnConflicto) {

@@ -224,8 +224,8 @@ end;
 // Apagado cooperativo de la instalacion existente (python -m src.lanzador
 // --detener). Devuelve True SOLO si el panel contesto "llenado en curso"
 // (codigo de salida 3, contrato en src\lanzador.py): en ese caso NADIE debe
-// matar nada — un kill dejaria un documento a medias en el programa de
-// facturacion. Cualquier otro desenlace (apagado, sin panel, sin archivos
+// matar nada — un kill dejaria un documento a medias en Winledger. Cualquier
+// otro desenlace (apagado, sin panel, sin archivos
 // para intentarlo, --detener viejo que siempre sale 0) devuelve False y el
 // llamador sigue con el remate por ruta.
 function ApagadoCooperativoDiceLlenado(Contexto: String): Boolean;
@@ -271,7 +271,7 @@ begin
   Result := '';
   if ApagadoCooperativoDiceLlenado('PrepareToInstall') then
   begin
-    Result := 'El asistente está a mitad de un llenado en el programa de facturación y no se puede cerrar ahora. Espera a que ese documento termine y vuelve a ejecutar el instalador.';
+    Result := 'El asistente está a mitad de un llenado en Winledger y no se puede cerrar ahora. Espera a que ese documento termine y vuelve a ejecutar el instalador.';
     Exit;
   end;
   MatarProcesosBajoApp('PrepareToInstall');
@@ -286,7 +286,7 @@ begin
   Result := True;
   if ApagadoCooperativoDiceLlenado('Desinstalacion') then
   begin
-    MsgBox('El asistente está a mitad de un llenado en el programa de facturación y no se puede cerrar ahora.' + #13#10#13#10 + 'Espera a que ese documento termine y vuelve a desinstalar.', mbError, MB_OK);
+    MsgBox('El asistente está a mitad de un llenado en Winledger y no se puede cerrar ahora.' + #13#10#13#10 + 'Espera a que ese documento termine y vuelve a desinstalar.', mbError, MB_OK);
     Result := False;
     Exit;
   end;
