@@ -12824,11 +12824,12 @@ const CASOS_REVISION = [
   // Winledger rechazó el código con el llenado ya empezado
   // (caso real 2026-07-30): nada local puede saber si un código existe allá, así
   // que el pedido llega aquí DESPUÉS del tropiezo, con el cruce ya marcado —
-  // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). Dos
-  // salidas: corregir el código aquí, o —si ya la crearon allá— intentar de
-  // nuevo. Crear el cliente o la sucursal en Winledger se
-  // hace allá: el asistente no puede, y por eso aquí no hay ninguna solución
-  // "Crear".
+  // en todas las máquinas, no solo en la que tropezó (058, 2026-09-27). UNA
+  // salida, con la misma forma que los demás casos (2026-09-28, decisión del
+  // usuario: "si dice que no existe, se crea"): «Crear sucursal» / «Crear
+  // cliente» abre la ficha del cruce, donde va el código; se crea en
+  // Winledger y aquí se confirma o corrige ese código. Guardar la ficha ya
+  // quita la marca y devuelve el pedido a PENDIENTES.
   {
     prefijo: "Winledger no reconoció el código",
     objeto: (p) => `<b>Cliente:</b> ${esc(p.razon_social || p.cliente_id)}`,
@@ -12841,10 +12842,9 @@ const CASOS_REVISION = [
     soluciones: (p, i, m) => {
       const suc = m.includes("de sucursal");
       return [
-        {linea: "El código está mal escrito.",
-         etiqueta: "Corregir el código", ejecutar: () => crearClienteDesdeRevision(i)},
-        {linea: `Falta crear ${suc ? "la sucursal" : "el cliente"} en Winledger.`,
-         etiqueta: `Ya ${suc ? "la" : "lo"} creé, intentar de nuevo`, ejecutar: () => marcarCruceCreado(i)},
+        {linea: `Créa${suc ? "la" : "lo"} en Winledger y pon aquí su código.`,
+         etiqueta: suc ? "Crear sucursal" : "Crear cliente",
+         ejecutar: () => crearClienteDesdeRevision(i)},
       ];
     },
   },
