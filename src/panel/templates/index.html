@@ -2041,22 +2041,21 @@
                  background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                  width:min(460px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #motivo-caja h3, #hermanas-caja h3, #conflicto-caja h3, #resolver-caja h3 { margin:0 0 12px; font-size:14px; }
-  /* «Resolver» de EN REVISIÓN: el problema en rojo, las soluciones numeradas
-     (cada número con su color, para que "así o así" se vea de un vistazo). */
+  /* «Resolver» de EN REVISIÓN: el problema en rojo y, debajo, qué hacer. Sin
+     recuadros de color ni numeración con UNA sola salida (2026-09-28,
+     decisión del usuario): ahí el número y la caja son ruido — la frase y su
+     botón bastan. El número vuelve solo cuando hay varias, que es cuando hace
+     falta distinguir "así o así"; y entonces separa una raya, no un color. */
   #resolver-caja { width:min(560px, 94vw); max-height:80vh; overflow:auto; }
   #resolver-caja h3 { margin-bottom:10px; }
   #resolver-problema { margin:0 0 14px; font-size:14px; font-weight:600; background:#fdecec;
                        color:#a12a2a; border-radius:6px; padding:10px 12px; }
   #resolver-problema div + div { margin-top:4px; }
-  #resolver-como { margin:0 0 8px; font-size:13.5px; }
-  .resolver-opcion { display:flex; gap:12px; align-items:center; font-size:14px;
-                     border:1px solid #c7d2fe; background:#f5f7ff; border-radius:8px;
-                     padding:12px 14px; margin-top:8px; }
-  .resolver-opcion:nth-child(2) { border-color:#bbf0cf; background:#f2fbf5; }
-  .resolver-num { flex:none; width:26px; height:26px; border-radius:50%; background:#1d4ed8;
-                  color:#fff; font-weight:700; font-size:13px; display:flex;
-                  align-items:center; justify-content:center; }
-  .resolver-opcion:nth-child(2) .resolver-num { background:#15803d; }
+  #resolver-como { margin:0 0 10px; font-size:13.5px; }
+  .resolver-opcion { display:flex; gap:12px; align-items:center; font-size:14px; }
+  .resolver-opcion + .resolver-opcion { margin-top:12px; padding-top:12px;
+                                        border-top:1px solid #e3e6ec; }
+  .resolver-num { flex:none; color:var(--mut); font-weight:700; }
   .resolver-linea { flex:1; }
   .resolver-opcion button { flex:none; white-space:nowrap; }
   /* Resolución de un doble llenado: el detalle en rojo (es el hecho), los dos
@@ -13186,11 +13185,13 @@ function abrirResolver(i) {
   resolverAbierto = {i, soluciones};
   $("resolver-titulo").textContent = `${p.razon_social || p.cliente_id} · pedido ${p.pedido_id}`;
   $("resolver-problema").innerHTML = problemasRevision(p).map(f => `<div>${esc(f)}</div>`).join("");
-  $("resolver-como").textContent = soluciones.length > 1
+  // El número solo se pinta con varias salidas: con una sola no numera nada.
+  const varias = soluciones.length > 1;
+  $("resolver-como").textContent = varias
     ? "Se resuelve de una de estas formas:" : "Se resuelve así:";
   $("resolver-opciones").innerHTML = soluciones.map((sol, j) => `
     <div class="resolver-opcion">
-      <span class="resolver-num">${j + 1}</span>
+      ${varias ? `<span class="resolver-num">${j + 1}.</span>` : ""}
       <span class="resolver-linea">${esc(sol.linea)}</span>
       <button class="primario" onclick="ejecutarSolucion(${j})">${esc(sol.etiqueta)}</button>
     </div>`).join("");
