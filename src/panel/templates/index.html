@@ -1813,6 +1813,9 @@
   .sup-tabla th { color:var(--mut); font-size:11.5px; background:#fafbfc;
                   font-weight:600; white-space:nowrap; }
   .sup-tabla tbody tr:last-child td { border-bottom:0; }
+  /* Ancla de la confirmación flotante de la columna Activa (2026-09-29): sin
+     esto la pregunta se posiciona contra la página y sale lejos de su fila. */
+  .sup-tabla tbody tr { position:relative; }
   /* .sup-rol-check también viste las casillas de rol de AJUSTES →
      Computadoras, donde vive la asignación desde 2026-08-05. */
   .sup-rol-check { display:inline-flex; align-items:center; gap:4px;
@@ -1820,6 +1823,7 @@
   .sup-rol-check input { width:15px; height:15px; cursor:pointer; }
   .sup-rol-check input:disabled { cursor:default; }
   .sup-rol-check:has(input:disabled) { color:var(--mut); }
+  .sup-activa-col { text-align:center; white-space:nowrap; width:62px; }
   .sup-tabla-roles { min-width:0; }
   .sup-rol-celda { text-align:center; width:90px; }
   .sup-rol-si { color:#166534; font-weight:600; }
@@ -3488,7 +3492,12 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
           <h3>Equipos</h3>
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
-              <th>Equipo</th><th>Estado</th><th>Versión</th><th>Nube</th>
+              <th>Equipo</th><th>Estado</th>
+              <!-- La misma marca de servicio de AJUSTES → Computadoras
+                   (2026-09-29, pedido del usuario): es la que le da o le
+                   quita el acceso a esa computadora. -->
+              <th class="sup-activa-col">Activa</th>
+              <th>Versión</th><th>Nube</th>
               <!-- Soporte remoto (2026-08-08, pedido del usuario): si el
                    programa está listo en esa PC, con qué número se entra y si
                    dejó una solicitud esperando. -->
@@ -7810,6 +7819,63 @@ async function supCambiarCanal(sel, dispositivo) {
   }
 }
 
+// Poner o sacar de servicio desde ADMIN → Equipos (2026-09-29, pedido del
+// usuario): es la misma marca "Activa" de AJUSTES → Computadoras —una
+// computadora sin ella solo ve el aviso y no factura—, así que viaja por el
+// mismo endpoint y se confirma igual, en la propia fila. Las que el backend
+// no deja tocar (esta misma y las de supervisión, que son la vía de vuelta)
+// se pintan marcadas y bloqueadas en vez de esconderse: saber que están en
+// servicio también es información.
+function supCasillaActiva(equipo) {
+  const host = esc(equipo.dispositivo || "");
+  if (!host) return "—";
+  const activa = equipo.activa !== false;
+  const puede = !!equipo.puede_activarse;
+  const titulo = puede
+    ? (activa ? "Al apagarlo, esa computadora queda fuera de servicio."
+              : "Al prenderlo, esa computadora vuelve a servicio.")
+    : "Este equipo no se saca de servicio desde aquí: siempre queda una vía de vuelta.";
+  return `<input type="checkbox" class="switch" ${activa ? "checked" : ""}${
+    puede ? "" : " disabled"} title="${titulo}"
+    onclick="return onClickActivaEquipoSupervision(event, '${host}')">`;
+}
+
+function onClickActivaEquipoSupervision(ev, dispositivo) {
+  const caja = ev.target;
+  const activando = caja.checked;
+  ev.preventDefault();
+  confirmarEnFilaEquipo(caja, () => {
+    caja.checked = activando;
+    supCambiarActiva(dispositivo, caja);
+  }, activando ? "Confirmar: vuelve a servicio" : "Confirmar: fuera de servicio");
+  return false;
+}
+
+async function supCambiarActiva(dispositivo, caja) {
+  const activa = caja.checked;
+  caja.disabled = true;
+  try {
+    const r = await api("/api/ajustes/equipo-activa", {dispositivo, activa});
+    equipos = r.equipos_gestionables || equipos;
+    for (const lista of [supEquipos, supSinDatos]) {
+      const eq = lista.find(e => e.dispositivo === dispositivo);
+      if (eq) eq.activa = activa;
+    }
+    const nombre = (supEquipos.concat(supSinDatos).find(
+      e => e.dispositivo === dispositivo) || {}).maquina || dispositivo;
+    pintarEquiposSupervision();
+    pintarEquipos();
+    mensaje(activa
+      ? `${nombre} vuelve a estar en servicio; lo toma en su próximo refresco.`
+      : `${nombre} queda fuera de servicio; lo toma en su próximo refresco.`,
+      "info");
+  } catch (e) {
+    caja.checked = !activa;
+    caja.disabled = false;
+    mensaje("No se pudo cambiar el estado de la computadora: " + e.message, "error");
+  }
+}
+
 function supFilaEquipo(equipo, sinDatos) {
   const host = esc(equipo.dispositivo || "");
   const canal = supCanalEquipo(equipo);
@@ -7835,6 +7901,7 @@ function supFilaEquipo(equipo, sinDatos) {
   return `<tr>
     <td><div class="sup-equipo-nombre">${esc(supNombreEquipo(equipo, true))}</div></td>
     <td>${supEstadoEquipo(equipo, sinDatos)}${notaAccesoEquipo(equipo)}</td>
+    <td class="sup-activa-col">${supCasillaActiva(equipo)}</td>
     <td>${esc(sinDatos ? "—" : (equipo.version || "—"))}${
       !sinDatos && canal ? `<div class="mut">${esc(canal)}</div>` : ""}${
       supSelectorCanal(equipo)}${
