@@ -903,15 +903,22 @@
   /* Totalización por grupo (2026-09-28, pedido del usuario): un número por
      grupo con los paquetes y los kilos SUMADOS (30 paq + 3,5 kg = 33,5), para
      cuadrar el despacho por grupo sin ir producto por producto. Mismas
-     cajitas de la barra de llenado: es el mismo dato, ya sumado. */
-  #fin-llenado-totales { display:flex; flex-wrap:wrap; align-items:center;
-                         gap:6px; margin-top:8px; }
-  #fin-llenado-totales:empty { display:none; }
-  #fin-llenado-totales .cj-val { font-size:13px; }
-  #fin-llenado-totales .flt-rot { font-size:10.5px; font-weight:700;
-                         letter-spacing:.4px; text-transform:uppercase;
-                         color:var(--mut); }
-  #fin-llenado-totales .flt-nota { font-size:11px; color:var(--mut); }
+     cajitas de la barra de llenado: es el mismo dato, ya sumado.
+     La MISMA tira va al pie de la ventana del pedido (2026-10-03, pedido del
+     usuario), así que el estilo cuelga de una clase y no del id. En franja
+     propia —fondo y borde suaves— para que se lea como el total de la lista y
+     no como otra fila suya; el valor en cifras de ancho fijo, que es lo que se
+     compara de un grupo a otro. */
+  .totales-grupo { display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+                   margin-top:8px; padding:6px 8px; border-radius:6px;
+                   background:#f6f8fb; border:1px solid #e6eaf1; }
+  .totales-grupo:empty { display:none; }
+  .totales-grupo .cajita { padding:2px 9px; }
+  .totales-grupo .cj-val { font-size:13px; font-variant-numeric:tabular-nums; }
+  .totales-grupo .flt-rot { font-size:10.5px; font-weight:700;
+                   letter-spacing:.4px; text-transform:uppercase;
+                   color:var(--mut); margin-right:2px; }
+  .totales-grupo .flt-nota { font-size:11px; color:var(--mut); }
   #fin-llenado-acciones { display:flex; gap:8px; margin-top:8px; }
   #mensaje.error { background:#fee4e2; color:var(--err); }
   #mensaje.info { background:#e0eaff; color:#1d4ed8; }
@@ -1419,6 +1426,7 @@
                   display:flex; flex-direction:column;
                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #detalle-caja > h3, #detalle-caja > #detalle-fijo,
+  #detalle-caja > #detalle-totales,
   #detalle-caja > .editor-acciones { flex:none; }
   #detalle-caja > h3 { margin:0 0 12px; font-size:14px;
                        display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
@@ -2749,7 +2757,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
            resumen, cuánto llevó cada grupo con paquetes y kilos sumados en un
            solo número. Va FUERA del cuerpo para que no se vaya con el scroll
            de la lista cuando el pedido no cabe en pantalla. -->
-      <div id="fin-llenado-totales"></div>
+      <div id="fin-llenado-totales" class="totales-grupo"></div>
       <div id="fin-llenado-acciones"></div>
     </div>
   </div>
@@ -4010,6 +4018,10 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
          líneas. -->
     <div id="detalle-fijo"></div>
     <div id="detalle-cuerpo"></div>
+    <!-- Total por grupo (2026-10-03, pedido del usuario): el mismo del resumen
+         de fin de llenado, al pie y fuera del scroll para que no se vaya con
+         las líneas cuando el pedido no cabe en la ventana. -->
+    <div id="detalle-totales" class="totales-grupo"></div>
     <!-- Salidas de la ventana (2026-07-31, pedido del usuario): mientras no se
          toque nada, "Volver". En cuanto se ajusta una línea esa salida se parte
          en las dos que el operador necesita distinguir —"Guardar cambios" y
@@ -5611,35 +5623,58 @@ function pintarResumenFinal() {
   pintarAccionesResumen(claves.length > 0);
 }
 
-// Totalización por grupo al pie del resumen (2026-09-28, pedido del usuario):
-// un solo número por grupo con los paquetes y los kilos SUMADOS (30 paq +
-// 3,5 kg = 33,5). Es para cuadrar la factura contra el despacho por grupo
-// —ensaladas, hierbas…—, no producto por producto: ese detalle ya está en la
-// tabla de arriba.
+// Totalización por grupo (2026-09-28, pedido del usuario): un solo número por
+// grupo con los paquetes y los kilos SUMADOS (30 paq + 3,5 kg = 33,5). Es para
+// cuadrar la factura contra el despacho por grupo —ensaladas, hierbas…—, no
+// producto por producto: ese detalle ya está en la tabla de arriba.
 // Solo suma lo que ENTRÓ al documento: el total tiene que dar lo que dice la
-// factura que quedó en pantalla, y cuando quedó algo fuera lo aclara la nota.
-function pintarTotalesGrupo(lineas, omitidas) {
+// factura, y cuando quedó algo fuera lo aclara la nota.
+// Compartida con la ventana del pedido (2026-10-03, pedido del usuario), así
+// que devuelve el HTML y cada sitio lo planta donde va. `fuera(l)` dice si esa
+// línea no entró al documento; `orden` es el orden preferido de los grupos (el
+// de las cajitas del llenado) y lo que no esté ahí se agrega en el orden en que
+// vienen las líneas, que es el mismo en que se llenan.
+function htmlTotalesGrupo(lineas, fuera, orden) {
   const suma = {};
-  const comoSeLlenaron = [];
-  let fuera = 0;
+  const comoVienen = [];
+  let afuera = 0;
   (lineas || []).forEach(l => {
-    if (omitidas && omitidas[l.codigo]) { fuera++; return; }
+    if (fuera(l)) { afuera++; return; }
     const grupo = l.grupo || "Otros";
-    if (!(grupo in suma)) { suma[grupo] = 0; comoSeLlenaron.push(grupo); }
+    if (!(grupo in suma)) { suma[grupo] = 0; comoVienen.push(grupo); }
     suma[grupo] += Number(l.cantidad) || 0;
   });
-  // El orden es el de las cajitas del llenado; si el avance no trajo la lista
-  // de grupos, el orden en que se llenaron las líneas, que es el mismo.
-  const nombres = (resumenFinal.grupos || []).map(g => g.nombre).filter(n => n in suma);
-  comoSeLlenaron.forEach(n => { if (!nombres.includes(n)) nombres.push(n); });
-  $("fin-llenado-totales").innerHTML = !nombres.length ? ""
-    : `<span class="flt-rot">Total por grupo</span>`
-      + nombres.map(n => `<div class="cajita">
-           <span class="cj-rot">${esc(n)}</span>
-           <span class="cj-val">${fmtCantidad(suma[n])}</span>
-         </div>`).join("")
-      + (!fuera ? "" : `<span class="flt-nota">No suma ${
-           fuera === 1 ? "la línea que no entró" : `las ${fuera} líneas que no entraron`}.</span>`);
+  const nombres = (orden || []).filter(n => n in suma);
+  comoVienen.forEach(n => { if (!nombres.includes(n)) nombres.push(n); });
+  // Ningún código cayó en un grupo del catálogo (un pedido de un cliente que no
+  // factura, todavía sin códigos): un solo "Otros" con todo adentro no cuadra
+  // nada y solo ocupa sitio.
+  if (!nombres.length || (nombres.length === 1 && nombres[0] === "Otros")) return "";
+  return `<span class="flt-rot">Total por grupo</span>`
+    + nombres.map(n => `<div class="cajita">
+         <span class="cj-rot">${esc(n)}</span>
+         <span class="cj-val">${fmtCantidad(suma[n])}</span>
+       </div>`).join("")
+    + (!afuera ? "" : `<span class="flt-nota">No suma ${
+         afuera === 1 ? "la línea que no entró" : `las ${afuera} líneas que no entraron`}.</span>`);
+}
+
+function pintarTotalesGrupo(lineas, omitidas) {
+  $("fin-llenado-totales").innerHTML = htmlTotalesGrupo(
+    lineas,
+    l => !!(omitidas && omitidas[l.codigo]),
+    (resumenFinal.grupos || []).map(g => g.nombre));
+}
+
+// El mismo total, al pie de la ventana de UNA factura (2026-10-03, pedido del
+// usuario): lo que se cuadra contra el despacho se ve también al abrir una
+// procesada, sin tener que volver a llenarla. Las líneas vienen del panel en el
+// orden de llenado, así que ese es el orden de los grupos; la línea que no
+// entró al documento (`omitida`) no suma, igual que en el resumen.
+function totalesDetalle(clave) {
+  const d = detalleDatos[clave];
+  if (!d || !d.lineas) return "";
+  return htmlTotalesGrupo(d.lineas, l => !!l.omitida, []);
 }
 
 // Las salidas del resumen (2026-08-01, pedido del usuario). Con líneas
@@ -12205,6 +12240,7 @@ function pintarVentanaDetalle(clave) {
                onclick="copiarNumeroPedido(this)">Copiar</button></span>${partes}`;
   $("detalle-fijo").innerHTML = fijoDetalle(clave);
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
+  $("detalle-totales").innerHTML = totalesDetalle(clave);
   pintarBotonDetalle();
 }
 
