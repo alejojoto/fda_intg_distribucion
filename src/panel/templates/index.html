@@ -892,7 +892,14 @@
                                  text-align:left; font-size:10.5px; color:var(--mut); }
   #fin-llenado-cuerpo th, #fin-llenado-cuerpo td { padding:3px 6px;
                                  border-bottom:1px solid #eef1f5; }
-  #fin-llenado-cuerpo .vp-num { text-align:right; white-space:nowrap; }
+  /* Cantidad y descuento: mismo ancho y cifra centrada en las dos ventanas que
+     listan las lineas de un pedido (2026-10-04, pedido del usuario). Antes la
+     cantidad iba pegada al nombre del producto y el descuento quedaba muy
+     lejos de ella (columnas de 180 y 150 px con el texto a la izquierda, o
+     alineadas al borde derecho de la ventana); a igual ancho y centradas, las
+     tres columnas se separan parejo y la linea se lee de un golpe. */
+  #fin-llenado-cuerpo .col-cifra, #detalle-cuerpo .col-cifra {
+    width:110px; text-align:center; white-space:nowrap; }
   /* La línea que el robot reconoció como saltada, marcada donde se ve. */
   #fin-llenado-cuerpo tr.fl-omitida td { background:#fffbeb; color:#b54708; }
   #fin-llenado-cuerpo .fl-motivo { font-size:11px; }
@@ -5606,7 +5613,7 @@ function pintarResumenFinal() {
   }
   $("fin-llenado-cuerpo").innerHTML = !lineas.length ? ""
     : `<table><thead><tr><th></th><th>Código</th><th>Producto</th>
-         <th class="vp-num">Cantidad</th><th class="vp-num">Descuento</th>
+         <th class="col-cifra">Cantidad</th><th class="col-cifra">Descuento</th>
        </tr></thead><tbody>${lineas.map((l, i) => {
         const motivo = omitidas && omitidas[l.codigo];
         return `<tr${motivo ? ` class="fl-omitida"` : l.al_final ? ` class="fl-al-final"` : ""}>
@@ -5615,8 +5622,8 @@ function pintarResumenFinal() {
           <td>${esc(l.producto || l.codigo || "")}${
             motivo ? `<div class="fl-motivo">No entró al documento: ${esc(motivo)}.</div>`
             : l.al_final ? `<div class="fl-final">Se agregó al final: no entró cuando le tocaba.</div>` : ""}</td>
-          <td class="vp-num">${fmtCantidad(l.cantidad)} ${esc(l.unidad || "paq")}</td>
-          <td class="vp-num">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
+          <td class="col-cifra">${fmtCantidad(l.cantidad)} ${esc(l.unidad || "paq")}</td>
+          <td class="col-cifra">${l.descuento ? `${fmtCantidad(l.descuento)} %` : "—"}</td>
         </tr>`;
       }).join("")}</tbody></table>`;
   pintarTotalesGrupo(lineas, omitidas);
@@ -12465,8 +12472,8 @@ function contenidoDetalle(clave) {
   return `
     ${nota}${pendiente}
     <table><thead><tr>
-      <th></th><th>Producto</th><th style="width:180px">Cantidad</th>
-      <th style="width:150px">Descuento</th>
+      <th></th><th>Producto</th><th class="col-cifra">Cantidad</th>
+      <th class="col-cifra">Descuento</th>
     </tr></thead><tbody>
       ${d.lineas.map(l => filaLineaDetalle(d, l)).join("")}
     </tbody></table>
@@ -12502,10 +12509,10 @@ function filaLineaDetalle(d, l) {
   if (!detalleEdicionActiva(d)) return `
     <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
       <td class="det-num">${l.n}</td><td>${producto}${omitida}${rechazado}</td>
-      <td>${fmtCantidad(l.cantidad)}${l.ajustada
+      <td class="col-cifra">${fmtCantidad(l.cantidad)}${l.ajustada
         || (l.ajuste && (l.ajuste.cantidad !== undefined || l.ajuste.descuento_pct !== undefined))
         ? ` <span class="chip ajustada">a mano</span>` : ""}</td>
-      <td>${l.descuento_pct === null
+      <td class="col-cifra">${l.descuento_pct === null
         ? `<span class="mut" title="No quedó guardado con qué descuento salió el documento.">sin dato</span>`
         : `${fmtCantidad(l.descuento_pct)} %`}</td></tr>`;
 
@@ -12531,7 +12538,7 @@ function filaLineaDetalle(d, l) {
     <tr>
       <td class="det-num">${l.n}</td>
       <td>${producto}${rechazado}</td>
-      <td>
+      <td class="col-cifra">
         <input type="text" inputmode="decimal" class="det-cant" value="${l.cantidad}"
                oninput="cantValidar(this)"
                onchange="ajustarCantidad(this,${ref})"
@@ -12540,7 +12547,7 @@ function filaLineaDetalle(d, l) {
         ${cantidadAjustada ? volverAutomatico(ref, "cantidad", fmtCantidad(l.cantidad_automatica)) : ""}
         ${despachoViejo}
       </td>
-      <td>
+      <td class="col-cifra">
         <input type="text" inputmode="decimal" class="det-pct" value="${l.descuento_pct}"
                oninput="pctValidar(this)"
                onchange="ajustarDescuento(this,${ref})"
