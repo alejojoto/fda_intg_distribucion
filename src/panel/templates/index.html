@@ -659,7 +659,6 @@
      aviso distinto del de despacho: con su propio color no hay que leer el
      texto para distinguirlos cuando una factura trae los dos. */
   .chip.lineas-sumadas { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; }
-  .chip.agromovil { background:#ecfeff; color:#155e75; border:1px solid #a5f3fc; }
   /* Cada producto repetido con sus opciones, dentro del aviso de la fila. */
   .repetida-fila { margin-top:6px; }
   .repetida-fila button { margin-left:6px; }
@@ -9415,26 +9414,15 @@ function nubeClase() {
   return "nube-ok";
 }
 
-// Contraste con AgroMovil (2026-10-06): una línea del desplegable de la nube.
-// Dice si la lista se armó completando lo que la nube no traía y cuánto; sin
-// copia de AgroMovil lo dice en ámbar, porque un pedido podría venir corto.
+// Sin copia de AgroMovil con la que completar (2026-10-06): un pedido podría
+// venir corto, y eso se dice. Con copia no se dice nada: los pedidos ya salen
+// completos y de dónde vino cada línea no le importa a quien opera.
 function filaContrasteAgromovil() {
   const c = nube.contraste;
-  if (!c || !c.activo) return "";
-  if (!c.disponible) {
-    return `<div class="nube-nota">Sin contraste con AgroMovil: la lista se armó `
-         + `solo con lo que trae la nube y un pedido podría venir incompleto. `
-         + `Se reintenta en la próxima actualización.</div>`;
-  }
-  const completo = (c.completadas || 0) + (c.agregadas || 0);
-  const detalle = completo
-    ? `${completo} ${completo === 1 ? "línea completada" : "líneas completadas"} en `
-      + `${c.pedidos || 0} ${c.pedidos === 1 ? "pedido" : "pedidos"}`
-    : "sin diferencias";
-  return `<div class="nube-fila" title="Lo que la nube no trae de un pedido se `
-       + `completa con la lista de AgroMovil, solo en las líneas que allá ya `
-       + `están aprobadas."><span>Contraste con AgroMovil</span>`
-       + `<span>${esc(detalle)}</span></div>`;
+  if (!c || !c.activo || c.disponible) return "";
+  return `<div class="nube-nota">Sin contraste con AgroMovil: la lista se armó `
+       + `solo con lo que trae la nube y un pedido podría venir incompleto. `
+       + `Se reintenta en la próxima actualización.</div>`;
 }
 
 // Sin contador de segundos (pedido del usuario 2026-07-30): lo que corre cada
@@ -11639,18 +11627,6 @@ const chipPorRevisar = (f) =>
     ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
     : "";
 
-// La nube no traía la cantidad aprobada (o la línea entera) de estas líneas y
-// se completaron con AgroMovil, donde ya estaban aprobadas (2026-10-06). Es
-// visibilidad: el documento sale completo, y el operador sabe que esas líneas
-// no venían de la nube. El detalle dice cuáles.
-const chipAgromovil = (f) =>
-  f.lineas_agromovil
-    ? ` <span class="chip agromovil" title="${esc(
-        "La nube no traía estas líneas (o su cantidad aprobada) y se tomaron de "
-        + "AgroMovil, donde ya están aprobadas. El detalle del pedido dice cuáles.")}">${
-        f.lineas_agromovil === 1 ? "1 línea de AgroMovil"
-                                 : `${f.lineas_agromovil} líneas de AgroMovil`}</span>`
-    : "";
 
 // Esta factura trae productos que Winledger YA rechazó antes (2026-08-13,
 // pedido del usuario: avisar antes de llenar, sabiendo que lo más probable es
@@ -12539,15 +12515,9 @@ const detalleEdicionActiva = (d) =>
 
 function filaLineaDetalle(d, l) {
   const ref = `'${esc(d.pedido_id)}',${d.parte},'${esc(l.codigo_winledger)}'`;
-  // Lo que la nube no traía y se completó con AgroMovil (2026-10-06).
-  const deAgromovil = l.origen_agromovil === "linea"
-    ? `<div class="det-nota">Línea tomada de AgroMovil: la nube no la traía.</div>`
-    : l.origen_agromovil === "cantidad"
-      ? `<div class="det-nota">Cantidad tomada de AgroMovil: la nube no traía la aprobada.</div>`
-      : "";
   const producto = `${esc(l.descripcion || l.codigo_winledger)}
     <div class="mut">${esc(l.codigo_winledger)}${l.presentacion ? ` · ${esc(l.presentacion)}` : ""}</div>
-    ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}${deAgromovil}`;
+    ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}`;
   // Línea que se mandó pero NO entró al documento (cargador: sin precio,
   // código inexistente, aviso no reconocido). Va marcada porque la foto son
   // las líneas mandadas: sin esto el detalle muestra un renglón que el
@@ -12883,7 +12853,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
-      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}${chipAgromovil(f)}</td>
+      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
@@ -13707,7 +13677,7 @@ function filaProcesada(f, enFamilia) {
         f.fecha_factura && fechaCorta(f.fecha_factura) !== fechaCorta(f.fecha_cierre || f.fecha_cargado)
           ? `<div><span class="fecha-factura-distinta">Factura: ${esc(fechaCorta(f.fecha_factura))}</span></div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
-      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipAgromovil(f)}</td>
+      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>${detalleFila}${conflicto}${omitidas}
     <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
