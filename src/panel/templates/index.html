@@ -11467,8 +11467,12 @@ const botonVolverALlenar = (f) =>
 // (2026-10-06, pedido del usuario). Solo le llega a quien revisa (editor): el
 // servidor no manda la marca a los demás. Marcarla no cambia el documento;
 // dice que alguien ya la miró.
-const MOTIVO_INCOMPLETA = "Faltaban líneas que la nube no traía";
+const MOTIVO_INCOMPLETA = "Faltaban líneas aprobadas en el pedido";
 const tieneFaltantes = (f) => !!(f && f.faltantes && f.faltantes.length);
+// Volver a llenar solo trae lo que faltó cuando el pedido salió en UNA factura:
+// con varias, rellenar una repartiría las líneas distinto entre partes y podría
+// cobrar dos veces un producto que sigue en otra. Ahí lo que faltó va aparte.
+const rellenaCompleta = (f, partes) => tieneFaltantes(f) && (partes || 1) === 1;
 const botonIncompletaRevisada = (f) =>
   `<button title="Ya se revisó: deja de decir incompleta en todas las computadoras."
      onclick="marcarIncompletaRevisada('${esc(f.pedido_id)}')">Revisada</button>`;
@@ -12538,9 +12542,13 @@ function contenidoDetalle(clave) {
       ${(d.faltantes || []).map(x => `
         <tr class="linea-no-escrita">
           <td class="det-num"></td>
-          <td>${esc(x.descripcion)}<div class="det-nota alerta">Faltó en la factura: la nube no la traía cuando se llenó.</div></td>
+          <td>${esc(x.descripcion)}<div class="det-nota alerta">Está aprobada en el pedido y no salió en la factura.</div></td>
           <td class="col-cifra">${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}</td>
           <td class="col-cifra"></td></tr>`).join("")}
+      ${(d.faltantes || []).length && (d.partes_emitidas || 1) > 1 ? `
+        <tr><td></td><td colspan="3"><div class="det-nota alerta">Este pedido salió en
+          ${d.partes_emitidas} facturas: volver a llenar una sola no agrega estas
+          líneas. Hay que facturarlas aparte.</div></td></tr>` : ""}
     </tbody></table>
     <div class="det-error" id="det-error-${esc(clave)}"${
       detalleErrorAjuste[clave] ? "" : ' style="display:none"'}>${
@@ -13266,6 +13274,9 @@ function pintarLlenadosPorRevisar(lista) {
     const acciones = f.tipo === "incompleta"
       ? (modoImplantacion
           ? `<span class="mut" title="Esta decisión cambia una factura real.">Solo en REAL</span>`
+          : (f.total_partes || 1) > 1
+          ? `${botonIncompletaRevisada(f)}
+             <div class="mut">Salió en ${f.total_partes} facturas: lo que faltó se factura aparte.</div>`
           : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
                onclick="reintentarIncompleta('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>
              ${botonIncompletaRevisada(f)}`)
@@ -14790,8 +14801,12 @@ function pintarBotonMotivo() {
 
 function volverAFacturar(pedido_id, parte) {
   if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
-  // A la que le faltaron líneas no se le pregunta el motivo: es ese.
-  if (tieneFaltantes(filaDeLista(pedido_id, parte))) {
+  // A la que le faltaron líneas no se le pregunta el motivo: es ese. Vale
+  // también desde el detalle abierto, que las muestra a cualquier rol.
+  const fila = filaDeLista(pedido_id, parte);
+  const abierto = detalleDatos[claveDetalle(pedido_id, parte)];
+  if (rellenaCompleta(fila, fila && fila.total_partes)
+      || rellenaCompleta(abierto, abierto && abierto.partes_emitidas)) {
     reabrirYPrellenar(pedido_id, parte, MOTIVO_INCOMPLETA);
     return;
   }
