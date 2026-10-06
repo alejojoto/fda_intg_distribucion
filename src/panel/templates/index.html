@@ -731,6 +731,14 @@
   tr.linea-no-escrita td:nth-child(3), tr.linea-no-escrita td:nth-child(4) {
     color:var(--mut); text-decoration:line-through;
   }
+  /* Línea aprobada en el pedido que NO salió en la factura emitida
+     (2026-10-06): franja roja propia, nada de tachado — lo tachado es lo que
+     se mandó y no entró; esto es lo que nunca se mandó. */
+  tr.linea-faltante td { background:#fef2f2; }
+  tr.linea-faltante td:first-child { border-left:4px solid #dc2626; }
+  tr.linea-faltante td:nth-child(3) { color:#b91c1c; font-weight:700; }
+  tr.det-separador td { background:#fee2e2; color:#991b1b; font-weight:700;
+                        font-size:12px; padding:6px 8px; }
   .detalle-error { color:var(--err); font-size:12px; }
   .mut { color:var(--mut); font-size:12px; }
   /* Aviso sensible (Ajustes de admin, 2026-07-26): esta máquina es también el
@@ -1771,6 +1779,7 @@
      datos (esperan, no urgen). */
   .desc-subtab.st-fallidos  { --st-fg:#b42318; --st-bg:#dc2626; }
   .desc-subtab.st-faltantes { --st-fg:#0f766e; --st-bg:#0d9488; }
+  .desc-subtab.st-incompletas { --st-fg:#9f1239; --st-bg:#be123c; }
   /* ADMIN conserva una sola pestaña principal y separa sus dos vistas con las
      mismas subtabs livianas del resto del panel. Supervisión usa el morado de
      ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
@@ -3633,6 +3642,18 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <div class="tabla-scroll"><table id="t-llenados">
         <thead><tr>
           <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué pasó</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+    <div id="rev-panel-incompletas" class="rev-panel">
+      <p class="mut" style="margin:10px 14px 8px">
+        Facturas que ya salieron sin productos que el pedido tenía aprobados
+        (la nube no los traía cuando se llenó). Cada una se queda aquí hasta
+        volver a llenarla completa o marcarla como revisada.</p>
+      <div class="tabla-scroll"><table id="t-incompletas">
+        <thead><tr>
+          <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué faltó</th><th></th>
         </tr></thead>
         <tbody></tbody>
       </table></div>
@@ -11231,16 +11252,19 @@ function repintar() {
   // llenados que no terminaron perfectos, o los pedidos que aún no se pueden
   // facturar (ver actualizarSubtabsRevision para cómo se reparten en subtabs).
   // Si quedó vacía con esa vista abierta, se vuelve a PENDIENTES.
-  const porRevisar = ultimaLista.por_revisar || [];
-  const totalRevision = porRevisar.length + revision.length;
+  // Las facturas que salieron incompletas tienen su propia vista (2026-10-06).
+  const incompletas = (ultimaLista.por_revisar || []).filter(f => f.tipo === "incompleta");
+  const porRevisar = (ultimaLista.por_revisar || []).filter(f => f.tipo !== "incompleta");
+  const totalRevision = porRevisar.length + revision.length + incompletas.length;
   $("tab-revision").style.display = totalRevision ? "" : "none";
   $("n-revision-total").textContent = totalRevision;
   if (!totalRevision && $("tab-revision").classList.contains("activa"))
     cambiarTab("pendientes");
   pintarPendientes(paginarFamilias("pendientes", ultimaLista.pendientes));
   pintarLlenadosPorRevisar(porRevisar);
+  pintarIncompletas(incompletas);
   pintarRevision(paginar("revision", revision));
-  actualizarSubtabsRevision(porRevisar.length, revision.length);
+  actualizarSubtabsRevision(porRevisar.length, revision.length, incompletas.length);
   // Deja "Siguiente" activo al final de PROCESADAS mientras quede histórico por
   // fuera de la ventana vigente; pulsarlo la ensancha un escalón. En el último
   // escalón el backend ya no reporta más y el botón se apaga solo.
@@ -12539,10 +12563,13 @@ function contenidoDetalle(clave) {
       <th class="col-cifra">Descuento</th>
     </tr></thead><tbody>
       ${d.lineas.map(l => filaLineaDetalle(d, l)).join("")}
+      ${(d.faltantes || []).length ? `
+        <tr class="det-separador"><td colspan="4">No salieron en la factura (${
+          d.faltantes.length === 1 ? "1 línea aprobada" : `${d.faltantes.length} líneas aprobadas`} en el pedido)</td></tr>` : ""}
       ${(d.faltantes || []).map(x => `
-        <tr class="linea-no-escrita">
+        <tr class="linea-faltante">
           <td class="det-num"></td>
-          <td>${esc(x.descripcion)}<div class="det-nota alerta">Está aprobada en el pedido y no salió en la factura.</div></td>
+          <td>${esc(x.descripcion)}</td>
           <td class="col-cifra">${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}</td>
           <td class="col-cifra"></td></tr>`).join("")}
       ${(d.faltantes || []).length && (d.partes_emitidas || 1) > 1 ? `
@@ -13201,7 +13228,16 @@ const fechaDeLlenadoPorRevisar = (f) => f.fecha_cierre || f.fecha_cargado;
 
 function pintarLlenadosPorRevisar(lista) {
   $("t-llenados").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
-    lista, fechaDeLlenadoPorRevisar, 6, (f, atrasada) => {
+    lista, fechaDeLlenadoPorRevisar, 6, filaPorRevisar);
+}
+
+// Facturas que salieron incompletas (2026-10-06): misma fila, su propia tabla.
+function pintarIncompletas(lista) {
+  $("t-incompletas").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    lista, fechaDeLlenadoPorRevisar, 6, filaPorRevisar);
+}
+
+function filaPorRevisar(f, atrasada) {
     const detalle = f.detalle_error
       ? esc(f.detalle_error) + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "")
       : "";
@@ -13211,8 +13247,8 @@ function pintarLlenadosPorRevisar(lista) {
     // El doble llenado (tipo "conflicto", 2026-08-05) trae su marca completa:
     // qué pasó, quién llegó primero y qué hay que decidir.
     const quePaso = f.tipo === "incompleta"
-      ? `Le faltaron líneas que la nube no traía:<br>${(f.faltantes || []).map(x =>
-          esc(`${x.descripcion} ${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}`.trim())).join("<br>")}`
+      ? (f.faltantes || []).map(x =>
+          esc(`${x.descripcion} ${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}`.trim())).join("<br>")
       : f.tipo === "conflicto"
       ? esc(f.conflicto || "").replaceAll("\n", "<br>")
       : f.tipo === "error"
@@ -13317,7 +13353,6 @@ function pintarLlenadosPorRevisar(lista) {
         ? `<div class="mut">${esc(ultimaReemision)}</div>` : ""}</td>
       <td${CELDA_ACCIONES}>${acciones}</td>
     </tr>`;
-  });
 }
 
 // --- Subtabs de EN REVISIÓN (2026-07-31) ------------------------------------
@@ -13330,35 +13365,41 @@ function pintarLlenadosPorRevisar(lista) {
 // hay botones, pero se deja el nombre de esa categoría como título fijo
 // (2026-08-01, pedido del usuario: sin título no se distinguía cuál de las
 // dos vistas era).
-let subtabRevisionActiva = "llenados";   // "llenados" | "datos"
-const TITULO_SUBTAB_REVISION = {llenados: "Llenados por revisar", datos: "Pedidos que no se pueden facturar"};
+let subtabRevisionActiva = "llenados";   // "llenados" | "incompletas" | "datos"
+const TITULO_SUBTAB_REVISION = {llenados: "Llenados por revisar",
+                                incompletas: "Facturas incompletas",
+                                datos: "Pedidos que no se pueden facturar"};
+const ORDEN_SUBTABS_REVISION = ["llenados", "incompletas", "datos"];
+const ESTILO_SUBTAB_REVISION = {llenados: "st-fallidos", incompletas: "st-incompletas",
+                                datos: "st-faltantes"};
 
-function actualizarSubtabsRevision(nLlenados, nDatos) {
-  // Si la lista de la vista activa se vació, se pasa a la que sí tiene algo.
-  if (!nLlenados && subtabRevisionActiva === "llenados") subtabRevisionActiva = "datos";
-  if (!nDatos && subtabRevisionActiva === "datos") subtabRevisionActiva = "llenados";
-  const ambas = nLlenados > 0 && nDatos > 0;
-  const subtab = (id, txt, n, st) => `<button class="desc-subtab ${st}${
+function actualizarSubtabsRevision(nLlenados, nDatos, nIncompletas = 0) {
+  const cuentas = {llenados: nLlenados, incompletas: nIncompletas, datos: nDatos};
+  const conAlgo = ORDEN_SUBTABS_REVISION.filter(id => cuentas[id] > 0);
+  // Si la lista de la vista activa se vació, se pasa a la primera que sí tiene algo.
+  if (!cuentas[subtabRevisionActiva] && conAlgo.length) subtabRevisionActiva = conAlgo[0];
+  const subtab = (id) => `<button class="desc-subtab ${ESTILO_SUBTAB_REVISION[id]}${
     subtabRevisionActiva === id ? " activa" : ""}" data-subtab="${id}"
-    onclick="irASubtabRevision('${id}')">${txt}<span class="cuenta">${n}</span></button>`;
-  $("rev-subtabs").style.display = (nLlenados || nDatos) ? "" : "none";
-  $("rev-subtabs").innerHTML = ambas
-    ? `<div class="desc-subtabs">${
-        subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
-        + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")}</div>`
-    : (nLlenados || nDatos)
+    onclick="irASubtabRevision('${id}')">${TITULO_SUBTAB_REVISION[id]}<span class="cuenta">${cuentas[id]}</span></button>`;
+  $("rev-subtabs").style.display = conAlgo.length ? "" : "none";
+  $("rev-subtabs").innerHTML = conAlgo.length > 1
+    ? `<div class="desc-subtabs">${conAlgo.map(subtab).join("")}</div>`
+    : conAlgo.length
       ? `<h4 class="rev-titulo-solo">${TITULO_SUBTAB_REVISION[subtabRevisionActiva]}</h4>`
       : "";
-  $("rev-panel-llenados").style.display = subtabRevisionActiva === "llenados" ? "" : "none";
-  $("rev-panel-datos").style.display = subtabRevisionActiva === "datos" ? "" : "none";
+  mostrarPanelRevision(subtabRevisionActiva);
+}
+
+function mostrarPanelRevision(id) {
+  for (const otro of ORDEN_SUBTABS_REVISION)
+    $(`rev-panel-${otro}`).style.display = otro === id ? "" : "none";
 }
 
 function irASubtabRevision(id) {
   subtabRevisionActiva = id;
   $("rev-subtabs").querySelectorAll(".desc-subtab").forEach(b =>
     b.classList.toggle("activa", b.dataset.subtab === id));
-  $("rev-panel-llenados").style.display = id === "llenados" ? "" : "none";
-  $("rev-panel-datos").style.display = id === "datos" ? "" : "none";
+  mostrarPanelRevision(id);
 }
 
 let listaRevisionVisible = [];   // página visible, para Crear cliente/producto
