@@ -3648,9 +3648,10 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
     </div>
     <div id="rev-panel-incompletas" class="rev-panel">
       <p class="mut" style="margin:10px 14px 8px">
-        Facturas que ya salieron sin productos que el pedido tenía aprobados
-        (la nube no los traía cuando se llenó). Cada una se queda aquí hasta
-        volver a llenarla completa o marcarla como revisada.</p>
+        Facturas ya emitidas a las que les faltaron productos que el pedido
+        tenía aprobados. Las pendientes no llegan aquí: se llenan completas.
+        Cada una se queda hasta volver a llenarla completa o marcarla como
+        revisada.</p>
       <div class="tabla-scroll"><table id="t-incompletas">
         <thead><tr>
           <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué faltó</th><th></th>
@@ -13367,7 +13368,7 @@ function filaPorRevisar(f, atrasada) {
 // dos vistas era).
 let subtabRevisionActiva = "llenados";   // "llenados" | "incompletas" | "datos"
 const TITULO_SUBTAB_REVISION = {llenados: "Llenados por revisar",
-                                incompletas: "Facturas incompletas",
+                                incompletas: "Procesadas incompletas",
                                 datos: "Pedidos que no se pueden facturar"};
 const ORDEN_SUBTABS_REVISION = ["llenados", "incompletas", "datos"];
 const ESTILO_SUBTAB_REVISION = {llenados: "st-fallidos", incompletas: "st-incompletas",
