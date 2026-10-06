@@ -669,6 +669,8 @@
   /* "Por revisar" (2026-07-29): quedaron líneas omitidas sin despachar. Mismo
      ámbar que el resto de los avisos: ese color ya dice "hay que mirar esto". */
   .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
+  .chip.incompleta { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+  .chip.revisada { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
   /* "Filtro activo" junto al conteo de una lista filtrada: mismo ámbar, para
      que se note que lo que se ve no es la lista completa. */
   .chip.chip-filtro { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
@@ -729,6 +731,14 @@
   tr.linea-no-escrita td:nth-child(3), tr.linea-no-escrita td:nth-child(4) {
     color:var(--mut); text-decoration:line-through;
   }
+  /* Línea aprobada en el pedido que NO salió en la factura emitida
+     (2026-10-06): franja roja propia, nada de tachado — lo tachado es lo que
+     se mandó y no entró; esto es lo que nunca se mandó. */
+  tr.linea-faltante td { background:#fef2f2; }
+  tr.linea-faltante td:first-child { border-left:4px solid #dc2626; }
+  tr.linea-faltante td:nth-child(3) { color:#b91c1c; font-weight:700; }
+  tr.det-separador td { background:#fee2e2; color:#991b1b; font-weight:700;
+                        font-size:12px; padding:6px 8px; }
   .detalle-error { color:var(--err); font-size:12px; }
   .mut { color:var(--mut); font-size:12px; }
   /* Aviso sensible (Ajustes de admin, 2026-07-26): esta máquina es también el
@@ -1769,6 +1779,7 @@
      datos (esperan, no urgen). */
   .desc-subtab.st-fallidos  { --st-fg:#b42318; --st-bg:#dc2626; }
   .desc-subtab.st-faltantes { --st-fg:#0f766e; --st-bg:#0d9488; }
+  .desc-subtab.st-incompletas { --st-fg:#9f1239; --st-bg:#be123c; }
   /* ADMIN conserva una sola pestaña principal y separa sus dos vistas con las
      mismas subtabs livianas del resto del panel. Supervisión usa el morado de
      ADMIN; Ajustes queda neutra para no competir con los estados del parque. */
@@ -3631,6 +3642,19 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <div class="tabla-scroll"><table id="t-llenados">
         <thead><tr>
           <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué pasó</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+    <div id="rev-panel-incompletas" class="rev-panel">
+      <p class="mut" style="margin:10px 14px 8px">
+        Facturas ya emitidas a las que les faltaron productos que el pedido
+        tenía aprobados. Las pendientes no llegan aquí: se llenan completas.
+        Cada una se queda hasta volver a llenarla completa o marcarla como
+        revisada.</p>
+      <div class="tabla-scroll"><table id="t-incompletas">
+        <thead><tr>
+          <th>Pedido</th><th>Cliente y sucursal</th><th>Fecha pedido</th><th>Ruta</th><th>Qué faltó</th><th></th>
         </tr></thead>
         <tbody></tbody>
       </table></div>
@@ -9224,6 +9248,8 @@ async function cargar(conservarScroll = false) {
       nube.carga_ts = d.nube.carga_ts;
       nube.espejo_activo = d.nube.espejo_activo;
       nube.bajada_error = d.nube.bajada_error;
+      nube.carga_error = d.nube.carga_error || null;
+      nube.contraste = d.nube.contraste_agromovil || null;
       nube.lista_de_antes = !!d.nube.lista_de_antes;
       nube.paso_carga = d.nube.paso_carga || null;
       recibirProgresoCarga(d.nube.progreso_carga || null);
@@ -9349,7 +9375,8 @@ setInterval(async () => {
 // el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
 // lleva demasiado sin aterrizar una carga completa.
 let nube = {estado: "ok", ultimoOk: null, carga_ts: null, espejo_activo: true,
-            lista_de_antes: false, paso_carga: null};
+            lista_de_antes: false, paso_carga: null, carga_error: null,
+            contraste: null};
 let nubeAbierto = false;
 let cargaFallo = false;   // la última /api/facturas no aterrizó (ver cargar())
 
@@ -9405,7 +9432,21 @@ function nubeClase() {
   // La conexión responde pero lo bajado no está aterrizando (p. ej. un dato
   // que esta versión no conoce): decir "Todo al día" aquí sería mentir.
   if (nube.bajada_error) return "nube-sync";
+  // La última carga completa falló (2026-10-06): se sigue mostrando la lista
+  // anterior, y eso se dice en vez de un check verde.
+  if (nube.carga_error) return "nube-sync";
   return "nube-ok";
+}
+
+// Sin copia de AgroMovil con la que completar (2026-10-06): un pedido podría
+// venir corto, y eso se dice. Con copia no se dice nada: los pedidos ya salen
+// completos y de dónde vino cada línea no le importa a quien opera.
+function filaContrasteAgromovil() {
+  const c = nube.contraste;
+  if (!c || !c.activo || c.disponible) return "";
+  return `<div class="nube-nota">Sin contraste con AgroMovil: la lista se armó `
+       + `solo con lo que trae la nube y un pedido podría venir incompleto. `
+       + `Se reintenta en la próxima actualización.</div>`;
 }
 
 // Sin contador de segundos (pedido del usuario 2026-07-30): lo que corre cada
@@ -9428,7 +9469,9 @@ function armarPopoverNube(clase) {
   const titulo = clase === "nube-caida" ? "Sin conexión con la nube"
                : clase === "nube-sync"  ? (nube.bajada_error
                                             ? "No se está pudiendo actualizar"
-                                            : textoActualizando())
+                                            : nube.carga_error && nube.carga_ts
+                                              ? "La última actualización falló"
+                                              : textoActualizando())
                                         : "Todo al día";
   let html = `<h3><span class="nube-punto" style="background:${color}"></span>${titulo}</h3>`;
   if (clase === "nube-caida") {
@@ -9438,6 +9481,9 @@ function armarPopoverNube(clase) {
     html += `<div class="nube-nota">Los cambios de las otras computadoras no `
           + `están bajando: lo que se ve puede quedarse viejo. El detalle `
           + `está en el Informe para soporte.</div>`;
+  } else if (clase === "nube-sync" && nube.carga_error && nube.carga_ts) {
+    html += `<div class="nube-nota">Se sigue mostrando la lista anterior. `
+          + `Motivo: ${esc(nube.carga_error)}</div>`;
   } else {
     html += `<div class="nube-fila" title="Pedidos, facturas, descuentos y `
           + `catálogos se revisan solos cada pocos segundos.">`
@@ -9445,6 +9491,7 @@ function armarPopoverNube(clase) {
           + (nube.ultimoOk ? haceTexto(nube.ultimoOk) : "sin datos aún")
           + `</span></div>`;
   }
+  html += filaContrasteAgromovil();
   if (llenando || secuenciaActiva) {
     html += `<div class="nube-nota">El llenado en curso manda: se actualiza al terminar.</div>`;
   } else {
@@ -10769,6 +10816,8 @@ async function sondearCompartido() {
       nube.carga_ts = r.nube.carga_ts;
       nube.espejo_activo = r.nube.espejo_activo;
       nube.bajada_error = r.nube.bajada_error;
+      nube.carga_error = r.nube.carga_error || null;
+      nube.contraste = r.nube.contraste_agromovil || null;
       nube.lista_de_antes = !!r.nube.lista_de_antes;
       nube.paso_carga = r.nube.paso_carga || null;
       recibirProgresoCarga(r.nube.progreso_carga || null);
@@ -11204,16 +11253,19 @@ function repintar() {
   // llenados que no terminaron perfectos, o los pedidos que aún no se pueden
   // facturar (ver actualizarSubtabsRevision para cómo se reparten en subtabs).
   // Si quedó vacía con esa vista abierta, se vuelve a PENDIENTES.
-  const porRevisar = ultimaLista.por_revisar || [];
-  const totalRevision = porRevisar.length + revision.length;
+  // Las facturas que salieron incompletas tienen su propia vista (2026-10-06).
+  const incompletas = (ultimaLista.por_revisar || []).filter(f => f.tipo === "incompleta");
+  const porRevisar = (ultimaLista.por_revisar || []).filter(f => f.tipo !== "incompleta");
+  const totalRevision = porRevisar.length + revision.length + incompletas.length;
   $("tab-revision").style.display = totalRevision ? "" : "none";
   $("n-revision-total").textContent = totalRevision;
   if (!totalRevision && $("tab-revision").classList.contains("activa"))
     cambiarTab("pendientes");
   pintarPendientes(paginarFamilias("pendientes", ultimaLista.pendientes));
   pintarLlenadosPorRevisar(porRevisar);
+  pintarIncompletas(incompletas);
   pintarRevision(paginar("revision", revision));
-  actualizarSubtabsRevision(porRevisar.length, revision.length);
+  actualizarSubtabsRevision(porRevisar.length, revision.length, incompletas.length);
   // Deja "Siguiente" activo al final de PROCESADAS mientras quede histórico por
   // fuera de la ventana vigente; pulsarlo la ensancha un escalón. En el último
   // escalón el backend ya no reporta más y el botón se apaga solo.
@@ -11433,7 +11485,42 @@ const botonPrellenado = (f, etiqueta, clase) =>
 // retirado de src/roles.py): lo hace cualquiera que esté facturando. El
 // motivo obligatorio y la nota de reemisión siguen siendo el rastro.
 const botonVolverALlenar = (f) =>
-  `<button onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`;
+  `<button onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>`
+  + (f.incompleta ? botonIncompletaRevisada(f) : "");
+
+// Factura emitida a la que le faltaron líneas que la nube no traía
+// (2026-10-06, pedido del usuario). Solo le llega a quien revisa (editor): el
+// servidor no manda la marca a los demás. Marcarla no cambia el documento;
+// dice que alguien ya la miró.
+const MOTIVO_INCOMPLETA = "Faltaban líneas aprobadas en el pedido";
+const tieneFaltantes = (f) => !!(f && f.faltantes && f.faltantes.length);
+// Volver a llenar solo trae lo que faltó cuando el pedido salió en UNA factura:
+// con varias, rellenar una repartiría las líneas distinto entre partes y podría
+// cobrar dos veces un producto que sigue en otra. Ahí lo que faltó va aparte.
+const rellenaCompleta = (f, partes) => tieneFaltantes(f) && (partes || 1) === 1;
+const botonIncompletaRevisada = (f) =>
+  `<button title="Ya se revisó: deja de decir incompleta en todas las computadoras."
+     onclick="marcarIncompletaRevisada('${esc(f.pedido_id)}')">Revisada</button>`;
+function chipEstadoProcesada(f) {
+  if (f.incompleta) {
+    const cuantas = (f.faltantes || []).length;
+    return `<span class="chip incompleta" title="${esc(
+      `Le faltaron ${cuantas === 1 ? "1 línea" : `${cuantas} líneas`} que la nube no traía cuando se llenó. El detalle del pedido dice cuáles.`)}">incompleta</span>`;
+  }
+  return `<span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>`
+    + (f.incompleta_revisada
+        ? ` <span class="chip revisada" title="Le faltaron líneas y ya se revisó.">revisada</span>` : "");
+}
+async function marcarIncompletaRevisada(pedido_id) {
+  const listo = avisarTrabajando("Marcando la factura como revisada…");
+  try {
+    await api("/api/factura_incompleta_revisada", {pedido_id});
+    await cargar();
+    listo();
+  } catch (e) {
+    mensaje("No se pudo marcar la factura como revisada: " + e.message, "error");
+  }
+}
 
 function accionesDeFila(f) {
   // Pedido de un cliente que no factura: no hay nada que llenar, reabrir ni
@@ -11601,6 +11688,7 @@ const chipPorRevisar = (f) =>
   f.revision_pendiente
     ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
     : "";
+
 
 // Esta factura trae productos que Winledger YA rechazó antes (2026-08-13,
 // pedido del usuario: avisar antes de llenar, sabiendo que lo más probable es
@@ -12476,6 +12564,19 @@ function contenidoDetalle(clave) {
       <th class="col-cifra">Descuento</th>
     </tr></thead><tbody>
       ${d.lineas.map(l => filaLineaDetalle(d, l)).join("")}
+      ${(d.faltantes || []).length ? `
+        <tr class="det-separador"><td colspan="4">No salieron en la factura (${
+          d.faltantes.length === 1 ? "1 línea aprobada" : `${d.faltantes.length} líneas aprobadas`} en el pedido)</td></tr>` : ""}
+      ${(d.faltantes || []).map(x => `
+        <tr class="linea-faltante">
+          <td class="det-num"></td>
+          <td>${esc(x.descripcion)}</td>
+          <td class="col-cifra">${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}</td>
+          <td class="col-cifra"></td></tr>`).join("")}
+      ${(d.faltantes || []).length && (d.partes_emitidas || 1) > 1 ? `
+        <tr><td></td><td colspan="3"><div class="det-nota alerta">Este pedido salió en
+          ${d.partes_emitidas} facturas: volver a llenar una sola no agrega estas
+          líneas. Hay que facturarlas aparte.</div></td></tr>` : ""}
     </tbody></table>
     <div class="det-error" id="det-error-${esc(clave)}"${
       detalleErrorAjuste[clave] ? "" : ' style="display:none"'}>${
@@ -13128,7 +13229,16 @@ const fechaDeLlenadoPorRevisar = (f) => f.fecha_cierre || f.fecha_cargado;
 
 function pintarLlenadosPorRevisar(lista) {
   $("t-llenados").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
-    lista, fechaDeLlenadoPorRevisar, 6, (f, atrasada) => {
+    lista, fechaDeLlenadoPorRevisar, 6, filaPorRevisar);
+}
+
+// Facturas que salieron incompletas (2026-10-06): misma fila, su propia tabla.
+function pintarIncompletas(lista) {
+  $("t-incompletas").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    lista, fechaDeLlenadoPorRevisar, 6, filaPorRevisar);
+}
+
+function filaPorRevisar(f, atrasada) {
     const detalle = f.detalle_error
       ? esc(f.detalle_error) + (f.linea_fallida ? ` (línea ${f.linea_fallida})` : "")
       : "";
@@ -13137,7 +13247,10 @@ function pintarLlenadosPorRevisar(lista) {
     const ultimaReemision = ultimaReapertura(f.nota_reemision);
     // El doble llenado (tipo "conflicto", 2026-08-05) trae su marca completa:
     // qué pasó, quién llegó primero y qué hay que decidir.
-    const quePaso = f.tipo === "conflicto"
+    const quePaso = f.tipo === "incompleta"
+      ? (f.faltantes || []).map(x =>
+          esc(`${x.descripcion} ${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}`.trim())).join("<br>")
+      : f.tipo === "conflicto"
       ? esc(f.conflicto || "").replaceAll("\n", "<br>")
       : f.tipo === "error"
       ? ((!detalle && ultimaReemision)
@@ -13195,7 +13308,16 @@ function pintarLlenadosPorRevisar(lista) {
          onclick="volverAFacturar('${esc(f.pedido_id)}',${f.parte})">Reintentar</button>`;
     // El conflicto ignora la rama remota a propósito: resolverlo es cosa del
     // PERMISO (botonesResolverConflicto), no de cuál máquina tiene la fila.
-    const acciones = f.tipo === "conflicto"
+    const acciones = f.tipo === "incompleta"
+      ? (modoImplantacion
+          ? `<span class="mut" title="Esta decisión cambia una factura real.">Solo en REAL</span>`
+          : (f.total_partes || 1) > 1
+          ? `${botonIncompletaRevisada(f)}
+             <div class="mut">Salió en ${f.total_partes} facturas: lo que faltó se factura aparte.</div>`
+          : `<button class="acento" title="Emite un documento nuevo con todas las líneas; el que salió incompleto queda anulado en papel."
+               onclick="reintentarIncompleta('${esc(f.pedido_id)}',${f.parte})">Volver a llenar</button>
+             ${botonIncompletaRevisada(f)}`)
+      : f.tipo === "conflicto"
       ? botonesResolverConflicto(f)
       : modoImplantacion
       ? (f.tipo === "error"
@@ -13232,7 +13354,6 @@ function pintarLlenadosPorRevisar(lista) {
         ? `<div class="mut">${esc(ultimaReemision)}</div>` : ""}</td>
       <td${CELDA_ACCIONES}>${acciones}</td>
     </tr>`;
-  });
 }
 
 // --- Subtabs de EN REVISIÓN (2026-07-31) ------------------------------------
@@ -13245,35 +13366,41 @@ function pintarLlenadosPorRevisar(lista) {
 // hay botones, pero se deja el nombre de esa categoría como título fijo
 // (2026-08-01, pedido del usuario: sin título no se distinguía cuál de las
 // dos vistas era).
-let subtabRevisionActiva = "llenados";   // "llenados" | "datos"
-const TITULO_SUBTAB_REVISION = {llenados: "Llenados por revisar", datos: "Pedidos que no se pueden facturar"};
+let subtabRevisionActiva = "llenados";   // "llenados" | "incompletas" | "datos"
+const TITULO_SUBTAB_REVISION = {llenados: "Llenados por revisar",
+                                incompletas: "Procesadas incompletas",
+                                datos: "Pedidos que no se pueden facturar"};
+const ORDEN_SUBTABS_REVISION = ["llenados", "incompletas", "datos"];
+const ESTILO_SUBTAB_REVISION = {llenados: "st-fallidos", incompletas: "st-incompletas",
+                                datos: "st-faltantes"};
 
-function actualizarSubtabsRevision(nLlenados, nDatos) {
-  // Si la lista de la vista activa se vació, se pasa a la que sí tiene algo.
-  if (!nLlenados && subtabRevisionActiva === "llenados") subtabRevisionActiva = "datos";
-  if (!nDatos && subtabRevisionActiva === "datos") subtabRevisionActiva = "llenados";
-  const ambas = nLlenados > 0 && nDatos > 0;
-  const subtab = (id, txt, n, st) => `<button class="desc-subtab ${st}${
+function actualizarSubtabsRevision(nLlenados, nDatos, nIncompletas = 0) {
+  const cuentas = {llenados: nLlenados, incompletas: nIncompletas, datos: nDatos};
+  const conAlgo = ORDEN_SUBTABS_REVISION.filter(id => cuentas[id] > 0);
+  // Si la lista de la vista activa se vació, se pasa a la primera que sí tiene algo.
+  if (!cuentas[subtabRevisionActiva] && conAlgo.length) subtabRevisionActiva = conAlgo[0];
+  const subtab = (id) => `<button class="desc-subtab ${ESTILO_SUBTAB_REVISION[id]}${
     subtabRevisionActiva === id ? " activa" : ""}" data-subtab="${id}"
-    onclick="irASubtabRevision('${id}')">${txt}<span class="cuenta">${n}</span></button>`;
-  $("rev-subtabs").style.display = (nLlenados || nDatos) ? "" : "none";
-  $("rev-subtabs").innerHTML = ambas
-    ? `<div class="desc-subtabs">${
-        subtab("llenados", "Llenados por revisar", nLlenados, "st-fallidos")
-        + subtab("datos", "Pedidos que no se pueden facturar", nDatos, "st-faltantes")}</div>`
-    : (nLlenados || nDatos)
+    onclick="irASubtabRevision('${id}')">${TITULO_SUBTAB_REVISION[id]}<span class="cuenta">${cuentas[id]}</span></button>`;
+  $("rev-subtabs").style.display = conAlgo.length ? "" : "none";
+  $("rev-subtabs").innerHTML = conAlgo.length > 1
+    ? `<div class="desc-subtabs">${conAlgo.map(subtab).join("")}</div>`
+    : conAlgo.length
       ? `<h4 class="rev-titulo-solo">${TITULO_SUBTAB_REVISION[subtabRevisionActiva]}</h4>`
       : "";
-  $("rev-panel-llenados").style.display = subtabRevisionActiva === "llenados" ? "" : "none";
-  $("rev-panel-datos").style.display = subtabRevisionActiva === "datos" ? "" : "none";
+  mostrarPanelRevision(subtabRevisionActiva);
+}
+
+function mostrarPanelRevision(id) {
+  for (const otro of ORDEN_SUBTABS_REVISION)
+    $(`rev-panel-${otro}`).style.display = otro === id ? "" : "none";
 }
 
 function irASubtabRevision(id) {
   subtabRevisionActiva = id;
   $("rev-subtabs").querySelectorAll(".desc-subtab").forEach(b =>
     b.classList.toggle("activa", b.dataset.subtab === id));
-  $("rev-panel-llenados").style.display = id === "llenados" ? "" : "none";
-  $("rev-panel-datos").style.display = id === "datos" ? "" : "none";
+  mostrarPanelRevision(id);
 }
 
 let listaRevisionVisible = [];   // página visible, para Crear cliente/producto
@@ -13651,7 +13778,7 @@ function filaProcesada(f, enFamilia) {
         f.fecha_factura && fechaCorta(f.fecha_factura) !== fechaCorta(f.fecha_cierre || f.fecha_cargado)
           ? `<div><span class="fecha-factura-distinta">Factura: ${esc(fechaCorta(f.fecha_factura))}</span></div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
-      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
+      <td>${chipEstadoProcesada(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>${detalleFila}${conflicto}${omitidas}
     <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
@@ -14716,6 +14843,15 @@ function pintarBotonMotivo() {
 
 function volverAFacturar(pedido_id, parte) {
   if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
+  // A la que le faltaron líneas no se le pregunta el motivo: es ese. Vale
+  // también desde el detalle abierto, que las muestra a cualquier rol.
+  const fila = filaDeLista(pedido_id, parte);
+  const abierto = detalleDatos[claveDetalle(pedido_id, parte)];
+  if (rellenaCompleta(fila, fila && fila.total_partes)
+      || rellenaCompleta(abierto, abierto && abierto.partes_emitidas)) {
+    reabrirYPrellenar(pedido_id, parte, MOTIVO_INCOMPLETA);
+    return;
+  }
   abrirMotivo("refacturar", pedido_id, [parte]);
 }
 
@@ -14724,6 +14860,11 @@ function volverAFacturar(pedido_id, parte) {
 // el robot dijo qué línea no entró y por qué—, así que preguntarlo era pedir
 // dos veces el mismo dato; ese mismo hecho queda como traza de la reemisión.
 // Es lo mismo que hace el resumen de fin de llenado (volverALlenarDesdeResumen).
+function reintentarIncompleta(pedido_id, parte) {
+  if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
+  reabrirYPrellenar(pedido_id, parte, MOTIVO_INCOMPLETA);
+}
+
 function reintentarOmitidas(pedido_id, parte) {
   if (llenando) { mensaje("Ya hay un llenado en curso.", "error"); return; }
   reabrirYPrellenar(pedido_id, parte, "Faltaron líneas en el documento");
