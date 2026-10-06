@@ -659,6 +659,7 @@
      aviso distinto del de despacho: con su propio color no hay que leer el
      texto para distinguirlos cuando una factura trae los dos. */
   .chip.lineas-sumadas { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; }
+  .chip.agromovil { background:#ecfeff; color:#155e75; border:1px solid #a5f3fc; }
   /* Cada producto repetido con sus opciones, dentro del aviso de la fila. */
   .repetida-fila { margin-top:6px; }
   .repetida-fila button { margin-left:6px; }
@@ -9224,6 +9225,8 @@ async function cargar(conservarScroll = false) {
       nube.carga_ts = d.nube.carga_ts;
       nube.espejo_activo = d.nube.espejo_activo;
       nube.bajada_error = d.nube.bajada_error;
+      nube.carga_error = d.nube.carga_error || null;
+      nube.contraste = d.nube.contraste_agromovil || null;
       nube.lista_de_antes = !!d.nube.lista_de_antes;
       nube.paso_carga = d.nube.paso_carga || null;
       recibirProgresoCarga(d.nube.progreso_carga || null);
@@ -9349,7 +9352,8 @@ setInterval(async () => {
 // el propio asistente) no contesta; el ámbar sale solo cuando lo conectado
 // lleva demasiado sin aterrizar una carga completa.
 let nube = {estado: "ok", ultimoOk: null, carga_ts: null, espejo_activo: true,
-            lista_de_antes: false, paso_carga: null};
+            lista_de_antes: false, paso_carga: null, carga_error: null,
+            contraste: null};
 let nubeAbierto = false;
 let cargaFallo = false;   // la última /api/facturas no aterrizó (ver cargar())
 
@@ -9405,7 +9409,32 @@ function nubeClase() {
   // La conexión responde pero lo bajado no está aterrizando (p. ej. un dato
   // que esta versión no conoce): decir "Todo al día" aquí sería mentir.
   if (nube.bajada_error) return "nube-sync";
+  // La última carga completa falló (2026-10-06): se sigue mostrando la lista
+  // anterior, y eso se dice en vez de un check verde.
+  if (nube.carga_error) return "nube-sync";
   return "nube-ok";
+}
+
+// Contraste con AgroMovil (2026-10-06): una línea del desplegable de la nube.
+// Dice si la lista se armó completando lo que la nube no traía y cuánto; sin
+// copia de AgroMovil lo dice en ámbar, porque un pedido podría venir corto.
+function filaContrasteAgromovil() {
+  const c = nube.contraste;
+  if (!c || !c.activo) return "";
+  if (!c.disponible) {
+    return `<div class="nube-nota">Sin contraste con AgroMovil: la lista se armó `
+         + `solo con lo que trae la nube y un pedido podría venir incompleto. `
+         + `Se reintenta en la próxima actualización.</div>`;
+  }
+  const completo = (c.completadas || 0) + (c.agregadas || 0);
+  const detalle = completo
+    ? `${completo} ${completo === 1 ? "línea completada" : "líneas completadas"} en `
+      + `${c.pedidos || 0} ${c.pedidos === 1 ? "pedido" : "pedidos"}`
+    : "sin diferencias";
+  return `<div class="nube-fila" title="Lo que la nube no trae de un pedido se `
+       + `completa con la lista de AgroMovil, solo en las líneas que allá ya `
+       + `están aprobadas."><span>Contraste con AgroMovil</span>`
+       + `<span>${esc(detalle)}</span></div>`;
 }
 
 // Sin contador de segundos (pedido del usuario 2026-07-30): lo que corre cada
@@ -9428,7 +9457,9 @@ function armarPopoverNube(clase) {
   const titulo = clase === "nube-caida" ? "Sin conexión con la nube"
                : clase === "nube-sync"  ? (nube.bajada_error
                                             ? "No se está pudiendo actualizar"
-                                            : textoActualizando())
+                                            : nube.carga_error && nube.carga_ts
+                                              ? "La última actualización falló"
+                                              : textoActualizando())
                                         : "Todo al día";
   let html = `<h3><span class="nube-punto" style="background:${color}"></span>${titulo}</h3>`;
   if (clase === "nube-caida") {
@@ -9438,6 +9469,9 @@ function armarPopoverNube(clase) {
     html += `<div class="nube-nota">Los cambios de las otras computadoras no `
           + `están bajando: lo que se ve puede quedarse viejo. El detalle `
           + `está en el Informe para soporte.</div>`;
+  } else if (clase === "nube-sync" && nube.carga_error && nube.carga_ts) {
+    html += `<div class="nube-nota">Se sigue mostrando la lista anterior. `
+          + `Motivo: ${esc(nube.carga_error)}</div>`;
   } else {
     html += `<div class="nube-fila" title="Pedidos, facturas, descuentos y `
           + `catálogos se revisan solos cada pocos segundos.">`
@@ -9445,6 +9479,7 @@ function armarPopoverNube(clase) {
           + (nube.ultimoOk ? haceTexto(nube.ultimoOk) : "sin datos aún")
           + `</span></div>`;
   }
+  html += filaContrasteAgromovil();
   if (llenando || secuenciaActiva) {
     html += `<div class="nube-nota">El llenado en curso manda: se actualiza al terminar.</div>`;
   } else {
@@ -10769,6 +10804,8 @@ async function sondearCompartido() {
       nube.carga_ts = r.nube.carga_ts;
       nube.espejo_activo = r.nube.espejo_activo;
       nube.bajada_error = r.nube.bajada_error;
+      nube.carga_error = r.nube.carga_error || null;
+      nube.contraste = r.nube.contraste_agromovil || null;
       nube.lista_de_antes = !!r.nube.lista_de_antes;
       nube.paso_carga = r.nube.paso_carga || null;
       recibirProgresoCarga(r.nube.progreso_carga || null);
@@ -11600,6 +11637,19 @@ const chipAjustes = (f) =>
 const chipPorRevisar = (f) =>
   f.revision_pendiente
     ? ` <span class="chip por-revisar" title="Faltaron líneas en el documento: revísalo antes de darlo por bueno.">por revisar</span>`
+    : "";
+
+// La nube no traía la cantidad aprobada (o la línea entera) de estas líneas y
+// se completaron con AgroMovil, donde ya estaban aprobadas (2026-10-06). Es
+// visibilidad: el documento sale completo, y el operador sabe que esas líneas
+// no venían de la nube. El detalle dice cuáles.
+const chipAgromovil = (f) =>
+  f.lineas_agromovil
+    ? ` <span class="chip agromovil" title="${esc(
+        "La nube no traía estas líneas (o su cantidad aprobada) y se tomaron de "
+        + "AgroMovil, donde ya están aprobadas. El detalle del pedido dice cuáles.")}">${
+        f.lineas_agromovil === 1 ? "1 línea de AgroMovil"
+                                 : `${f.lineas_agromovil} líneas de AgroMovil`}</span>`
     : "";
 
 // Esta factura trae productos que Winledger YA rechazó antes (2026-08-13,
@@ -12489,9 +12539,15 @@ const detalleEdicionActiva = (d) =>
 
 function filaLineaDetalle(d, l) {
   const ref = `'${esc(d.pedido_id)}',${d.parte},'${esc(l.codigo_winledger)}'`;
+  // Lo que la nube no traía y se completó con AgroMovil (2026-10-06).
+  const deAgromovil = l.origen_agromovil === "linea"
+    ? `<div class="det-nota">Línea tomada de AgroMovil: la nube no la traía.</div>`
+    : l.origen_agromovil === "cantidad"
+      ? `<div class="det-nota">Cantidad tomada de AgroMovil: la nube no traía la aprobada.</div>`
+      : "";
   const producto = `${esc(l.descripcion || l.codigo_winledger)}
     <div class="mut">${esc(l.codigo_winledger)}${l.presentacion ? ` · ${esc(l.presentacion)}` : ""}</div>
-    ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}`;
+    ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}${deAgromovil}`;
   // Línea que se mandó pero NO entró al documento (cargador: sin precio,
   // código inexistente, aviso no reconocido). Va marcada porque la foto son
   // las líneas mandadas: sin esto el detalle muestra un renglón que el
@@ -12827,7 +12883,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
-      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}</td>
+      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}${chipAgromovil(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
@@ -13651,7 +13707,7 @@ function filaProcesada(f, enFamilia) {
         f.fecha_factura && fechaCorta(f.fecha_factura) !== fechaCorta(f.fecha_cierre || f.fecha_cargado)
           ? `<div><span class="fecha-factura-distinta">Factura: ${esc(fechaCorta(f.fecha_factura))}</span></div>` : ""}</td>
       <td class="mut">${esc(f.maquina || "")}</td>
-      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}</td>
+      <td><span class="chip ${esc(f.estado)}">${esc(etiquetaEstado(f.estado))}</span>${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipAgromovil(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>${detalleFila}${conflicto}${omitidas}
     <tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="11"></td></tr>`;
