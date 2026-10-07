@@ -581,6 +581,13 @@
   tr.fila-cambio-sin-llenar td:first-child { box-shadow:inset 4px 0 0 #7e3ff2; }
   tr.fila-cambiada td { background:#eaf6ec; }
   tr.fila-cambiada td:first-child { box-shadow:inset 4px 0 0 #2e7d32; }
+  /* Revisión de lo emitido contra AgroMovil (2026-10-06): la factura con
+     líneas que no están en la base va en celeste; la que salió incompleta,
+     en rojo (manda sobre el celeste). */
+  tr.fila-fuera-base td { background:#e0f2fe; }
+  tr.fila-fuera-base td:first-child { box-shadow:inset 4px 0 0 #0284c7; }
+  tr.fila-incompleta td { background:#fee2e2; }
+  tr.fila-incompleta td:first-child { box-shadow:inset 4px 0 0 #dc2626; }
   /* Pedido de un cliente que no factura (2026-09-11, colores pedidos por el
      usuario): la fila entera lleva el color de su tipo —rojo el de prueba,
      cian el especial— para reconocerse de lejos en una lista larga. El gris de
@@ -670,6 +677,13 @@
      ámbar que el resto de los avisos: ese color ya dice "hay que mirar esto". */
   .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   .chip.incompleta { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+  .chip.fuera-base { background:#0284c7; color:#fff; border:1px solid #0284c7; }
+  /* Línea del detalle que no está en la base: mismo celeste, con su rótulo. */
+  tr.linea-fuera-base td { background:#f0f9ff; }
+  tr.linea-fuera-base td:first-child { box-shadow:inset 4px 0 0 #0284c7; }
+  .det-fuera-base { display:inline-block; margin-top:3px; padding:1px 7px;
+                    border-radius:9px; background:#0284c7; color:#fff;
+                    font-size:11px; font-weight:600; }
   .chip.revisada { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
   /* "Filtro activo" junto al conteo de una lista filtrada: mismo ámbar, para
      que se note que lo que se ve no es la lista completa. */
@@ -11501,7 +11515,23 @@ const rellenaCompleta = (f, partes) => tieneFaltantes(f) && (partes || 1) === 1;
 const botonIncompletaRevisada = (f) =>
   `<button title="Ya se revisó: deja de decir incompleta en todas las computadoras."
      onclick="marcarIncompletaRevisada('${esc(f.pedido_id)}')">Revisada</button>`;
+// Líneas que no están en la base: la nube no las trae y salieron de AgroMovil
+// (2026-10-06, pedido del usuario). Va al lado del estado, en pendientes y en
+// procesadas, para cualquier rol.
+const chipFueraBase = (f) =>
+  f.fuera_de_base
+    ? ` <span class="chip fuera-base" title="${esc(
+        `${f.fuera_de_base === 1 ? "1 línea de este pedido no está" : `${f.fuera_de_base} líneas de este pedido no están`} en la base: la nube no las trae y salieron de AgroMovil. El detalle dice cuáles.`)}">${
+        f.fuera_de_base === 1 ? "1 línea no está en la base" : `${f.fuera_de_base} líneas no están en la base`}</span>`
+    : "";
+const claseRevisionEmitida = (f) =>
+  f.incompleta ? "fila-incompleta" : f.fuera_de_base ? "fila-fuera-base" : "";
+
 function chipEstadoProcesada(f) {
+  return chipEstadoProcesadaBase(f) + chipFueraBase(f);
+}
+
+function chipEstadoProcesadaBase(f) {
   if (f.incompleta) {
     const cuantas = (f.faltantes || []).length;
     return `<span class="chip incompleta" title="${esc(
@@ -12570,7 +12600,8 @@ function contenidoDetalle(clave) {
       ${(d.faltantes || []).map(x => `
         <tr class="linea-faltante">
           <td class="det-num"></td>
-          <td>${esc(x.descripcion)}</td>
+          <td>${esc(x.descripcion)}${x.fuera_de_base
+            ? `<div><span class="det-fuera-base" title="La nube no trae esta línea: salió de AgroMovil.">No está en la base</span></div>` : ""}</td>
           <td class="col-cifra">${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}</td>
           <td class="col-cifra"></td></tr>`).join("")}
       ${(d.faltantes || []).length && (d.partes_emitidas || 1) > 1 ? `
@@ -12592,6 +12623,7 @@ function filaLineaDetalle(d, l) {
   const ref = `'${esc(d.pedido_id)}',${d.parte},'${esc(l.codigo_winledger)}'`;
   const producto = `${esc(l.descripcion || l.codigo_winledger)}
     <div class="mut">${esc(l.codigo_winledger)}${l.presentacion ? ` · ${esc(l.presentacion)}` : ""}</div>
+    ${l.fuera_de_base ? `<span class="det-fuera-base" title="La nube no trae esta línea: salió de AgroMovil.">No está en la base</span>` : ""}
     ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}`;
   // Línea que se mandó pero NO entró al documento (cargador: sin precio,
   // código inexistente, aviso no reconocido). Va marcada porque la foto son
@@ -12608,7 +12640,7 @@ function filaLineaDetalle(d, l) {
         esc(l.rechazado_antes)}): lo más probable es que no entre. Se llena igual; para
         que entre, hay que arreglarlo en Winledger.</div>` : "";
   if (!detalleEdicionActiva(d)) return `
-    <tr${l.omitida ? ` class="linea-no-escrita"` : ""}>
+    <tr${l.omitida ? ` class="linea-no-escrita"` : l.fuera_de_base ? ` class="linea-fuera-base"` : ""}>
       <td class="det-num">${l.n}</td><td>${producto}${omitida}${rechazado}</td>
       <td class="col-cifra">${fmtCantidad(l.cantidad)}${l.ajustada
         || (l.ajuste && (l.ajuste.cantidad !== undefined || l.ajuste.descuento_pct !== undefined))
@@ -12636,7 +12668,7 @@ function filaLineaDetalle(d, l) {
     ? `<div class="det-nota alerta">Elegiste lo despachado (${fmtCantidad(ajuste.cantidad)});
         el pedido ahora dice ${fmtCantidad(l.cantidad_despachada)}.</div>` : "";
   return `
-    <tr>
+    <tr${l.fuera_de_base ? ` class="linea-fuera-base"` : ""}>
       <td class="det-num">${l.n}</td>
       <td>${producto}${rechazado}</td>
       <td class="col-cifra">
@@ -12919,7 +12951,7 @@ function avisoPendientesVacio() {
 function filaPendiente(f, enFamilia, atrasada = false) {
   const clave = esc(`${f.pedido_id}|${f.parte}`);
   const clases = [enFamilia ? "fam-parte" : "", atrasada ? "fila-atrasada" : "",
-                  claseCambio(f)].filter(Boolean).join(" ");
+                  claseCambio(f), claseRevisionEmitida(f)].filter(Boolean).join(" ");
   return `
     <tr${filaDetalle(f, clases, TITULO_PEDIDO_FECHA_INUSUAL)} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
@@ -12928,7 +12960,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
-      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}</td>
+      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}${chipFueraBase(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
@@ -13765,7 +13797,7 @@ function filaProcesada(f, enFamilia) {
     </tr>` : "";
   return `
     <tr${filaDetalle(f, [enFamilia ? "fam-parte" : "", claseCambio(f),
-                         claseSinFactura(f)]
+                         claseSinFactura(f), claseRevisionEmitida(f)]
                         .filter(Boolean).join(" "))} data-factura-key="${clave}">
       <td>${enFamilia ? "" : esc(f.pedido_id)}</td>
       <td>${enFamilia ? "" : celdaCliente(f)}</td>
