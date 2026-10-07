@@ -8948,8 +8948,12 @@ function paginaSalioDelCampo(tab, campo) {
 // pedido entero a EN REVISIÓN). Se filtra al pintar y no en la lista misma:
 // `ultimaLista.procesadas` es de donde el detalle y los avisos sacan la fila
 // (filaDeLista), y sin ella la ventana de la factura quedaría sin sus datos.
+// La que salió incompleta por líneas que la nube no traía (2026-10-07, pedido
+// del usuario) SÍ se queda aquí: ya es un documento emitido, y su chip rojo
+// es lo que hay que ver al buscarla.
 function procesadasParaTabla() {
   const enRevision = new Set((ultimaLista.por_revisar || [])
+    .filter(f => f.tipo !== "incompleta")
     .map(f => `${f.pedido_id}|${f.parte}`));
   return (ultimaLista.procesadas || [])
     .filter(f => !enRevision.has(`${f.pedido_id}|${f.parte}`));
@@ -11521,8 +11525,8 @@ const botonIncompletaRevisada = (f) =>
 const chipFueraBase = (f) =>
   f.fuera_de_base
     ? ` <span class="chip fuera-base" title="${esc(
-        `${f.fuera_de_base === 1 ? "1 línea de este pedido no está" : `${f.fuera_de_base} líneas de este pedido no están`} en la base: la nube no las trae y salieron de AgroMovil. El detalle dice cuáles.`)}">${
-        f.fuera_de_base === 1 ? "1 línea no está en la base" : `${f.fuera_de_base} líneas no están en la base`}</span>`
+        `${f.fuera_de_base === 1 ? "1 línea de este pedido no llegó" : `${f.fuera_de_base} líneas de este pedido no llegaron`} a la base de datos: salieron de AgroMovil. El aviso se quita solo cuando lleguen. El detalle dice cuáles.`)}">${
+        f.fuera_de_base === 1 ? "1 línea no llegó a la base de datos" : `${f.fuera_de_base} líneas no llegaron a la base de datos`}</span>`
     : "";
 const claseRevisionEmitida = (f) =>
   f.incompleta ? "fila-incompleta" : f.fuera_de_base ? "fila-fuera-base" : "";
@@ -12601,7 +12605,7 @@ function contenidoDetalle(clave) {
         <tr class="linea-faltante">
           <td class="det-num"></td>
           <td>${esc(x.descripcion)}${x.fuera_de_base
-            ? `<div><span class="det-fuera-base" title="La nube no trae esta línea: salió de AgroMovil.">No está en la base</span></div>` : ""}</td>
+            ? `<div><span class="det-fuera-base" title="Salió de AgroMovil; el aviso se quita cuando llegue a la base de datos.">No llegó a la base de datos</span></div>` : ""}</td>
           <td class="col-cifra">${x.cantidad === null || x.cantidad === undefined ? "" : fmtCantidad(x.cantidad)}</td>
           <td class="col-cifra"></td></tr>`).join("")}
       ${(d.faltantes || []).length && (d.partes_emitidas || 1) > 1 ? `
@@ -12623,7 +12627,7 @@ function filaLineaDetalle(d, l) {
   const ref = `'${esc(d.pedido_id)}',${d.parte},'${esc(l.codigo_winledger)}'`;
   const producto = `${esc(l.descripcion || l.codigo_winledger)}
     <div class="mut">${esc(l.codigo_winledger)}${l.presentacion ? ` · ${esc(l.presentacion)}` : ""}</div>
-    ${l.fuera_de_base ? `<span class="det-fuera-base" title="La nube no trae esta línea: salió de AgroMovil.">No está en la base</span>` : ""}
+    ${l.fuera_de_base ? `<span class="det-fuera-base" title="Salió de AgroMovil; el aviso se quita cuando llegue a la base de datos.">No llegó a la base de datos</span>` : ""}
     ${l.filas_sumadas > 1 ? repetidaEnDetalle(d, l) : ""}`;
   // Línea que se mandó pero NO entró al documento (cargador: sin precio,
   // código inexistente, aviso no reconocido). Va marcada porque la foto son
