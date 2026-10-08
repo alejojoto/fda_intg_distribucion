@@ -581,13 +581,13 @@
   tr.fila-cambio-sin-llenar td:first-child { box-shadow:inset 4px 0 0 #7e3ff2; }
   tr.fila-cambiada td { background:#eaf6ec; }
   tr.fila-cambiada td:first-child { box-shadow:inset 4px 0 0 #2e7d32; }
-  /* Revisión de lo emitido contra AgroMovil (2026-10-06): la factura con
-     líneas que no están en la base va en celeste; la que salió incompleta,
-     en rojo (manda sobre el celeste). */
-  tr.fila-fuera-base td { background:#fce7f3; }
-  tr.fila-fuera-base td:first-child { box-shadow:inset 4px 0 0 #db2777; }
-  tr.fila-incompleta td { background:#fee2e2; }
-  tr.fila-incompleta td:first-child { box-shadow:inset 4px 0 0 #dc2626; }
+  /* Revisión de lo emitido contra AgroMovil: solo la factura que salió
+     incompleta pinta la fila, en naranja de aviso y no en rojo de error
+     (2026-10-08, pedido del usuario). La que tiene líneas que no llegaron a la
+     base deja la fila normal y lleva solo su aviso: con la fila pintada
+     parecía un pedido roto o para saltar. */
+  tr.fila-incompleta td { background:#ffedd5; }
+  tr.fila-incompleta td:first-child { box-shadow:inset 4px 0 0 #f97316; }
   /* Pedido de un cliente que no factura (2026-09-11, colores pedidos por el
      usuario): la fila entera lleva el color de su tipo —rojo el de prueba,
      cian el especial— para reconocerse de lejos en una lista larga. El gris de
@@ -676,14 +676,16 @@
   /* "Por revisar" (2026-07-29): quedaron líneas omitidas sin despachar. Mismo
      ámbar que el resto de los avisos: ese color ya dice "hay que mirar esto". */
   .chip.por-revisar { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
-  .chip.incompleta { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
-  .chip.fuera-base { background:#db2777; color:#fff; border:1px solid #db2777; }
-  /* Línea del detalle que no está en la base: mismo celeste, con su rótulo. */
-  tr.linea-fuera-base td { background:#fdf2f8; }
-  tr.linea-fuera-base td:first-child { box-shadow:inset 4px 0 0 #db2777; }
+  .chip.incompleta { background:#ffedd5; color:#9a3412; border:1px solid #fdba74; }
+  /* Morado suave (2026-10-08, pedido del usuario): aviso que se distingue del
+     ámbar de "por revisar" sin el morado sólido de "despacho ≠ aprobado". */
+  .chip.fuera-base { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; }
+  /* Línea del detalle que no está en la base: ámbar de aviso, con su rótulo. */
+  tr.linea-fuera-base td { background:#fffaf0; }
+  tr.linea-fuera-base td:first-child { box-shadow:inset 4px 0 0 #f5c98a; }
   .det-fuera-base { display:inline-block; margin-top:3px; padding:1px 7px;
-                    border-radius:9px; background:#db2777; color:#fff;
-                    font-size:11px; font-weight:600; }
+                    border-radius:9px; background:#fff4e5; color:#b54708;
+                    border:1px solid #f5c98a; font-size:11px; font-weight:600; }
   .chip.revisada { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
   /* "Filtro activo" junto al conteo de una lista filtrada: mismo ámbar, para
      que se note que lo que se ve no es la lista completa. */
@@ -11528,8 +11530,7 @@ const chipFueraBase = (f) =>
         `${f.fuera_de_base === 1 ? "1 línea de este pedido no llegó" : `${f.fuera_de_base} líneas de este pedido no llegaron`} a la base de datos: salieron de AgroMovil. El aviso se quita solo cuando lleguen. El detalle dice cuáles.`)}">${
         f.fuera_de_base === 1 ? "1 línea no llegó a la base de datos" : `${f.fuera_de_base} líneas no llegaron a la base de datos`}</span>`
     : "";
-const claseRevisionEmitida = (f) =>
-  f.incompleta ? "fila-incompleta" : f.fuera_de_base ? "fila-fuera-base" : "";
+const claseRevisionEmitida = (f) => f.incompleta ? "fila-incompleta" : "";
 
 function chipEstadoProcesada(f) {
   return chipEstadoProcesadaBase(f) + chipFueraBase(f);
