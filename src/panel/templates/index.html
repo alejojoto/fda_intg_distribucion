@@ -2792,7 +2792,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        se pre-llena con la que CORRESPONDE al día a facturar — la publicada
        PARA ese día (fecha valor igual) si existe, tomada de la portada o del
        registro de tasas guardadas; si el BCV no publica para ese día
-       (sábado, domingo, feriado), la última publicada antes de él — y el
+       (sábado, domingo, feriado), la DEL último día hábil anterior — y el
        aviso discreto "BCV dd/mm/aaaa" declara la fecha valor usada. Si el
        usuario la modifica a mano el aviso se quita (y si la borra completa,
        el campo vuelve solo a la del BCV). Solo cuando NINGUNA tasa conocida
@@ -2830,7 +2830,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
          fecha (Desde/Hasta) siguen con "Hoy". -->
     <div class="campo-con-aviso">
       <div class="campo"><span class="rotulo">Fecha a facturar<span class="rotulo-dia" id="f-fecha-dia"></span></span><input type="date" id="f-fecha-facturar" data-atajo="despacho" onchange="cambioFechaFacturar()"
-          title="Pre-seleccionada con el día de despacho de esta máquina (hoy o mañana, se elige en AJUSTES) y se puede cambiar a mano. Los fines de semana y feriados no la mueven — afectan la tasa (va la última publicada, nunca una posterior). Se escribe en el Período de Winledger si la Ficha no coincide."></div>
+          title="Pre-seleccionada con el día de despacho de esta máquina (hoy o mañana, se elige en AJUSTES) y se puede cambiar a mano. Los fines de semana y feriados no la mueven — afectan la tasa (va la del último día hábil, nunca una posterior). Se escribe en el Período de Winledger si la Ficha no coincide."></div>
       <span id="f-fecha-aviso"></span>
     </div>
     <div class="campo-con-aviso campo-separador">
@@ -6275,7 +6275,8 @@ function cambioSerie(valor) {
 // huecos (máquina apagada, registro arrancado después) — un hueco es
 // indistinguible de un feriado y adivinar pondría una tasa ajena en una
 // factura. Sí valen los motivos DUROS (sábado, domingo, feriado del catálogo
-// de AJUSTES): ahí la última publicada antes del día es la correcta.
+// de AJUSTES): ahí corresponde la DEL último día hábil anterior, y se exige
+// igual que la de un día hábil (diaConTasaEsperada).
 let tasaAutoBCV = null;   // último valor auto-llenado en el campo Tasa
 let ultimoBCV = null;     // último resultado de /api/tasa_bcv (o error de red)
 
@@ -6323,12 +6324,24 @@ function esDiaPasado(iso) {
 // BCV la haya saltado. No se asume ninguna otra: el campo Tasa se deja vacío
 // y la alerta pide escribirla (upgrade opcional post-desarrollo: buscarla en
 // el histórico del BCV — PLAN.md pendiente 21).
-// Los días sin tasa propia (sábado, domingo, feriado del catálogo) no entran
-// aquí: para ellos la última publicada antes del día ES la que corresponde.
+// El día que se mira es el que APORTA la tasa (diaConTasaEsperada): para un
+// sábado, domingo o feriado es el último hábil anterior, y si ese falta, la
+// de un día antes tampoco sirve (pedido del usuario 2026-10-08).
 function faltaTasaDeDiaPasado(fechaFacturar) {
-  if (!esDiaPasado(fechaFacturar)) return false;
-  if (motivoSinTasa(fechaFacturar)) return false;
-  return !tasasConocidas().some(t => t.fecha_valor === fechaFacturar);
+  const esperado = diaConTasaEsperada(fechaFacturar);
+  if (!esDiaPasado(esperado)) return false;
+  return !tasasConocidas().some(t => t.fecha_valor === esperado);
+}
+
+// ¿La tasa elegida es ANTERIOR a la que le toca al día a facturar? Es que la
+// que le toca todavía no sale. Le toca la DEL último día hábil (el propio día
+// si tiene tasa propia), no la última disponible: un sábado espera la del
+// viernes igual que el viernes espera la suya (pedido del usuario 2026-10-08;
+// antes el sábado daba por buena la del jueves si la del viernes no había
+// salido).
+function tasaPendiente(fechaFacturar, eleccion) {
+  return !!fechaFacturar && !!eleccion
+      && eleccion.fecha_valor < diaConTasaEsperada(fechaFacturar);
 }
 
 // La tasa que corresponde al día a facturar, entre las conocidas (portada +
@@ -6370,9 +6383,7 @@ function tasaOficialAplica(fechaFacturar) {
   if (faltaTasaDeDiaPasado(fechaFacturar)) return false;
   const eleccion = tasaCorrespondiente(fechaFacturar);
   if (!eleccion) return false;
-  const pendiente = eleccion.fecha_valor !== fechaFacturar
-                 && fechaFacturar && !motivoSinTasa(fechaFacturar);
-  return !pendiente;
+  return !tasaPendiente(fechaFacturar, eleccion);
 }
 
 // Pre-llena el campo Tasa con la que corresponde al día a facturar y repinta
@@ -6432,9 +6443,7 @@ function tasaParaLlenar() {
   if (faltaTasaDeDiaPasado(fechaFacturar)) return null;
   const eleccion = tasaCorrespondiente(fechaFacturar);
   if (!eleccion) return null;                    // alerta: no se tiene ninguna
-  const pendiente = eleccion.fecha_valor !== fechaFacturar
-                 && fechaFacturar && !motivoSinTasa(fechaFacturar);
-  return pendiente ? null : escrito;
+  return tasaPendiente(fechaFacturar, eleccion) ? null : escrito;
 }
 
 // ¿La factura saldría SIN la tasa de su día? (pedido del usuario 2026-07-22)
@@ -6450,20 +6459,21 @@ function motivoTasaAusente() {
   const dma = (iso) => (iso || "").split("-").reverse().join("/");
   const fechaFacturar = $("f-fecha-facturar").value;
   const dia = dma(fechaFacturar) || "el día a facturar";
+  // El día que aporta la tasa: el propio en un día hábil, el último hábil
+  // anterior en un sábado, domingo o feriado (que no tienen tasa propia).
+  const diaTasa = dma(diaConTasaEsperada(fechaFacturar)) || dia;
 
   if (!ultimoBCV)
     return `La consulta al BCV todavía no ha respondido, así que aquí no se `
          + `tiene ninguna tasa para ${dia}.`;
   if (faltaTasaDeDiaPasado(fechaFacturar))
-    return `${dia} ya pasó y su tasa no está en el registro de esta máquina: `
+    return `${diaTasa} ya pasó y su tasa no está en el registro de esta máquina: `
          + `el BCV la publicó en su momento, pero desde aquí nadie la vio. La `
          + `de otro día no puede ir en esta factura.`;
 
   const eleccion = tasaCorrespondiente(fechaFacturar);
-  const pendiente = eleccion && eleccion.fecha_valor !== fechaFacturar
-                 && fechaFacturar && !motivoSinTasa(fechaFacturar);
-  if (pendiente)
-    return `El BCV todavía no publica la tasa de ${dia}: la saca en la tarde `
+  if (tasaPendiente(fechaFacturar, eleccion))
+    return `El BCV todavía no publica la tasa de ${diaTasa}: la saca en la tarde `
          + `del último día que opera antes de ese. Lo más nuevo que se tiene `
          + `es la del ${dma(eleccion.fecha_valor)} (${eleccion.tasa} Bs/USD), `
          + `que no es la de esta factura.`;
@@ -6530,14 +6540,19 @@ function pintarAvisoBCV() {
 
   const fechaFacturar = $("f-fecha-facturar").value;
   const [ay, am, ad] = (fechaFacturar || "--").split("-");
+  // Los avisos NOMBRAN el día cuya tasa falta —igual que en un día normal—, en
+  // vez de hablar de "por dónde va el BCV" (pedido del usuario 2026-07-25). En
+  // un fin de semana o feriado ese día es el último hábil (el que aporta la
+  // tasa), no el propio día a facturar, que no tiene tasa propia.
+  const [ey, em, ed] = (diaConTasaEsperada(fechaFacturar) || "--").split("-");
 
   // Día PASADO sin su tasa registrada (2026-07-22): manda sobre cualquier otro
   // aviso — hay una tasa anterior a mano, pero ponerla sería inventarse la de
   // ese día. El campo quedó vacío (aplicarTasaBCV) y esta alerta pide la real.
   if (faltaTasaDeDiaPasado(fechaFacturar)) {
     aviso.classList.add("bcv-alerta");
-    aviso.textContent = `⚠ sin la tasa del ${ad}/${am} — escríbela`;
-    aviso.title = `Falta la tasa del ${ad}/${am}/${ay} y ese día ya pasó. `
+    aviso.textContent = `⚠ sin la tasa del ${ed}/${em} — escríbela`;
+    aviso.title = `Falta la tasa del ${ed}/${em}/${ey} y ese día ya pasó. `
       + `El campo quedó vacío a propósito: escríbela a mano — la tasa de `
       + `otro día no puede ir en esta factura.`;
     return;
@@ -6547,19 +6562,17 @@ function pintarAvisoBCV() {
   if (eleccion) {
     const [y, m, d] = eleccion.fecha_valor.split("-");
     const fechaVal = `${d}/${m}/${y}`;
-    // ¿Es la tasa DEL día a facturar, o una anterior? Una anterior es lo
-    // correcto y definitivo si ese día no tiene tasa propia (sábado, domingo
-    // o feriado — incluido el que se detecta porque el BCV ya lo saltó); si
-    // ese día sí va a tener la suya, es que todavía no ha salido — eso se
-    // avisa, porque va a cambiar sola.
-    const esDelDia = eleccion.fecha_valor === fechaFacturar;
-    const pendiente = !esDelDia && fechaFacturar && !motivoSinTasa(fechaFacturar);
+    // ¿Es la tasa del día que la aporta (el propio, o el último hábil en un
+    // sábado, domingo o feriado — incluido el que se detecta porque el BCV ya
+    // lo saltó), o una anterior? Una anterior es que la que toca todavía no
+    // ha salido — eso se avisa, porque va a cambiar sola.
+    const pendiente = tasaPendiente(fechaFacturar, eleccion);
     aviso.textContent = pendiente
-      ? `falta la del ${ad}/${am} — va la del ${d}/${m}`
+      ? `falta la del ${ed}/${em} — va la del ${d}/${m}`
       : `BCV ${fechaVal}` + (ultimoBCV.error ? " ⚠" : "");
     if (pendiente) aviso.classList.add("bcv-pendiente");
     aviso.title = (pendiente
-      ? `El BCV todavía no publica la tasa de hoy: se usa la última conocida `
+      ? `El BCV todavía no publica la tasa del ${ed}/${em}: se usa la última conocida `
         + `y se actualiza sola en cuanto salga.`
       : `Tasa oficial del BCV para este día.`)
       + (ultimoBCV.error ? ` Aviso: ${ultimoBCV.error}` : "");
@@ -6579,12 +6592,6 @@ function pintarAvisoBCV() {
   // pre-llenó a propósito: esa tasa es de un día futuro y no puede ir en esta
   // factura (regla del usuario 2026-07-22).
   const futura = fechaFacturar && ultimoBCV.fecha_valor > fechaFacturar;
-  // El aviso NOMBRA el día cuya tasa falta —igual que en un día normal—, en vez
-  // de hablar de "por dónde va el BCV" (pedido del usuario 2026-07-25). En un
-  // fin de semana o feriado ese día es el último hábil (el que aporta la tasa),
-  // no el propio día a facturar, que no tiene tasa propia.
-  const diaEsperado = diaConTasaEsperada(fechaFacturar);
-  const [ey, em, ed] = (diaEsperado || "--").split("-");
   const motivoDia = motivoSinTasa(fechaFacturar);
   aviso.textContent = `⚠ sin la tasa del ${ed}/${em} — escríbela`;
   aviso.title =
@@ -6737,8 +6744,8 @@ function pintarAvisoFecha() {
   aviso.textContent = motivo ? `${corta}: última tasa de día hábil` : "";
   aviso.title = motivo
     ? `El ${iso} es ${motivo.nombre}: se entrega y factura igual, pero el BCV no `
-      + `publica tasa para ese día — el campo Tasa lleva la última publicada `
-      + `antes de él (el aviso BCV dice cuál), nunca una posterior.`
+      + `publica tasa para ese día — el campo Tasa lleva la del último día `
+      + `hábil antes de él (el aviso BCV dice cuál), nunca una posterior.`
     : "";
 }
 
