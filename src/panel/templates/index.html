@@ -606,15 +606,6 @@
   tr.fila-atrasada:hover td { background:#fdeb96; }
   tr.fam-cabecera.fila-atrasada td { background:#fce18c; }
   tr.fam-cabecera.fila-atrasada:hover td { background:#f9d670; }
-  /* Selector global de gramaje Baby Mix (TEMPORAL, FDA 2026-07-19: conviven
-     ambos gramajes; BORRAR con su HTML cuando se acaben los paquetes de
-     125 g). Desde 2026-07-20 vive a la derecha de la fila de filtros como un
-     botón con su propio color ámbar. Clase, no id (2026-07-31, pedido del
-     usuario): el mismo control, idéntico y de primero, se repite en las
-     ventanas de revisión/prellenado (previoBabyMix/detalleBabyMix). */
-  .babymix-fila { display:flex; gap:14px; align-items:center; margin-left:10px;
-                  padding:6px 12px; border:1px solid #fcd34d;
-                  border-radius:8px; background:#fffbeb; font-size:13.5px; }
   /* Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8): SOLO la parte
      visual del flujo por lotes: el botón sigue llenando UNA factura y
      deteniéndose. */
@@ -626,11 +617,6 @@
                                      width:15px; height:15px; accent-color:#1d4ed8;
                                      vertical-align:-2px; cursor:pointer; margin-right:3px; }
   #enfila-bloque select { padding:4px 7px; }
-  .babymix-fila b { color:var(--warn); }
-  .babymix-fila label { cursor:pointer; white-space:nowrap; font-weight:600; }
-  .babymix-fila input[type=radio] { padding:0; border:none; background:none;
-                                    width:16px; height:16px; accent-color:#b54708;
-                                    vertical-align:-3px; cursor:pointer; margin-right:4px; }
   .chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap; }
   /* llenada_pendiente_cierre ya no existe localmente (2026-07-19) pero puede
      llegar espejado desde otra máquina con versión vieja del panel. */
@@ -2247,24 +2233,22 @@
   .etiqueta-estado.rechazado, .etiqueta-estado.desactivado {
       border-color:#c0483c; color:#95352b; background:#fdeeec; }
   #tasa-overlay, #docencurso-overlay, #repetida-overlay,
-  #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay,
-  #babymix-overlay {
+  #configmaq-overlay, #lineas-omitidas-overlay, #previo-overlay {
                        position:fixed; inset:0; background:rgba(29,36,51,.45);
                        display:none; z-index:20; align-items:flex-start; justify-content:center; }
   #tasa-overlay.visible, #docencurso-overlay.visible,
   #repetida-overlay.visible,
   #configmaq-overlay.visible, #lineas-omitidas-overlay.visible,
-  #previo-overlay.visible, #babymix-overlay.visible { display:flex; }
+  #previo-overlay.visible { display:flex; }
   #tasa-caja, #docencurso-caja, #repetida-caja,
-  #configmaq-caja, #lineas-omitidas-caja, #previo-caja, #babymix-caja {
+  #configmaq-caja, #lineas-omitidas-caja, #previo-caja {
                     background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                     width:min(480px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #tasa-caja h3, #docencurso-caja h3, #repetida-caja h3,
   #configmaq-caja h3, #lineas-omitidas-caja h3,
-  #previo-caja h3, #babymix-caja h3 { margin:0 0 10px; font-size:14px; }
+  #previo-caja h3 { margin:0 0 10px; font-size:14px; }
   #tasa-caja p, #docencurso-caja p, #repetida-caja p,
-  #configmaq-caja p, #lineas-omitidas-caja p,
-  #babymix-caja p { margin:0 0 12px; font-size:13.5px; }
+  #configmaq-caja p, #lineas-omitidas-caja p { margin:0 0 12px; font-size:13.5px; }
   /* Revisión previa de la corrida (2026-07-30): lleva una tabla con el lote
      entero, así que no cabe en los 480 px de los demás avisos. Grande a
      propósito (2026-07-31, pedido del usuario): sale con el panel todavía a
@@ -2412,12 +2396,11 @@
      por si el alto que hace falta no cabe en la pantalla. */
   body.modo-llenado #tasa-overlay, body.modo-llenado #docencurso-overlay,
   body.modo-llenado #repetida-overlay,
-  body.modo-llenado #configmaq-overlay, body.modo-llenado #babymix-overlay,
+  body.modo-llenado #configmaq-overlay,
   body.modo-llenado #lineas-omitidas-overlay { overflow-y:auto; }
   body.modo-llenado #tasa-caja, body.modo-llenado #docencurso-caja,
   body.modo-llenado #repetida-caja,
-  body.modo-llenado #configmaq-caja, body.modo-llenado #lineas-omitidas-caja,
-  body.modo-llenado #babymix-caja {
+  body.modo-llenado #configmaq-caja, body.modo-llenado #lineas-omitidas-caja {
                     margin-top:10px; width:min(700px, 96vw); padding:14px 16px; }
   /* El aviso del documento sin terminar es la excepción (2026-07-28, pedido del
      usuario): cabe en la caja SIN agrandar la ventana. Título y botonera pegados
@@ -2862,8 +2845,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
          la derecha: la fila aparte costaba ~50 px de alto en una pantalla
          donde lo que escasea son filas de la lista. Si no cabe —modo admin,
          con el bloque "Llenar en fila" visible— baja sola por el flex-wrap de
-         la barra y se ve como antes. Baby Mix va de último, a la derecha
-         (2026-07-31, pedido del usuario). -->
+         la barra y se ve como antes. -->
     <div class="barra" id="llenado-barra">
       <!-- Bloque "Llenar en fila" (2026-07-21, PLAN.md pendiente 8) — SOLO la
            parte visual del flujo por lotes, en el orden dictado por el usuario:
@@ -2935,17 +2917,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
            las guardas de llenar(). -->
       <button class="primario" id="btn-llenar-siguiente" onclick="llenarSiguiente()"
               title="Llena la siguiente factura pendiente y se detiene, para que la revises y la aceptes en Winledger.">Llenar siguiente</button>
-      <!-- Selector TEMPORAL Baby Mix (FDA 2026-07-19): conviven paquetes de 125
-           y 150 g; el gramaje elegido aquí se usa en CADA factura que se llene.
-           Lo marca pintarGramajeBaby() con el último elegido en esta computadora
-           (125 g mientras nadie lo toque). De último, a la derecha (2026-07-31,
-           pedido del usuario). BORRAR este bloque (y la CSS .babymix-fila, y
-           babyMixControl() más abajo) cuando se acaben los paquetes de 125 g. -->
-      <div class="babymix-fila" title="Temporal hasta agotar los paquetes de 125 g: aplica a todas las facturas que se llenen mientras esté elegido. La elección queda guardada en esta máquina.">
-        <b>Baby Mix</b>
-        <label><input type="radio" name="f-bm" value="125" onchange="elegirGramajeBaby(this.value)"> 125 g</label>
-        <label><input type="radio" name="f-bm" value="150" onchange="elegirGramajeBaby(this.value)"> 150 g</label>
-      </div>
     </div>
   </div>
 
@@ -4420,22 +4391,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <button class="primario" id="docencurso-si" onclick="resolverDocEnCurso(true)">Cancelarlo y continuar el llenado</button>
       <button data-preseleccionado id="docencurso-no" onclick="resolverDocEnCurso(false)"
               title="El llenado se detiene aquí; resuelve el documento en Winledger (Aceptar o Cancelar) y vuelve a darle Llenar.">No tocar nada</button>
-    </div>
-  </div>
-</div>
-
-<!-- Baby Mix sin gramaje elegido al mandar a llenar (TEMPORAL, se borra junto
-     con el resto del selector). Aparece solo, así que no cierra por clic afuera
-     ni por Escape: se sale eligiendo un gramaje o cancelando el llenado. -->
-<div id="babymix-overlay">
-  <div id="babymix-caja">
-    <h3>¿Con cuál gramaje sale Baby Mix?</h3>
-    <p class="mut">No hay ninguno elegido y las líneas de Baby Mix no se pueden
-      llenar sin él. El que escojas queda guardado en esta computadora.</p>
-    <div class="editor-acciones">
-      <button class="primario" onclick="cerrarPreguntaBabyMix('125')">Llenar con 125 g</button>
-      <button class="primario" onclick="cerrarPreguntaBabyMix('150')">Llenar con 150 g</button>
-      <button data-preseleccionado onclick="cerrarPreguntaBabyMix('')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -5994,32 +5949,6 @@ function resolverRepetida(llenarOtraVez) {
   }
 }
 
-// Modal del gramaje de Baby Mix que falta (TEMPORAL, se borra junto con el
-// resto del selector). Mismo patrón que los dos de arriba: devuelve el gramaje
-// escogido, o "" si se cancela el llenado.
-let resolverPreguntaBabyMix = null;
-function preguntarGramajeBaby() {
-  $("babymix-overlay").classList.add("visible");
-  crecerVentanaPorModal("babymix-caja");
-  return new Promise((resolve) => { resolverPreguntaBabyMix = resolve; });
-}
-function cerrarPreguntaBabyMix(gramaje) {
-  $("babymix-overlay").classList.remove("visible");
-  replantarCajaFlotante();
-  if (gramaje) {
-    elegirGramajeBaby(gramaje);
-  } else {
-    // Cancelar para la corrida, igual que la tasa que falta (pararPorTasa): sin
-    // gramaje no se llena esta factura ni ninguna de las que vienen detrás.
-    mensaje("Detenido: falta elegir el gramaje de Baby Mix.", "info");
-    if (secuenciaActiva) detenerSecuencia();
-  }
-  if (resolverPreguntaBabyMix) {
-    resolverPreguntaBabyMix(gramaje);
-    resolverPreguntaBabyMix = null;
-  }
-}
-
 async function api(ruta, cuerpo) {
   const opciones = cuerpo
     ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cuerpo)}
@@ -6237,7 +6166,6 @@ let seriesMaquina = [];
 let serieSeleccionada = "";
 let seriePredeterminada = "";
 let seriePredetAplicada = false;
-let babyPredetAplicado = false;      // el gramaje guardado se aplica solo al abrir
 
 // Config de serie de la ruta elegida (AJUSTES → Rutas, 2026-08-02), o null si
 // esa ruta no tiene fila en asistente_rutas_series — ahí sigue la selección
@@ -9301,13 +9229,6 @@ async function cargar(conservarScroll = false) {
       seriePredetAplicada = true;
       serieSeleccionada = seriePredeterminada;
     }
-    // Gramaje de Baby Mix guardado en esta máquina: se aplica UNA vez, al
-    // abrir (después manda lo que el usuario toque, que ya se guarda solo).
-    if (!babyPredetAplicado) {
-      babyPredetAplicado = true;
-      babyGramaje = d.baby_mix_gramaje || "";
-      pintarGramajeBaby();
-    }
     pintarSeries();
     if (!rutaPredetAplicada) {
       rutaPredetAplicada = true;
@@ -11421,38 +11342,6 @@ function pintarTituloVentana() {
   document.title = estado ? `${TITULO_PAGINA} — ${estado}` : TITULO_PAGINA;
 }
 
-// Baby Mix paq (FDA 2026-07-19, TEMPORAL hasta agotar los paquetes viejos):
-// conviven 125 y 150 g — el gramaje elegido se usa en CADA factura que se
-// llene mientras esté seleccionado. La elección se persiste por máquina en
-// SQLite (config_dispositivo) al momento de tocarla, así sobrevive refrescos
-// de página y reinicios del panel.
-// El gramaje vive en esta variable, no en el DOM: los tres sitios donde se
-// pinta el selector (barra, revisión del lote, prellenado) solo lo reflejan.
-let babyGramaje = "";                     // "125" | "150" | "" (ninguno elegido)
-const gramajeBaby = () => babyGramaje;
-
-function elegirGramajeBaby(gramaje) {
-  babyGramaje = gramaje;
-  pintarGramajeBaby();
-  guardarGramajeBaby(gramaje);
-}
-
-// Cada sitio pinta su PROPIO grupo de radios (name distinto) a propósito: con
-// un name compartido el navegador deja un solo marcado en todo el documento, y
-// al cerrar la ventana ese marcado se iba con ella dejando la barra sin gramaje.
-function pintarGramajeBaby() {
-  document.querySelectorAll('input[type=radio][name^="f-bm"]')
-    .forEach(r => { r.checked = (r.value === babyGramaje); });
-}
-
-async function guardarGramajeBaby(gramaje) {
-  try {
-    await api("/api/ajustes/baby-mix", {gramaje});
-  } catch (e) {
-    mensaje("No se pudo guardar el gramaje de Baby Mix: " + e.message, "error");
-  }
-}
-
 // Cómo se nombra cada estado DENTRO del resumen de la familia (singular,
 // plural). Aparte de las chips a propósito: aquí se lee como frase.
 const ESTADOS_RESUMEN = {
@@ -12503,10 +12392,8 @@ function fijoDetalle(clave) {
   const llenable = llenadoDirecto(filaDeLista(...partesDeClave(clave)))
     || detalleReabriendo === clave;
   if (!llenable) return cabecera;
-  // Baby Mix de último, a la derecha (2026-07-31, pedido del usuario): misma
-  // posición que en la barra del panel.
   const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
-                   cajitaImpresion(), cajitaEmpresa(), babyMixControl("detalle")].join("");
+                   cajitaImpresion(), cajitaEmpresa()].join("");
   return cabecera
     + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
     + `<div id="detalle-avisos">${htmlAvisosDetalle(clave)}</div>`;
@@ -14019,16 +13906,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     });
     return "sin_configurar";
   }
-  // Baby Mix (TEMPORAL, mientras convivan los dos gramajes): sin gramaje elegido
-  // no se adivina — se pregunta y este mismo llenado sigue con el que se escoja,
-  // igual que la configuración de la máquina de aquí arriba.
-  if (!gramajeBaby()) {
-    preguntarGramajeBaby().then((elegido) => {
-      if (elegido) llenar(pedido_id, parte, autorizarCancelar, tasaConfirmada,
-                          repetirConfirmado, motivoFamilia);
-    });
-    return "sin_gramaje_baby";
-  }
   // Antes de tocar Winledger: si no se tiene la tasa del día a facturar, se
   // avisa y se espera la decisión del operador (2026-07-22). El switch de admin
   // "Saltar puesta a punto → Tasa" omite ese modal (ver saltandoTasa): probando
@@ -14207,8 +14084,6 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     } catch (_) { /* sondeo informativo: un fallo puntual no interrumpe nada */ }
   }, 600);
   try {
-    // El gramaje de Baby Mix elegido en la barra siempre viaja: si la
-    // factura no trae Baby Mix, el backend lo ignora.
     // Fecha a facturar y Serie (2026-07-19): siempre viajan; si la Ficha de
     // Winledger no coincide, el programa cambia el Período y/o reabre la
     // Ficha eligiendo la serie en 'Seleccionar Serie TD' (entorno.py). La
@@ -14216,7 +14091,7 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
     // usuario 2026-07-21): el programa la registra en Archivos→Tasas de
     // Cambio dentro de la misma puesta a punto de fecha/serie.
     const r = await api("/api/llenar",
-      {pedido_id, parte, baby_mix_gramaje: gramajeBaby(),
+      {pedido_id, parte,
        fecha_facturar: $("f-fecha-facturar").value || null,
        tasa: tasaParaLlenar(),
        // En corrida manda la serie resuelta por bloque de ruta (2026-08-05,
@@ -16065,25 +15940,6 @@ const cajitaImpresion = () => cajitaEditable("Imprimir",
     cajitaOpciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
   imprimirEnFila());
 
-// Baby Mix también se revisa antes de llenar (2026-07-31, pedido del usuario):
-// IDÉNTICO al de la barra —mismo toggle, color y de último, a la derecha—
-// en vez de una cajita más: es el único control temporal que necesita llamar
-// la atención, y las demás cajitas se quedan sin resaltar. Cada ventana pinta
-// su propio grupo de radios (name distinto al de la barra) y la sincronía la
-// hace pintarGramajeBaby, no el navegador.
-const babyMixControl = (grupo) => {
-  const g = gramajeBaby();
-  return `<div class="babymix-fila" title="Temporal hasta agotar los paquetes `
-    + `de 125 g: las líneas de Baby Mix salen con el gramaje elegido. La `
-    + `elección queda guardada en esta máquina.">
-      <b>Baby Mix</b>
-      <label><input type="radio" name="f-bm-${grupo}" value="125" ${g === "125" ? "checked" : ""}
-        onchange="elegirGramajeBaby(this.value)"> 125 g</label>
-      <label><input type="radio" name="f-bm-${grupo}" value="150" ${g === "150" ? "checked" : ""}
-        onchange="elegirGramajeBaby(this.value)"> 150 g</label>
-    </div>`;
-};
-
 // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
 // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
 // De solo lectura: se cambia en ADMIN, no a un clic de llenar.
@@ -16149,9 +16005,6 @@ function pintarPrevioCajitas() {
 
   cajitas.push(cajitaImpresion());
   cajitas.push(cajitaEmpresa());
-  // Baby Mix de último, a la derecha (2026-07-31, pedido del usuario): misma
-  // posición que en la barra del panel.
-  cajitas.push(babyMixControl("previo"));
 
   $("previo-cajitas").innerHTML = cajitas.join("");
 }
