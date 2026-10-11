@@ -3364,18 +3364,19 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
            por el mismo motivo que la fila "Carga": ese contenedor se oculta
            con el modo admin apagado, y de una versión vieja hay que poder
            volver sin prender nada más.
-           Tres valores reales desde el release del 2026-08-05: "Actual" es la
-           rama `produccion` (al día), 1.0 ES la rama `estable` congelada (lo
-           que antes prendía el modo viejo) y 1.1 es la rama `estable-1.1`,
-           fija en el release publicado el 2026-08-05 — el punto de vuelta más
-           reciente que 1.0 si un envío nuevo falla. -->
+           Valores reales: "Actual" es la rama `produccion` (al día); 1.2 y 1.1
+           son las ramas `estable-1.2` y `estable-1.1`, fijas en los releases
+           del 2026-10-11 y del 2026-08-05; y el valor "1.0" ES la rama
+           `estable`, la que el usuario congela a mano — se rotula "Última
+           estable" porque desde el 2026-09-14 ya no guarda la 1.0. -->
       <div class="ajustes-fila">
         <b class="rotulo">Versión estable:</b>
         <select id="version-estable-sel" onchange="onCambioVersionEstable(this)"
                 title="La versión que corren todas las computadoras de producción. Cada una la toma al reabrir el asistente. Este equipo no se mueve: sigue con la carga elegida arriba.">
           <option value="actual">Actual</option>
-          <option value="1.1">1.1 — Release estable del 2026-08-05</option>
-          <option value="1.0">1.0 — Primer release estable, antes de producción</option>
+          <option value="1.2">1.2 — Release del 2026-10-11</option>
+          <option value="1.1">1.1 — Release del 2026-08-05</option>
+          <option value="1.0">Última estable — la que se congela a mano</option>
         </select>
         <span class="prueba-nota" id="version-estable-nota" style="display:none"
               title="Las computadoras cambian de versión al reabrir el asistente, no en el momento.">Congelada: no reciben actualizaciones</span>
@@ -3412,7 +3413,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
 
       <p class="mut" style="margin:8px 0 0">
         Fija en qué versión corren <b>todas las computadoras de producción</b>.
-        Con la <b>1.0</b> o la <b>1.1</b> se quedan ahí, sin recibir
+        Con cualquier opción que no sea <b>Actual</b> se quedan ahí, sin recibir
         actualizaciones, hasta que se elija otra: es para cuando una
         actualización sale lenta o con fallas — siguen facturando con lo que ya
         servía y se corrige con calma. Cada computadora la toma al reabrir el
@@ -7772,7 +7773,7 @@ function supProblemasEquipo(equipo) {
       esc(SUP_PROBLEMAS[p.tipo] || p.tipo || "atención")}</span>`).join("")}</div>`;
 }
 
-const SUP_CANALES = {produccion: "Producción", estable: "Estable (1.0)", "estable-1.1": "Estable 1.1", main: "Desarrollo"};
+const SUP_CANALES = {produccion: "Producción", estable: "Última estable", "estable-1.1": "Estable 1.1", "estable-1.2": "Estable 1.2", main: "Desarrollo"};
 function supCanalEquipo(equipo) {
   const rama = equipo.rama || "";
   // Una rama fuera del mapa (worktree de desarrollo) se muestra tal cual.
@@ -7798,8 +7799,9 @@ function supReleaseMasNuevo() {
 // muestra herramientas de admin, así que su vuelta a Dev se hace desde aquí.
 const SUP_CANALES_ASIGNABLES = [["", "Automático"], ["desarrollo", "Dev"],
                                 ["produccion", "Producción"],
-                                ["estable", "Estable (1.0)"],
-                                ["estable-1.1", "Estable 1.1"]];
+                                ["estable-1.2", "Estable 1.2"],
+                                ["estable-1.1", "Estable 1.1"],
+                                ["estable", "Última estable"]];
 
 function supSelectorCanal(equipo) {
   const host = esc(equipo.dispositivo || "");
@@ -17810,7 +17812,8 @@ async function guardarOpcionesPrueba() {
 // lanzador no toca la rama a propósito. Sin esto a la vista, marcar
 // "Producción" se parecía a estar en producción sin ninguna prueba de estarlo.
 const RAMA_DE_CANAL = {produccion: "produccion", estable: "estable",
-                       "estable-1.1": "estable-1.1", desarrollo: "main", "": "main"};
+                       "estable-1.1": "estable-1.1", "estable-1.2": "estable-1.2",
+                       desarrollo: "main", "": "main"};
 
 // La rama que el lanzador buscaría hoy en este equipo. El canal vacío es el
 // automático por equipo y NO es el mismo para todos (ver lanzador.rama_del_canal):
@@ -19757,9 +19760,10 @@ async function guardarDiaDespacho(dia) {
 // asistente. El guardado no se anuncia (el selector ya dice en qué versión
 // quedó), pero sí se avisa cuando no se pudo compartir: ahí el hecho importa —
 // las demás computadoras siguieron con su versión.
-// Tres versiones reales: "actual" (rama produccion, al día), "1.0" (rama
-// estable congelada) y "1.1" (rama estable-1.1, fija en el release del
-// 2026-08-05). El servidor traduce a la clave compartida.
+// Versiones reales: "actual" (rama produccion, al día), "1.2" y "1.1" (ramas
+// estable-1.2 y estable-1.1, fijas en sus releases) y "1.0" (rama estable, la
+// que se congela a mano: se muestra como "Última estable"). El servidor
+// traduce a la clave compartida.
 const VERSION_ACTUAL = "actual";
 let versionEstablePintada = VERSION_ACTUAL;
 
@@ -19782,7 +19786,8 @@ function onCambioVersionEstable(sel) {
   pintarVersionEstable(versionEstablePintada);
   confirmarSinQuitar(sel, () => guardarVersionEstable(querida),
     querida === VERSION_ACTUAL ? "Confirmar: todas al día"
-                               : `Confirmar: todas a la ${querida}`);
+    : querida === "1.0" ? "Confirmar: todas a la última estable"
+                        : `Confirmar: todas a la ${querida}`);
 }
 
 async function guardarVersionEstable(version) {
