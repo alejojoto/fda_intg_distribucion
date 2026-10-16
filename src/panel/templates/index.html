@@ -2881,7 +2881,10 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <div id="enfila-bloque" style="display:none" title="Llena la cantidad elegida una tras otra: cada documento se acepta al cerrar y sigue con el siguiente. Con Imprimir: sí se espera tu «Continuar» entre facturas.">
         <b class="rotulo">Llenar:</b>
         <select id="enfila-cantidad" onchange="fijarCantidad(this.value)"></select>
-        <span>Imprimir:
+        <!-- Imprimir oculto (2026-10-16, pedido del usuario): no se usó y la
+             fila se va a rehacer integrada. Los radios se quedan, fijos en
+             "no", porque imprimirEnFila() los lee. -->
+        <span style="display:none">Imprimir:
           <label><input type="radio" name="enfila-imp" value="si" onchange="cambioImpresionEnFila()"> sí</label>
           <label><input type="radio" name="enfila-imp" value="no" checked onchange="cambioImpresionEnFila()"> no</label>
         </span>
@@ -2891,16 +2894,6 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
              hover. -->
         <span id="enfila-imp-aviso" style="display:none"
               title="El programa espera tu confirmación «Continuar» por cada factura; hay que revisar cada impresión y el papel cada cinco facturas antes de seguir.">Hay que controlar manualmente cada impresión.</span>
-        <!-- Nota gris del lado "no", pareja del aviso ámbar (repuesta 2026-07-26
-             a pedido del usuario; hover reescrito 2026-08-01, mismo pedido).
-             Corta y visible por la misma razón que la de arriba: solo el hover
-             no basta. Nombra lo que el operador necesita saber de este lado: sin
-             pausas entre pedido y pedido, el envío a facturación NO lo hace el
-             programa (2026-07-27) y el pedido igual queda guardado, consultable
-             después en facturación. El día que el envío se habilite (CONTRATOS.md
-             3.1 punto 2), este texto cambia. -->
-        <span id="enfila-sinimp-nota" class="mut"
-              title="No hay pausas entre pedido y pedido: no se imprime nada ni se espera tu confirmación entre uno y el siguiente. El envío a facturación queda por fuera, pero el pedido sí queda guardado: se puede ver luego con Consultar, en facturación.">Se guardan pedidos seguidos, sin enviar a facturación</span>
         <button class="primario" id="btn-secuencia" onclick="lanzarEnFila()">Llenar en fila</button>
         <button class="peligro" id="btn-detener" onclick="detenerSecuencia()" style="display:none">Detener secuencia</button>
         <!-- Los botones Reintentar / Cancelar del fallo se mudaron a la barra
@@ -12373,7 +12366,8 @@ function cabeceraDetalle(clave) {
 // pedido del usuario): debajo de la cabecera van las mismas cajitas de puesta
 // a punto de la revisión del lote —sin ruta (la del pedido ya está arriba) ni
 // cantidad (aquí siempre es una)— y sus avisos. En una ya cerrada no hay nada
-// que poner a punto y queda solo la cabecera.
+// que poner a punto y queda solo la cabecera. Sin la cajita de Imprimir
+// (2026-10-16, pedido del usuario): venía del llenado en fila y aquí no se usa.
 function fijoDetalle(clave) {
   const cabecera = cabeceraDetalle(clave);
   // La reapertura en vuelo cuenta como llenable: la revisión (cajitas y
@@ -12382,7 +12376,7 @@ function fijoDetalle(clave) {
     || detalleReabriendo === clave;
   if (!llenable) return cabecera;
   const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
-                   cajitaImpresion(), cajitaEmpresa()].join("");
+                   cajitaEmpresa()].join("");
   return cabecera
     + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
     + `<div id="detalle-avisos">${htmlAvisosDetalle(clave)}</div>`;
@@ -15243,11 +15237,9 @@ function pintarCantidades() {
   acomodarCantidadAlModo();
   const imp = imprimirEnFila();
   $("enfila-cantidad").innerHTML = opcionesCantidadHtml();
-  // Cada radio trae su nota, y solo se ve la del elegido (el aviso ámbar con
-  // "sí" desde 2026-07-22, cuando dejó de ser un modal que había que
-  // despachar; la nota gris con "no").
+  // El aviso ámbar sale solo con "sí" (2026-07-22, cuando dejó de ser un
+  // modal que había que despachar).
   $("enfila-imp-aviso").style.display = imp ? "" : "none";
-  $("enfila-sinimp-nota").style.display = imp ? "none" : "";
   firmaCantidadesPintada = firmaCantidades();
 }
 
@@ -15894,16 +15886,6 @@ const cajitaSerie = (porBloques) => saltandoPuestaAPunto("serie")
                        serieSeleccionada)}</select>`,
       !serieSeleccionada);
 
-// Con "no" el hover explica qué pasa con lo que no se imprime (2026-08-01,
-// pedido del usuario): el documento igual queda guardado en Winledger y se
-// busca después con su modo Consultar.
-const cajitaImpresion = () => cajitaEditable("Imprimir",
-  `<select class="cj-edit"${imprimirEnFila() ? "" :
-      ` title="${esc("Se guardan los pedidos: se pueden ver luego con Consultar, en Winledger.")}"`
-    } onchange="cajitaImpresionElegida(this.value)">${
-    cajitaOpciones([["no", "no"], ["si", "sí"]], imprimirEnFila() ? "si" : "no")}</select>`,
-  imprimirEnFila());
-
 // La empresa solo se nombra cuando NO es la de producción: contra la 999 se
 // llena con el relleno fijo de prueba y el documento no corresponde al pedido.
 // De solo lectura: se cambia en ADMIN, no a un clic de llenar.
@@ -15935,8 +15917,8 @@ function pintarPrevioCajitas() {
   const cajitas = [];
 
   // Orden dictado por el usuario (2026-07-31): arriba de qué se factura (ruta,
-  // fecha, tasa) y, en un renglón aparte, cómo sale el documento (serie, cuánto
-  // y si se imprime).
+  // fecha, tasa) y, en un renglón aparte, cómo sale el documento (serie y
+  // cuánto).
   // Cambiar la ruta rehace el lote entero: es el filtro del que sale la fila.
   const rutas = [["", "todas"], ...(ultimaLista.rutas || []).map(r => [r, nombreRuta(r)])];
   if (ultimaLista.hay_sin_ruta) rutas.push(["__sin_ruta__", "sin ruta"]);
@@ -15967,7 +15949,6 @@ function pintarPrevioCajitas() {
         elegida && elegida.hover ? ` title="${esc(elegida.hover)}"` : ""
       } onchange="previoCantidadElegida(this.value)">${opcionesCantidadHtml()}</select>`));
 
-  cajitas.push(cajitaImpresion());
   cajitas.push(cajitaEmpresa());
 
   $("previo-cajitas").innerHTML = cajitas.join("");
@@ -16153,13 +16134,6 @@ function cambioImpresionEnFila() {
   pintarCantidades();          // la unidad y las opciones dependen del papel
   if (previoResolver) rehacerPrevioLote();  // la línea de proceso también cambia
   if (detalleAbierto) pintarVentanaDetalle(detalleAbierto);
-}
-
-function cajitaImpresionElegida(valor) {
-  const radio = document.querySelector(
-    `input[name="enfila-imp"][value="${valor}"]`);
-  if (radio) radio.checked = true;
-  cambioImpresionEnFila();
 }
 
 // Lo que hay que sopesar antes de dar el sí, con su consecuencia dicha para n
