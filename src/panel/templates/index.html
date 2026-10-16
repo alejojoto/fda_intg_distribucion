@@ -12373,7 +12373,8 @@ function cabeceraDetalle(clave) {
 // pedido del usuario): debajo de la cabecera van las mismas cajitas de puesta
 // a punto de la revisión del lote —sin ruta (la del pedido ya está arriba) ni
 // cantidad (aquí siempre es una)— y sus avisos. En una ya cerrada no hay nada
-// que poner a punto y queda solo la cabecera.
+// que poner a punto y queda solo la cabecera. Sin la cajita de Imprimir
+// (2026-10-16, pedido del usuario): venía del llenado en fila y aquí no se usa.
 function fijoDetalle(clave) {
   const cabecera = cabeceraDetalle(clave);
   // La reapertura en vuelo cuenta como llenable: la revisión (cajitas y
@@ -12382,7 +12383,7 @@ function fijoDetalle(clave) {
     || detalleReabriendo === clave;
   if (!llenable) return cabecera;
   const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
-                   cajitaImpresion(), cajitaEmpresa()].join("");
+                   cajitaEmpresa()].join("");
   return cabecera
     + `<div id="detalle-cajitas" class="pap-cajitas">${cajitas}</div>`
     + `<div id="detalle-avisos">${htmlAvisosDetalle(clave)}</div>`;
