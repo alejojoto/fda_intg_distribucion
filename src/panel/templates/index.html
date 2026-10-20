@@ -2321,6 +2321,11 @@
      unas seis; el resto se desplaza dentro del aviso. */
   .pap-ojo-lineas { max-height:140px; overflow-y:auto; }
   .pap-ojo-lineas li { margin-top:2px; }
+  .pap-ojo-detalle { flex:1; min-width:0; }
+  .pap-ojo-detalle summary { cursor:pointer; list-style:none; }
+  .pap-ojo-detalle summary::-webkit-details-marker { display:none; }
+  .pap-ojo-ver { text-decoration:underline; white-space:nowrap; }
+  .pap-ojo-detalle[open] .pap-ojo-ver::after { content:" (ocultar)"; }
   /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
      las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
      la lista ni a cancelar la corrida. */
@@ -11730,6 +11735,10 @@ let detalleOriginal = null;           // {clave, ajustes:{código:{…}}, repeti
 // editar lo que manda la aplicación de pedidos es la excepción, no la regla.
 // Se apaga al abrir y al cerrar: cada factura vuelve a empezar bloqueada.
 let detalleEdicionHabilitada = false;
+// El aviso morado abre plegado y se despliega con un clic (2026-10-20):
+// con 20 y pico líneas discrepantes se comía la ventana entera en una laptop
+// pequeña. Vuelve a plegarse en cada factura, como el candado de edición.
+let detalleDespachoDesplegado = false;
 let detalleAjustesEnVuelo = [];       // ajustes tecleados que todavía viajan
 // Claves cuya factura no dejó foto de lo que se llenó: lo que la ventana
 // enseña es el pedido rearmado desde el origen (`origen: "pedido"`). Lo marca
@@ -11782,6 +11791,7 @@ async function abrirDetalle(pedidoId, parte) {
   detalleSinGuardar = false;
   detalleRepintePendiente = false;
   detalleEdicionHabilitada = false;
+  detalleDespachoDesplegado = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
   fechaDesfaseOk.detalle = "";
@@ -11809,6 +11819,7 @@ function abrirDetalleCargando(pedidoId, parte) {
   detalleSinGuardar = false;
   detalleRepintePendiente = false;
   detalleEdicionHabilitada = false;
+  detalleDespachoDesplegado = false;
   detalleOriginal = null;
   detalleAjustesEnVuelo = [];
   fechaDesfaseOk.detalle = "";
@@ -11832,6 +11843,7 @@ function cerrarDetalle() {
   detalleSinGuardar = false;
   detalleRepintePendiente = false;
   detalleEdicionHabilitada = false;
+  detalleDespachoDesplegado = false;
   detalleOriginal = null;
   // De vuelta a la revisión del lote: lo tecleado aquí (la tasa sobre todo) se
   // refleja en sus cajitas, que quedaron pintadas con el valor de antes.
@@ -16421,9 +16433,14 @@ function avisoDespachoDifiere(clave) {
     : detalleEdicionHabilitada
       ? "Cada una de esas líneas trae abajo los botones Aprobada y Despachada."
       : "Con «Habilitar edición» eliges línea por línea cuál va.";
+  // Plegado por defecto: el resumen de una línea basta para saber que pasa;
+  // cuáles son y cómo cambiarlas sale con un clic (2026-10-20).
   return `<div class="pap-ojo pap-ojo-morado pap-ojo-alerta"><div class="pap-ojo-tri-col">${
-      TRIANGULO_ALERTA}</div><div>${esc(hecho)}`
-    + `<ul class="pap-ojo-lineas">${listadas}</ul>${esc(salida)}</div></div>`;
+      TRIANGULO_ALERTA}</div><details class="pap-ojo-detalle"${
+      detalleDespachoDesplegado ? " open" : ""
+      } ontoggle="detalleDespachoDesplegado = this.open"><summary>${esc(hecho)}`
+    + ` <span class="pap-ojo-ver">Ver cuáles</span></summary>`
+    + `<ul class="pap-ojo-lineas">${listadas}</ul>${esc(salida)}</details></div>`;
 }
 
 function pintarPrevioAvisos() {
