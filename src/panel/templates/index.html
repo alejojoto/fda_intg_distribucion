@@ -2315,6 +2315,11 @@
   /* Las líneas con discrepancia, una por renglón: el aviso dice cuáles son sin
      tener que ir a buscarlas en la tabla. */
   .pap-ojo-lineas { margin:5px 0 0; padding-left:18px; }
+  /* Tope de alto con desplazamiento propio (2026-10-20, pedido del usuario): con
+     20 y pico líneas discrepantes el aviso se comía la ventana entera en una
+     laptop pequeña y las líneas del pedido quedaban fuera de la vista. Caben
+     unas seis; el resto se desplaza dentro del aviso. */
+  .pap-ojo-lineas { max-height:140px; overflow-y:auto; }
   .pap-ojo-lineas li { margin-top:2px; }
   /* Aviso que trae su propia acción (2026-07-31): el del pedido dividido lleva
      las otras dos salidas ahí mismo, para no mandar al operador a buscarlas en
