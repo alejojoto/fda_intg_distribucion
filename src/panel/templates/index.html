@@ -664,6 +664,12 @@
   /* Rojo (2026-10-15, pedido del usuario): la incompleta ya no pasa por EN
      REVISIÓN, así que su marca en PROCESADAS es la que tiene que verse. */
   .chip.incompleta { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
+  /* En aprobación (2026-10-21): el pedido todavía tiene líneas sin cantidad
+     aprobada y no se llena. Mismo rojo que "incompleta": es la misma falta,
+     vista antes de llenar en vez de después. Liberado = la misma falta, pero
+     un editor decidió que se llene igual: ámbar de aviso. */
+  .chip.en-aprobacion { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
+  .chip.liberado, .chip.aprobacion-vencida { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   /* Morado suave (2026-10-08, pedido del usuario): aviso que se distingue del
      ámbar de "por revisar" sin el morado sólido de "despacho ≠ aprobado". */
   .chip.fuera-base { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; }
@@ -11413,6 +11419,41 @@ const chipFueraBase = (f) =>
         f.fuera_de_base === 1 ? "1 línea no llegó a la base de datos" : `${f.fuera_de_base} líneas no llegaron a la base de datos`}</span>`
     : "";
 const claseRevisionEmitida = (f) => f.incompleta ? "fila-incompleta" : "";
+// Pedido EN APROBACIÓN (2026-10-21, regla del usuario): tiene líneas de
+// paquetes que todavía no tienen cantidad aprobada, así que se ve pero no se
+// llena —ni a mano ni en la fila— hasta que esté completo. Lo destranca que
+// aprueben esas líneas (la lista se refresca sola) o que un editor lo libere.
+// Liberado y todavía incompleto: el chip lo dice, para que quien lo llene
+// sepa que esas líneas no entran.
+const textoSinAprobar = (f) => {
+  const n = (f.sin_aprobar || []).length;
+  return `${n === 1 ? "1 línea" : `${n} líneas`} sin cantidad aprobada: ${f.sin_aprobar.join(", ")}`;
+};
+const chipEnAprobacion = (f) => {
+  if (f.en_aprobacion)
+    return ` <span class="chip en-aprobacion" title="${esc(
+        `${textoSinAprobar(f)}. Se llena cuando el pedido esté completo; un editor puede liberarlo o llenarlo igual.`)}">en aprobación · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+  if (f.liberado && (f.sin_aprobar || []).length)
+    return ` <span class="chip liberado" title="${esc(
+        `Liberado desde '${f.liberado.por || "otra máquina"}': se puede llenar con lo aprobado, pero sigue con ${textoSinAprobar(f)}. Esas líneas no entran al documento.`)}">liberado · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+  // Ya pasó la hora de cierre de aprobación y sigue con líneas vacías: se
+  // puede llenar (nadie las va a aprobar ya), con el aviso a la vista.
+  if (f.aprobacion_vencida)
+    return ` <span class="chip aprobacion-vencida" title="${esc(
+        `${textoSinAprobar(f)}. Ya pasó la hora de cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}): se puede llenar con lo aprobado; esas líneas no entran al documento.`)}">quedaron ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+  return "";
+};
+async function liberarPedido(pedido_id, cuantas) {
+  const listo = avisarTrabajando("Liberando el pedido…");
+  try {
+    await api("/api/pedido/liberar", {pedido_id});
+    await cargar();
+    listo();
+    mensaje(`Pedido ${pedido_id} liberado: se puede llenar aunque le falten ${cuantas} por aprobar.`, "info");
+  } catch (e) {
+    mensaje("No se pudo liberar el pedido: " + e.message, "error");
+  }
+}
 
 function chipEstadoProcesada(f) {
   return chipEstadoProcesadaBase(f) + chipFueraBase(f);
@@ -11498,6 +11539,20 @@ function accionesDeFila(f) {
   // es un atajo solo de prueba y el Llenar de la ventana no carga ese sí.
   if (f.estado === "llenada_prueba")
     return `<button class="acento" onclick="llenar('${id}',${f.parte},false,false,true)">Llenar otra vez</button>`;
+  // EN APROBACIÓN (2026-10-21): sin el permiso de editor no hay Llenar — solo
+  // Descartar, que no emite nada. Con el permiso, Llenar (con lo aprobado) y
+  // Liberar (para que lo llene cualquiera). El servidor rechaza igual.
+  if (f.en_aprobacion && (f.estado === "pendiente" || f.estado === "error_llenado")) {
+    const cuantas = (f.sin_aprobar || []).length === 1 ? "1 línea" : `${(f.sin_aprobar || []).length} líneas`;
+    const descartar = modoImplantacion ? "" :
+      `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
+    if (!tienePermiso("liberar_pedido"))
+      return `<span class="mut" title="${esc(`${textoSinAprobar(f)}. Se llena cuando el pedido esté completo.`)}">En aprobación</span>` + descartar;
+    return botonPrellenado(f, f.estado === "error_llenado" ? "Reintentar" : "Llenar", "acento")
+      + `<button onclick="liberarPedido('${id}','${cuantas}')" title="${esc(
+          `Deja llenar este pedido en cualquier computadora aunque le falten ${cuantas} por aprobar. Las líneas sin aprobar no entran al documento.`)}">Liberar</button>`
+      + descartar;
+  }
   if (f.estado === "pendiente" || f.estado === "reservada")
     // La familia ajena también pasa por el prellenado: su pregunta del motivo
     // la despacha el Llenar de la ventana (llenarDesdeDetalle).
@@ -12113,6 +12168,8 @@ function llenadoDirecto(f) {
   if (!f) return null;
   if (f.a_mano) return "Llenar";
   if (f.remota) return null;
+  // En aprobación: solo un editor lo llena (2026-10-21, ver accionesDeFila).
+  if (f.en_aprobacion && !tienePermiso("liberar_pedido")) return null;
   if (f.estado === "reservada" && secuenciaActiva) return null;
   if (f.estado === "pendiente" || f.estado === "reservada") return "Llenar";
   if (f.estado === "error_llenado") return "Reintentar";
@@ -12853,7 +12910,7 @@ function filaPendiente(f, enFamilia, atrasada = false) {
       <td>${enFamilia ? "" : esc(fechaCorta(f.fecha_orden_salida))}</td>
       <td>${f.cantidad_lineas}</td>
       <td>${esc(f.causa_salida || "")}</td>
-      <td>${chipEstado(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}${chipFueraBase(f)}</td>
+      <td>${chipEstado(f)}${chipEnAprobacion(f)}${chipDespacho(f)}${chipSumadas(f)}${chipAjustes(f)}${chipPorRevisar(f)}${chipRechazados(f)}${chipFueraBase(f)}</td>
       <td${CELDA_ACCIONES}>${accionesDeFila(f)}</td>
     </tr>` + avisoRepetidas(f, enFamilia) + avisoDeFactura(f, enFamilia)
       + `<tr class="fila-aviso-error ${enFamilia ? "fam-parte" : ""}" data-factura-key="${clave}" style="display:none"><td colspan="8"></td></tr>`;
@@ -16409,6 +16466,24 @@ const lineasDespachoDifiere = (d) =>
 // números, en el morado de ese chip (2026-08-09, pedido del usuario). A
 // diferencia del desfase de fecha NO pide intervención ninguna para llenar: la
 // factura sale igual, esto solo avisa.
+// Prellenado de un pedido con líneas sin aprobar (2026-10-21): a esta ventana
+// solo llega quien puede llenarlo igual (un editor, o cualquiera si ya se
+// liberó), y tiene que saber qué se queda fuera del documento antes de dar
+// Llenar.
+function avisoEnAprobacion(fila) {
+  if (!fila || !(fila.sin_aprobar || []).length) return "";
+  const lista = fila.sin_aprobar.map(n => `<li>${esc(n)}</li>`).join("");
+  const encabezado = fila.liberado
+    ? `Pedido liberado desde '${esc(fila.liberado.por || "otra máquina")}', todavía en aprobación:`
+    : fila.aprobacion_vencida
+      ? `Ya pasó la hora de cierre de aprobación (${esc(ultimaLista.hora_cierre_aprobacion || "")}) y el pedido sigue con`
+      : "Pedido EN APROBACIÓN:";
+  return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
+      TRIANGULO_ALERTA}</div><div class="pap-ojo-detalle">${encabezado} ${esc(textoSinAprobar(fila))}.
+    <ul class="pap-ojo-lineas">${lista}</ul>
+    Esas líneas NO entran al documento si se llena ahora. Lo que se facturó, se facturó: si las aprueban después, no se agregan solas.</div></div>`;
+}
+
 function avisoDespachoDifiere(clave) {
   const d = detalleDatos[clave];
   const lineas = lineasDespachoDifiere(d);
@@ -16460,6 +16535,7 @@ function htmlAvisosDetalle(clave) {
   return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
        + botonesSerieRapidos(false)
        + avisoFechaDelPedido(fila ? [fila] : [], "detalle")
+       + avisoEnAprobacion(fila)
        // De último: los de arriba hay que resolverlos para llenar, este no.
        + avisoDespachoDifiere(clave);
 }
