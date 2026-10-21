@@ -367,6 +367,8 @@
      por eso su letra va en rojo también inactiva, es la única excepción. */
   #tab-revision { border-top-color:#f3b9b9; color:#c9736a; }
   #tab-revision.activa { border-top-color:#dc2626; color:#b42318; }
+  #tab-cambios { border-top-color:#f5c98a; color:#c2761f; }
+  #tab-cambios.activa { border-top-color:#ea580c; color:#b54708; }
   /* El panel de la tab activa llena la ventana; solo su tabla hace scroll y
      el paginador queda fijo al pie. */
   .tab-panel { border-top-left-radius:0; flex:1; min-height:0;
@@ -2967,6 +2969,11 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
          completa, y sin selector de por medio cuando solo una tiene algo). -->
     <button class="tab-btn" id="tab-revision" style="display:none" onclick="irATab('revision')">
       EN REVISIÓN (<span id="n-revision-total">…</span>)</button>
+    <!-- Facturas ya emitidas cuya cantidad aprobada cambió después (regla del
+         usuario 2026-10-21): categoría aparte, no se mezcla con EN REVISIÓN.
+         Oculta hasta que repintar() ve algo. -->
+    <button class="tab-btn" id="tab-cambios" style="display:none" onclick="irATab('cambios')">
+      CAMBIOS TRAS FACTURAR<span id="n-cambios-par"> (<span id="n-cambios">0</span>)</span></button>
     <button class="tab-btn" id="tab-procesadas" onclick="irATab('procesadas')">
       PROCESADAS</button>
     <button class="tab-btn" id="tab-descuentos" onclick="irATab('descuentos')">DESCUENTOS</button>
@@ -3630,6 +3637,19 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        (ver actualizarSubtabsRevision) solo aparece cuando AMBAS tienen algo;
        con una sola, su panel ocupa toda la vista sin selector de por medio,
        pero conserva el título de esa categoría. -->
+  <section id="sec-cambios" class="tab-panel" style="display:none">
+    <p class="mut" style="margin:10px 14px 8px">
+      Facturas ya emitidas cuya cantidad aprobada cambió después en AgroMovil.
+      Revisa la factura y decide; con Revisada deja de contarse.</p>
+    <div class="tabla-scroll"><table id="t-cambios">
+      <thead><tr>
+        <th>Fecha pedido</th><th>Pedido</th><th>Cliente y sucursal</th>
+        <th>Documento</th><th>Máquina</th><th>Qué cambió</th><th>Estado</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
   <section id="sec-revision" class="tab-panel" style="display:none">
     <div id="rev-subtabs" style="display:none"></div>
     <div id="rev-panel-llenados" class="rev-panel">
@@ -8734,7 +8754,7 @@ function intentarCerrarTicketSupervision() {
 
 function cambiarTab(tab) {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
-  for (const t of ["pendientes", "procesadas", "descuentos", "ajustes", "admin", "revision"]) {
+  for (const t of ["pendientes", "procesadas", "descuentos", "ajustes", "admin", "revision", "cambios"]) {
     // El botón de ADMIN solo se renderiza en el equipo admin; su sección sí
     // existe siempre, así que la guarda es sobre el botón.
     const btn = $("tab-" + t);
@@ -11202,6 +11222,16 @@ function repintar() {
   $("n-revision-total").textContent = totalRevision;
   if (!totalRevision && $("tab-revision").classList.contains("activa"))
     cambiarTab("pendientes");
+  // CAMBIOS TRAS FACTURAR: el número cuenta solo lo no revisado; con alguna
+  // ya revisada la pestaña se queda (sin número) para poder consultarla.
+  const cambios = ultimaLista.cantidad_cambiada || [];
+  const cambiosSinRevisar = cambios.filter(c => !c.revisada).length;
+  pintarCambiosTrasFacturar(cambios);
+  $("tab-cambios").style.display = cambios.length ? "" : "none";
+  $("n-cambios").textContent = cambiosSinRevisar;
+  $("n-cambios-par").style.display = cambiosSinRevisar ? "" : "none";
+  if (!cambios.length && $("tab-cambios").classList.contains("activa"))
+    cambiarTab("pendientes");
   pintarPendientes(paginarFamilias("pendientes", ultimaLista.pendientes));
   pintarLlenadosPorRevisar(porRevisar);
   pintarRevision(paginar("revision", revision));
@@ -11456,7 +11486,10 @@ async function liberarPedido(pedido_id, cuantas) {
 }
 
 function chipEstadoProcesada(f) {
-  return chipEstadoProcesadaBase(f) + chipFueraBase(f);
+  return chipEstadoProcesadaBase(f) + chipFueraBase(f)
+    + (f.cantidad_cambiada
+        ? ` <span class="chip incompleta" title="La cantidad aprobada de algún producto cambió después de facturar; está en CAMBIOS TRAS FACTURAR">cantidad cambió</span>`
+        : "");
 }
 
 function chipEstadoProcesadaBase(f) {
@@ -11477,6 +11510,48 @@ async function marcarIncompletaRevisada(pedido_id) {
     listo();
   } catch (e) {
     mensaje("No se pudo marcar la factura como revisada: " + e.message, "error");
+  }
+}
+
+function pintarCambiosTrasFacturar(lista) {
+  $("t-cambios").querySelector("tbody").innerHTML = pintarConSeparadoresDeFecha(
+    lista, (c) => c.detectado_en, 8, (c) => filaCambioTrasFacturar(c), null);
+}
+
+function filaCambioTrasFacturar(c) {
+  const que = (c.cantidades || []).map(q =>
+    `<div>${esc(q.descripcion)} (${esc(q.presentacion)}): facturado ${esc(String(Number(q.facturado)))}`
+    + ` → aprobado ahora ${esc(String(Number(q.aprobado)))}</div>`).join("");
+  const estado = c.revisada
+    ? `<span class="chip revisada" title="Revisada desde ${esc(c.revisada_por || "")}">revisada</span>`
+    : `<span class="chip incompleta">cantidad cambió</span>`;
+  const boton = (!c.revisada && tienePermiso("revision_completa"))
+    ? `<button class="acento" onclick="event.stopPropagation();marcarCantidadRevisada('${esc(c.pedido_id)}')">Revisada</button>`
+    : "";
+  const docs = (c.documentos || []).length ? c.documentos.join(", ") : "—";
+  return `
+    <tr class="abre-detalle" title="Clic para ver el detalle del pedido"
+        onclick="abrirDetalle('${esc(c.pedido_id)}',1)">
+      <td>${esc(fechaCorta(c.fecha_orden_salida))}</td>
+      <td>${esc(c.pedido_id)}</td>
+      <td>${esc(c.nombre_cliente || c.razon_social || "")}${c.nombre_sucursal
+            ? `<div class="mut">${esc(c.nombre_sucursal)}</div>` : ""}</td>
+      <td>${esc(docs)}</td>
+      <td class="mut">${esc(c.maquina || "")}</td>
+      <td>${que}</td>
+      <td>${estado}</td>
+      <td${CELDA_ACCIONES}>${boton}</td>
+    </tr>`;
+}
+
+async function marcarCantidadRevisada(pedido_id) {
+  const listo = avisarTrabajando("Marcando el cambio como revisado…");
+  try {
+    await api("/api/cantidad_cambiada_revisada", {pedido_id});
+    await cargar();
+    listo();
+  } catch (e) {
+    mensaje("No se pudo marcar el cambio como revisado: " + e.message, "error");
   }
 }
 
