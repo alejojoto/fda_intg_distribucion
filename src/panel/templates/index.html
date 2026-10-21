@@ -669,7 +669,7 @@
      vista antes de llenar en vez de después. Liberado = la misma falta, pero
      un editor decidió que se llene igual: ámbar de aviso. */
   .chip.en-aprobacion { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
-  .chip.liberado { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
+  .chip.liberado, .chip.aprobacion-vencida { background:#fff4e5; color:#b54708; border:1px solid #f5c98a; }
   /* Morado suave (2026-10-08, pedido del usuario): aviso que se distingue del
      ámbar de "por revisar" sin el morado sólido de "despacho ≠ aprobado". */
   .chip.fuera-base { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; }
@@ -11436,6 +11436,11 @@ const chipEnAprobacion = (f) => {
   if (f.liberado && (f.sin_aprobar || []).length)
     return ` <span class="chip liberado" title="${esc(
         `Liberado desde '${f.liberado.por || "otra máquina"}': se puede llenar con lo aprobado, pero sigue con ${textoSinAprobar(f)}. Esas líneas no entran al documento.`)}">liberado · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+  // Ya pasó la hora de cierre de aprobación y sigue con líneas vacías: se
+  // puede llenar (nadie las va a aprobar ya), con el aviso a la vista.
+  if (f.aprobacion_vencida)
+    return ` <span class="chip aprobacion-vencida" title="${esc(
+        `${textoSinAprobar(f)}. Ya pasó la hora de cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}): se puede llenar con lo aprobado; esas líneas no entran al documento.`)}">quedaron ${(f.sin_aprobar || []).length} sin aprobar</span>`;
   return "";
 };
 async function liberarPedido(pedido_id, cuantas) {
@@ -16470,7 +16475,9 @@ function avisoEnAprobacion(fila) {
   const lista = fila.sin_aprobar.map(n => `<li>${esc(n)}</li>`).join("");
   const encabezado = fila.liberado
     ? `Pedido liberado desde '${esc(fila.liberado.por || "otra máquina")}', todavía en aprobación:`
-    : "Pedido EN APROBACIÓN:";
+    : fila.aprobacion_vencida
+      ? `Ya pasó la hora de cierre de aprobación (${esc(ultimaLista.hora_cierre_aprobacion || "")}) y el pedido sigue con`
+      : "Pedido EN APROBACIÓN:";
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
       TRIANGULO_ALERTA}</div><div class="pap-ojo-detalle">${encabezado} ${esc(textoSinAprobar(fila))}.
     <ul class="pap-ojo-lineas">${lista}</ul>
