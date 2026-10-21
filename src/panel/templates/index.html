@@ -11542,14 +11542,6 @@ function accionesDeFila(f) {
   // EN APROBACIÓN (2026-10-21): sin el permiso de editor no hay Llenar — solo
   // Descartar, que no emite nada. Con el permiso, Llenar (con lo aprobado) y
   // Liberar (para que lo llene cualquiera). El servidor rechaza igual.
-  // Sin ninguna línea aprobada todavía (parte vacía, 2026-10-21): no hay
-  // nada que llenar, ni liberado ni pasada la hora de cierre.
-  if ((f.sin_aprobar || []).length && !f.cantidad_lineas
-      && (f.estado === "pendiente" || f.estado === "error_llenado")) {
-    const descartar = modoImplantacion ? "" :
-      `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
-    return `<span class="mut" title="${esc(`${textoSinAprobar(f)}. Se llena cuando tenga alguna aprobada.`)}">Nada aprobado todavía</span>` + descartar;
-  }
   if (f.en_aprobacion && (f.estado === "pendiente" || f.estado === "error_llenado")) {
     const cuantas = (f.sin_aprobar || []).length === 1 ? "1 línea" : `${(f.sin_aprobar || []).length} líneas`;
     const descartar = modoImplantacion ? "" :
@@ -12178,7 +12170,6 @@ function llenadoDirecto(f) {
   if (f.remota) return null;
   // En aprobación: solo un editor lo llena (2026-10-21, ver accionesDeFila).
   if (f.en_aprobacion && !tienePermiso("liberar_pedido")) return null;
-  if ((f.sin_aprobar || []).length && !f.cantidad_lineas) return null;
   if (f.estado === "reservada" && secuenciaActiva) return null;
   if (f.estado === "pendiente" || f.estado === "reservada") return "Llenar";
   if (f.estado === "error_llenado") return "Reintentar";
