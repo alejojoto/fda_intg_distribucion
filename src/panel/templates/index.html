@@ -11462,7 +11462,7 @@ const textoSinAprobar = (f) => {
 const chipEnAprobacion = (f) => {
   if (f.en_aprobacion)
     return ` <span class="chip en-aprobacion" title="${esc(
-        `${textoSinAprobar(f)}. Se llena cuando el pedido esté completo; un editor puede liberarlo o llenarlo igual.`)}">en aprobación · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+        `${textoSinAprobar(f)}. Se llena cuando el pedido esté completo o un editor lo libere.`)}">en aprobación · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
   if (f.liberado && (f.sin_aprobar || []).length)
     return ` <span class="chip liberado" title="${esc(
         `Liberado desde '${f.liberado.por || "otra máquina"}': se puede llenar con lo aprobado, pero sigue con ${textoSinAprobar(f)}. Esas líneas no entran al documento.`)}">liberado · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
@@ -11614,17 +11614,16 @@ function accionesDeFila(f) {
   // es un atajo solo de prueba y el Llenar de la ventana no carga ese sí.
   if (f.estado === "llenada_prueba")
     return `<button class="acento" onclick="llenar('${id}',${f.parte},false,false,true)">Llenar otra vez</button>`;
-  // EN APROBACIÓN (2026-10-21): sin el permiso de editor no hay Llenar — solo
-  // Descartar, que no emite nada. Con el permiso, Llenar (con lo aprobado) y
-  // Liberar (para que lo llene cualquiera). El servidor rechaza igual.
+  // EN APROBACIÓN (2026-10-21; 2026-10-22, pedido del usuario): sin el permiso
+  // de editor solo el rótulo, ni Llenar ni Descartar. Con el permiso, Liberar
+  // y Descartar; Llenar aparece recién cuando el pedido queda liberado.
   if (f.en_aprobacion && (f.estado === "pendiente" || f.estado === "error_llenado")) {
     const cuantas = (f.sin_aprobar || []).length === 1 ? "1 línea" : `${(f.sin_aprobar || []).length} líneas`;
     const descartar = modoImplantacion ? "" :
       `<button class="peligro" onclick="descartar('${id}',${f.parte})">Descartar</button>`;
     if (!tienePermiso("liberar_pedido"))
-      return `<span class="mut" title="${esc(`${textoSinAprobar(f)}. Se llena cuando el pedido esté completo.`)}">En aprobación</span>` + descartar;
-    return botonPrellenado(f, f.estado === "error_llenado" ? "Reintentar" : "Llenar", "acento")
-      + `<button onclick="liberarPedido('${id}','${cuantas}')" title="${esc(
+      return `<span class="mut" title="${esc(`${textoSinAprobar(f)}. Se llena cuando el pedido esté completo.`)}">En aprobación</span>`;
+    return `<button onclick="liberarPedido('${id}','${cuantas}')" title="${esc(
           `Deja llenar este pedido en cualquier computadora aunque le falten ${cuantas} por aprobar. Las líneas sin aprobar no entran al documento.`)}">Liberar</button>`
       + descartar;
   }
@@ -12243,8 +12242,8 @@ function llenadoDirecto(f) {
   if (!f) return null;
   if (f.a_mano) return "Llenar";
   if (f.remota) return null;
-  // En aprobación: solo un editor lo llena (2026-10-21, ver accionesDeFila).
-  if (f.en_aprobacion && !tienePermiso("liberar_pedido")) return null;
+  // En aprobación: nadie lo llena hasta liberarlo (2026-10-22, ver accionesDeFila).
+  if (f.en_aprobacion) return null;
   if (f.estado === "reservada" && secuenciaActiva) return null;
   if (f.estado === "pendiente" || f.estado === "reservada") return "Llenar";
   if (f.estado === "error_llenado") return "Reintentar";
