@@ -10579,17 +10579,6 @@ function textoFalta(segundos) {
   if (segundos < 60) return `faltan ~${Math.ceil(segundos)} s`;
   return `faltan ~${Math.ceil(segundos / 60)} min`;
 }
-// Lo medido de verdad (2026-10-24): cuánto llegó de cuánto se espera y a qué
-// velocidad. Es lo que sostiene el "faltan ~N s", así que va a la vista.
-function textoMB(bytes) {
-  return (bytes / 1e6).toLocaleString("es-VE", {maximumFractionDigits: 1}) + " MB";
-}
-function textoBajada(p) {
-  if (!p || !p.bytes_esperados) return "";
-  const partes = [`${textoMB(p.bytes_recibidos || 0)} de ${textoMB(p.bytes_esperados)}`];
-  if (p.velocidad_bps) partes.push(`${Math.round(p.velocidad_bps / 1000)} kB/s`);
-  return " · " + partes.join(" · ");
-}
 
 function pintarProgresoCarga() {
   const caja = document.getElementById("carga-progreso");
@@ -10626,7 +10615,7 @@ function pintarProgresoCarga() {
   const paso = textoPasoCarga(progresoCarga.paso, progresoCarga.novedad);
   document.getElementById("carga-texto").textContent = sinSenal
       ? `${paso} · ${Math.round(pct)}% · esperando respuesta del panel…`
-      : `${paso} · ${Math.round(pct)}% · ${textoFalta(restante)}${textoBajada(progresoCarga)}`;
+      : `${paso} · ${Math.round(pct)}% · ${textoFalta(restante)}`;
   barra.style.width = pct.toFixed(1) + "%";
   caja.style.display = "";
 }
