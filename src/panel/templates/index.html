@@ -10572,9 +10572,21 @@ function recibirProgresoCarga(p) {
 }
 
 function textoFalta(segundos) {
+  if (segundos == null) return "midiendo la velocidad…";
   if (segundos <= 3) return "casi listo";
   if (segundos < 60) return `faltan ~${Math.ceil(segundos)} s`;
   return `faltan ~${Math.ceil(segundos / 60)} min`;
+}
+// Lo medido de verdad (2026-10-24): cuánto llegó de cuánto se espera y a qué
+// velocidad. Es lo que sostiene el "faltan ~N s", así que va a la vista.
+function textoMB(bytes) {
+  return (bytes / 1e6).toLocaleString("es-VE", {maximumFractionDigits: 1}) + " MB";
+}
+function textoBajada(p) {
+  if (!p || !p.bytes_esperados) return "";
+  const partes = [`${textoMB(p.bytes_recibidos || 0)} de ${textoMB(p.bytes_esperados)}`];
+  if (p.velocidad_bps) partes.push(`${Math.round(p.velocidad_bps / 1000)} kB/s`);
+  return " · " + partes.join(" · ");
 }
 
 function pintarProgresoCarga() {
@@ -10593,19 +10605,26 @@ function pintarProgresoCarga() {
     return;
   }
   const desde = (Date.now() - progresoCarga.recibido) / 1000;
-  // Sin noticias frescas (sondeo caído, pestaña oculta, llenado en curso) la
-  // barra se retira: clavada en 99% diría que algo sigue pasando cuando ya
-  // nadie sabe si pasa.
-  if (desde > 15) { caja.style.display = "none"; return; }
-  const restante = Math.max((progresoCarga.restante_s || 0) - desde, 0);
+  // Sin noticias frescas (sondeo sin respuesta, pestaña oculta) la barra no se
+  // va: la carga sigue hasta que el servidor diga lo contrario, y una barra
+  // que desaparece a medias se leía como "ya terminó" (2026-10-24). Solo tras
+  // un minuto sin señal se retira, porque ya nadie sabe si pasa algo.
+  if (desde > 60) { caja.style.display = "none"; return; }
+  const sinSenal = desde > 15;
+  const restante = progresoCarga.restante_s == null
+    ? null : Math.max(progresoCarga.restante_s - desde, 0);
   const transcurrido = (progresoCarga.transcurrido_s || 0) + desde;
-  const total = transcurrido + restante;
-  let pct = total > 0 ? (100 * transcurrido) / total : 0;
-  pct = Math.max(Math.min(pct, 99), progresoPctVisto);
-  progresoPctVisto = pct;
+  let pct = progresoPctVisto;
+  if (restante != null) {
+    const total = transcurrido + restante;
+    pct = total > 0 ? (100 * transcurrido) / total : 0;
+    pct = Math.max(Math.min(pct, 99), progresoPctVisto);
+    progresoPctVisto = pct;
+  }
   const paso = textoPasoCarga(progresoCarga.paso, progresoCarga.novedad);
-  document.getElementById("carga-texto").textContent =
-      `${paso} · ${Math.round(pct)}% · ${textoFalta(restante)}`;
+  document.getElementById("carga-texto").textContent = sinSenal
+      ? `${paso} · ${Math.round(pct)}% · esperando respuesta del panel…`
+      : `${paso} · ${Math.round(pct)}% · ${textoFalta(restante)}${textoBajada(progresoCarga)}`;
   barra.style.width = pct.toFixed(1) + "%";
   caja.style.display = "";
 }
