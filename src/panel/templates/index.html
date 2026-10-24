@@ -10573,7 +10573,9 @@ function recibirProgresoCarga(p) {
 
 function textoFalta(segundos) {
   if (segundos == null) return "midiendo la velocidad…";
-  if (segundos <= 3) return "casi listo";
+  // Cuenta agotada sin la lista todavía: se dice que sigue, sin número que
+  // prometa un tiempo que ya venció (2026-10-24, pedido del usuario).
+  if (segundos <= 1) return "cargando…";
   if (segundos < 60) return `faltan ~${Math.ceil(segundos)} s`;
   return `faltan ~${Math.ceil(segundos / 60)} min`;
 }
