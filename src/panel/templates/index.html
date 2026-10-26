@@ -2302,6 +2302,12 @@
   .cajita.ojo .cj-val { color:#b54708; }
   #previo-avisos, #detalle-avisos { display:flex; flex-direction:column; gap:6px;
                                     margin:0 0 10px; }
+  /* Los avisos con triángulo de la ventana del pedido, de a dos por fila
+     (2026-10-26, pedido del usuario): uno debajo del otro empujaban las líneas
+     del pedido fuera de la vista en una laptop pequeña. Uno solo ocupa el
+     ancho entero (auto-fit colapsa la columna vacía). */
+  .avisos-dos-col { display:grid; gap:6px;
+                    grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); }
   .pap-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
              padding:8px 10px; font-size:13px; line-height:1.45; }
   /* Aviso con triángulo propio (2026-08-02): el desfase de fecha del pedido es
@@ -11480,7 +11486,7 @@ const chipEnAprobacion = (f) => {
   // puede llenar (nadie las va a aprobar ya), con el aviso a la vista.
   if (f.aprobacion_vencida)
     return ` <span class="chip aprobacion-vencida" title="${esc(
-        `${textoSinAprobar(f)}. Ya pasó la hora de cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}): se puede llenar con lo aprobado; esas líneas no entran al documento.`)}">quedaron ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+        `${textoSinAprobar(f)}. Ya pasó la hora de cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}): se puede llenar con lo aprobado; esas líneas no entran al documento.`)}">pasó el cierre · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
   return "";
 };
 async function liberarPedido(pedido_id, cuantas) {
@@ -16554,18 +16560,29 @@ const lineasDespachoDifiere = (d) =>
 // solo llega quien puede llenarlo igual (un editor, o cualquiera si ya se
 // liberó), y tiene que saber qué se queda fuera del documento antes de dar
 // Llenar.
+// Una sola frase (2026-10-26, pedido del usuario): los nombres iban dos veces
+// (en el texto y en una lista debajo) y no quedaba claro qué se factura. Dice
+// dónde falta la aprobación —no es un cero ni una línea perdida— y con cuántas
+// líneas sale el documento.
 function avisoEnAprobacion(fila) {
-  if (!fila || !(fila.sin_aprobar || []).length) return "";
-  const lista = fila.sin_aprobar.map(n => `<li>${esc(n)}</li>`).join("");
-  const encabezado = fila.liberado
-    ? `Pedido liberado desde '${esc(fila.liberado.por || "otra máquina")}', todavía en aprobación:`
+  const sin = (fila || {}).sin_aprobar || [];
+  if (!sin.length) return "";
+  const cuantas = sin.length === 1 ? "1 línea" : `${sin.length} líneas`;
+  const hecho = fila.liberado
+    ? `Liberado desde '${fila.liberado.por || "otra máquina"}' con ${cuantas} de paquetes sin aprobar en AgroMovil`
     : fila.aprobacion_vencida
-      ? `Ya pasó la hora de cierre de aprobación (${esc(ultimaLista.hora_cierre_aprobacion || "")}) y el pedido sigue con`
-      : "Pedido EN APROBACIÓN:";
+      ? `Pasó el cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}) y AgroMovil sigue sin aprobar ${cuantas} de paquetes`
+      : `En aprobación: AgroMovil todavía no aprueba ${cuantas} de paquetes`;
+  // Con el pedido partido en varias facturas el conteo de esta parte no es el
+  // del documento entero: ahí solo se dice que salen sin ellas.
+  const sinEsas = sin.length === 1 ? "sin esa" : `sin esas ${sin.length}`;
+  const sale = fila.total_partes > 1 ? `salen ${sinEsas}`
+    : `sale con ${fila.cantidad_lineas === 1 ? "1 línea" : `${fila.cantidad_lineas} líneas`} y ${sinEsas}`;
   return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
-      TRIANGULO_ALERTA}</div><div class="pap-ojo-detalle">${encabezado} ${esc(textoSinAprobar(fila))}.
-    <ul class="pap-ojo-lineas">${lista}</ul>
-    Esas líneas NO entran al documento si se llena ahora. Lo que se facturó, se facturó: si las aprueban después, no se agregan solas.</div></div>`;
+      TRIANGULO_ALERTA}</div><div class="pap-ojo-detalle">${esc(hecho)}: ${esc(sin.join(", "))}.
+    Si se llena ahora, ${fila.total_partes > 1 ? "los documentos" : "el documento"} ${esc(sale)}; ${
+      sin.length === 1 ? "si la aprueban después, no se agrega sola"
+                       : "si las aprueban después, no se agregan solas"}.</div></div>`;
 }
 
 function avisoDespachoDifiere(clave) {
@@ -16616,12 +16633,13 @@ function pintarPrevioAvisos() {
 // de su fecha, que necesita la fila (la cola del lote la trae por su cuenta).
 function htmlAvisosDetalle(clave) {
   const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
-  return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
-       + botonesSerieRapidos(false)
-       + avisoFechaDelPedido(fila ? [fila] : [], "detalle")
+  const alertas = avisoFechaDelPedido(fila ? [fila] : [], "detalle")
        + avisoEnAprobacion(fila)
        // De último: los de arriba hay que resolverlos para llenar, este no.
        + avisoDespachoDifiere(clave);
+  return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
+       + botonesSerieRapidos(false)
+       + (alertas ? `<div class="avisos-dos-col">${alertas}</div>` : "");
 }
 
 // El div de avisos del detalle existe solo con la factura llenable (lo crea
