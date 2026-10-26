@@ -1449,8 +1449,8 @@
   /* Abierta DESDE la revisión del lote (que vive en 20): sube por encima de
      ella; la clase la pone abrirDetalle y se va al cerrar. */
   #detalle-overlay.sobre-previo { z-index:21; }
-  #detalle-caja { background:#fff; border-radius:10px; padding:18px; margin-top:6vh;
-                  width:min(860px, 94vw); max-height:85vh; overflow:hidden;
+  #detalle-caja { background:#fff; border-radius:10px; padding:18px; margin-top:3vh;
+                  width:min(860px, 94vw); max-height:93vh; overflow:hidden;
                   display:flex; flex-direction:column;
                   box-shadow:0 10px 40px rgba(0,0,0,.3); }
   #detalle-caja > h3, #detalle-caja > #detalle-fijo,
@@ -2089,6 +2089,13 @@
                     display:none; z-index:20; align-items:flex-start; justify-content:center; }
   #motivo-overlay.visible, #hermanas-overlay.visible,
   #conflicto-overlay.visible, #resolver-overlay.visible { display:flex; }
+  /* El motivo sale por encima de quien lo pide (2026-10-26): con 20 quedaba
+     debajo del detalle abierto desde la revisión del lote (21) y del popup de
+     avisos (22), y la pantalla parecía colgada. */
+  #motivo-overlay { z-index:23; }
+  /* La configuración obligatoria de la máquina la abre el sondeo en cualquier
+     momento: va por encima del motivo y del popup de avisos. */
+  #configmaq-overlay { z-index:24; }
   #motivo-caja, #hermanas-caja, #conflicto-caja, #resolver-caja {
                  background:#fff; border-radius:10px; padding:18px; margin-top:10vh;
                  width:min(460px, 92vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
@@ -2302,12 +2309,49 @@
   .cajita.ojo .cj-val { color:#b54708; }
   #previo-avisos, #detalle-avisos { display:flex; flex-direction:column; gap:6px;
                                     margin:0 0 10px; }
-  /* Los avisos con triángulo de la ventana del pedido, de a dos por fila
-     (2026-10-26, pedido del usuario): uno debajo del otro empujaban las líneas
-     del pedido fuera de la vista en una laptop pequeña. Uno solo ocupa el
-     ancho entero (auto-fit colapsa la columna vacía). */
-  .avisos-dos-col { display:grid; gap:6px;
-                    grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); }
+  /* Los avisos de la ventana del pedido van en UNA barra de chips que abre su
+     propio popup (2026-10-26, pedido del usuario: "más visual, menos texto"):
+     los bloques con triángulo empujaban las líneas y el botón de llenar fuera
+     de la vista en una laptop pequeña. Chip rojo = frena el llenado. */
+  .barra-avisos { display:flex; align-items:center; flex-wrap:wrap; gap:6px;
+                  width:100%; padding:5px 10px; border-radius:6px;
+                  border:1px solid #f5c98a; background:#fef0c7; color:#b54708;
+                  font:inherit; font-size:12.5px; text-align:left; cursor:pointer; }
+  .barra-avisos:hover { background:#fde8b0; }
+  .ba-tri { position:relative; flex:none; width:16px; height:16px; }
+  .ba-chip { padding:1px 8px; border-radius:10px; white-space:nowrap;
+             background:#fff8ec; border:1px solid #f5c98a; }
+  .ba-chip.bloquea { background:#fee2e2; color:#b91c1c; border-color:#fca5a5;
+                     font-weight:600; }
+  .ba-chip.morado { background:#ede9fe; color:#5b21b6; border-color:#c4b5fd; }
+  .ba-ver { margin-left:auto; font-weight:600; text-decoration:underline; }
+  #avisos-overlay { position:fixed; inset:0; background:rgba(29,36,51,.45);
+                    display:none; z-index:22; align-items:flex-start;
+                    justify-content:center; }
+  #avisos-overlay.visible { display:flex; }
+  #avisos-caja { background:#fff; border-radius:10px; padding:16px; margin-top:8vh;
+                 width:min(440px, 92vw); max-height:84vh; display:flex;
+                 flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #avisos-caja > h3 { margin:0 0 10px; font-size:14px; flex:none; }
+  #avisos-cuerpo { flex:1 1 auto; min-height:0; overflow:auto;
+                   display:flex; flex-direction:column; gap:8px; }
+  #avisos-caja > .editor-acciones { flex:none; border-top:1px solid #e2e6ec;
+                                    padding-top:12px; }
+  .av-tarjeta { background:#fef0c7; color:#b54708; border-radius:6px;
+                border-left:4px solid #f5c98a; padding:8px 12px;
+                font-size:13px; line-height:1.4; }
+  .av-tarjeta.av-bloquea { border-left-color:#d92d20; }
+  .av-titulo { display:flex; align-items:center; gap:6px; font-weight:700;
+               margin-bottom:4px; }
+  .av-datos { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; margin:0; }
+  .av-datos dd { margin:0; font-weight:600; }
+  .av-datos dd.av-mal { color:#b91c1c; }
+  .av-cifra b { font-size:18px; }
+  .av-lista summary { cursor:pointer; text-decoration:underline; margin-top:4px; }
+  .av-acciones { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .av-acciones button { padding:3px 10px; font-size:12.5px; }
+  .av-ok { color:#1f6b39; font-weight:600; }
+  .av-error { color:#b91c1c; font-weight:600; }
   .pap-ojo { background:#fef0c7; color:#b54708; border-radius:6px;
              padding:8px 10px; font-size:13px; line-height:1.45; }
   /* Aviso con triángulo propio (2026-08-02): el desfase de fecha del pedido es
@@ -4081,6 +4125,18 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
       <button data-preseleccionado id="detalle-volver" onclick="cerrarDetalle()">Volver</button>
       <button id="detalle-descartar" style="display:none"
               onclick="descartarCambiosDetalle()">Descartar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- Avisos de la ventana del pedido (2026-10-26, pedido del usuario): se abren
+     desde su barra para que la ventana siga usable aunque haya avisos. -->
+<div id="avisos-overlay" onclick="cerrarAvisosDesdeFondo(event)">
+  <div id="avisos-caja">
+    <h3 id="avisos-titulo">Avisos</h3>
+    <div id="avisos-cuerpo"></div>
+    <div class="editor-acciones">
+      <button data-preseleccionado id="avisos-cerrar" onclick="cerrarAvisosDetalle()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -11483,12 +11539,16 @@ const chipEnAprobacion = (f) => {
     return ` <span class="chip liberado" title="${esc(
         `Liberado desde '${f.liberado.por || "otra máquina"}': se puede llenar con lo aprobado, pero sigue con ${textoSinAprobar(f)}. Esas líneas no entran al documento.`)}">liberado · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
   // Ya pasó la hora de cierre de aprobación y sigue con líneas vacías: se
-  // puede llenar (nadie las va a aprobar ya), con el aviso a la vista.
+  // puede llenar (nadie las va a aprobar ya), con el aviso a la vista. El
+  // rótulo no nombra el cierre (2026-10-26, pedido del usuario): con cero
+  // aprobadas o con algunas es lo mismo, manda lo que diga AgroMovil.
   if (f.aprobacion_vencida)
     return ` <span class="chip aprobacion-vencida" title="${esc(
-        `${textoSinAprobar(f)}. Ya pasó la hora de cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}): se puede llenar con lo aprobado; esas líneas no entran al documento.`)}">pasó el cierre · ${(f.sin_aprobar || []).length} sin aprobar</span>`;
+        `${textoSinAprobar(f)}. Se puede llenar con lo aprobado; esas líneas no entran al documento.`)}">${(f.sin_aprobar || []).length} sin aprobar</span>`;
   return "";
 };
+// Devuelve "" si se liberó, o el error (el popup de avisos lo pinta en su
+// tarjeta; la fila de la lista no lo usa).
 async function liberarPedido(pedido_id, cuantas) {
   const listo = avisarTrabajando("Liberando el pedido…");
   try {
@@ -11496,8 +11556,10 @@ async function liberarPedido(pedido_id, cuantas) {
     await cargar();
     listo();
     mensaje(`Pedido ${pedido_id} liberado: se puede llenar aunque le falten ${cuantas} por aprobar.`, "info");
+    return "";
   } catch (e) {
     mensaje("No se pudo liberar el pedido: " + e.message, "error");
+    return e.message || "error";
   }
 }
 
@@ -11980,6 +12042,7 @@ function abrirDetalleCargando(pedidoId, parte) {
 
 function cerrarDetalle() {
   if (confirmSalidaCerrar) confirmSalidaCerrar();   // limpia una pregunta de salida colgada
+  cerrarAvisosDetalle();
   const seTocoAlgo = detalleTocado;
   $("detalle-overlay").classList.remove("visible");
   $("detalle-overlay").classList.remove("sobre-previo");
@@ -12408,6 +12471,7 @@ function pintarVentanaDetalle(clave) {
   $("detalle-cuerpo").innerHTML = contenidoDetalle(clave);
   $("detalle-totales").innerHTML = totalesDetalle(clave);
   pintarBotonDetalle();
+  pintarAvisosPopup();
 }
 
 // El pie entero: el botón de llenar y las salidas, que cambian según se haya
@@ -12534,11 +12598,12 @@ function cabeceraDetalle(clave) {
 // (2026-10-16, pedido del usuario): venía del llenado en fila y aquí no se usa.
 function fijoDetalle(clave) {
   const cabecera = cabeceraDetalle(clave);
-  // La reapertura en vuelo cuenta como llenable: la revisión (cajitas y
-  // avisos) sale de una, aunque las líneas sigan siendo la foto del documento.
-  const llenable = llenadoDirecto(filaDeLista(...partesDeClave(clave)))
-    || detalleReabriendo === clave;
-  if (!llenable) return cabecera;
+  if (!llenableDetalle(clave)) {
+    // En aprobación no se llena: sin la barra, la ventana no decía por qué
+    // (2026-10-26).
+    const barra = htmlAvisosDetalle(clave);
+    return barra ? cabecera + `<div id="detalle-avisos">${barra}</div>` : cabecera;
+  }
   const cajitas = [cajitaFecha(), cajitaTasa(), cajitaSerie(),
                    cajitaEmpresa()].join("");
   return cabecera
@@ -16463,6 +16528,9 @@ function faltaDecidirLaFecha(donde) {
 function pedirMotivoFechaDesfase(donde) {
   const d = desfaseDeFechas(facturasDeLaVentana(donde));
   if (!d) return;
+  // Desde el popup de avisos: elegido el motivo se vuelve directo a la ventana
+  // del pedido, con Llenar ya suelto.
+  if (donde === "detalle") cerrarAvisosDetalle();
   abrirMotivo("fecha_desfasada", "", [], {
     donde, firma: d.firma,
     aviso: `La Fecha a facturar se mantiene en ${fechaCorta(d.isoFacturar)}. `
@@ -16556,35 +16624,6 @@ const lineasDespachoDifiere = (d) =>
 // números, en el morado de ese chip (2026-08-09, pedido del usuario). A
 // diferencia del desfase de fecha NO pide intervención ninguna para llenar: la
 // factura sale igual, esto solo avisa.
-// Prellenado de un pedido con líneas sin aprobar (2026-10-21): a esta ventana
-// solo llega quien puede llenarlo igual (un editor, o cualquiera si ya se
-// liberó), y tiene que saber qué se queda fuera del documento antes de dar
-// Llenar.
-// Una sola frase (2026-10-26, pedido del usuario): los nombres iban dos veces
-// (en el texto y en una lista debajo) y no quedaba claro qué se factura. Dice
-// dónde falta la aprobación —no es un cero ni una línea perdida— y con cuántas
-// líneas sale el documento.
-function avisoEnAprobacion(fila) {
-  const sin = (fila || {}).sin_aprobar || [];
-  if (!sin.length) return "";
-  const cuantas = sin.length === 1 ? "1 línea" : `${sin.length} líneas`;
-  const hecho = fila.liberado
-    ? `Liberado desde '${fila.liberado.por || "otra máquina"}' con ${cuantas} de paquetes sin aprobar en AgroMovil`
-    : fila.aprobacion_vencida
-      ? `Pasó el cierre de aprobación (${ultimaLista.hora_cierre_aprobacion || ""}) y AgroMovil sigue sin aprobar ${cuantas} de paquetes`
-      : `En aprobación: AgroMovil todavía no aprueba ${cuantas} de paquetes`;
-  // Con el pedido partido en varias facturas el conteo de esta parte no es el
-  // del documento entero: ahí solo se dice que salen sin ellas.
-  const sinEsas = sin.length === 1 ? "sin esa" : `sin esas ${sin.length}`;
-  const sale = fila.total_partes > 1 ? `salen ${sinEsas}`
-    : `sale con ${fila.cantidad_lineas === 1 ? "1 línea" : `${fila.cantidad_lineas} líneas`} y ${sinEsas}`;
-  return `<div class="pap-ojo pap-ojo-alerta"><div class="pap-ojo-tri-col">${
-      TRIANGULO_ALERTA}</div><div class="pap-ojo-detalle">${esc(hecho)}: ${esc(sin.join(", "))}.
-    Si se llena ahora, ${fila.total_partes > 1 ? "los documentos" : "el documento"} ${esc(sale)}; ${
-      sin.length === 1 ? "si la aprueban después, no se agrega sola"
-                       : "si las aprueban después, no se agregan solas"}.</div></div>`;
-}
-
 function avisoDespachoDifiere(clave) {
   const d = detalleDatos[clave];
   const lineas = lineasDespachoDifiere(d);
@@ -16629,25 +16668,192 @@ function pintarPrevioAvisos() {
     + avisoFamiliaEstirada();
 }
 
-// Avisos de la ventana de una factura: los mismos de la puesta a punto más el
-// de su fecha, que necesita la fila (la cola del lote la trae por su cuenta).
-function htmlAvisosDetalle(clave) {
-  const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
-  const alertas = avisoFechaDelPedido(fila ? [fila] : [], "detalle")
-       + avisoEnAprobacion(fila)
-       // De último: los de arriba hay que resolverlos para llenar, este no.
-       + avisoDespachoDifiere(clave);
-  return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
-       + botonesSerieRapidos(false)
-       + (alertas ? `<div class="avisos-dos-col">${alertas}</div>` : "");
+// La reapertura en vuelo cuenta como llenable: la revisión (cajitas y avisos)
+// sale de una, aunque las líneas sigan siendo la foto del documento.
+const llenableDetalle = (clave) => !!clave
+  && (!!llenadoDirecto(filaDeLista(...partesDeClave(clave)))
+      || detalleReabriendo === clave);
+
+// La fecha del pedido en tres renglones (2026-10-26, pedido del usuario: "más
+// visual, menos texto"): de qué día es, cuál le toca y cuál está puesta. El
+// texto largo sigue en la revisión del lote (avisoFechaDelPedido).
+function tarjetaFechaDetalle(fila) {
+  const desfase = desfaseDeFechas([fila]);
+  if (!desfase) return "";
+  const pedido = desfase.fechas[0];
+  const aFacturar = fechasAFacturarDePedido(pedido);
+  const leToca = aFacturar.length > 1
+    ? `${fechaCorta(aFacturar[0])} – ${fechaCorta(aFacturar[aFacturar.length - 1])}`
+    : aFacturar.length ? fechaCorta(aFacturar[0]) : "";
+  const sinDecidir = desfase.firma !== fechaDesfaseOk.detalle;
+  const accion = sinDecidir
+    ? `<button onclick="pedirMotivoFechaDesfase('detalle')">Indicar motivo</button>`
+    : `<span class="av-ok" title="${esc(motivoFechaDesfase.detalle || "")}">Motivo indicado</span>`;
+  const sinPoner = saltandoPuestaAPunto("fecha")
+    ? `<div>Sale con la fecha del programa de facturación</div>` : "";
+  return `<div class="av-tarjeta${sinDecidir ? " av-bloquea" : ""}">`
+    + `<div class="av-titulo"><span class="ba-tri">${TRIANGULO_ALERTA}</span>Fecha</div>`
+    + `<dl class="av-datos"><dt>Pedido</dt><dd>${esc(fechaCorta(pedido))}</dd>`
+    + (leToca ? `<dt>Le toca</dt><dd>${esc(leToca)}</dd>` : "")
+    + `<dt>A facturar</dt><dd class="av-mal">${esc(fechaCorta(desfase.isoFacturar))}</dd></dl>`
+    + `${sinPoner}<div class="av-acciones">${accion}</div></div>`;
 }
 
-// El div de avisos del detalle existe solo con la factura llenable (lo crea
-// fijoDetalle): tecleando la tasa se refresca aparte para no repintar las
-// cajitas y perder el foco.
+// Mismo caso en que la lista ofrece Liberar (accionesDeFila): la fila es de
+// esta máquina y sigue por llenar. Una parte ya cerrada o tomada por otra
+// máquina no se libera desde aquí.
+const enAprobacionAqui = (f) => !!f && !!f.en_aprobacion && !f.remota
+  && (f.estado === "pendiente" || f.estado === "error_llenado");
+
+// Cuándo se suelta solo: a la hora de cierre del día en que entró el pedido, o
+// del siguiente si entró a esa hora o después (misma cuenta que
+// clasificacion.ventana_de_aprobacion_abierta, con la hora de pared tal cual).
+function sueltaDeAprobacion(fila) {
+  const hora = ultimaLista.hora_cierre_aprobacion || "";
+  const entrada = String(fila.fecha_orden_salida || "");
+  const dia = calDesdeISO(entrada.slice(0, 10));
+  if (!hora || !dia) return "";
+  if (entrada.slice(11, 16) >= hora) dia.setDate(dia.getDate() + 1);
+  return `${fechaCorta(calISO(dia))}, ${hora}`;
+}
+
+// Las líneas de paquetes que AgroMovil no ha aprobado (2026-10-21): el número
+// grande, con cuántas sale el documento y los nombres plegados. En aprobación
+// no se llena, y el editor lo libera desde aquí mismo.
+function tarjetaAprobacion(fila) {
+  const sin = (fila || {}).sin_aprobar || [];
+  if (!sin.length) return "";
+  const una = sin.length === 1;
+  const lineas = (n) => n === 1 ? "1 línea" : `${n} líneas`;
+  const sale = fila.total_partes > 1 ? `Sale sin ${una ? "ella" : "ellas"}`
+    : `Sale con ${lineas(fila.cantidad_lineas)}`;
+  const despues = una ? "no se agrega después" : "no se agregan después";
+  const puedeLiberar = enAprobacionAqui(fila) && tienePermiso("liberar_pedido");
+  const suelta = fila.en_aprobacion ? sueltaDeAprobacion(fila) : "";
+  const estado = fila.en_aprobacion
+    ? `No se llena hasta que ${una ? "la" : "las"} aprueben${
+        puedeLiberar ? "" : " o un editor lo libere"}`
+      + (suelta ? `<br>Se suelta sola: ${esc(suelta)}` : "")
+    : fila.liberado ? `Liberado · ${esc(sale.toLowerCase())}; ${despues}`
+    : `${esc(sale)}; ${despues}`;
+  const liberar = puedeLiberar
+    ? `<div class="av-acciones"><button onclick="liberarDesdeAvisos(this)" title="${esc(
+        `Deja llenar este pedido en cualquier computadora aunque le falten ${lineas(sin.length)} por aprobar. Las líneas sin aprobar no entran al documento.`)}">Liberar</button></div>`
+    : "";
+  return `<div class="av-tarjeta${fila.en_aprobacion ? " av-bloquea" : ""}">`
+    + `<div class="av-titulo"><span class="ba-tri">${TRIANGULO_ALERTA}</span>AgroMovil</div>`
+    + `<div class="av-cifra"><b>${sin.length}</b> sin aprobar</div><div>${estado}</div>`
+    + `<details class="av-lista"><summary>Ver cuáles</summary><ul class="pap-ojo-lineas">${
+        sin.map(n => `<li>${esc(n)}</li>`).join("")}</ul></details>${liberar}</div>`;
+}
+
+// Los avisos de la ventana de una factura, cada uno con su chip para la barra
+// y su tarjeta para el popup. En un pedido EN APROBACIÓN (no llenable) solo
+// aplica el de aprobación: es lo que dice por qué no se llena. Sin la fila en
+// la lista (una reapertura en vuelo) sigue el de despacho, que sale del detalle.
+function avisosDeLaVentana(clave) {
+  if (!clave) return [];
+  const fila = filaDeLista(...partesDeClave(clave));
+  const sin = ((fila || {}).sin_aprobar || []).length;
+  const aprobacion = sin ? {
+    chip: fila.en_aprobacion ? `En aprobación · ${sin}` : `${sin} sin aprobar`,
+    clase: fila.en_aprobacion ? "bloquea" : "",
+    html: tarjetaAprobacion(fila)} : null;
+  if (!llenableDetalle(clave)) return enAprobacionAqui(fila) && aprobacion ? [aprobacion] : [];
+  const avisos = [];
+  if (fila && desfaseDeFechas([fila])) {
+    const falta = faltaDecidirLaFecha("detalle");
+    avisos.push({chip: falta ? "Fecha · falta motivo" : "Fecha",
+                 clase: falta ? "bloquea" : "", html: tarjetaFechaDetalle(fila)});
+  }
+  if (aprobacion) avisos.push(aprobacion);
+  const despacho = lineasDespachoDifiere(detalleDatos[clave]).length;
+  if (despacho) avisos.push({chip: `Despacho · ${despacho}`, clase: "morado",
+                             html: avisoDespachoDifiere(clave)});
+  return avisos;
+}
+
+// Avisos de la ventana de una factura: los de la puesta a punto (serie y tasa,
+// que se resuelven en las cajitas de arriba) y la barra con el resto.
+function htmlAvisosDetalle(clave) {
+  const avisos = avisosDeLaVentana(clave);
+  const barra = avisos.length
+    ? `<button type="button" class="barra-avisos" onclick="abrirAvisosDetalle()">`
+      + `<span class="ba-tri">${TRIANGULO_ALERTA}</span><b>Avisos</b>`
+      + avisos.map(a => `<span class="ba-chip ${a.clase}">${esc(a.chip)}</span>`).join("")
+      + `<span class="ba-ver">Ver</span></button>`
+    : "";
+  if (!llenableDetalle(clave)) return barra;
+  return htmlAvisosPuestaAPunto(avisosPuestaAPunto(1))
+       + botonesSerieRapidos(false)
+       + barra;
+}
+
+let avisosDetalleAbiertos = false;
+let avisosAbiertosEn = 0;
+
+function pintarAvisosPopup() {
+  if (!avisosDetalleAbiertos) return;
+  const avisos = avisosDeLaVentana(detalleAbierto);
+  if (!avisos.length) { cerrarAvisosDetalle(); return; }
+  $("avisos-titulo").textContent = `Avisos · Pedido ${partesDeClave(detalleAbierto)[0]}`;
+  $("avisos-cuerpo").innerHTML = avisos.map(a => a.html).join("");
+}
+
+function abrirAvisosDetalle() {
+  if (!detalleAbierto) return;
+  avisosDetalleAbiertos = true;
+  avisosAbiertosEn = Date.now();
+  pintarAvisosPopup();
+  if (avisosDetalleAbiertos) $("avisos-overlay").classList.add("visible");
+}
+
+function cerrarAvisosDetalle() {
+  avisosDetalleAbiertos = false;
+  $("avisos-overlay").classList.remove("visible");
+}
+
+// El popup es más angosto que la barra que lo abre: el segundo clic de un
+// doble clic cae en el fondo y lo cerraba al instante.
+function cerrarAvisosDesdeFondo(ev) {
+  if (ev.target === ev.currentTarget && Date.now() - avisosAbiertosEn > 400)
+    cerrarAvisosDetalle();
+}
+
+// Liberar desde el popup: mientras viaja el botón lo dice, y un fallo se lee
+// en la tarjeta (el mensaje de la barra de estado queda debajo de la
+// ventana). La lista se recarga sola, pero la ventana del pedido no se repinta
+// con ella: sin repintar seguiría sin cajitas ni Llenar.
+async function liberarDesdeAvisos(boton) {
+  const clave = detalleAbierto;
+  const fila = clave ? filaDeLista(...partesDeClave(clave)) : null;
+  if (!fila) return;
+  const n = (fila.sin_aprobar || []).length;
+  if (boton) { boton.disabled = true; boton.textContent = "Liberando…"; }
+  const error = await liberarPedido(fila.pedido_id, n === 1 ? "1 línea" : `${n} líneas`);
+  if (error) {
+    if (boton) {
+      boton.disabled = false;
+      boton.textContent = "Liberar";
+      boton.insertAdjacentHTML("afterend",
+        `<span class="av-error">No se pudo liberar: ${esc(error)}</span>`);
+    }
+    return;
+  }
+  // Otra carga de la lista pudo ganarle a la de liberar: sin la marca nueva la
+  // ventana seguiría diciendo "en aprobación".
+  if ((filaDeLista(...partesDeClave(clave)) || {}).en_aprobacion) await cargar();
+  cerrarAvisosDetalle();
+  if (detalleAbierto === clave) pintarVentanaDetalle(clave);
+}
+
+// El div de avisos del detalle existe con la factura llenable y con la que
+// está en aprobación (lo crea fijoDetalle): tecleando la tasa se refresca
+// aparte para no repintar las cajitas y perder el foco.
 function pintarDetalleAvisos() {
   const div = $("detalle-avisos");
   if (div) div.innerHTML = htmlAvisosDetalle(detalleAbierto);
+  pintarAvisosPopup();
 }
 
 // El pedido dividido que el corte partía por la mitad (2026-07-31, pedido del
