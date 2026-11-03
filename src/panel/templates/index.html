@@ -2871,7 +2871,11 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
        porque hacia atrás un hueco del registro no se distingue de un feriado
        y la tasa del día anterior no es la de esa factura. La tasa VIAJA CON CADA LLENADO solo si ya se tiene la
        del día (tasaParaLlenar): entorno.py la registra en Archivos→Tasas de
-       Cambio dentro de la puesta a punto de fecha/serie (2026-07-21). La
+       Cambio dentro de la puesta a punto de fecha/serie (2026-07-21). Sin la
+       del día SÍ se llena (2026-11-04, pedido del usuario: la tasa también se
+       actualiza por otro lado): no viaja ninguna, la factura sale con la que
+       tenga el programa de facturación y el aviso lo dice; el operador puede
+       escribirla si la sabe. La
        SERIE también viaja siempre y es obligatoria: se elige en
        'Seleccionar Serie TD' al abrir la Ficha y se verifica en su título. -->
   <div class="rutas-barra" id="rutas-barra">
@@ -4442,7 +4446,9 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
              oninput="sincronizarBotonTasa()" onkeydown="if(event.key==='Enter')llenarConTasaDelAviso()">
     </label>
     <div class="editor-acciones">
-      <button class="primario" id="tasa-usar" onclick="llenarConTasaDelAviso()">Llenar con esta tasa</button>
+      <button class="primario" id="tasa-sin-tocar" onclick="llenarSinTocarTasa()"
+              title="No viaja ninguna tasa: la factura sale con la que tenga el programa de facturación.">Llenar sin tocar la tasa</button>
+      <button id="tasa-usar" onclick="llenarConTasaDelAviso()">Llenar con esta tasa</button>
       <button id="tasa-despacho" onclick="llenarParaDespachoDesdeAviso()"></button>
       <button data-preseleccionado onclick="pararPorTasa()">Parar</button>
     </div>
@@ -6469,23 +6475,22 @@ function tasaOficialAplica(fechaFacturar) {
 // el aviso. Se llama tras cada consulta al BCV y al cambiar el día a
 // facturar. Una tasa escrita a mano nunca se pisa (guarda de tasaAutoBCV).
 //
-// Sin tasa correspondiente se cae a la de portada, PERO nunca a una con fecha
-// valor POSTERIOR al día a facturar (regla del usuario 2026-07-22: una
-// factura no puede llevar la tasa de un día futuro), ni a una anterior cuando
-// el día ya pasó y su tasa no está registrada (faltaTasaDeDiaPasado). En esos
-// casos el campo queda VACÍO — si traía la auto-llenada de otro día se borra,
-// para que no se cuele una tasa ajena — y la alerta chillona de
-// pintarAvisoBCV pide escribirla. Una tasa escrita a mano no se toca nunca.
+// Solo se pre-llena la tasa QUE LE TOCA al día a facturar (2026-11-04, pedido
+// del usuario: si falta la del día no se toca la que tenga el programa de
+// facturación). Antes, con la del día pendiente, el campo mostraba la del
+// día anterior aunque no viajara — se veía una tasa que no iba a ninguna
+// parte. Sin la que corresponde (pendiente, día pasado sin registro, hueco
+// del registro, portada de un día posterior) el campo queda VACÍO — si traía
+// la auto-llenada de otro día se borra, para que no se cuele una tasa
+// ajena — y el aviso de pintarAvisoBCV dice con cuál sale la factura. Una
+// tasa escrita a mano no se toca nunca.
 function aplicarTasaBCV() {
   const fechaFacturar = $("f-fecha-facturar").value;
   const campo = $("f-tasa");
   const eleccion = tasaCorrespondiente(fechaFacturar);
-  const portadaEsFutura = ultimoBCV && ultimoBCV.fecha_valor && fechaFacturar
-                       && ultimoBCV.fecha_valor > fechaFacturar;
-  const valor = faltaTasaDeDiaPasado(fechaFacturar)
-              ? null
-              : (eleccion ? eleccion.tasa
-                          : (!portadaEsFutura && ultimoBCV && ultimoBCV.tasa));
+  const valor = (eleccion && !faltaTasaDeDiaPasado(fechaFacturar)
+                 && !tasaPendiente(fechaFacturar, eleccion))
+              ? eleccion.tasa : null;
   if (valor) {
     if (!campo.value.trim() || campo.value.trim() === tasaAutoBCV)
       campo.value = valor;
@@ -6565,29 +6570,6 @@ function motivoTasaAusente() {
           ? ` (el BCV va en fecha valor ${dma(ultimoBCV.fecha_valor)}).` : `.`);
 }
 
-// La tasa que el aviso propone cuando no se tiene la del día a facturar
-// (pedido del usuario 2026-07-22): la última conocida que NO sea posterior a
-// ese día — normalmente la del día anterior. Se propone, no se impone: el
-// aviso la muestra escrita y el operador la corrige o la cambia.
-// Motivo del cambio de criterio: no registrar ninguna deja el documento con
-// el Cambio que Winledger tenga, que puede ser 0 o el de otro día, y el
-// operador apurado no tiene por qué saber dónde se corrige eso en Winledger.
-// Nunca una de fecha valor POSTERIOR al día a facturar (regla 2026-07-22).
-function tasaSugeridaParaAviso(fechaFacturar) {
-  const eleccion = tasaCorrespondiente(fechaFacturar);
-  if (eleccion) return eleccion;
-  // Sin ninguna que "corresponda" (hueco mayor a MAX_DIAS_HUECO_TASA, o
-  // registro corto): la más nueva anterior al día, aunque quede lejos — con
-  // el hueco a la vista en el aviso, decidir es del operador.
-  let mejor = null;   // fechas ISO: comparar como texto ordena bien
-  for (const t of tasasConocidas())
-    if ((!fechaFacturar || t.fecha_valor <= fechaFacturar)
-        && (!mejor || t.fecha_valor > mejor.fecha_valor))
-      mejor = t;
-  return mejor ? {tasa: mejor.tasa, fecha_valor: mejor.fecha_valor,
-                  origen: "registro"} : null;
-}
-
 // Pinta el aviso del campo Tasa según el estado actual. Tres niveles:
 //   - discreto ("BCV dd/mm/aaaa") cuando la tasa mostrada ES la publicada
 //     para el día a facturar, o la última que le corresponde;
@@ -6630,10 +6612,11 @@ function pintarAvisoBCV() {
   // ese día. El campo quedó vacío (aplicarTasaBCV) y esta alerta pide la real.
   if (faltaTasaDeDiaPasado(fechaFacturar)) {
     aviso.classList.add("bcv-alerta");
-    aviso.textContent = `⚠ sin la tasa del ${ed}/${em} — escríbela`;
+    aviso.textContent = `⚠ sin la tasa del ${ed}/${em}`;
     aviso.title = `Falta la tasa del ${ed}/${em}/${ey} y ese día ya pasó. `
-      + `El campo quedó vacío a propósito: escríbela a mano — la tasa de `
-      + `otro día no puede ir en esta factura.`;
+      + `El campo quedó vacío a propósito: la tasa de otro día no puede ir en `
+      + `esta factura. Si la sabes, escríbela; si no, la factura sale con la `
+      + `que tenga el programa de facturación, que no se toca.`;
     return;
   }
 
@@ -6645,24 +6628,29 @@ function pintarAvisoBCV() {
     // sábado, domingo o feriado — incluido el que se detecta porque el BCV ya
     // lo saltó), o una anterior? Una anterior es que la que toca todavía no
     // ha salido — eso se avisa, porque va a cambiar sola.
+    // Con la tasa del día en mano, que la consulta al BCV esté fallando es un
+    // asunto técnico: va al administrador (incidencias), no a este aviso.
     const pendiente = tasaPendiente(fechaFacturar, eleccion);
     aviso.textContent = pendiente
-      ? `falta la del ${ed}/${em} — va la del ${d}/${m}`
-      : `BCV ${fechaVal}` + (ultimoBCV.error ? " ⚠" : "");
+      ? `sin la del ${ed}/${em} — va la del programa`
+      : `BCV ${fechaVal}`;
     if (pendiente) aviso.classList.add("bcv-pendiente");
-    aviso.title = (pendiente
-      ? `El BCV todavía no publica la tasa del ${ed}/${em}: se usa la última conocida `
-        + `y se actualiza sola en cuanto salga.`
-      : `Tasa oficial del BCV para este día.`)
-      + (ultimoBCV.error ? ` Aviso: ${ultimoBCV.error}` : "");
+    aviso.title = pendiente
+      ? `El BCV todavía no publica la tasa del ${ed}/${em} (la última conocida es `
+        + `la del ${fechaVal}). Se puede llenar igual: la factura sale con la tasa `
+        + `que tenga el programa de facturación, que no se toca. Si la sabes, `
+        + `escríbela aquí; si sale mientras tanto, se pone sola.`
+      : `Tasa oficial del BCV para este día.`;
     return;
   }
 
   // Excepción: ninguna tasa conocida corresponde al día a facturar.
   aviso.classList.add("bcv-alerta");
+  const sinTocar = `Se puede llenar igual: la factura sale con la tasa que tenga `
+    + `el programa de facturación, que no se toca. Si la sabes, escríbela aquí.`;
   if (!ultimoBCV.tasa) {   // el BCV nunca ha respondido y el registro no alcanza
-    aviso.textContent = "⚠ sin tasa BCV — escribe la tasa de hoy";
-    aviso.title = ultimoBCV.error || "El BCV no respondió.";
+    aviso.textContent = "⚠ sin tasa BCV";
+    aviso.title = `${ultimoBCV.error || "El BCV no respondió."} ${sinTocar}`;
     return;
   }
   const [y, m, d] = ultimoBCV.fecha_valor.split("-");
@@ -6672,7 +6660,7 @@ function pintarAvisoBCV() {
   // factura (regla del usuario 2026-07-22).
   const futura = fechaFacturar && ultimoBCV.fecha_valor > fechaFacturar;
   const motivoDia = motivoSinTasa(fechaFacturar);
-  aviso.textContent = `⚠ sin la tasa del ${ed}/${em} — escríbela`;
+  aviso.textContent = `⚠ sin la tasa del ${ed}/${em}`;
   aviso.title =
     (motivoDia
        ? `El ${ad}/${am}/${ay} es ${motivoDia.nombre}: le corresponde la tasa `
@@ -6682,8 +6670,7 @@ function pintarAvisoBCV() {
        ? `La única conocida (fecha valor ${fechaVal}) es de un día posterior y `
          + `no puede ir en esta factura. `
        : "")
-    + `El campo quedó vacío a propósito: escríbela a mano.`
-    + (ultimoBCV.error ? ` Además: ${ultimoBCV.error}` : "");
+    + sinTocar;
 }
 
 // Si el usuario borra la tasa por completo y sale del campo, se vuelve a
@@ -7661,6 +7648,7 @@ const SUP_PROBLEMAS = {
   atraso_cursor: "atrasada",
   modo_prueba: "modo prueba",
   banderas: "banderas de prueba",
+  incidencia: "error técnico",
 };
 
 const SUP_RESULTADOS = {
@@ -8453,6 +8441,13 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
           equipo.modo_admin ? `<div class="sup-dato">Modo admin</div>` : ""}${
           banderasEq.length ? `<div class="sup-dato">Banderas del .env: ${
             esc(banderasEq.join(", "))}</div>` : ""}</div>` : "";
+    // Errores técnicos que el equipo reporta de sí mismo (2026-11-04): el
+    // detalle completo se lee aquí, el operador solo vio el mensaje llano.
+    const incidenciasEq = (equipo.incidencias || []).filter(i => i && typeof i === "object");
+    const incidencias = incidenciasEq.length
+      ? `<div class="sup-detalle-seccion"><h4>Errores técnicos</h4>${
+          incidenciasEq.map(i => `<div class="sup-dato">${esc(i.texto || "")} <span class="mut">(desde ${
+            esc(supFechaCorta(i.desde))}${(i.veces || 1) > 1 ? `, ${esc(String(i.veces))} veces` : ""})</span></div>`).join("")}</div>` : "";
     const recientes = Array.isArray(d.tickets) && d.tickets.length
       ? `<div class="sup-detalle-seccion"><h4>Tickets recientes de este equipo</h4>${
           d.tickets.map(t => `<div class="sup-dato"><b>${esc(t.id || "—")}</b> · ${
@@ -8498,6 +8493,7 @@ async function abrirDetalleEquipoSupervision(dispositivo) {
         <div class="sup-dato"><span>Choques:</span>${esc(supNumero(equipo.conflictos))}</div>
       </div>
       ${modos}
+      ${incidencias}
       <div class="sup-detalle-seccion"><h4>Log del equipo</h4>
         <div id="sup-log-estado" class="mut"><span class="spinner"></span> Consultando…</div>
         <div style="margin:6px 0">
@@ -12537,11 +12533,10 @@ function pintarBotonLlenarDetalle() {
     boton.toggleAttribute("data-preseleccionado", true);
     // Mismo candado que el lote para el desfase de fecha del pedido (2026-08-05).
     const faltaFecha = faltaDecidirLaFecha("detalle");
-    boton.disabled = listaDeAntes() || sinTasaParaLlenar() || faltaFecha;
+    boton.disabled = listaDeAntes() || faltaFecha;
     // Llegando desde la revisión del lote, llenar ESTA deja el lote sin arrancar
     // (llenarDesdeDetalle): el botón lo dice antes de pulsarlo.
     boton.textContent = listaDeAntes() ? "Esperando la lista de hoy…"
-      : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
       : faltaFecha ? "Decide la fecha para llenar"
       : (previoResolver && etiqueta === "Llenar") ? "Llenar esta factura sola"
       : etiqueta;
@@ -13931,19 +13926,18 @@ function abrirAvisoTasa(motivo, llenado) {
     ? `Todavía no hay tasa para el ${fecha.split("-").reverse().join("/")}`
     : "Todavía no hay tasa para el día a facturar";
   $("tasa-motivo").textContent = motivo;
-  // La tasa es obligatoria (2026-07-31, regla del usuario): sin ella no se
-  // llena. El aviso trae el campo con la última conocida ya escrita, así que
-  // pedir que se confirme o se corrija ahí mismo no es mandar a hacer trabajo
-  // afuera — es la única acción que falta, y está a un teclazo.
+  // Sin la tasa del día SÍ se llena (2026-11-04, pedido del usuario: la tasa
+  // también se actualiza por otro lado). El aviso dice el hecho y la
+  // consecuencia, y trae las dos salidas: seguir sin tocar la tasa (no viaja
+  // ninguna) o escribirla, si el operador la sabe. Entre el 2026-07-31 y hoy
+  // la tasa fue obligatoria y el campo llegaba con la última conocida ya
+  // escrita; ahora llega VACÍO a propósito: proponer la de otro día es
+  // proponer que se registre una tasa que no es la de esta factura.
   $("tasa-consecuencia").textContent =
-    "Escríbela aquí para llenar: sin una tasa registrada la factura saldría con el Cambio "
-    + "que Winledger tenga en ese momento, que puede ser 0 o el de otro día.";
-
-  // El campo llega con la última tasa conocida ya escrita: el camino corto es
-  // el correcto, y corregirla es escribir encima.
-  const sugerida = tasaSugeridaParaAviso(fecha);
-  $("tasa-editable").value = sugerida ? sugerida.tasa : "";
-  tasaDelAvisoAlAbrir = $("tasa-editable").value;
+    "Se puede llenar igual: la factura sale con la tasa que ya tenga el programa "
+    + "de facturación, que no se toca. Si la sabes, escríbela aquí y viaja con la factura.";
+  $("tasa-editable").value = "";
+  tasaDelAvisoAlAbrir = "";
   sincronizarBotonTasa();
 
   // "Llenar para el despacho": la salida al día que factura esta máquina
@@ -13963,8 +13957,24 @@ function abrirAvisoTasa(motivo, llenado) {
 
   $("tasa-overlay").classList.add("visible");
   crecerVentanaPorModal("tasa-caja");
-  // Listo para teclear la tasa sin buscar el campo con el ratón.
-  setTimeout(() => { $("tasa-editable").focus(); $("tasa-editable").select(); }, 30);
+  // El camino normal es seguir sin tocar la tasa: el foco va a ese botón;
+  // quien la sepa hace clic en el campo y la escribe.
+  setTimeout(() => $("tasa-sin-tocar").focus(), 30);
+}
+
+// "Llenar sin tocar la tasa" (vuelve el 2026-11-04; se había retirado el
+// 2026-07-31): no viaja ninguna tasa, entorno.py no abre Tasas de Cambio y la
+// factura sale con el Cambio que tenga el programa de facturación. La
+// decisión vale para TODO lo que se llene con esta misma Fecha a facturar
+// (sinTocarTasaAceptadaPara): en una fila o un lote no se pregunta por cada
+// factura. Cambiar la fecha la descarta, y si la tasa del día aparece mientras
+// tanto, viaja sola (motivoTasaAusente ya no tiene nada que avisar).
+let sinTocarTasaAceptadaPara = null;
+function llenarSinTocarTasa() {
+  const l = llenadoEsperandoTasa;
+  sinTocarTasaAceptadaPara = $("f-fecha-facturar").value;
+  cerrarAvisoTasa();
+  if (l) llenar(l.pedido_id, l.parte, l.autorizarCancelar, true);
 }
 
 // "Llenar con esta tasa" queda apagado mientras el campo esté vacío: sin
@@ -14031,11 +14041,6 @@ function llenarParaDespachoDesdeAviso() {
   cambioFechaFacturar();
   if (l) llenar(l.pedido_id, l.parte, l.autorizarCancelar);
 }
-
-// Retirado el 2026-07-31 (regla del usuario): "Llenar sin tocar la tasa" era la
-// salida para llenar sin registrar ninguna, y ahora sin tasa no se llena. Quien
-// ya la puso a mano en Winledger la escribe también aquí: registrar la misma
-// dos veces no cambia el documento.
 
 // "Parar": no se manda ni una tecla a Winledger. Si venía de "Llenar en
 // fila", la secuencia se detiene también — nadie quedó llenando.
@@ -14104,7 +14109,10 @@ async function llenar(pedido_id, parte, autorizarCancelar = false,
   // contra un día cuya tasa el BCV aún no publicó, salía en cada llenado, y
   // saltando la tasa no viaja ninguna — justo lo que motivoTasaAusente estaba
   // por advertir.
-  if (!tasaConfirmada && !saltandoTasa()) {
+  // Ya se eligió seguir sin tocar la tasa para esta misma fecha
+  // (llenarSinTocarTasa): no se vuelve a preguntar por cada factura.
+  if (!tasaConfirmada && !saltandoTasa()
+      && sinTocarTasaAceptadaPara !== $("f-fecha-facturar").value) {
     const motivo = motivoTasaAusente();
     if (motivo) {
       abrirAvisoTasa(motivo, {pedido_id, parte, autorizarCancelar});
@@ -15832,11 +15840,11 @@ async function pedirDescuentosDelLote(cola) {
   if (previoResolver) pintarPrevioLote();
 }
 
-// Falta la tasa que va a registrarse en el documento (2026-07-31, regla del
-// usuario): sin ella no se llena — ni el lote ni una factura suelta desde su
-// prellenado. En modo prueba con la puesta a punto saltada no aplica: ahí la
-// tasa no se toca a propósito.
-const sinTasaParaLlenar = () => !saltandoTasa() && !tasaParaLlenar();
+// Sin la tasa del día SÍ se llena (2026-11-04, pedido del usuario; deroga la
+// regla del 2026-07-31 que apagaba el botón): la tasa también se actualiza
+// por otro lado, así que faltar aquí no detiene la facturación. El aviso de
+// la tasa (abrirAvisoTasa) lo dice antes de tocar el programa, y no viaja
+// ninguna: la factura sale con la que tenga el programa de facturación.
 
 // Sin serie no se llena (regla 2026-07-30 del backend): el lote de UNA ruta la
 // exige aquí, antes de arrancar. En la corrida por bloques (sin ruta elegida)
@@ -15860,14 +15868,13 @@ function pintarBotonPrevio() {
   // (2026-08-05): o se mueve la fecha, o se confirma la que está puesta.
   const faltaFecha = faltaDecidirLaFecha("previo");
   btn.disabled = listaDeAntes() || previoCargando || !previoCola.length
-    || sinTasaParaLlenar() || faltaSerieParaElLote() || !!previoQuitando || faltaFecha;
+    || faltaSerieParaElLote() || !!previoQuitando || faltaFecha;
   // Con una sola unidad el botón dice "Llenar siguiente" (2026-07-31, pedido del
   // usuario): "Llenar 1 factura" contaba algo que no hace falta contar.
   btn.textContent = listaDeAntes() ? "Esperando la lista de hoy…"
     : previoCargando ? "Rehaciendo la fila…"
     : previoQuitando ? "Decide qué pasa con la fila"
     : !previoCola.length ? "No hay nada que llenar"
-    : sinTasaParaLlenar() ? "Escribe la tasa para llenar"
     : faltaSerieParaElLote() ? "Elige la serie para llenar"
     : faltaFecha ? "Decide la fecha para llenar"
     : n === 1 ? "Llenar siguiente"
@@ -16380,8 +16387,9 @@ function avisosPuestaAPunto(n, porBloques = false) {
       ? "la factura" : "ninguna factura del lote"}. Elígela aquí mismo, arriba.`);
   const motivoTasa = saltandoTasa() ? null : motivoTasaAusente();
   if (motivoTasa)
-    avisos.push(`${motivoTasa} Escríbela aquí arriba, en Tasa: sin ella no se `
-      + `llena ${n === 1 ? "la factura" : "ninguna factura del lote"}.`);
+    avisos.push(`${motivoTasa} ${n === 1 ? "La factura sale" : "Las facturas salen"} `
+      + `con la tasa que tenga el programa de facturación, que no se toca. Si la `
+      + `sabes, escríbela aquí arriba, en Tasa.`);
   return avisos;
 }
 
