@@ -3575,6 +3575,7 @@ body.solo-equipos #ajustes-subtabs { display: none !important; }
         </div>
         <div class="sup-bloque">
           <h3>Equipos</h3>
+          <div id="sup-token-resumen" class="sup-estado-nota" style="display:none"></div>
           <div class="sup-tabla-scroll"><table id="sup-equipos-tabla" class="sup-tabla">
             <thead><tr>
               <th>Equipo</th><th>Estado</th>
@@ -7995,7 +7996,7 @@ function supFilaEquipo(equipo, sinDatos) {
         ? `<div class="sup-estado-nota${atrasada ? " atrasada" : ""}">${
             esc(supFechaCorta(equipo.fecha_release))}${
             atrasada ? " · atrasada" : ""}</div>`
-        : ""}</td>
+        : ""}${supNotaTokenRepo(equipo)}</td>
     <td>${sinDatos ? "—" : supNubeEquipo(equipo)}</td>
     <td>${sinDatos ? "—" : supSoporteEquipo(equipo)}</td>
     <td>${sinDatos ? "" : supProblemasEquipo(equipo)}</td>
@@ -8111,7 +8112,36 @@ function pintarAlertasSupervision(alertas) {
   ).join("");
 }
 
+// Llave del repo de distribución (2026-11-04): el repo pasa a privado y cada
+// computadora lee con su propia llave. Los Macs no cuentan: corren el código
+// fuente, no el repo de distribución.
+function supCuentaTokenRepo(equipo) {
+  return equipo.plataforma !== "darwin" && equipo.acceso === "activo"
+    && typeof equipo.token_repo === "boolean";
+}
+
+function supNotaTokenRepo(equipo) {
+  if (!supCuentaTokenRepo(equipo)) return "";
+  return equipo.token_repo
+    ? `<div class="sup-estado-nota">Repo privado: listo</div>`
+    : `<div class="sup-estado-nota atrasada" title="Le llega sola cuando corra la versión nueva y su panel esté abierto unos minutos.">Repo privado: falta la llave</div>`;
+}
+
+function pintarResumenTokenRepo() {
+  const caja = $("sup-token-resumen");
+  const cuentan = supEquipos.filter(supCuentaTokenRepo);
+  if (!cuentan.length) { caja.style.display = "none"; return; }
+  const listos = cuentan.filter(e => e.token_repo).length;
+  const faltan = cuentan.filter(e => !e.token_repo).map(e => supNombreEquipo(e, false));
+  caja.style.display = "";
+  caja.classList.toggle("atrasada", faltan.length > 0);
+  caja.textContent = faltan.length
+    ? `Repo privado: ${listos} de ${cuentan.length} computadoras activas tienen su llave. Faltan: ${faltan.join(", ")}. Todavía no se puede poner privado.`
+    : `Repo privado: las ${cuentan.length} computadoras activas tienen su llave. Ya se puede poner privado.`;
+}
+
 function pintarEquiposSupervision() {
+  pintarResumenTokenRepo();
   const filas = supEquipos.map(e => supFilaEquipo(e, false))
     .concat(supSinDatos.map(e => supFilaEquipo(e, true)));
   $("sup-equipos-tabla").querySelector("tbody").innerHTML = filas.length
